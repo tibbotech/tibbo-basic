@@ -1,0 +1,252 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Tibbo Basic",
+	"patterns": [
+		{
+			"match": "\\n",
+			"name": "meta.ending-space"
+		},
+		{
+			"include": "#round-brackets"
+		},
+		{
+			"begin": "^(?=\\t)",
+			"end": "(?=[^\\t])",
+			"name": "meta.leading-space",
+			"patterns": [
+				{
+					"captures": {
+						"1": {
+							"name": "meta.odd-tab.tabs"
+						},
+						"2": {
+							"name": "meta.even-tab.tabs"
+						}
+					},
+					"match": "(\\t)(\\t)?"
+				}
+			]
+		},
+		{
+			"begin": "^(?= )",
+			"end": "(?=[^ ])",
+			"name": "meta.leading-space",
+			"patterns": [
+				{
+					"captures": {
+						"1": {
+							"name": "meta.odd-tab.spaces"
+						},
+						"2": {
+							"name": "meta.even-tab.spaces"
+						}
+					},
+					"match": "(  )(  )?"
+				}
+			]
+		},
+		{
+			"captures": {
+				"1": {
+					"name": "storage.type.function.tibbo-basic"
+				},
+				"2": {
+					"name": "entity.name.function.tibbo-basic"
+				},
+				"3": {
+					"name": "punctuation.definition.parameters.tibbo-basic"
+				},
+				"4": {
+					"name": "variable.parameter.function.tibbo-basic"
+				},
+				"5": {
+					"name": "punctuation.definition.parameters.tibbo-basic"
+				}
+			},
+			"match": "^\\s*((?i:function|sub))\\s*([a-zA-Z_]\\w*)\\s*(\\()([^)]*)(\\)).*\\n?",
+			"name": "meta.function.tibbo-basic"
+		},
+		{
+			"begin": "(^[ \\t]+)?(?=')",
+			"beginCaptures": {
+				"1": {
+					"name": "punctuation.whitespace.comment.leading.tibbo-basic"
+				}
+			},
+			"end": "(?!\\G)",
+			"patterns": [
+				{
+					"begin": "'",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.comment.tibbo-basic"
+						}
+					},
+					"end": "\\n",
+					"name": "comment.line.apostrophe.tibbo-basic"
+				}
+			]
+		},
+		{
+			"match": "(?i:\\b(adc|beep|bt|button|fd|io|lcd|net|pat|ppp|pppoe|romfile|rtc|ser|sock|ssi|stor|sys|wln)\\b)",
+			"name": "support.class.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(If|Then|Else|ElseIf|Else If|Elif|End If|While|Wend|For|To|Each|Case|Select|End Select|Return|Continue|Do|Until|Loop|Next|With|Exit Do|Exit For|Exit Function|Exit Property|Exit Sub|IIf|EndIf|IfnDef|IfDef)\\b)",
+			"name": "keyword.control.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(Mod|And|Not|Or|Xor|as)\\b)",
+			"name": "keyword.operator.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(If|Then|Else|ElseIf|Else If|Elif|End If|While|Wend|For|To|Each|Case|Select|End Select|Return|Continue|Do|Until|Loop|Next|With|Exit Do|Exit For|Exit Function|Exit Property|Exit Sub|IIf|EndIf|IfnDef|IfDef)\\b)",
+			"name": "keyword.control.tibbo-basic"
+		},
+		{
+			"captures": {
+				"1": {
+					"name": "storage.type.tibbo-basic"
+				},
+				"2": {
+					"name": "variable.other.bfeac.tibbo-basic"
+				},
+				"3": {
+					"name": "meta.separator.comma.tibbo-basic"
+				}
+			},
+			"match": "(?i:(dim)\\s*(?:(\\b[a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?\\b)\\s*(,?)))",
+			"name": "variable.other.dim.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\s*\\b(Const|Dim|Function|Sub|Private Sub|Public Sub|End Sub|End Function|Set|Get|New|Declare|Enum|End Enum|Type|End Type)\\b\\s*)",
+			"name": "storage.type.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\s*\\b(Empty|False|Nothing|Null|True)\\b)",
+			"name": "constant.language.tibbo-basic"
+		},
+		{
+			"begin": "\"",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.begin.tibbo-basic"
+				}
+			},
+			"end": "\"",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.end.tibbo-basic"
+				}
+			},
+			"name": "string.quoted.double.tibbo-basic",
+			"patterns": [
+				{
+					"match": "\"\"",
+					"name": "constant.character.escape.apostrophe.tibbo-basic"
+				}
+			]
+		},
+		{
+			"captures": {
+				"1": {
+					"name": "punctuation.definition.variable.tibbo-basic"
+				}
+			},
+			"match": "(\\$)[a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?\\b\\s*",
+			"name": "variable.other.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(include|includepp)\\b)",
+			"name": "keyword.control.include.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(End)\\b)",
+			"name": "support.function.tibbo-basic"
+		},
+		{
+			"match": "(?i:(?<=as )(\\b[a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?\\b))",
+			"name": "support.type.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(Array|Add|Asc|Atn|CBool|CByte|CCur|CDate|CDbl|Chr|CInt|CLng|Conversions|Cos|CreateObject|CSng|CStr|Date|DateAdd|DateDiff|DatePart|DateSerial|DateValue|Day|Derived|Math|Escape|Eval|Exists|Exp|Filter|FormatCurrency|FormatDateTime|FormatNumber|FormatPercent|GetLocale|GetObject|GetRef|Hex|Hour|InputBox|InStr|InStrRev|Int|Fix|IsArray|IsDate|IsEmpty|IsNull|IsNumeric|IsObject|Item|Items|Join|Keys|LBound|LCase|Left|Len|LoadPicture|Log|LTrim|RTrim|Trim|Maths|Mid|Minute|Month|MonthName|MsgBox|Now|Oct|Remove|RemoveAll|Replace|RGB|Right|Rnd|Round|ScriptEngine|ScriptEngineBuildVersion|ScriptEngineMajorVersion|ScriptEngineMinorVersion|Second|SetLocale|Sgn|Sin|Space|Split|Sqr|StrComp|String|StrReverse|Tan|Time|Timer|TimeSerial|TimeValue|TypeName|UBound|UCase|Unescape|VarType|Weekday|WeekdayName|Year)\\b)",
+			"name": "support.function.tibbo-basic"
+		},
+		{
+			"match": "-?\\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\\.?[0-9]*)|(\\.[0-9]+))((e|E)(\\+|-)?[0-9]+)?)(L|l|UL|ul|u|U|F|f)?\\b",
+			"name": "constant.numeric.tibbo-basic"
+		},
+		{
+			"match": "(?i:\\b(char|byte|short|integer|word|long|dword|real|float|string|boolean)\\b)",
+			"name": "support.type.tibbo-basic"
+		},
+		{
+			"captures": {
+				"1": {
+					"name": "entity.name.function.tibbo-basic"
+				}
+			},
+			"match": "(?i:(\\b[a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?\\b)(?=\\(\\)?))",
+			"name": "support.function.tibbo-basic"
+		},
+		{
+			"match": "(?i:((?<=(\\+|=|-|\\&|\\\\|/|<|>|\\(|,))\\s*\\b([a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?)\\b(?!(\\(|\\.))|\\b([a-zA-Z_x7f-xff][a-zA-Z0-9_x7f-xff]*?)\\b(?=\\s*(\\+|=|-|\\&|\\\\|/|<|>|\\(|\\)))))",
+			"name": "variable.other.tibbo-basic"
+		},
+		{
+			"match": "!|\\$|%|&|\\*|\\-\\-|\\-|\\+\\+|\\+|~|===|==|=|!=|!==|<=|>=|<<=|>>=|>>>=|<>|<|>|!|&&|\\|\\||\\?\\:|\\*=|/=|%=|\\+=|\\-=|&=|\\^=|\\b(in|instanceof|new|delete|typeof|void)\\b",
+			"name": "keyword.operator.tibbo-basic"
+		},
+		{
+			"match": "(#\\b(if|else|elif|ifdef|ifndef|endif)\\b)",
+			"name": "meta.preprocessor.conditional.tibbo-basic"
+		},
+		{
+			"match": "(#\\b(define)\\b)",
+			"name": "meta.preprocessor.define.tibbo-basic"
+		}
+
+	],
+	"repository": {
+		"keywords": {
+			"begin": "",
+			"end": "",
+			"patterns": [{
+				"name": "keyword.control.tibbo-basic",
+				"match": "\\b(if|while|for|return)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.tibbo-basic",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.tibbo-basic",
+					"match": "\\\\."
+				}
+			]
+		},
+		"round-brackets": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.section.round-brackets.begin.tibbo-basic"
+				}
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.section.round-brackets.end.tibbo-basic"
+				}
+			},
+			"name": "meta.round-brackets",
+			"patterns": [
+				{
+					"include": "source.tibbo-basic"
+				}
+			]
+		}
+	},
+	"scopeName": "source.tibbo-basic"
+}

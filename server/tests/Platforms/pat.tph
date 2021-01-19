@@ -1,0 +1,171 @@
+'**************************************************************************************************
+'       PAT (LED pattern) object
+'**************************************************************************************************
+
+#if PLATFORM_ID=DS1100
+
+object pat
+'The pat. object allows you to "play" blink patters on up to five LED pairs or channels, each pair typically consisting of red and green LEDs.
+'<br><br>
+'Patterns only play when your application is executing and pause when you application is not running.
+'<br><br>
+'Channel 0 is the primary channel of your system. It utilizes green and red status LEDs (or LED lines) that are present on all programmable Tibbo devices.
+'Channel 0 requires no configuration -- your code can proceed straight to playing patterns.
+'<br><br>
+'The remaining four channels (1-4) use regular I/O lines of Tibbo devices.
+'Mapping properties allow you to select control I/O lines for LEDs of channels 1-4.
+
+#elif PLATFORM_ID=EM500W
+
+object pat
+'The pat. object allows you to "play" blink patters on up to five LED pairs or channels, each pair typically consisting of red and green LEDs.
+'<br><br>
+'Patterns only play when your application is executing and pause when you application is not running.
+'<br><br>
+'Channel 0 is the primary channel of your system. It utilizes green and red status LEDs (or LED lines) that are present on all programmable Tibbo devices.
+'Channel 0 requires no configuration -- your code can proceed straight to playing patterns.
+'<br><br>
+'The remaining four channels (1-4) use regular I/O lines of Tibbo devices.
+'Mapping properties allow you to select control I/O lines for LEDs of channels 1-4.
+
+#else
+
+object pat
+'The pat. object allows you to "play" blink patters on up to five LED pairs or channels, each pair typically consisting of red and green LEDs.
+'<br><br>
+'Patterns only play when your application is executing and pause when you application is not running.
+'<br><br>
+'Channel 0 is the primary channel of your system. It utilizes green and red status LEDs (or LED lines) that are present on all programmable Tibbo devices.
+'Channel 0 requires no configuration -- your code can proceed straight to playing patterns.
+'<br><br>
+'The remaining four channels (1-4) use regular I/O lines of Tibbo devices.
+'Mapping properties allow you to select control I/O lines for LEDs of channels 1-4.
+'<br><br>
+'<b>On this platform you need to configure LED control lines of channels 1-4 as outputs. This is done through the io.enabled property.</b>
+
+#endif
+
+'--------------------------------------------------------------------
+enum pl_pat_int 
+    PL_PAT_NOINT, '<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can only be loaded if no pattern is playing at the moment.
+    PL_PAT_CANINT '<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can be loaded even if another pattern is currently playing.
+end enum
+
+syscall(184,"31.TDL") pat.play(byref pattern as string, patint as pl_pat_int)
+'<b>METHOD. </b><br><br> 
+'For the currently selected pattern channel (selection is made through the pat.channel property), loads a new LED pattern to play.
+'<br><br>
+'The pattern string defines the pattern, for example: "R-G-B~*".
+'<br><br>
+'The meaning of characters:
+'<br><br>
+''-': Both LEDs are off.
+'<br><br>
+''R' or 'r': Red LED on (green LED off).
+'<br><br>
+''G' or 'g': Green LED on (red LED off).
+'<br><br>
+''B' or 'b': Both LEDs on.
+'<br><br>
+''~': Looped pattern. This character can be inserted anywhere in the pattern string. 
+'<br><br>
+''*': Double the speed of playing this pattern. Can be inserted anywhere in the pattern string. Applies to the entire string. You can use up to two * characters, meaning that you can quadruple the normal speed of the output. 
+'<br><br>
+'The patint argument determines if this method's invocation is allowed to interrupt another pattern that is already playing. 
+
+'--------------------------------------------------------------------
+property pat.channel
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (channel 0). </b><br><br>
+'Selects/returns the pattern channel to work with. This selection is related to the pat.play method, as well as io.redmap and io.greenmap properties.
+'<br><br>
+'Note that this property's value will be set automatically when the event handler for the on_pat event is entered.
+    get = syscall(5,"31.TDL"+) as byte
+    set = syscall(6,"31.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID=DS1100
+
+property pat.greenmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's green LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4. 
+    get = syscall(7,"31.TDL"+) as pl_io_num
+    set = syscall(8,"31.TDL"+) (value as pl_io_num)
+end property
+
+#elif PLATFORM_ID=EM500W
+
+property pat.greenmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's green LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4. 
+    get = syscall(7,"31.TDL"+) as pl_io_num
+    set = syscall(8,"31.TDL"+) (value as pl_io_num)
+end property
+
+#else
+
+property pat.greenmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's green LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4.
+'<br><br>
+'<b>On this platform you must also configure I/O lines of channels 1-4 as outputs. This is done through the io.enabled property of the io. object.</b>
+    get = syscall(7,"31.TDL"+) as pl_io_num
+    set = syscall(8,"31.TDL"+) (value as pl_io_num)
+end property
+
+#endif
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID=DS1100
+
+property pat.redmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's red LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4. 
+    get = syscall(9,"31.TDL"+) as pl_io_num
+    set = syscall(10,"31.TDL"+) (value as pl_io_num)
+end property
+
+#elif PLATFORM_ID=EM500W
+
+property pat.redmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's red LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4. 
+    get = syscall(9,"31.TDL"+) as pl_io_num
+    set = syscall(10,"31.TDL"+) (value as pl_io_num)
+end property
+
+#else
+
+property pat.redmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
+'For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's red LED.
+'<br><br>
+'Channel 0 does not require configuration. Writing to this property will only work on channels 1-4.
+'<br><br>
+'<b>On this platform you must also configure I/O lines of channels 1-4 as outputs. This is done through the io.enabled property of the io. object.</b>
+    get = syscall(9,"31.TDL"+) as pl_io_num
+    set = syscall(10,"31.TDL"+) (value as pl_io_num)
+end property
+
+#endif
+
+'--------------------------------------------------------------------
+event(8)  on_pat
+'<b>EVENT of the pat object. </b><br><br>
+'Generated when an LED pattern finishes "playing". This can only happened for "non-looped" patterns.
+'<br><br>
+'Multiple on_pat events may be waiting in the event queue (but not exceeding one per channel).
+'<br><br>
+'On entering the event handler, pat.channel will be set to the channel number for which this event was generated. 
+'<br><br>
+'The event won't be generated if the current pattern is superseded (overwritten) by a new call to pat.play.

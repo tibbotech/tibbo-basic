@@ -1,0 +1,143 @@
+'**************************************************************************************************
+'       IO (Input/output) object
+'**************************************************************************************************
+
+object io
+'The io. object controls the I/O lines, 8-bit I/O ports, and interrupt lines of your device.
+'<br><br>
+'The lists of available I/O lines, ports, and interrupt lines are platform-specific and are defined by pl_io_num, pl_io_port_num, and  pl_int_num enums.
+'<br><br>
+'On this platform, the I/O lines are unidirectional, i.e. you must configure each I/O line to be an output or an input, as it can't be both at the same time.
+'This is done through io.enabled and io.portenabled properties.
+
+'--------------------------------------------------------------------
+event(19) on_io_int(linestate as byte)
+'<b>EVENT of the io. object.</b><br><br>
+'Generated when a change of state (from LOW to HIGH or from HIGH to LOW) on one of the enabled interrupt lines is detected.
+'<br><br>
+'Each bit of the linestate argument corresponds to one interrupt line in the order, in which these lines are declared in the pl_int_num enum.
+'A bit value of 1 indicates that this line has CHANGED. Several lines may be reported as changed in a single call to on_io_int.
+'<br><br>
+'All interrupt lines are disabled by default and must be enabled individually through the io.intenabled property.
+'<br><br>
+'Another on_io_int event will not be generated until the previous one is processed.
+'The consequence is that if the first enabled interrupt line changes its state, and then the second enabled interrupt line changes its state while the first on_io_int event hasn't yet been processed,
+'then the second event will be lost.
+
+'--------------------------------------------------------------------
+property io.num
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the currently selected I/O line. This selection is related to io.enabled and io.state properties.
+    get = syscall(170) as pl_io_num
+    set = syscall(171) (num as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+property io.portnum
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the currently selected 8-bit I/O port. This selection is related to io.portenabled and io.portstate properties.
+    get = syscall(297) as pl_io_port_num
+    set = syscall(298) (num as pl_io_port_num)
+end property
+#endif
+
+'--------------------------------------------------------------------
+property io.state
+'<b>PROPERTY (ENUM, BYTE). DEFAULT_VALUE= 1- HIGH (typically)</b><br><br>
+'For the currently selected I/O line (selection is made through the io.num property), sets/returns this line's state.
+'<br><br>
+'The line must be configured as output (io.enabled= 1- YES) for writes to this property to have any effect.
+    get = syscall(172) as low_high
+    set = syscall(173) (state as low_high)
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+property io.portstate
+'<b>PROPERTY (BYTE). DEFAULT_VALUE= 255 (typically)</b><br><br>
+'For the currently selected 8-bit I/O port (selection is made through the io.portnum property), sets/returns the states of 8 port's lines.
+'<br><br>
+'Each individual bit in this byte value sets/returns the state of the corresponding I/O line within the port.
+'<br><br>
+'Port lines must be configured as outputs (io.portenabled= 255) for writes to this property to have (full) effect.
+    get = syscall(299) as byte
+    set = syscall(300) (state as byte)
+end property
+#endif
+
+'--------------------------------------------------------------------
+property io.enabled
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
+'For the currently selected I/O line (selection is made through the io.num property), sets/returns the state of the line's output buffer,
+'i.e. configures the line as input (io.enabled=0) or output (io.enabled=1).
+    get = syscall(167) as no_yes
+    set = syscall(187) (state as no_yes)
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+property io.portenabled
+'<b>PROPERTY (BYTE). DEFAULT VALUE= 0.</b><br><br>
+'For the currently selected 8-bit I/O port (selection is made through the io.portnum property), sets/returns the state of the port's output buffers,
+'i.e. configures individual port lines as inputs or outputs.
+'<br><br>
+'For each bit (line) 0 means "input" and 1 means "output".
+    get = syscall(301) as byte
+    set = syscall(302) (state as byte)
+end property
+#endif
+
+'--------------------------------------------------------------------
+syscall(303) io.invert(num as pl_io_num)
+'<b>METHOD.</b><br><br>
+'For the I/O line specified by the num argument, inverts the state of this line (reads its current state and writes an opposite state into the output buffer).
+'<br><br>
+'The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
+
+'--------------------------------------------------------------------
+syscall(304) io.lineget(num as pl_io_num) as low_high
+'<b>METHOD.</b><br><br>
+'For the I/O line specified by the num argument, returns this line's state.
+
+'--------------------------------------------------------------------
+syscall(305) io.lineset(num as pl_io_num, state as low_high)
+'<b>METHOD.</b><br><br>
+'For the I/O line specified by the num argument, sets the state of this line's output buffer.
+'The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+syscall(306) io.portget(num as pl_io_port_num) as byte
+'<b>METHOD.</b><br><br>
+'For the 8-bit I/O port specified by the num argument, returns this port's state.
+'<br><br>
+'Each individual bit of the returned value carries the state of the corresponding I/O line within the port.
+#endif
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+syscall(307) io.portset(num as pl_io_port_num, state as byte)
+'<b>METHOD.</b><br><br>
+'For the 8-bit I/O port specified by the num argument, sets the state of this port's output buffers.
+'<br><br>
+'Each individual bit of the state argument defines the state of the corresponding I/O line within the port.
+'<br><br>
+'Port lines must be configured as outputs (io.portenabled= 255) for writes to this property to have (full) effect.
+#endif
+
+'--------------------------------------------------------------------
+property io.intnum
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the currently selected interrupt line. This selection is related to the io.intenebled property.
+    get = syscall(15) as pl_int_num
+    set = syscall(16) (num as pl_int_num)
+end property
+
+'--------------------------------------------------------------------
+property io.intenabled
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
+'For the currently selected interrupt line (selection is made through the io.intnum property), enables/disables on_io_int event generation for this line.
+    get = syscall(419,"80.TDL"+) as no_yes
+    set = syscall(420,"80.TDL"+) (state as no_yes)
+end property

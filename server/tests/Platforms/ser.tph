@@ -1,0 +1,828 @@
+'**************************************************************************************************
+'       SER (Serial port) object
+'**************************************************************************************************
+
+object ser
+'This is a serial port object that encompasses ALL serial ports (UARTs) available on a particular system (total number
+'of available serial ports can be obtained through the <font color="maroon"><b>ser.numofports </b></font>read-only property).
+'<br><br>
+'Selection of a particular port to work with is done through the <font color="maroon"><b>ser.num property</b></font>. Most other 
+'properties and methods refer to the currently selected port. When the handler for one of the serial port events is entered
+'the <font color="maroon"><b>ser.num </b></font>is automatically switched to the port for which this event was generated.
+'<br><br>
+'Each serial port has 2 outputs- TX/W1out/dout and RTS/W0out/cout, and two inputs- RX/W1in/din and CTS/W0&1in/cin. Two lines- 
+'TX/W1out/dout and RX/W1in/din use fixed I/O pins and cannot be remapped. Two other lines- RTS/W0out/cout and CTS/W0&1in/cin- can be 
+'remapped through <font color="maroon"><b>ser.rtsmap </b></font>and <font color="maroon"><b>ser.ctsmap </b></font>properties.
+'<br><br>
+'The serial port can work in the UART, Wiegand, or clock/data mode (see <font color="maroon"><b>ser.mode</b></font>).
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'For the Wiegand and clock/data mode, TX/W1out/dout and RTS/W0out/cout must be configured as outputs by the application (through <font color="maroon"><b>
+'io.enabled</b></font>)- this won't happen automatically. The RX/W1in/din and CTS/W0&1in/cin lines must be configured as inputs- this 
+'won't happen automatically as well. <br><br>For the UART mode, the TX/W1out/dout and RX/W1in/din are configured automatically when 
+'the port is opened (see <font color="maroon"><b>ser.enabled</b></font>). Your application still needs to set the direction of 
+'RTS/W0out/cout CTS/W0&1in/cin "manually".
+
+'--------------------------------------------------------------------
+property ser.numofports
+'<b>READ-ONLY PROPERTY (BYTE). </b><br><br> 
+'Returns total number of serial ports found on the current platform.
+    get = syscall(137) as byte
+end property
+
+'--------------------------------------------------------------------
+property ser.num
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (serial port #0 selected). </b><br><br>
+'Sets/returns the number of currently selected serial port (ports are enumerated from 0).
+'Most other properties and methods of this object relate to the serial port selected through this property.<br><br>
+'Note that serial-port related events such as <font color="teal"><b>on_ser_data_arrival </b></font> change currently selected port!
+'The value of this property won't exceed <font color="maroon"><b>ser.numofports</b></font>-1 (even if you attempt to set a higher value).
+    get = syscall(100) as byte
+    set = syscall(101) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property ser.enabled
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font> (not enabled). </b><br><br>
+'Enables/disables currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
+'<font color="olive"><b>0- NO </b></font>(not enabled), <font color="olive"><b>1- YES </b></font>(enabled).<br><br>
+'Enabling/disabling the serial port does not automatically clear its buffers, this is done via <font color="maroon"><b>ser.rxclear </b></font>
+'and <font color="maroon"><b>ser.txclear</b></font>. <br><br>
+'Notice that certain properties can only be changed and methods executed when the port is not enabled (<font color="maroon"><b>ser.rtsmap</b>
+'</font>, <font color="maroon"><b>ser.ctsmap</b></font>, <font color="maroon"><b>ser.mode</b></font>, <font color="maroon"><b>ser.redir</b>
+'</font>, <font color="maroon"><b>ser.txclear</b></font>). You also cannot allocate buffer memory for the port (do <font color="maroon"><b>
+'sys.buffalloc </b></font>) when the port is enabled.
+    get = syscall(102,"80.TDL"+) as no_yes
+    set = syscall(103,"34.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ser_mode
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of the operating mode of the serial port.
+        PL_SER_MODE_UART,   '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+                            'UART mode, suitable for RS232, RS422, RS485, etc. communications in full-duplex or half-duplex mode 
+                            '(see <font color="maroon"><b>ser.interface</b></font>).<br><br>
+                            'Data is transmitted through the TX pin and received through the RX pin. Optionally, RTS (output) and CTS 
+                            '(input) lines are used for flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>) 
+                            'in the full-duplex mode. Additionally, RTS can be used for direction control in the half-duplex mode.
+    PL_SER_MODE_WIEGAND,    '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Wiegand mode, suitable for sending to or receiving data from any standard Wiegand device. Data transmission 
+                            'is through pins W0out and W1out, reception- through W0&1in and W1in. <br><br>
+                            '"W0&1in" means that a logical AND of W0 and W1 signals must be applied to this input. Therefore, external 
+                            'logical gate is needed in order to receive Wiegand data.               
+    PL_SER_MODE_CLOCKDATA   '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Clock/data mode, suitable for sending to or receiving data from any standard clock/data (or magstripe) device.
+                            'Data transmission is through pins cout and dout, reception- through cin and din. <br><br>
+                            'Third line of the magstripe interface- card present- is not required for data reception. For transmission, 
+                            'any I/O line can be used as card present output (under software control).
+end enum
+
+property ser.mode
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- UART (UART). </b><br><br>
+'Sets operating mode for the currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
+'<font color="olive"><b>0- PL_SER_MODE_UART </b></font>(UART), <font color="olive"><b>1- PL_SER_MODE_WIEGAND </b></font>(Wiegand), 
+'<font color="olive"><b>2- PL_SER_MODE_CLOCKDATA </b></font>(clock/data). <br><br>
+'Changing port mode is only possible when the port is closed (<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>
+'0- NO</b></font>). RTS/W1out/cout and CTS/W0&1in/cin lines can be remapped to other I/O pins of the device through the <font color="maroon"><b>
+'ser.rtsmap </b></font>and <font color="maroon"><b>ser.ctsmap </b></font>properties.
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'For the UART mode (and provided that <font color="maroon"><b>ser.flowcontrol</b></font>= <font color="olive"><b>1- ENABLED</b></font>),
+'you will need to configure RTS line as output and CTS line as input through the <font color="maroon"><b>io.enabled </b></font>property. 
+'TX and RX configuration will happen automatically. <br><br>
+'For the Wiegand and clock/data mode, you will need to configure both RTS and TX as outputs, and CTS and RX as inputs.  
+    get = syscall(75,"80.TDL"+) as pl_ser_mode
+    set = syscall(76,"80.TDL"+) (value as pl_ser_mode)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ser_interface
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of full-duplex or half-duplex interface for the UART mode
+'of serial port (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+    PL_SER_SI_FULLDUPLEX,   '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+                            'Full-duplex mode, suitable for RS232, RS422, or four-wire RS485 communications. RTS output (together with 
+                            'CTS input) can be used for optional hardware flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>).
+    PL_SER_SI_HALFDUPLEX    '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Half-duplex mode, suitable for two-wire RS485 communications. RTS line is used for direction control.
+                            'Direction control polarity can be set through <font color="maroon"><b>ser.dircontrol </b></font>property.
+end enum
+
+property ser.interface
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_SI_FULLDUPLEX (full-duplex). </b><br><br>
+'Chooses full-duplex or half-duplex operating mode for currently selected serial port (selection is made through <font color="maroon"><b>
+'ser.num</b></font>): <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX </b></font>(full-duplex mode), <font color="olive"><b>
+'1- PL_SER_SI_HALFDUPLEX </b></font>(half-duplex mode). <br><br>
+'Full-duplex mode is suitable for RS232, RS422, or four-wire RS485 communications. Half-duplex mode is suitable for 2-wire RS485 communications.
+'This property is only relevant when the port is in the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>
+'0- PL_SER_MODE_UART</b></font>). <br><br>
+'RTS and CTS lines can be remapped to other I/O pins of the device through the <font color="maroon"><b>ser.rtsmap </b></font>and 
+'<font color="maroon"><b>ser.ctsmap </b></font>properties.
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'You have to configure RTS line as output and CTS line as input 
+'through the <font color="maroon"><b>io.enabled </b></font>property.
+    get = syscall(112,"80.TDL"+) as pl_ser_interface
+    set = syscall(113,"80.TDL"+) (value as pl_ser_interface)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ser_flowcontrol
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the flow control for the UART mode of serial port (ser.mode= 0- PL_SER_MODE_UART).
+    PL_SER_FC_DISABLED, '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+                'No flow control.
+    PL_SER_FC_RTSCTS,   '<b>PLATFORM CONSTANT. </b><br><br> 
+                'RTS/CTS flow control.
+    PL_SER_FC_XONOFF    '<b>PLATFORM CONSTANT. </b><br><br> 
+                'XON/XOFF flow control.
+end enum
+
+property ser.flowcontrol
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- DISABLED. </b><br><br> 
+'Sets/returns flow control mode for currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
+'<font color="olive"><b>0- DISABLED</b></font>, <font color="olive"><b>1- PL_SER_FC_RTSCTS</b></font>, or <font color="olive"><b>1- PL_SER_FC_XONXOFF</b></font>. Only relevant when the serial port is in UART 
+'mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>) and full-duplex interface is selected 
+'(<font color="maroon"><b>ser.interface</b></font>= <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX</b></font>).<br><br>
+'RTS/CTS flow control uses two serial port lines- RTS and CTS- to regulate the flow of data between the serial port of your device and another 
+'("attached") serial device. On some platforms you can select which I/O line will serve as RTS line and which- as CTS line (see 
+'<font color="maroon"><b>ser.rtsmap </b></font>and <font color="maroon"><b>ser.ctsmap</b></font>).
+'XON/XOFF flow control uses XON (ser.xonchar) and XOFF (ser.xoffchar) characters to pause and resume transmission between devices.
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'The RTS lines are not automatically configured as outputs and CTS- as inputs. You need to do this manually, through 
+'the <font color="maroon"><b>io.enabled </b></font>property of the io object. 
+    get = syscall(110,"80.TDL"+) as pl_ser_flowcontrol
+    set = syscall(111,"80.TDL"+) (value as pl_ser_flowcontrol)
+end property
+
+'--------------------------------------------------------------------
+property ser.rtsmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE- different for each serial port: UART0: 0- PL_IO_NUM_0, <br>
+'UART1: 1- PL_IO_NUM_1,<br> UART2: 2- PL_IO_NUM_2, <br> UART3: 3- PL_IO_NUM_3. </b><br><br>
+'Sets/returns the number of the I/O line that will act as RTS/W0out/cout output of currently selected serial port (selection is made through 
+'<font color="maroon"><b>ser.num</b></font>). When the port in in the UART/full-duplex mode (<font color="maroon"><b>ser.mode </b></font>= 
+'<font color="olive"><b>0- PL_SER_MODE_UART </b></font>and <font color="maroon"><b>ser.interface </b></font>= <font color="olive"><b>
+'0- PL_SER_SI_FULLDUPLEX</b></font>) and the flow control is set to <font color="maroon"><b>ser.flowcontrol </b></font>=
+'<font color="olive"><b>1- PL_SER_FC_RTSCTS</b></font>) the line will act as an RTS output, used for flow control. <br><br>
+'In the UART/half-duplex mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>and
+'<font color="maroon"><b>ser.interface </b></font>= <font color="olive"><b>1- PL_SER_SI_HALFDUPLEX</b></font>) this line acts as direction 
+'control output (see also <font color="maroon"><b>ser.dircontrol</b></font>). <br><br>
+'In the UART mode, this line has no function when the port is configured for full-duplex operation and the flow control is disabled. When the 
+'port is in the Wiegand mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND</b></font>) the line 
+'will act as a W0out output of Wiegand interface. When the port is in the clock/data mode (<font color="maroon"><b>ser.mode </b></font>= 
+'<font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) the line will act as a clock output of the clock/data interface. <br><br>
+'Absolutely any I/O line can be selected by this property, as long as this line is not occupied by some other function. Property value can only 
+'be changed when the port is closed (<font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>).
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'For the selected line to work, you have to configure it as an output through the <font color="maroon"><b>io.enabled </b></font>property of the 
+'io object.
+    get = syscall(168,"80.TDL"+) as pl_io_num
+    set = syscall(169,"80.TDL"+) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property ser.ctsmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE- different for each serial port: UART0: 0- PL_INT_NUM_0, <br>
+'UART1: 1- PL_INT_NUM_1, <br>UART2: 2- PL_INT_NUM_2, <br>UART3: 3- PL_INT_NUM_3. </b><br><br>
+'Sets/returns the number of I/O line that will act as CTS/W0&1in/cin input of currently selected serial port (selection is made through 
+'<font color="maroon"><b>ser.num</b></font>). When the port in in the UART mode (<font color="maroon"><b>ser.mode </b></font>= 
+'<font color="olive"><b>0- PL_SER_MODE_UART</b></font>) and the flow control is set to ser.flowcontrol </b></font>= 1- PL_SER_FC_RTSCTS</b></font>) 
+'the line will act as a CTS input, used for flow control.<br><br>
+'When the port is in the Wiegand mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND</b></font>) 
+'the line will act as a W0in input of Wiegand interface. <br><br>
+'When the port is in the clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b>
+'</font>) the line will act as a clock input of the clock/data interface.<br><br>
+'Selection can be made only among interrupt lines 0-7 (that is, I/O lines 16-23). Regular, non-interrupt I/O lines cannot be selected. Property 
+'value can only be changed when the port is closed (<font color="maroon"><b>ser.enabled </b></font>=<font color="olive"><b>0- NO</b></font>).
+'<br><br>
+'<b>Platforms with explicit configuration of I/O lines as inputs or outputs:</b>
+'<br><br>
+'For the selected line to work, you have to configure it as an input through the <font color="maroon"><b>io.enabled </b></font>
+'property of the io object.
+    get = syscall(174,"80.TDL"+) as pl_int_num
+    set = syscall(23,"80.TDL"+) (value as pl_int_num)
+end property
+
+'--------------------------------------------------------------------
+property ser.xonchar
+'<b>PROPERTY (BYTE), DEFAULT VALUE= &h11 (XON character) </b><br><br>
+'Sets/returns the ASCII code of the character that will be used to PAUSE transmission in the XON/XOFF flow control mode (ser.flowcontrol= 2- PL_SER_FC_XONOFF)
+'for the currently selected serial port (selection is made through ser.num).
+    get = syscall(590,"80.TDL"+) as byte
+    set = syscall(591,"80.TDL"+) (value as byte)
+end property
+
+
+'--------------------------------------------------------------------
+property ser.xoffchar
+'<b>PROPERTY (BYTE), DEFAULT VALUE= &h13 (XOFF character) </b><br><br>
+'Sets/returns the ASCII code of the character that will be used to RESUME transmission in the XON/XOFF flow control mode (ser.flowcontrol= 2- PL_SER_FC_XONOFF)
+'for the currently selected serial port (selection is made through ser.num).
+    get = syscall(592,"80.TDL"+) as byte
+    set = syscall(593,"80.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ser_dircontrol
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of polarity for the RTS line which controls direction in the UART/half-duplex mode of 
+'the serial port (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>and <font color="maroon">
+'<b>ser.interface </b></font>= <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX</b></font>).
+    PL_SER_DCP_LOWFORINPUT, '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+                            'Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be LOW when the serial 
+                            'port is ready to RX data and HIGH when the serial port is TXing data. LOW/HIGH states provided are for 
+                            'the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
+    PL_SER_DCP_HIGHFORINPUT '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be HIGH when the serial 
+                            'port is ready to RX data and LOW when the serial port is TXing data. LOW/HIGH states provided are for 
+                            'the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
+end enum
+
+property ser.dircontrol
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_DCP_LOWFORINPUT (LOW for input). </b><br><br>
+'Sets/returns the polarity of the direction control line (RTS) for selected serial port (selection is made through <font color="maroon">
+'<b>ser.num</b></font>): <br> <font color="olive"><b>0- PL_SER_DCP_LOWFORINPUT </b></font>(DIR LOW for input, HIGH for output),<br> 
+'<font color="olive"><b>1- PL_SER_DCP_HIGHFORINPUT </b></font>(DIR HIGH for input, LOW for output). <br><br>
+'Which I/O line of the device will be used  as RTS line is defined by the <font color="maroon"><b>ser.rtsmap </b></font>property. 
+'Direction control is only relevant when the serial port is in the UART/half-duplex mode (<font color="maroon"><b>ser.mode </b></font>
+'= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>and <font color="maroon"><b>ser.interface </b></font>= <font color="olive"><b>
+'1- PL_SER_SI_HALFDUPLEX</b></font>).<br><br>
+'Note, that HIGH/LOW states specified above are for the TTL-serial interface of the MODULE-level products. If you are dealing with the RS232 
+'port then the states will be in reverse (for example, <font color="olive"><b>1- PL_SER_DCP_HIGHFORINPUT </b></font>will mean "LOW for input, 
+'HIGH for output"). When the serial port is in the UART/half-duplex mode you can use the CTS line as a regular I/O line of your device.
+    get = syscall(114,"80.TDL"+) as pl_ser_dircontrol
+    set = syscall(115,"80.TDL"+) (value as pl_ser_dircontrol)
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+property ser.baudrate
+'<b>PROPERTY (WORD), DEFAULT VALUE= "platform-dependent, results in 9600 bps". </b><br><br>
+'Sets/returns the baudrate "divisor value" for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>).
+'Actual baudrade is calculated as follows: (9600*<font color="maroon"><b>ser.div9600</b></font>)/<font color="maroon"><b>ser.baudrate</b></font>.
+'<br><br> 
+'The <font color="maroon"><b>ser.div9600 </b></font>read-only property returns the value <font color="maroon"><b>ser.baudrate </b></font>must 
+'be set to in order to obtain 9600 bps on a particular device under present operating confitions. This property is only relevant when the 
+'serial port is in the UART mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+    get = syscall(104,"80.TDL"+) as word
+    set = syscall(105,"34.TDL"+) (value as word)
+end property
+#endif
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID=LTPP3
+
+enum pl_ser_baud
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of baud rates of the serial port in the UART mode
+'(<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+	PL_SER_BAUD_50,      '<b>PLATFORM CONSTANT. </b><br><br> 50 bps
+	PL_SER_BAUD_75,      '<b>PLATFORM CONSTANT. </b><br><br> 75 bps
+	PL_SER_BAUD_110,     '<b>PLATFORM CONSTANT. </b><br><br> 110 bps
+	PL_SER_BAUD_134,     '<b>PLATFORM CONSTANT. </b><br><br> 134.5 bps
+	PL_SER_BAUD_150,     '<b>PLATFORM CONSTANT. </b><br><br> 150 bps
+	PL_SER_BAUD_200,     '<b>PLATFORM CONSTANT. </b><br><br> 200 bps
+	PL_SER_BAUD_300,     '<b>PLATFORM CONSTANT. </b><br><br> 300 bps
+	PL_SER_BAUD_600,     '<b>PLATFORM CONSTANT. </b><br><br> 600 bps
+	PL_SER_BAUD_1200,    '<b>PLATFORM CONSTANT. </b><br><br> 1,200 bps
+	PL_SER_BAUD_1800,    '<b>PLATFORM CONSTANT. </b><br><br> 1,800 bps
+	PL_SER_BAUD_2400,    '<b>PLATFORM CONSTANT. </b><br><br> 2,400 bps
+	PL_SER_BAUD_4800,    '<b>PLATFORM CONSTANT. </b><br><br> 4,800 bps
+	PL_SER_BAUD_9600,    '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 9,600 bps
+	PL_SER_BAUD_19200,   '<b>PLATFORM CONSTANT. </b><br><br> 19,200 bps    
+	PL_SER_BAUD_38400,   '<b>PLATFORM CONSTANT. </b><br><br> 38,400 bps    
+	PL_SER_BAUD_57600,   '<b>PLATFORM CONSTANT. </b><br><br> 57,600 bps    
+	PL_SER_BAUD_115200,  '<b>PLATFORM CONSTANT. </b><br><br> 115,200 bps   
+	PL_SER_BAUD_230400,  '<b>PLATFORM CONSTANT. </b><br><br> 230,400 bps   
+	PL_SER_BAUD_460800,  '<b>PLATFORM CONSTANT. </b><br><br> 460,800 bps   
+	PL_SER_BAUD_500000,  '<b>PLATFORM CONSTANT. </b><br><br> 500,000 bps   
+	PL_SER_BAUD_576000,  '<b>PLATFORM CONSTANT. </b><br><br> 576,000 bps   
+	PL_SER_BAUD_921600,  '<b>PLATFORM CONSTANT. </b><br><br> 921,600 bps   
+	PL_SER_BAUD_1000000, '<b>PLATFORM CONSTANT. </b><br><br> 1,000,000 bps  
+	PL_SER_BAUD_1152000, '<b>PLATFORM CONSTANT. </b><br><br> 1,152,000 bps  
+	PL_SER_BAUD_1500000, '<b>PLATFORM CONSTANT. </b><br><br> 1,500,000 bps  
+	PL_SER_BAUD_2000000, '<b>PLATFORM CONSTANT. </b><br><br> 2,000,000 bps  
+	PL_SER_BAUD_2500000, '<b>PLATFORM CONSTANT. </b><br><br> 2,500,000 bps  
+	PL_SER_BAUD_3000000, '<b>PLATFORM CONSTANT. </b><br><br> 3,000,000 bps  
+	PL_SER_BAUD_3500000, '<b>PLATFORM CONSTANT. </b><br><br> 3,500,000 bps  
+	PL_SER_BAUD_4000000  '<b>PLATFORM CONSTANT. </b><br><br> 4,000,000 bps     
+end enum
+
+property ser.baud
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 12- PL_SER_BAUD_9600. </b><br><br>
+'Sets/returns the baudrate for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>).
+'<br><br> 
+'This property is only relevant when the serial port is in the UART mode
+'(<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+	get = syscall(694) as pl_ser_baud
+	set = syscall(695) (value as pl_ser_baud)
+end property
+
+#endif
+
+'--------------------------------------------------------------------
+enum pl_ser_parity
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of the parity mode of the serial port in the UART mode
+'(<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+    PL_SER_PR_NONE,     '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> No parity bit to be transmitted.
+    PL_SER_PR_EVEN,     '<b>PLATFORM CONSTANT. </b><br><br> Even parity.
+    PL_SER_PR_ODD,      '<b>PLATFORM CONSTANT. </b><br><br> Odd parity.
+    PL_SER_PR_MARK,     '<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "1". Also can be used to emulate second stop bit
+                        '(there is no separate property to explicitely select the number of stop bits).
+    PL_SER_PR_SPACE     '<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "0".
+end enum
+
+#if SER_7BIT_LIMITATION=0
+
+property ser.parity
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_PR_NONE (no parity). </b><br><br>
+'Sets/returns the parity mode for the selected serial port (selection is made through ser.num): 0- PL_SER_PR_NONE (no parity),
+'1- PL_SER_PR_EVEN (even parity), 2- PL_SER_PR_ODD (odd parity), 3- PL_SER_PR_MARK (mark), 4- PL_SER_PR_SPACE (space).
+'<br><br>
+'Mark parity is equivalent to having a second stop-bit (there is no separate property to explicitly select the number of stop bits).
+'<br><br>
+'This property is only relevant when the serial port is in the UART mode (ser.mode= 0- PL_SER_MODE_UART).
+    get = syscall(106,"80.TDL"+) as pl_ser_parity
+    set = syscall(107,"34.TDL"+) (value as pl_ser_parity)
+end property
+
+#else
+
+property ser.parity
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_PR_NONE (no parity). </b><br><br>
+'Sets/returns the parity mode for the selected serial port (selection is made through ser.num): 0- PL_SER_PR_NONE (no parity),
+'1- PL_SER_PR_EVEN (even parity), 2- PL_SER_PR_ODD (odd parity), 3- PL_SER_PR_MARK (mark), 4- PL_SER_PR_SPACE (space).
+'<br><br>
+'Mark parity is equivalent to having a second stop-bit (there is no separate property to explicitly select the number of stop bits).
+'<br><br>
+'This property is only relevant when the serial port is in the UART mode (ser.mode= 0- PL_SER_MODE_UART).
+'<br><br>
+'<b>On the platform, the combination of 7 bits/word (ser.bits=0- PL_SER_BB_7) and ser.parity= 0- PL_SER_PR_NONE will NOT work correctly.</b>
+    get = syscall(106,"80.TDL"+) as pl_ser_parity
+    set = syscall(107,"34.TDL"+) (value as pl_ser_parity)
+end property
+
+#endif
+
+'--------------------------------------------------------------------
+enum pl_ser_bits
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of the number of bits in the word TXed/RXed by the serial
+'port in the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+    PL_SER_BB_7,        '<b>PLATFORM CONSTANT. </b><br><br> Data word TXed/RXed by the serial port is to contain 7 data bits.
+    PL_SER_BB_8         '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> Data word TXed/RXed by the serial port is to contain 8 data bits.
+end enum
+
+#if SER_7BIT_LIMITATION=0
+
+property ser.bits
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- PL_SER_BB_8 (8 bits). </b><br><br>
+'Specifies the number of data bits in a word TXed/RXed by the currently selected serial port (selection is made through ser.num):
+'<br>0- PL_SER_BB_7 (7 bits/word), or 1- PL_SER_BB_8 (8 bits/word).
+'<br><br>
+'This property is only relevant when the serial port is in the UART mode (ser.mode = 0- PL_SER_MODE_UART).
+    get = syscall(108,"80.TDL"+) as pl_ser_bits
+    set = syscall(109,"34.TDL"+) (value as pl_ser_bits)
+end property
+
+#else
+
+property ser.bits
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- PL_SER_BB_8 (8 bits). </b><br><br>
+'Specifies the number of data bits in a word TXed/RXed by the currently selected serial port (selection is made through ser.num):
+'<br>0- PL_SER_BB_7 (7 bits/word), or 1- PL_SER_BB_8 (8 bits/word).
+'<br><br>
+'This property is only relevant when the serial port is in the UART mode (ser.mode = 0- PL_SER_MODE_UART).
+'<br><br>
+'<b>On the platform, the combination of 7 bits/word (ser.bits=0- PL_SER_BB_7) and ser.parity= 0- PL_SER_PR_NONE will NOT work correctly.</b>
+    get = syscall(108,"80.TDL"+) as pl_ser_bits
+    set = syscall(109,"34.TDL"+) (value as pl_ser_bits)
+end property
+
+#endif
+
+'--------------------------------------------------------------------
+property ser.interchardelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (no delay). </b><br><br>
+'Sets/returns maximum intercharacter delay for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) 
+'in 10ms steps.<br><br>
+'For UART mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>) specifies the time that 
+'needs to elapse since the arrival of the most recent serial character into the RX buffer to cause the data to be committed (and 
+'<font color="teal"><b>on_ser_data_arrival </b></font>event generated). <br><br>
+'For Wiegand and clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND </b></font>or 
+'<font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) the time since the most recent data bit (high-to-low transition on the W0&1in/cin 
+'line) is counted. <br><br>
+'In the UART mode this property allows you to combine incoming serial data into larger "chunks", which typically improves performance. Notice, 
+'that the time is not counted when the new data is not being received because the serial port has set the RTS line to LOW (not ready).<br><br>
+'For this to happen, the serial port must be in the UART/full-duplex/flow control mode (<font color="maroon"><b>ser.mode </b></font>= 
+'<font color="olive"><b>0- PL_SER_MODE_UART</b></font>, <font color="maroon"><b>ser.interface </b></font>= <font color="olive"><b>
+'0- 0- PL_SER_SI_FULLDUPLEX</b></font>, and <font color="maroon"><b>ser.flowcontrol </b></font>= <font color="olive"><b>1- ENABLED</b></font>) 
+'and the RX buffer must be getting nearly full (less than 64 bytes of free space left). <br><br>
+'For Wiegand and clock/data modes, counting timeout  since the last bit is the only way to determine the end of the data output. Suggested 
+'timeout is app. 10 times the bit period of the data output by attached Wiegand or clock/data device.
+    get = syscall(116,"80.TDL"+) as byte
+    set = syscall(117,"80.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property ser.autoclose
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font>. </b><br><br>
+'For currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) specifies whether the port will 
+'be disabled (<font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>) once the intercharacter gap expires 
+'(see <font color="maroon"><b>ser.interchardelay</b></font>): <br><br>
+'<font color="olive"><b>0- NO </b></font>(port won't be closed),<br> <font color="olive"><b>1- YES </b></font>(port will be closed). <br><br>
+'This property offers a way to make sure that no further data is received once the gap of certain length is encountered. This property is
+'especially useful in Wiegand or clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>
+'1- PL_SER_MODE_WIEGAND </b></font>or <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) where intercharacter gap is the only way 
+'to reliably identify the end of one data transmission.
+    get = syscall(77,"80.TDL"+) as no_yes
+    set = syscall(78,"80.TDL"+) (autoclose as no_yes)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ser_esctype
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the selection of the escape sequence type for the the serial port when the
+'port is in the UART mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+    PL_SER_ET_DISABLED,     '<b>PLATFORM CONSTANT. </b><br><br> Recognition of serial escape sequences disabled.
+    PL_SER_ET_TYPE1,        '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Escape sequences of type1 are to be recognized. Type1 escape sequence is "prev_char<--min 100ms-->EC<--min 
+                            '100ms-->EC<--min 100ms-->EC", where "EC" is escape character defined by the <font color="maroon"><b>
+                            'ser.escchar </b></font>property.<br><br>
+                            'There must be at least 100ms gap before the arrival of each escape character, otherwise the character will be 
+                            'counted as a regular data character. When escape sequence is detected in the incoming UART data stream the 
+                            '<font color="teal"><b>on_ser_esc </b></font>event is generated and the serial port is disabled, 
+                            'i.e. <font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>. 
+    PL_SER_ET_TYPE2         '<b>PLATFORM CONSTANT</b></font>. </b><br><br> 
+                            'Escape sequences of type2 are to be recognized. Type2 escape sequence is "EC OC", where "EC" is escape 
+                            'character defined by the <font color="maroon"><b>ser.escchar </b></font>property and "OC" is any character other
+                            'than "EC".<br><br>
+                            'When escape sequence is detected in the incoming UART data stream the <font color="teal"><b>on_ser_esc
+                            '</b></font>event is generated and the serial port is disabled, i.e. <font color="maroon"><b>ser.enabled 
+                            '</b></font>= <font color="olive"><b>0- NO</b></font>.<br><br>
+                            'Data character with ASCII code matching that of selected EC should be transmitted as "EC EC"- this will result 
+                            'in a single character added to the RX buffer of the serial port.
+end enum
+
+property ser.esctype
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_ET_DISABLED (escape sequences disabled).  </b><br><br>
+'Defines, for selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) whether serial escape sequence
+'recognition is enabled and, if yes, what type of escape sequence is to be recognised. <br><br>
+'Escape sequence is a special occurrence of characters in the incoming data received by the serial port. When escape sequence is detected the
+'<font color="teal"><b>on_ser_esc</b></font> event is generated and the serial port is disabled (<font color="maroon"><b>
+'ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>). When enabled, serial escape sequence detection works even when the buffer
+'shorting is employed (see <font color="maroon"><b>ser.redir </b></font>property). <br><br>
+'The <font color="maroon"><b>ser.esctype </b></font>property can have the following values: <br>  
+'<font color="olive"><b>0- PL_SER_ET_DISABLED </b></font>(recognition of serial escape sequences disabled),<br><font color="olive">
+'<b>1- PL_SER_ET_TYPE1</b></font> (Escape sequences of type1 are to be recognized),<br> <font color="olive"><b> 2- PL_SER_ET_TYPE2
+'</b></font>(escape sequences of type2 are to be recognized).<br><br> 
+'Type1 escape sequence is "prev_char<--min 100ms-->EC<--min 100ms-->EC<--min 100ms-->EC" and Type2 sequence is "EC OC", where "EC" is escape
+'character defined by the <font color="maroon"><b>ser.escchar </b></font>property and "OC" is any character other than "EC".<br><br>
+'This property is only relevant in the UART mode of the serial port (<font color="maroon"><b>ser.mode </b></font>= <font color="olive">
+'<b>0- PL_SER_MODE_UART</b></font>).
+    get = syscall(120,"80.TDL"+) as pl_ser_esctype
+    set = syscall(121,"80.TDL"+) (value as pl_ser_esctype)
+end property
+
+'--------------------------------------------------------------------
+property ser.escchar
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (SOH character).  </b><br><br>
+'For selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) sets/retrieves ASCII code of the escape
+'character used for type1 or type2 serial escape sequences. <br><br>
+'Which escape sequence is enabled is defined by the <font color="maroon"><b>ser.esctype </b></font>property. This property is irrelevant when
+'<font color="maroon"><b>ser.esctype </b></font>= <font color="olive"><b>0- PL_SER_ET_DISABLED </b></font> (escape sequences disabled) or when
+'the serial port is in the Wiegand or clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>
+'1- PL_SER_MODE_WIEGAND </b></font> or <font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>)
+'-- serial escape sequences are only recognized in the UART data.
+    get = syscall(118,"80.TDL"+) as byte
+    set = syscall(119,"80.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property ser.rxbuffsize
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>)returns current RX buffer capacity 
+'in bytes. Buffer capacity can be changed through the <font color="maroon"><b>ser.rxbuffrq </b></font>method followed by the 
+'<font color="maroon"><b>sys.buffalloc </b></font>method.<br><br>
+'The <font color="maroon"><b>ser.rxbuffrq </b></font>requests buffer size in 256-byte pages whereas this property returns buffer size 
+'in bytes. Relationship between the two is as follows: <br><br><font color="maroon"><b>ser.rxbuffsize</b></font>=num_pages*256-X (or =0 
+'when num_pages=0), where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>ser.rxbuffrq</b></font>.
+' "-X" is because a number of bytes is needed for internal buffer
+'variables. X=17 on 16-bit platforms and 33 on 32-bit platforms. <br><br>
+'The serial port cannot RX data when the RX buffer has zero capacity.
+    get = syscall(122,"38.TDL"+) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property ser.txbuffsize
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns current TX buffer capacity 
+'in bytes. Buffer capacity can be changed through the <font color="maroon"><b>ser.txbuffrq </b></font>method followed by the 
+'<font color="maroon"><b>sys.buffalloc </b></font>method. <br><br>
+'The <font color="maroon"><b>ser.txbuffrq </b></font>requests buffer size in 256-byte pages whereas this property returns buffer size 
+'in bytes. Relationship between the two is as follows: <br><br><font color="maroon"><b>ser.txbuffsize</b></font>=num_pages*256-X (or =0 
+'when num_pages=0), where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>ser.txbuffrq</b></font>. 
+' "-X" is because a number of bytes is needed for internal buffer
+'variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
+'The serial port cannot TX data when the TX buffer has zero capacity.
+    get = syscall(123,"38.TDL"+) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property ser.rxlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns total number of committed bytes
+'currently waiting in the RX buffer to be extracted and processed by your application. <br><br>
+'The <font color="teal"><b>on_ser_data_arrival </b></font>event is generated once the RX buffer is not empty, i.e. there is data to
+'process. There may be only one <font color="teal"><b>on_ser_data_arrival </b></font>event for each port waiting to be processed in 
+'the event queue. Another <font color="teal"><b>on_ser_data_arrival </b></font> event for the same port may be generated only after
+'the previous one is handled.<br><br>
+'If, during the <font color="teal"><b>on_ser_data_arrival </b></font>event handler execution, not all data is extracted from the RX 
+'buffer, another <font color="teal"><b>on_ser_data_arrival </b></font>event is generated immediately after the 
+'<font color="teal"><b>on_ser_data_arrival </b></font>event handler is exited.<br><br>
+'Notice that the RX buffer of the serial port employes "data committing" based on the amount of data in the buffer and intercharacter delay 
+'(<font color="maroon"><b>ser.interchardelay</b></font>). Data in the RX buffer may not be committed yet. Uncommitted data is not visible
+'to your application and is not included in the count returned by the  <font color="maroon"><b>ser.rxlen</b></font>).
+    get = syscall(124,"37.TDL"+) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property ser.txlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns total number of committed bytes
+'currently found in the TX buffer. The data in the TX buffer does not become committed until you use the  <font color="maroon"><b>ser.send
+'</b></font>) method. <br><br>
+'Your application may use the <font color="maroon"><b>ser.notifysent </b></font>method to get <font color="teal"><b>
+'on_ser_data_sent </b></font>event once the total number of committed bytes in the TX buffer drops below the level defined by the
+'<font color="maroon"><b>ser.notifysent </b></font> method. <br><br>
+'See also <font color="maroon"><b>ser.newtxlen</b></font>.
+    get = syscall(125,"37.TDL"+) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property ser.txfree
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>)returns the amount of free space in the TX
+'buffer in bytes, not taking into account uncommitted data. <br><br>
+'Actual free space is <font color="maroon"><b>ser.txfree</b></font> - <font color="maroon"><b>ser.newtxlen</b></font>. Your application will not
+'be able to store more data than this amount.<br><br>
+'To achieve asynchronous data processing, use the <font color="maroon"><b>ser.notifysent</b></font> method to get <font color="teal">
+'<b>on_ser_data_sent </b></font>event once the TX buffer gains required amount of free space.
+    get = syscall(127) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property ser.newtxlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns the amount of uncommitted TX data
+'in bytes.<br><br>
+'Uncommited data is the one that was added to the TX buffer with the <font color="maroon"><b>ser.setdata </b></font>method but not yet committed
+'using the <font color="maroon"><b>ser.send</b></font>) method.
+    get = syscall(133) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(128) ser.rxclear
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) clears (deletes all data from) the RX
+'buffer.
+
+'--------------------------------------------------------------------
+syscall(129,"80.TDL"+) ser.txclear
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) clears (deletes all data from) the TX 
+'buffer. This method will only work when the serial port is closed (<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>
+'0- NO</b></font>).
+
+'--------------------------------------------------------------------
+syscall(130) ser.getdata(maxinplen as word) as string
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) returns the string that contains the data
+'extracted from the RX buffer. Extracted data is permanently deleted from the buffer.<br><br>
+'Length of extracted data is limited by one of the three factors (whichever is smaller): amount of committed data in the RX buffer itself,
+'capacity of the "receiving" string variable, and the limit set by the maxinplen argument.<br><br>
+'In the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>)
+'the data is extracted "as is". <br><br>
+'For Wiegand and clock/data mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND</b></font> and
+'<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) each character of extracted data
+'represents one data bit and only two characters are possible: "0" or "1".
+'<br><br>
+'See also <font color="maroon"><b>ser.peekdata </b></font>method.
+
+'--------------------------------------------------------------------
+syscall(13) ser.peekdata(maxinplen as word) as string
+'METHOD.
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) returns the string that contains the "preview" of the data
+'from the RX buffer. The data is NOT deleted from the buffer. Length of returned data is limited by one of the three factors
+'(whichever is smaller): amount of committed data in the RX buffer itself, capacity of the "receiving" string variable,
+'and the limit set by the maxinplen argument.
+'<br><br>
+'String variables can hold up to 255 bytes of data, so this method will only
+'allow you to preview up to 255 "next" bytes from the RX buffer.
+'In the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>)
+'the data is previed "as is".
+'<br><br>
+'For Wiegand and clock/data mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND</b></font> and
+'<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) each data character
+'represents one data bit and only two characters are possible: "0" or "1".
+'<br><br>
+'See also <font color="maroon"><b>ser.getdata </b></font>method.
+
+'--------------------------------------------------------------------
+syscall(131) ser.setdata(byref txdata as string)
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) adds the data passed in the txdata argument
+'to the contents of the TX buffer. <br><br>
+'In the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>) the data is added "as is". 
+'<br><br>For Wiegand and clock/data mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>1- PL_SER_MODE_WIEGAND </b></font>
+'and <font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) each data character represents
+'one data bit and only bit0 (least significant bit) of each character is relevant (therefore, adding "0101" will result in
+'the 0101 sequence of data bits). <br><br>
+'If the buffer doesn't have enough space to accommodate the data being added then this data will be truncated. Newly saved data is not sent out
+'immediately. This only happens after the  <font color="maroon"><b>ser.send </b></font>) method is used to commit the data. This allows your
+'application to prepare large amounts of data before sending it out.<br><br>
+'Total amount of newly added (uncommitted) data in the buffer can be checked through the <font color="maroon"><b>ser.newtxlen</b></font>
+'setting. <br><br>
+'Also see <font color="maroon"><b>ser.txlen</b></font>, <font color="maroon"><b>ser.txfree</b></font>, <font color="maroon"><b>
+'ser.notifysent</b></font>, and <font color="teal"><b>on_ser_data_sent</b></font>. 
+
+'--------------------------------------------------------------------
+syscall(132) ser.send()
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) commits (allows sending) the data that was
+'previously saved into the TX buffer using the <font color="maroon"><b>ser.setdata</b></font> method.<br><br>
+'You can monitor the sending progress by checking the <font color="maroon"><b>ser.txlen </b></font>property or using the 
+'<font color="maroon"><b>ser.notifysent </b></font>method and the <font color="teal"><b>on_ser_data_sent </b></font>event. 
+
+'--------------------------------------------------------------------
+syscall(134) ser.notifysent(threshold as word)
+'<b>METHOD. </b><br><br>
+'Using this method for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) will cause the 
+'<font color="teal"><b>on_ser_data_sent </b></font> event to be generated when the amount of committed data in the TX buffer is found 
+'to be equal or below "threshold" number of bytes.<br><br>
+'Only one <font color="teal"><b>on_ser_data_sent </b></font>event will be generated each time after the <font color="maroon"><b>
+'ser.notifysent </b></font> is invoked. This method, together with the <font color="teal"><b>on_ser_data_sent </b></font>event 
+'provides a way to handle data sending asynchronously. <br><br>
+'Just like with <font color="maroon"><b>ser.txfree</b></font>, the trigger you set won't take into account any uncommitted data in the TX buffer.
+
+'--------------------------------------------------------------------
+syscall(85,"35.TDL"+) ser.rxbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) pre-requests "numpages" number of 
+'buffer pages (1 page= 256 bytes) for the RX buffer of the serial port. Returns actual number of pages that can be allocated.
+'Actual allocation happens when the <font color="maroon"><b>sys.buffalloc </b></font> method is used. <br><br>
+'The serial port is unable to RX data if its RX buffer has 0 capacity. Actual current buffer capacity can be checked through the
+'<font color="maroon"><b>ser.rxbuffsize </b></font> which returns buffer capacity in bytes. <br><br>
+'Relationship between the two is as follows: <font color="maroon"><b>ser.rxbuffsize</b></font>=num_pages*256-X (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>ser.rxbuffrq</b></font>. "-X" is because a number of bytes is needed for internal buffer
+'variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
+'Buffer allocation will not work if the serial port to which this buffer belongs is opened (<font color="maroon"><b>ser.enabled</b></font>=
+'<font color="olive"><b>1- YES</b></font>) at the time when <font color="maroon"><b>sys.buffalloc </b></font> executes. You can only change
+'buffer sizes of ports that are closed.
+'<br><br>
+'<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
+'<br><br>
+'See also <font color="maroon"><b>ser.txbuffrq </b></font>method.
+
+'--------------------------------------------------------------------
+syscall(86,"35.TDL"+) ser.txbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) pre-requests "numpages" number of 
+'buffer pages (1 page= 256 bytes) for the TX buffer of the serial port. Returns actual number of pages that can be allocated.
+'Actual allocation happens when the <font color="maroon"><b>sys.buffalloc </b></font> method is used. <br><br>
+'The serial port is unable to TX data if its TX buffer has 0 capacity. Actual current buffer capacity can be checked through the 
+'<font color="maroon"><b>ser.txbuffsize </b></font> which returns buffer capacity in bytes.<br><br>
+'Relationship between the two is as follows: <font color="maroon"><b>ser.txbuffsize</b></font>=num_pages*256-X (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>ser.txbuffrq</b></font>. "-X" is because a number of bytes is needed for internal buffer
+'variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
+'Buffer allocation will not work if the serial port to which this buffer belongs is opened (<font color="maroon"><b>ser.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) at the time when <font color="maroon"><b>sys.buffalloc </b></font> executes. You can only change
+'buffer sizes of ports that are closed.
+'<br><br>
+'<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
+'<br><br>
+'See also <font color="maroon"><b>ser.rxbuffrq </b></font> method.
+
+'--------------------------------------------------------------------
+syscall(79,"24.TDL") ser.redir(redir as pl_redir) as pl_redir
+'<b>METHOD. </b><br><br>
+'For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) redirects the data being RXed to the TX
+'buffer of the same serial port, different serial port, or another object that supports compatible buffers.<br><br>
+'The redir argument, as well as the value returned by this method are of "enum <font color="olive"><b>pl_redir </b></font>" type. The
+'<font color="olive"><b>pl_redir </b></font>defines a set of inter-object constants that include all possible redirections for this
+'platform. Specifying redir value of <font color="olive"><b>0- PL_REDIR_NONE </b></font>cancels redirection. <br><br>
+'When the redirection is enabled for a particular serial port, the <font color="teal"><b>on_ser_data_arrival</b></font>
+'event is not generated for this port. If redirection is being done on the port that is currently opened (<font color="maroon"><b>
+'ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>) then the port will be closed automatically. <br><br>
+'This method returns actual redirection result: <font color="olive"><b>0- PL_REDIR_NONE </b></font>if redirection failed or the same value
+'as the one that was passed in the redir argument if redirection was successful.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+property ser.div9600
+'<b>R/O PROPERTY (WORD), DEFAULT VALUE= "platform dependent". </b><br><br>
+'Returns the value to which the <font color="maroon"><b>ser.baudrate </b></font>property must be set in order to achieve the baudrate of 
+'9600bps under present operating conditions. <br><br>
+'This property will return a different value depending on the PLL mode of the device (see<font color="maroon"><b>sys.currentpll</b></font>).<br><br>
+'"Smart" applications will use this property to set baudrates independently of present operating conditions.<br><br>
+'The value may also differ between the serial ports on the same device. An example of such device is the EM2000. On this module, the ser.div9600 value for UART3 is different from the value for UARTS0~2.
+    get = syscall(126) as word
+end property
+#endif
+
+'--------------------------------------------------------------------
+property ser.sinkdata
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (normal data processing). </b><br><br>
+'For the currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>)
+'specifies whether the incoming data should be discarded.
+'<br><br>
+'Setting this property to
+'<font color="olive"><b>1- YES </b></font>
+'causes the port to automatically discard all incoming data without passing it to your application.
+'<br><br>
+'The <font color="teal"><b>on_ser_data_arrival </b></font>
+'event will not be generated, reading
+'<font color="maroon"><b>ser.rxlen </b></font>
+'will always return zero, and so on. No data will be reaching its destination even in case of buffer redirection
+'(see <font color="maroon"><b>ser.redir</b></font>).
+'<br><br>
+'Escape characters
+'(see <font color="maroon"><b>ser.esctype </b></font>and <font color="maroon"><b>ser.escchar</b></font>)
+'will still be detected in the incoming data stream.
+    get = syscall(11,"80.TDL"+) as no_yes
+    set= syscall(12,"80.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+syscall(635) !ser.gettxdata(maxinplen as word) as string
+syscall(636) !ser.setcommitrxdata(byref txdata as string)
+
+'--------------------------------------------------------------------
+event(9)  on_ser_esc
+'<b>EVENT of the ser object. </b><br><br> 
+'Generated when currently enabled escape sequence is detected in the received UART data stream. Once the serial escape sequence is detected 
+'on a certain serial port this port is automatically disabled (<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>
+'0- NO</b></font>).
+'<br><br>
+'When event handler for this event is entered the <font color="maroon"><b>ser.num </b></font>
+'property is automatically switched to the port
+'on which this event was generated. Whether or not escape sequence detection is enabled and what kind of escape sequence is expected is
+'defined by the
+'<font color="maroon"><b>ser.esctype </b></font>property.
+'<br><br>
+'Escape sequence detection works even when buffer redirection is set for the serial port using the <font color="maroon"><b>ser.redir
+'</b></font> method. Escape sequences are only recognized in the UART mode of the serial port (<font color="maroon"><b>ser.mode</b></font>
+'= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
+'<br><br>
+'Another <font color="teal"><b>on_ser_esc </b></font>
+'event for a particular port is never generated until the previous one is processed.
+'<br><br>
+
+'--------------------------------------------------------------------
+event(10) on_ser_data_arrival
+'<b>EVENT of the ser object. </b><br><br> Generated when at least one data byte is present in the RX buffer of the serial port (i.e. for this
+'port the  <font color="maroon"><b>ser.rxlen</b></font>)>0). When the event handler for this event is entered the <font color="maroon"><b>
+'ser.num </b></font>property is automatically switched to the port for which this event was generated. <br><br>
+'Another <font color="teal"><b>on_ser_data_arrival </b></font>event on a particular port is never generated until the previous one is
+'processed. Use <font color="maroon"><b>ser.getdata </b></font>method to extract the data from the RX buffer. <br><br>
+'You don't have to process all  data in the RX buffer at once. If you exit the <font color="teal"><b>on_ser_data_arrival
+'</b></font>event handler while there is still some unprocessed data in the RX buffer another <font color="teal"><b>on_ser_data_arrival
+'</b></font>event will be generated immediately. <br><br>
+'This event is not generated for a particular port when buffer redirection is set for this port through the <font color="maroon"><b>
+'ser.redir</b></font> method.
+
+'--------------------------------------------------------------------
+event(11) on_ser_data_sent
+'<b>EVENT of the ser object. </b><br><br> 
+'Generated after the total amount of committed data in the TX buffer of the serial port (<font color="maroon"><b>ser.txlen</b></font>) is 
+'found to be less than the threshold that was preset through the <font color="maroon"><b>ser.notifysent </b></font>method. <br><br>
+'This event may be generated only after the <font color="maroon"><b>ser.notifysent </b></font>method was used. Your application needs to use
+'the <font color="maroon"><b>ser.notifysent </b></font>method EACH TIME it wants to cause the <font color="teal"><b>on_ser_data_sent
+'</b></font>event generation for a particular port. <br><br>
+'When the event handler for this event is entered the <font color="maroon"><b>ser.num </b></font>is automatically switched to the port on
+'which this event was generated. Please, remember that uncommitted data in the TX buffer is not taken into account for the 
+'<font color="teal"><b>on_sock_data_sent </b></font>event generation.
+
+'--------------------------------------------------------------------
+event(12) on_ser_overrun
+'<b>EVENT of the ser object. </b><br><br> 
+'Generated when data overrun has occurred in the RX buffer of the serial port.
+'<br><br>
+'Another <font color="teal"><b>on_ser_overrun </b></font>
+'event for a particular port is never generated until the previous one is processed. <br><br>
+'When the event handler for this event is entered the <font color="maroon"><b>ser.num </b></font>property is automatically switched to the
+'port on which this event was generated. <br><br>
+'Data overruns are a common occurrence on serial lines. The overrun happens when the serial data is arriving into the RX buffer faster than
+'your application is able to extract it, the buffer runs out of space and "misses" some incoming data. <br><br>
+'For UART/full-duplex mode of the serial port (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART
+'</b></font> and <font color="maroon"><b>ser.interface</b></font>= <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX</b></font>) data overruns
+'can be prevented through the use of RTS/CTS flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>).

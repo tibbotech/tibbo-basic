@@ -1,0 +1,73 @@
+'**************************************************************************************************
+'       STOR (Storage system for "settings") object
+'**************************************************************************************************
+
+object stor
+'The stor object provides access to the non-volatile (EEPROM) memory in which your application can store data that
+'must not be lost when the device is switched off. <br><br>
+'Using this object you can also access and change the MAC address of the device (be careful with that!). 
+
+'--------------------------------------------------------------------
+syscall(58,"18.TDL") stor.getdata(startaddr as word, len as byte) as string
+'<b>METHOD. </b><br><br> 
+'Reads up to len number of bytes from the EEPROM starting from address startaddr (addresses are counted from 1).
+'Actual amount of extracted data is also limited by the capacity of the receiving variable and the starting address.<br><br>
+'EEPROM memory capacity can be checked through the <font color="maroon"><b>stor.size </b></font>read-only property. Notice that when the 
+'<font color="maroon"><b>stor.getdata </b></font>executes, an offset equal to the value of <font color="maroon"><b>stor.base </b></font>is 
+'added to the startaddr. <br><br>
+'For example, by default, the <font color="maroon"><b>stor.base </b></font>is 9. Therefore, if you do <font color="maroon"><b>
+'stor.getdata</b></font>(1,3) you are actually reading the data starting from physical EEPROM location 9. First 8 bytes of EEPROM are used to
+'store the MAC address. <br><br>
+'If you set the <font color="maroon"><b>stor.base </b></font>to 1 you will be able to access the EEPROM right from the physical address 0 and
+'change the MAC if necessary.<br><br>
+'Note: MAC address stored in the EEPROM has a certain formatting- see platform documentation for details.
+
+'--------------------------------------------------------------------
+syscall (59,"19.TDL") stor.setdata(byref datatoset as string, startaddr as word) as byte
+'<b>METHOD. </b><br><br> 
+'Writes data from the datatoset string into the EEPROM, starting from the address startaddr (addresses are counted from 1). Returns actual 
+'number of bytes written into the EEPROM. Hence, the operation has completed successfully if the value returned by this method equals the 
+'length of the datatoset string. <br><br>
+'If this is not the case then the write has (partially) failed and there may be two reasons for this: physical EEPROM failure or invalid
+'startaddr (too close to the end of memory to save the entire string). <br><br>
+'EEPROM memory capacity can be checked through the <font color="maroon"><b>stor.size </b></font>read-only property. Notice that when the 
+'<font color="maroon"><b>stor.setdata </b></font>executes, an offset equal to the value of <font color="maroon"><b>stor.base </b></font>is 
+'added to the startaddr. <br><br>
+'For example, by default, the <font color="maroon"><b>stor.base </b></font>is 8. Therefore, if you do <font color="maroon"><b>
+'stor.setdata</b></font>("ABC",1) you are actually saving the data starting from physical EEPROM location 9. First 8 bytes of EEPROM are 
+'used to store the MAC address and this mechanism prevents your program from overriting it by mistake. <br><br>
+'On the other hand, if you want to change MAC, set the <font color="maroon"><b>stor.base </b></font>to 1- this way you will be able to write 
+'to EEPROM starting from physical address 1.<br><br>
+'Note: if you change the MAC address this change will only take effect after device reboot. This is the only time when the device loads its MAC
+'address from the EEPROM into the Ethernet controller. MAC address stored in the EEPROM has a certain formatting- see platform documentation for 
+'details.
+
+'--------------------------------------------------------------------
+property stor.base
+'<b>PROPERTY (WORD), DEFAULT VALUE= 8. </b><br><br>
+'Returns the base address of the EEPROM from which the area available to your application starts. By default, the base address is 9 -- just 
+'above the special configuration area that stores MAC address of the device (8 bytes are needed for that).<br><br>
+'Default value of 9 makes sure that your application won't overwrite MAC by mistake. When you are accessing EEPROM memory using 
+'<font color="maroon"><b>stor.setdata </b></font>or <font color="maroon"><b>stor.getdata </b></font>methods, you specify the start address.
+'Actual physical address you access is start_address+<font color="maroon"><b>stor.base</b></font>. <br><br>
+'If your application needs to change the MAC address you can set the <font color="maroon"><b>stor.base </b></font>to 1- this way you will have
+'access to the entire memory.<br><br>
+'Also see <font color="maroon"><b>stor.size</b></font>.
+    get = syscall(181) as word
+    set = syscall(182) (value as word)
+end property
+
+'--------------------------------------------------------------------
+property stor.size
+'<b>R/O PROPERTY (WORD), DEFAULT VALUE= "actual_EEPROM_capacity-8" </b><br><br>
+'Returns total EEPROM memory capacity (in bytes) for the current device. First 8 bytes of the EEPROM are used by the special configuration
+'section (on this platform it occupies 8 bytes and stores MAC address of the device). By default, special configuration area is not accessible
+'to the application and is excluded from memory capacity reported by <font color="maroon"><b>stor.size</b></font>.<br><br>
+'For example, if the EEPROM capacity is 2048 bytes, the <font color="maroon"><b>stor.size </b></font>will return 2040 by default.
+'At the same time, the default value of <font color="maroon"><b>stor.base </b></font>property will be  9, meaning that the EEPROM locations 1-8 
+'are occupied by the special configuration area. <br><br>
+'If you set the <font color="maroon"><b>stor.base </b></font>to 1 (for instance, to edit the MAC address), the <font color="maroon"><b>stor.size 
+'</b></font>will show the capacity of 2048. In other words, the number this property returns is actual_EEPROM_capacity-
+'<font color="maroon"><b>stor.base</b></font>+1.
+    get = syscall(74) as word
+end property

@@ -1,0 +1,13 @@
+[project]
+name=empty_c_project
+output=output.tpc
+debug=on
+address=0.0.0.0.0.0
+[file1]
+path=main.tc
+type=c
+opened=active
+[file2]
+path=global.th
+type=cheader
+opened=yes

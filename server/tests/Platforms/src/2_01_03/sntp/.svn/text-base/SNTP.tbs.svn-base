@@ -1,0 +1,168 @@
+'***********************************************************************************************************
+'			 SNTP LIBARAY (SIMPLE NETWORK TIME PROTOCOL) THIS CODE CAN OBTAIN TIME FROM SNTP SERVER
+'***********************************************************************************************************
+'IP for some of the Time Servers changes sometimes, so we suggest using DNS to obtain your Time Server IP.
+'When the Query is sent to the Time Server, Server returns the amount of seconds from 1st Jan, 1900 00:00:00
+'to now.  This is called 64bits Timestamp format
+'***********************************************************************************************************
+include "global.tbh"
+
+'============================================================= 
+sub ConvertToTime(wMSW as word,
+	wLSW as word,	
+	byref wDayCount as word,
+	byref wMinCount as word,
+	byref bSec as byte)	
+'Take 4 bytes value from sock, which is the amount of seconds from 1st of Jan 1900 00:00:00 to now
+'convert this value into days,hours,mins,secs. 
+	dim wRemain,wFactor,wTemp,wTemp1,wTemp2,wTemp3 as word
+	dim wDays,wMinus,wSeconds as word
+	dim i,j as integer
+
+	wRemain = 0
+	wFactor = 0
+	wTemp1 = 0
+	wTemp2 = 0
+	wTemp3 = 0
+
+	wRemain = wMSW mod 24
+	wFactor = wMSW/24
+	wDays = wFactor * 18
+	wTemp1 = 0
+	 
+	for i = 1 to wFactor
+		wTemp1 = wTemp1 + 736
+		if wTemp1 > 3600 then 
+			wDays = wDays + 1
+			wTemp1 = wTemp1 - 3600
+		end if
+	next i 
+	for j = 1 to 18
+		wTemp2 = wTemp2 + wRemain
+		if wTemp2 > 24 then
+			wDays = wDays + 1
+			wTemp2 = wTemp2 -24
+		end if
+	next j
+	
+	'Put wTemp1 into Minutes and Seconds
+	wTemp3 = wRemain * 736
+	wTemp = wTemp1/60
+	wMinus = wTemp * 24
+	
+	'put wTemp2 into Minutes and Seconds
+	wSeconds = (wTemp1 mod 60) * 24
+	wMinus = wMinus + wTemp2 * 60
+	
+	'put wTemp3 into Minutes and Seconds
+	wMinus = wMinus + wTemp3/60
+	wSeconds = wSeconds + (wTemp3 mod 60) 
+	
+	'Add wLSW to Minutes and seconds
+	wMinus = wMinus + wLSW/60
+	wSeconds = wSeconds + (wLSW mod 60)
+	
+	'redistribute seconds to days.
+	wMinus = wMinus + wSeconds/60
+	bSec = wSeconds mod 60	
+	
+	wMinCount = wMinus mod 1440
+	wDayCount = wDays+(wMinus/1440)+ 1-36525 			'+1 because it counts start from 1st of January, (that is starting from 1)
+
+end sub
+
+'============================================================= 
+public sub SNTP_init
+'Initialize the sock for SNTP connection
+	dim s as string(5)	
+	sock.num = SOCK_SNTP
+
+	sock.txbuffrq(1)
+	sock.rxbuffrq(1)
+
+	sys.buffalloc
+	sock.protocol = PL_SOCK_PROTOCOL_UDP
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode=PL_SOCK_RECONMODE_3 
+end sub
+
+
+
+'============================================================= 
+public function GetSNTPTime(	
+	byref wDays as word,
+	byref wMinus as word,
+	byref bSeconds as byte) as sntp_states
+'extract the time from the rx buff
+	dim wMSW as word
+	dim wLSW as word
+	dim b1 as byte
+	dim b2 as byte
+	dim b3 as byte
+	dim b4 as byte
+	dim s as string
+	dim w as word
+	w=sys.timercount
+	sock.num = SOCK_SNTP
+	while sock.rxlen=0
+		if sys.timercount<w then w = 0
+		if sys.timercount>w+SNTP_WAIT_REPLY then
+			GetSNTPTime= SNTP_REPLY_TIMEOUT 'timeout while waiting for reply!
+			exit function
+		end if
+	wend
+	sock.nextpacket
+	s = sock.getdata(255)
+	b1 = asc(mid(s,41,1)) 'the time is in a 4 byte format, (64bits Timestamp format)
+	b2 = asc(mid(s,42,1))
+	b3 = asc(mid(s,43,1))
+	b4 = asc(mid(s,44,1))
+	wMSW = b1 * 256 + b2
+	wLSW = b3 * 256 + b4
+	ConvertToTime(wMSW, wLSW,wDays,wMinus,bSeconds)	'call ConvertToTime, to convert the 64bits timestamp into daycount, mincount, sec
+	if len(s) = 48 then 
+		GetSNTPTime = SNTP_TIME_SYNC_OK
+	else
+		GetSNTPTime = SNTP_ERROR_FORMAT 
+	end if
+end function
+
+'============================================================= 
+sub SNTPQuery
+'send query for time base to the time server
+	dim s as string
+	dim i as byte
+	sock.num = SOCK_SNTP
+	s = chr(&h0b)+strgen(47,chr(&h0))
+	sock.setdata(s)
+	sock.send
+end sub
+
+'============================================================= 
+public function ConnectToTimeServer(
+	sTimeServerIP as string, 
+	sTimeServerPort as string,		
+	byref wDays as word,
+	byref wMinus as word,
+	byref bSeconds as byte
+	) as sntp_states
+'Connect to SNTP Time Server specified by sTimeServerIP, the port 123 is the default value for time server
+	dim retry as byte
+	retry = SNTP_RETRY
+	while retry > 0 
+		sock.num = SOCK_SNTP
+		if sTimeServerPort = "" then
+			sock.targetport = 123
+		else
+			sock.targetport = val(sTimeServerPort)' 123 port is a common port for time server
+		end if
+		sock.targetip = sTimeServerIP 
+		sock.connect
+		SNTPQuery
+		ConnectToTimeServer = GetSNTPTime(wDays,wMinus,bSeconds)
+		sock.reset
+		if ConnectToTimeServer = SNTP_TIME_SYNC_OK then exit function
+		retry = retry -1
+	wend
+end function
+

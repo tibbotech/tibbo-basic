@@ -1,0 +1,162 @@
+'***********************************************************************************************************
+'			SETTINGS LIBRARY
+'***********************************************************************************************************
+
+'1- debug output in console.
+'0- no debug output.
+#ifndef STG_DEBUG_PRINT
+	#define STG_DEBUG_PRINT 0
+#endif
+
+'Name of the setting descriptor file
+'This file must be in your project and contain correct data!
+#ifndef STG_DESCRIPTOR_FILE
+	#define STG_DESCRIPTOR_FILE "settings.txt"
+#endif
+
+'0- non-volatile settings stored in the EEPROM
+'1- non-volatile settings stored in the file (on the flash disk)
+#ifndef STG_STORAGE_MEMORY
+	#define STG_STORAGE_MEMORY 0
+#endif
+
+'When STG_STORAGE_MEMORY= 1 (file), defines the filename in which setting values are stored
+#ifndef STG_FILENAME
+	#define STG_FILENAME "settings.dat"
+#endif
+
+'0- only one copy of data is stored for all settings.
+'1- two copies of data are stored for non-volatile settings. Only one copy is maintained for volatile settings.
+'2- two copies of data are stored for non-volatile and volatile settings.#ifndef STG_REDUNDANCY
+#ifndef STG_REDUNDANCY
+	#define STG_REDUNDANCY 0
+#endif
+
+'0- no timestamp is saved with settings
+'1- each setting keeps its own modification timestamp (one for all members)
+#ifndef STG_TIMESTAMP
+	#define STG_TIMESTAMP 0
+#endif
+
+'Set this to the actual number of settings in your project
+'Save memory -- set the exact number you need!
+'Range: 1-255
+#ifndef STG_MAX_NUM_SETTINGS
+	#define STG_MAX_NUM_SETTINGS 1
+#endif
+
+'If there are volatile settings in your project, set this to the necessary amount of RAM needed
+'Save memory -- set the exact number you need!
+#ifndef STG_RAM_ARRAY_SIZE
+	#define STG_RAM_ARRAY_SIZE 0
+#endif
+
+'0- volatile settings are saved into the "regular" RAM
+'1- volatile settings are saved using callback_stg_vm_write() and callback_stg_vm_read()
+#ifndef STG_RAM_TYPE
+	#define STG_RAM_TYPE 0
+#endif
+
+'Specifies maximum setting name lengths
+'Shorter names save memory!
+'Range: 1-255
+#ifndef STG_MAX_SETTING_NAME_LEN
+	#define STG_MAX_SETTING_NAME_LEN 2
+#endif 
+
+'Specifies maximum length for the setting value in string form
+'Trancation will occur if this value is insufficient
+'Smaller value saves memory!
+'Range: 1-253 (STG_TIMESTAMP 0)
+'Range: 1-246 (STG_TIMESTAMP 1)
+#ifndef STG_MAX_SETTING_VALUE_LEN
+	#define STG_MAX_SETTING_VALUE_LEN 16
+#endif 
+
+'Allows additional validation before settings are stored via callback_stg_validation_check
+'1- Enable additional validation
+'0- Disable additional validation
+#ifndef STG_ENABLE_VALIDATION_CALLBACK
+	#define STG_ENABLE_VALIDATION_CALLBACK 0
+#endif 
+
+'--------------------------------------------------------------------------------
+enum en_stg_rdwr
+	EN_STG_GET,			'Read operation
+	EN_STG_SET			'Write operation
+end enum
+
+'Status codes for setting-related operations
+enum en_stg_status_codes	
+	EN_STG_STATUS_OK,					'Operation completed successfully
+	EN_STG_STATUS_NOT_STARTED			'Stg_start() was not used or failed
+	EN_STG_STATUS_OUT_OF_FILE_NUMBERS,	'Need to open a file and there are no free file numbers left
+	EN_STG_STATUS_WRONG_DEFINE,			'Wrong #define value
+	EN_STG_STATUS_WRONG_DESCRIPTOR,		'Wrong descriptor file data
+	EN_STG_STATUS_UNKNOWN,				'Unknown setting or invalid setting number
+	EN_STG_STATUS_INVALID_INDEX,		'Invalid index (out-of-range)
+	EN_STG_STATUS_FAILURE,				'Read failure or write failure (checksum error, hardware malfunction, etc.)
+	EN_STG_STATUS_INVALID				'Invalid setting value
+end enum
+
+enum en_stg_init_modes
+	EN_STG_INIT_MODE_NORMAL,			'Initialize (or keep) settings according to the INI field in setting definition file
+	EN_STG_INIT_MODE_OVERRIDE,			'Initialize ALL settings irregardless of their condition
+	EN_STG_INIT_MODE_RAM_ONLY,			'Initialize (or keep) RAM ARR settings according to the INIT field in setting definition file
+	EN_STG_INIT_MODE_RAM_ONLY_OVERRIDE	'Initialize ALL RAM ARR settings irregardless of their condition
+end enum
+
+'--------------------------------------------------------------------------------
+type struct_stg_timestamp
+	ts_daycount as word
+	ts_mincount as word
+	ts_seconds as byte
+	ts_milsec as word
+end type
+
+'--------------------------------------------------------------------------------
+declare function stg_start() as en_stg_status_codes
+declare function stg_check_all(byref problem_stg as string) as en_stg_status_codes
+declare function stg_get_def(byref stg_name_or_num as string,index as byte,byref def_value as string) as en_stg_status_codes
+declare function stg_restore_member(byref stg_name_or_num as string, index as byte) as en_stg_status_codes
+declare function stg_restore_multiple(init_mode as en_stg_init_modes) as en_stg_status_codes
+declare function stg_get_num_settings() as byte
+declare function stg_get_num_members(byref stg_name_or_num as string, byref num_members as byte) as en_stg_status_codes
+declare function stg_get(byref stg_name_or_num as string, index as byte) as string
+declare sub stg_set(byref stg_name_or_num as string, index as byte, byref stg_value as string) 
+declare function stg_sg(byref stg_name_or_num as string,index as byte,byref stg_value as string,op as en_stg_rdwr) as en_stg_status_codes
+declare function stg_set_ts(byref stg_name_or_num as string) as en_stg_status_codes
+declare function stg_find(byref stg_name_or_num as string) as byte
+declare function stg_stype_get(byref stg_name_or_num as string) as byte
+
+declare sub callback_stg_error(byref stg_name_or_num as string, index as byte, status as en_stg_status_codes)
+'Callback procedure, informs of the error during the execution of stg_get() or set_set().
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_stg_pre_get(byref stg_name_or_num as string, index as byte, byref stg_value as string)
+'Callback procedure, informs that the setting member's value is being read through one of the STG library's procedures;
+'allows to update the setting member's value before it is returned by the STG library.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_stg_post_set(byref stg_name_or_num as string, index as byte, byref stg_value as string)
+'Callback procedure, informs that the setting member's value is being written to through one of the STG library's procedures;
+'allows to respond to the value change.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+#if STG_ENABLE_VALIDATION_CALLBACK
+declare sub callback_stg_validation_check(byref stg_name_or_num as string, index as byte, byref stg_value as string) as en_stg_status_codes
+'Callback procedure, before writing a value to a setting member, allow doing validation check according to the system rules;
+'For example: validation to a field that holds email address, or not allowing to set value '80' to a system port (creates a collision).
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+#endif 
+
+declare function callback_stg_vm_read(address as word) as byte
+'Callback procedure, required only when STG_RAM_TYPE=1, used to read one byte from a "custom" volatile memory.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_stg_vm_write(data_to_write as byte, address as word)
+'Callback procedure, required only when STG_RAM_TYPE=1, used to write one byte to a "custom" volatile memory.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+'--------------------------------------------------------------------------------
+declare stg_timestamp as struct_stg_timestamp

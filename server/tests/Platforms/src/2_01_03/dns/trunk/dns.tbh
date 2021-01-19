@@ -1,0 +1,46 @@
+
+'***********************************************************************************************************
+'			DNS LIBRARY
+'***********************************************************************************************************
+
+#ifndef DNS_DEBUG_PRINT
+	#define DNS_DEBUG_PRINT 0
+#endif
+
+'Status codes for dns-related operations
+enum en_dns_status_codes	
+	EN_STATUS_DNS_OK,
+	EN_STATUS_DNS_NOT_STARTED,
+	EN_STATUS_DNS_INVALID_SOCKET,
+	EN_STATUS_DNS_INVALID_INTERFACE,
+	EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE,
+	EN_STATUS_DNS_CONNECTION_TIMEOUT,
+	EN_STATUS_DNS_REPLY_TIMEOUT,
+	EN_STATUS_DNS_RECURSIVE_UNAVALIABLE,
+	EN_STATUS_DNS_NAME_ERROR,
+	EN_STATUS_DNS_NO_ANSWER,
+	EN_STATUS_DNS_BAD_ANSWER
+end enum
+
+enum en_dns_return_type
+	EN_DNS_RET_IP=1,
+	EN_DNS_RET_NAME_SERVER=2,
+	EN_DNS_RET_CANONICAL_NAME=5,
+	EN_DNS_RET_POINTER_RECORD=12,
+	EN_DNS_RET_HOST_INFO=13,
+	EN_DNS_RET_MAIL_EXCHANGE_SERVER=15
+end enum
+
+declare function dns_start(dns_sock_num as byte) as en_dns_status_codes
+declare function dns_connect(interface as pl_sock_interfaces, byref dns_server_ip as string, dns_port as word) as en_dns_status_codes
+declare sub dns_disconnect()
+declare sub dns_query(byref question as string)
+declare sub dns_proc_data()
+declare sub dns_proc_timer()
+declare sub dns_stop()
+
+declare sub callback_dns_failure(status as en_dns_status_codes)
+declare sub callback_dns_answer_acquired(return_type as en_dns_return_type, byref return_string as string)
+declare sub callback_dns_ok()
+declare sub callback_dns_pre_buffrq(num_of_pages_required as byte)
+declare sub callback_dns_buff_released()

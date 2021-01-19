@@ -1,0 +1,215 @@
+'**************************************************************************************************
+'       SSI (Synchronous Serial Interface) object
+'**************************************************************************************************
+
+#define SSI_AVAILABLE 1
+
+'--------------------------------------------------------------------
+object ssi
+'The ssi. object implements up to four serial synchronous interfaces (SSI) on the general-purpose I/O lines of your device.
+'Examples of such interfaces are SPI, I2C, clock/data, and numerous variations on these interfaces.
+
+'--------------------------------------------------------------------
+property ssi.baudrate
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 1 (the fastest clock rate possible). </b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets the clock rate on the CLK line (1-255).
+'<br><br>
+'When PLL is enabled (sys.currentpll= 1- PL_ON) the clock period can be calculated as 0.8us + ssi.baudrate * 0.1126uS.
+'With PLL disabled, the clock period will be 8 times longer.
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+'<br><br>
+'It is actually permissible to set the property to 0 -- this will be like setting it to 256 (slowest possible clock rate).
+'<br><br>
+'See also: ssi.direction, ssi.mode, ssi.zmode.
+    get = syscall(564,"82.TDL"+) as byte
+    set = syscall(565,"82.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property ssi.channel
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (channel #0 selected). </b><br><br>
+'Sets/returns the number of the currently selected SSI channel (channels are enumerated from 0).
+'There are four channels available (0-3).
+'<br><br>
+'All other properties and methods of this object relate to the channel selected through this property.
+    get = syscall(558,"82.TDL"+) as byte
+    set = syscall(559,"82.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property ssi.clkmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the clock (CLK) line of this channel.
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+'<br><br>
+'On devices with unidirectional I/O lines, the CLK line must be "manually" configured as output (see io.enabled= 1- YES).
+'<br><br>
+'See also: ssi.dimap, ssi.domap.
+    get = syscall(566,"82.TDL"+) as pl_io_num
+    set = syscall(567,"82.TDL"+) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property ssi.dimap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the data in (DI) line of this channel.
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+'<br><br>
+'On devices with unidirectional I/O lines, the DI line must be "manually" configured as input (see io.enabled= 0- NO).
+'<br><br>
+'See also: ssi.clkmap, ssi.domap.
+    get = syscall(570,"82.TDL"+) as pl_io_num
+    set = syscall(571,"82.TDL"+) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ssi_direction_options 
+    PL_SSI_DIRECTION_RIGHT,     '<b>PLATFORM CONSTANT. Data input/output least significant bit first.</b><br><br>.
+    PL_SSI_DIRECTION_LEFT       '<b>PLATFORM CONSTANT. Data input/output most significant bit first.</b><br><br>.
+end enum
+
+property ssi.direction
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_DIRECTION_RIGHT. </b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the direction of data input and output:
+'PL_SSI_DIRECTION_RIGHT means "least significant bit first", PL_SSI_DIRECTION_LEFT -- "most significant bit first".
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+    get = syscall(574,"82.TDL"+) as pl_ssi_direction_options
+    set = syscall(575,"82.TDL"+) (value as pl_ssi_direction_options)
+end property
+
+'--------------------------------------------------------------------
+property ssi.domap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the data out (DO) line of this channel.
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+'<br><br>
+'On devices with unidirectional I/O lines, the DO line must be "manually" configured as output (see io.enabled= 1- YES).
+'<br><br>
+'See also: ssi.clkmap, ssi.dimap.
+    get = syscall(568,"82.TDL"+) as pl_io_num
+    set = syscall(569,"82.TDL"+) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property ssi.enabled
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
+'Enables/disables the currently selected SSI channel (see ssi.channel).
+'<br><br>
+'SSI channel's operating parameters (ssi.baudrate, ssi.mode, etc.) can only be changed when the channel is disabled.
+'<br><br>
+'You can only send and receive the data (ssi.value, ssi.str) when the channel is enabled.
+    get = syscall(572,"82.TDL"+) as no_yes
+    set = syscall(573,"82.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ssi_modes 
+    PL_SSI_MODE_0,          '<b>PLATFORM CONSTANT.</b><br><br>.
+    PL_SSI_MODE_1,          '<b>PLATFORM CONSTANT.</b><br><br>.
+    PL_SSI_MODE_2,          '<b>PLATFORM CONSTANT.</b><br><br>.
+    PL_SSI_MODE_3           '<b>PLATFORM CONSTANT.</b><br><br>.
+end enum
+
+property ssi.mode
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_MODE_0. </b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the clock mode.
+'<br>
+'The mode corresponds to standard SPI modes 0-3:<br>
+'Mode 0: CPOL=0, CPHA=0<br>
+'Mode 1: CPOL=0, CPHA=1<br>
+'Mode 2: CPOL=1, CPHA=0<br>
+'Mode 3: CPOL=1, CPHA=1<br>
+'<br><br>
+'CPOL is "clock polarity", CPHA is "clock phase".
+'<br><br>
+'CPOL=0: clock line is LOW when idle:
+'<br>
+'  - CPHA=0: data bits are captured on the CLK's rising edge (LOW-to-HIGH transition) and data bits are propagated on the CLK's falling edge (HIGH-to-LOW transition).
+'<br>
+'  - CPHA=1: data bits are captured on the CLK's falling edge and data bits are propagated on the CLK's rising edge.
+'<br><br>
+'CPOL=1: clock line is HIGH when idle:
+'<br>
+'  - CPHA=0: data bits are captured on the CLK's falling edge and data bits are propagated on the CLK's rising edge.
+'<br>
+'  - CPHA=1: data bits are captured on the CLK's rising edge and data bits are propagated on the CLK's falling edge.
+'<br><br>
+'See also: ssi.baudrate, ssi.direction, ssi.zmode.
+    get = syscall(560,"82.TDL"+) as pl_ssi_modes
+    set = syscall(561,"82.TDL"+) (value as pl_ssi_modes)
+end property
+
+'--------------------------------------------------------------------
+enum pl_ssi_ack_modes 
+    PL_SSI_ACK_OFF,         '<b>PLATFORM CONSTANT. 8 bits per data byte. Acknowledgement bits are not transmitted (or expected to be received).</b><br><br>.
+    PL_SSI_ACK_RX,          '<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are expected to be generated by the slave and their presence will be verified.
+                    'The slave device should pull the DI line LOW on the 9th bit of the byte transmission.
+                    'Data exchange will be aborted if the slave device fails to acknowledge any of the bytes. This doesn't apply to the last byte because the method execution will
+                    'end after the transmission of this byte anyway.</b><br><br>.
+    PL_SSI_ACK_TX_ALL,      '<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte will be acknowledged by pulling the DI line low on the 9th bit
+                    'of the byte transmission.</b><br><br>.
+    PL_SSI_ACK_ALL_BUT_LAST     '<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte <b>except the last </b>will be acknowledged by pulling the DI line low
+                    'on the 9th bit of the byte transmission.
+'on the 9th bit of the transmission.</b><br><br>.
+end enum
+
+syscall(234) ssi.str(byref txdata as string, ack_bit as pl_ssi_ack_modes) as string
+'<b>METHOD.</b><br><br>
+'For the currently selected SSI channel (see ssi.channel) outputs a string of byte data to the slave device and simultaneously inputs the same amount of data from the slave device.
+'<br><br>
+'<b>Txdata </b>-- the string to send to the slave device.
+'<br><br>
+'<b>Ack_bit </b>-- defines how data bytes are transmitted and acknowledgements handled -- see pl_ssi_ack_modes for details.
+'<br><br>
+'The method will return a string of the same length as txdata or less if the transmission ended prematurely due to the acknowledgement error by the slave. Obviously, the error can only occur when ack_bit= PL_SSI_ACK_RX.
+'In this mode, if the slave device fails to acknowledge any byte "in the middle", the transmission will terminate. The length of the returned string will indicate how many bytes were sent. 
+'<br><br>
+'This method can be invoked only when ssi.enabled= 1- YES.
+'<br><br>
+'See also: ssi.value.
+
+'--------------------------------------------------------------------
+syscall(73) ssi.value(txdata as word, len as byte) as word
+'<b>METHOD.</b><br><br>
+'For the currently selected SSI channel (see ssi.channel) outputs a data word of up to 16 bits and simultaneously inputs a data word of the same length.
+'<br><br>
+'<b>Txdata </b>-- data to output to the slave device. The number of rightmost bits equal to the len argument will be sent.
+'<br><br>
+'<b>Len </b>-- Number of data bits to send to and receive from the slave device.
+'<br><br>
+'The method will return a 16-bit value containing the data received from the slave device, the number of bits received will be equal to the len argument,
+'and these data bits will be right-aligned within the returned 16-bit word.
+'<br><br>
+'Data input/output direction (least significant bit first or most significant bit first) is defined by the ssi.direction property. 
+'<br><br>
+'This method can be invoked only when ssi.enabled= 1- YES.
+'<br><br>
+'See also: ssi.str.
+
+'--------------------------------------------------------------------
+enum pl_ssi_zmodes 
+    PL_SSI_ZMODE_ALWAYS_ENABLED,    '<b>PLATFORM CONSTANT. The DO line toggles normally (by setting the output buffer to LOW or HIGH).</b><br><br>.
+    PL_SSI_ZMODE_ENABLED_ON_ZERO    '<b>PLATFORM CONSTANT. For HIGH state, the output buffer of the DO line is turned off, for LOW state, the output buffer is turned on and the line is set to LOW.</b><br><br>.
+end enum
+
+property ssi.zmode
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_ZMODE_ALWAYS_ENABLED. </b><br><br>
+'For the currently selected SSI channel (see ssi.channel) sets/returns the mode of the data out (DO) line:
+'<br>
+'PL_SSI_ZMODE_ALWAYS_ENABLED-- the DO line toggles normally by setting the output buffer to LOW or HIGH,
+'<br>
+'PL_SSI_ZMODE_ENABLED_ON_ZERO-- for HIGH state, the output buffer of the DO line is turned off, for LOW state, the output buffer is turned on and the line is set to LOW.
+'<br><br>
+'This property is only useful on devices with unidirectional I/O lines and in case the DO and DI lines are joined together, as necessary for the I2C and similar interfaces.
+'<br><br>
+'This property can only be changed when ssi.enabled= 0- NO.
+'<br><br>
+'See also: ssi.baudrate, ssi.direction, ssi.mode.
+    get = syscall(562,"82.TDL"+) as pl_ssi_zmodes
+    set = syscall(563,"82.TDL"+) (value as pl_ssi_zmodes)
+end property

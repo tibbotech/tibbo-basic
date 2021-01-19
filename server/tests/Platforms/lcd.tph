@@ -1,0 +1,856 @@
+'**************************************************************************************************
+'       LCD object
+'**************************************************************************************************
+
+#if OBJECT_LCD=LCD_ENABLED
+
+#define LCD_AVAILABLE 1
+
+object lcd
+'The lcd object is for operating a display panel. 
+
+'--------------------------------------------------------------------
+property lcd.backcolor
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
+'Specifies current background color.
+'<br><br>
+'The background color is used when drawing filled rectangles (
+'<font color="maroon"><b>lcd.filledrectangle</b></font>) and performing fills (
+'<font color="maroon"><b>lcd.fill</b></font>).  Property value interpretation depends on the currently selected controller/panel.
+'<br><br>
+'Only the <font color="maroon"><b>lcd.bitsperpixel </b></font> lower bits of this value will be relevant. All higher bits will be ignored.
+'<br><br>
+'For monochrome and grayscale controllers/panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>0- PL_LCD_PANELTYPE_GRAYSCALE</b></font>), this value will relate to the brightness of the pixel. For color panels/controllers (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>) the value is composed of three fields -- one each for the red, green, and blue "channels".  Check 
+'<font color="maroon"><b>lcd.redbits</b></font>, 
+'<font color="maroon"><b>lcd.greenbits</b></font>, and 
+'<font color="maroon"><b>lcd.bluebits </b></font>properties to see how the fields are combined into the color word.
+'<br><br>See also: 
+'<font color="maroon"><b>lcd.forecolor</b></font>, 
+'<font color="maroon"><b>lcd.linewidth</b></font>.
+    get = syscall(330,"57.TDL"+) as word
+    set = syscall(331,"57.TDL"+) (color as word)
+end property
+
+'--------------------------------------------------------------------
+property lcd.bitsperpixel
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the number of bits available for each pixel of the currently selected controller/panel.
+'<br><br>
+'For monochrome controllers/panels (see 
+'<font color="maroon"><b>lcd.paneltype</b></font>) the 
+'<font color="maroon"><b>lcd.bitsperpixel </b></font> will return 1, that is, the pixel can only be on or off.
+'For grayscale panels, this value will be >1, which indicates that each pixel can be set to a number of brightness levels. For example, if the 
+'<font color="maroon"><b>lcd.bitsperpixel</b></font>= 4, then each pixel's brightness can be adjusted in 16 steps.
+'<br><br>
+'For color panels, this property reflects the combined number of red, green, and blue bits available for each pixel (see 
+'<font color="maroon"><b>lcd.redbits</b></font>, 
+'<font color="maroon"><b>lcd.greenbits</b></font>, and 
+'<font color="maroon"><b>lcd.bluebits</b></font>). 
+'<br><br>
+'The number of bits per pixel affects how 
+'<font color="maroon"><b>lcd.forecolor</b></font>, 
+'<font color="maroon"><b>lcd.backcolor</b></font>, and 
+'<font color="maroon"><b>lcd.setpixel </b></font>are interpreted. Also, the output produced by 
+'<font color="maroon"><b>lcd.bmp </b></font>depends on this property.
+    get = syscall(325,LCD_DRIVER_TDL2) as byte
+end property
+
+'--------------------------------------------------------------------
+property lcd.bluebits
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'A 16-bit value packing two 8-bit parameters: number of "blue" bits per pixel (high byte) and the position of the least significant blue bit within the color word (low byte).
+'<br><br>
+'The value of this property depends on the currently selected controller/panel. This property is only relevant for color panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>).
+'<br><br>
+'Together with <font color="maroon"><b>lcd.greenbits </b></font>and 
+'<font color="maroon"><b>lcd.redbits</b></font>, this property allows you to understand the composition of a color word used in 
+'<font color="maroon"><b>lcd.setpixel</b></font>, 
+'<font color="maroon"><b>lcd.forecolor</b></font>, and 
+'<font color="maroon"><b>lcd.backcolor</b></font>.
+    get = syscall(369,LCD_DRIVER_TDL2) as word
+end property
+
+'--------------------------------------------------------------------
+syscall(364,"60.TDL") lcd.bmp(offset as dword, x as word, y as word, x_offset as word, y_offset as word, maxwidth as word, maxheight as word) as ok_ng
+'<b>METHOD. </b><br><br>
+'Displays a portion of or full image stored in a BMP file. Returns 
+'<font color="olive"><b>0- OK </b></font>if the image was processed successfully, or 
+'<font color="olive"><b>1- NG </b></font>if unsupported or invalid file format was detected.
+'<br><br>
+'<b>offset</b>- Offset within the compiled binary of your application at which the BMP file is stored. To obtain the offset, open the BMP file 
+'with romfile.open, then read the offset of this file from the 
+'<font color="maroon"><b>romfile.offset </b></font>R/O property. The BMP file must be present in your project for this to work (see how to add a file).
+'<br><br>
+'<b>x</b> -- X coordinate of the top-left point of the image position on the screen. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y</b> -- Y coordinate of the top-left point of the image position on the screen. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>x_offset</b> -- Horizontal offset within the BMP file marking the top-left corner of the image portion to be displayed.
+'<br>
+'<b>y_offset</b> -- Vertical offset within the BMP file marking the top-left corner of the image portion to be displayed.
+'<br>
+'<b>maxwidth</b> -- Maximum width of the image portion to be displayed. Actual width of the output will be defined by the total width of the image and specified x_offset.
+'<br>
+'<b>maxheight</b> -- Maximum height of the image portion to be displayed. Actual height of the output will be defined by the total height of the image and specified y_offset.
+'<br><br>
+'Note that only 2-, 16-, and 256-color modes are currently supported and the 
+'<font color="maroon"><b>lcd.bmp </b></font>will return 
+'<font color="olive"><b>1- NG </b></font>if you try to display any other type of BMP file. Compressed BMP files will be rejected too.
+
+'--------------------------------------------------------------------
+syscall(19,"60.TDL") lcd.bmpfromfile(ignored_parameter as dword, x as word, y as word, x_offset as word, y_offset as word, maxwidth as word, maxheight as word) as ok_ng
+
+'--------------------------------------------------------------------
+property lcd.enabled
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
+'Specifies whether the display panel is enabled.
+'<br><br>
+'Several properties -- 
+'<font color="maroon"><b>lcd.iomapping</b></font>, 
+'<font color="maroon"><b>lcd.width</b></font>, 
+'<font color="maroon"><b>lcd.height</b></font>, 
+'<font color="maroon"><b>lcd.inverted</b></font>, 
+'<font color="maroon"><b>lcd.rotated </b></font>-- can only be changed when the display panel is disabled.
+'<br><br>
+'When you set this property to 
+'<font color="olive"><b>1- YES</b></font>, the controller of the panel is initialized and enabled. This will only work if 
+'your display is properly connected, correct display type is selected in your project, 
+'<font color="maroon"><b>lcd.iomapping </b></font>is set property, and necessary I/O lines are configured as outputs. The 
+'<font color="maroon"><b>lcd.error </b></font>R/O property will indicate <font color="olive"><b>1- YES </b></font>if there was a problem enabling the display.
+'<br><br>
+'Setting the property to 
+'<font color="olive"><b>0- NO </b></font>disables the controller/panel.
+
+    get = syscall(308,"57.TDL"+) as no_yes
+    set = syscall(309,LCD_DRIVER_TDL3) (state as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property lcd.error
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no error detected).</b><br><br>
+'Indicates whether controller/panel I/O error has been detected.
+'<br><br>
+'The lcd. object will detect a malfunction (or absence) of the controller/panel that is expected to be connected.
+'If the display is not properly connected, or the lcd. object is not set up property to work with this display, the 
+'<font color="maroon"><b>lcd.error </b></font>will be set to 
+'<font color="olive"><b>1- YES </b></font>on attempt to enable the display (set 
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>).
+    get = syscall(310,"57.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+syscall(356,"61.TDL") lcd.fill(x as word,y as word, width as word, height as word)
+'<b>METHOD. </b><br><br>
+'Paints the area with the "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).
+'<br><br>
+'<b>x</b> -- X coordinate of the top-left point of the area to be painted. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y</b> -- Y coordinate of the top-left point  of the area to be painted. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>width</b> -- Width of the paint area in pixels.
+'<br>
+'<b>height</b> -- Height of the paint area in pixels.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.line</b></font>, 
+'<font color="maroon"><b>lcd.verline</b></font>, 
+'<font color="maroon"><b>lcd.horline</b></font>, 
+'<font color="maroon"><b>lcd.rectangle</b></font>,
+'<font color="maroon"><b>lcd.filledrectangle</b></font>.
+
+'--------------------------------------------------------------------
+syscall(361,"61.TDL") lcd.filledrectangle(x1 as word,y1 as word,x2 as word,y2 as word)
+'<b>METHOD. </b><br><br>
+'Draws a filled rectangle.
+'<br><br>
+'<b>x1</b> -- X coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y1</b> -- Y coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>x2</b> -- X coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y2</b> -- Y coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br><br>
+'The border is drawn with the specified line width (
+'<font color="maroon"><b>lcd.linewidth</b></font>) and "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).
+'The rectangle is then filled using the background color (
+'<font color="maroon"><b>lcd.backcolor</b></font>). Setting the 
+'<font color="maroon"><b>lcd.linewidth </b></font>to 0 will create a rectangle with no border -- basically, a filled area.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work. 
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.line</b></font>, 
+'<font color="maroon"><b>lcd.verline</b></font>, 
+'<font color="maroon"><b>lcd.horline</b></font>, 
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.fill</b></font>.
+
+'--------------------------------------------------------------------
+property lcd.fontheight
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Returns the maximum height, in pixels, of characters in the currently selected font.
+'<br><br>
+'This property will only return meaningful data after you select a font using the 
+'<font color="maroon"><b>lcd.setfont </b></font>method.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.fontpixelpacking</b></font>.
+    get = syscall(324,"57.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+property lcd.fontpixelpacking
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_VERTICAL (vertically adjacent pixels are packed into each byte).</b><br><br>
+'Indicates how pixels are packed into bytes in a currently selected font: 
+'<font color="olive"><b>0- PL_VERTICAL </b></font>when vertically adjacent pixels are packed into each byte, 
+'<font color="olive"><b>1- PL_HORIZONTAL </b></font>when horizontally adjacent pixels are packed into each byte.
+'<br><br>
+'Display controllers/panels can have vertical or horizontal pixel packing (see 
+'<font color="maroon"><b>lcd.pixelpacking</b></font>).
+'The speed at which you can output the text onto the screen is improved when the 
+'<font color="maroon"><b>lcd.pixelpacking </b></font>and 
+'<font color="maroon"><b>lcd.fontpixelpacking </b></font>have the same value,
+'i.e. controller memory pixels and font encoding are "aligned". Our font files are typically available both in vertical and horizontal pixel packing.
+'Pick the right file for your controller/panel.
+'<br><br>
+'This property will only return meaningful data after you select a font using the 
+'<font color="maroon"><b>lcd.setfont </b></font>method.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.fontheight</b></font>.
+    get = syscall(326,"57.TDL"+) as ver_hor
+end property
+
+'--------------------------------------------------------------------
+property lcd.forecolor
+'<b>PROPERTY (WORD), DEFAULT VALUE= 65535 (&hFFFF).</b><br><br>
+'Specifies current "pen" (drawing) color.
+'<br><br>
+'Pen color is used when drawing lines (
+'<font color="maroon"><b>lcd.line</b></font>, 
+'<font color="maroon"><b>lcd.verline</b></font>, 
+'<font color="maroon"><b>lcd.horline</b></font>) and rectangles (
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>), as well as displaying text (
+'<font color="maroon"><b>lcd.print</b></font>, 
+'<font color="maroon"><b>lcd.printaligned</b></font>). 
+'<br><br>
+'Property value interpretation depends on the currently selected controller/panel.
+'Selection is made through the Customize Platform dialog, accessible through the Project Settings dialog.
+'<br><br>
+'The property is of word type, but only 
+'<font color="maroon"><b>lcd.bitsperpixel </b></font> lower bits of this value will be relevant. All higher bits will be ignored.
+'<br><br>
+'For monochrome and grayscale controllers/panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>0- PL_LCD_PANELTYPE_GRAYSCALE</b></font>), this value will relate to the brightness of the pixel.  For color panels/controllers (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>) the value is composed of three fields -- one for the red, green, and blue "channels". Check 
+'<font color="maroon"><b>lcd.redbits</b></font>, 
+'<font color="maroon"><b>lcd.greenbits</b></font>, and 
+'<font color="maroon"><b>lcd.bluebits </b></font>properties to see how the fields are combined into the color word.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.backcolor</b></font>, 
+'<font color="maroon"><b>lcd.linewidth</b></font>.
+    get = syscall(328,"57.TDL"+) as word
+    set = syscall(329,"57.TDL"+) (color as word)
+end property
+
+'--------------------------------------------------------------------
+syscall(346,"58.TDL") lcd.getprintwidth(byref str as string) as word
+'<b>METHOD. </b><br><br>
+'Returns the width, in pixels, of the text output that will be produced if the <b>str</b> line is actually printed with the 
+'<font color="maroon"><b>lcd.print </b></font>method.
+'<br><br>
+'This method does not produce any output on the display, it merely estimates the width of the text if it was to be printed.
+'<font color="maroon"><b>Lcd.print </b></font>
+'also returns the width of the text in pixels, but this data comes after the printing.
+'Sometimes it is desirable to know the output width for the line of text before printing it, and this method allows you to do so.
+'<br><br>
+'The width calculation will be affected by the value of the 
+'<font color="maroon"><b>lcd.texthorizontalspacing </b></font>property.
+
+'--------------------------------------------------------------------
+property lcd.greenbits
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'A 16-bit value packing two 8-bit parameters: number of "green" bits per pixel (high byte) and the position of the least significant green bit within the color word (low byte).
+'<br><br>
+'The value of this property depends on the currently selected controller/panel. This property is only relevant for color panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>).
+'<br><br>
+'Together with <font color="maroon"><b>lcd.bluebits </b></font>and 
+'<font color="maroon"><b>lcd.redbits</b></font>, this property allows you to understand the composition of a color word used in 
+'<font color="maroon"><b>lcd.setpixel</b></font>, 
+'<font color="maroon"><b>lcd.forecolor</b></font>, and 
+'<font color="maroon"><b>lcd.backcolor</b></font>.
+    get = syscall(368,LCD_DRIVER_TDL2) as word
+end property
+
+'--------------------------------------------------------------------
+property lcd.height
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
+'Sets the vertical resolution of the display panel in pixels.
+'<br><br>
+'Set this property according to the characteristics of your display panel.
+'This value is not set automatically when you select a certain controller because the capability of the controller may exceed the actual resolution of the panel,
+'i.e. only "part" of the controller may be utilized.
+'<br><br>
+'This property can only be changed when the lcd is disabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>0- NO</b></font>). 
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.width</b></font>.
+    get = syscall(313,"57.TDL"+) as word
+    set = syscall(314,LCD_DRIVER_TDL2) (width as word)
+end property
+
+'--------------------------------------------------------------------
+syscall(358,"61.TDL") lcd.horline(x1 as word,x2 as word,y as word)
+'<b>METHOD. </b><br><br>
+'Draws a horizontal line.
+'<br><br>
+'<b>x1</b> -- X coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>x2</b> -- X coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y</b> -- Y coordinates of the first and second points. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br><br>
+'The line is drawn with the specified line width (
+'<font color="maroon"><b>lcd.linewidth</b></font>) and "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).  Drawing horizontal or vertical (
+'<font color="maroon"><b>lcd.verline</b></font>) lines is more efficient than drawing generic lines (
+'<font color="maroon"><b>lcd.line</b></font>), and should be used whenever possible.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>=
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>, 
+'<font color="maroon"><b>lcd.fill</b></font>.
+
+'--------------------------------------------------------------------
+property lcd.inverted
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (not inverted, higher memory value = higher pixel brightness).</b><br><br>
+'Specifies whether the image on the display panel has to be inverted: 
+'<font color="olive"><b>0- NO </b></font>(normal image), 
+'<font color="olive"><b>1- YES </b></font> (image must be inverted).
+'<br><br>
+'Set this property according to the characteristics of your display panel.
+'<br><br>
+'This value is not set automatically when you select a certain controller because the display characteristics cannot be detected automatically,
+'as they depend on the panel and its backlight arrangement.
+'<br><br>
+'This property can only be changed when the display is disabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>0- NO</b></font>). 
+    get = syscall(319,"57.TDL"+) as no_yes
+    set = syscall(320,"57.TDL"+) (inversion as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property lcd.iomapping
+'<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
+'Defines the list of I/O lines to interface with the currently selected controller/panel.
+'<br><br>
+'Different controllers/panels require a different set of interface lines, and even the number of lines depends on the hardware.
+'This property should contain a comma-separated list of decimal numbers that indicate which I/O lines and ports are used to connect the controller/panel to your device.
+'The meaning of each number in the list is controller- and panel-specific. See the Supported Controllers section of the Manual for details.
+'<br><br>
+'This property can only be changed when the display is disabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>0- NO</b></font>).
+    get = syscall(321,"25.TDL"+) as string
+    set = syscall(322,"26.TDL"+) (byref mapping as string)
+end property
+
+'--------------------------------------------------------------------
+syscall(357,"62.TDL") lcd.line(x1 as word,y1 as word, x2 as word, y2 as word)
+'<b>METHOD. </b><br><br>
+'Draws a line.
+'<br><br>
+'<b>x1</b> -- X coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>x2</b> -- Y coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>y1</b> -- X coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y2</b> -- Y coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br><br>
+'The line is drawn with the specified line width (
+'<font color="maroon"><b>lcd.linewidth</b></font>) and "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).  Drawing horizontal (
+'<font color="maroon"><b>lcd.horline</b></font>) or vertical (
+'<font color="maroon"><b>lcd.verline</b></font>) lines is more efficient than drawing generic lines, and should be used whenever possible.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also:  
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>, 
+'<font color="maroon"><b>lcd.fill</b></font>.
+
+'--------------------------------------------------------------------
+property lcd.linewidth
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
+'Specifies current "pen" width in pixels.
+'<br><br>
+'Pen width is used when drawing lines (
+'<font color="maroon"><b>lcd.line</b></font>, 
+'<font color="maroon"><b>lcd.verline</b></font>, 
+'<font color="maroon"><b>lcd.horline</b></font>) and rectangles (
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>).
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.forecolor</b></font>, 
+'<font color="maroon"><b>lcd.backcolor</b></font>.
+    get = syscall(362,"57.TDL"+) as byte
+    set = syscall(363,"57.TDL"+) (width as byte)
+end property
+
+'--------------------------------------------------------------------
+syscall(340,LCD_DRIVER_TDL) lcd.lock()
+'<b>METHOD. </b><br><br>
+'Freezes display output (on controllers/panels that support this feature).
+'<br><br>
+'When the display is locked, you can make changes to the display data without showing these changes on the screen.  You can then unlock the display (
+'<font color="maroon"><b>lcd.unlock</b></font>) and show all the changes made at once. This usually greatly improves the display agility perception by the user.
+'<br><br>
+'When you execute this method for the first time, the display gets locked and the 
+'<font color="maroon"><b>lcd.lockcount </b></font>R/O property changes from 0 to 1.  You can invoke 
+'<font color="maroon"><b>lcd.lock </b></font>again and again, and the 
+'<font color="maroon"><b>lcd.lockcount </b></font>will increase with each call to the 
+'<font color="maroon"><b>lcd.lock</b></font>. This allows you to nest locks/unlocks.  The display is locked for all 
+'<font color="maroon"><b>lcd.lockcount </b></font>values other than 0.
+
+'--------------------------------------------------------------------
+property lcd.lockcount
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0 (display unlocked).</b><br><br>
+'Indicates the current nesting level of the display lock.
+'<br><br>
+'Invoking <font color="maroon"><b>lcd.lock </b></font>increases the value of this property by 1. If 255 is reached, the value does not roll over to 0 and stays at 255.
+'Invoking <font color="maroon"><b>lcd.unlock </b></font>decreases the value of this property by 1. When 0 is reached, the value does not roll over to 255 and stays at 0.
+'The display is locked when 
+'<font color="maroon"><b>lcd.lockcount </b></font>is not at 0.
+'<br><br>
+'When the display is locked, you can make changes to the display data without showing these changes on the screen. You can then unlock the display and show all the changes made at once.
+'This usually greatly improves the display agility perception.
+'<br><br>
+'Not all controllers/panels support this feature. If your display does not support locking, executing 
+'<font color="maroon"><b>lcd.lock </b></font>will have no effect and 
+'<font color="maroon"><b>lcd.lockcount </b></font>will always stay at 0.
+    get = syscall(343,"57.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+enum pl_lcd_paneltype 
+    PL_LCD_PANELTYPE_GRAYSCALE, '<b>PLATFORM CONSTANT.</b><br> Monochrome or grayscale panel/controller.
+    PL_LCD_PANELTYPE_COLOR      '<b>PLATFORM CONSTANT.</b><br> Color panel/controller.
+end enum
+
+property lcd.paneltype
+'<b>PROPERTY (ENUM, BYTE).</b><br><br>
+'Returns the type of the currently selected controller/panel: 
+'<font color="olive"><b>0- PL_LCD_PANELTYPE_GRAYSCALE </b></font> for a monochrome or grayscale panel/controller, 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR </b></font> for color panel/controller.
+'<br><br>
+'Monochrome panels/controllers only allow you to turn pixels on and off. Grayscale panels/controllers allow you to set the brightness of pixels in steps.
+'The number of available steps is defined by the number of bits assigned to each pixel (see 
+'<font color="maroon"><b>lcd.bitsperpixel </b></font> property).
+'Finally, color panels/controllers allow you to set the brightness separately for the red, green, and blue components of each pixel.
+'<font color="maroon"><b>lcd.redbits</b></font>, 
+'<font color="maroon"><b>lcd.greenbits</b></font>, and 
+'<font color="maroon"><b>lcd.bluebits </b></font>R/O properties will tell you how many bits there are for each color "channel". 
+'<br><br>
+'Panel/controller type affects how 
+'<font color="maroon"><b>lcd.forecolor</b></font>, 
+'<font color="maroon"><b>lcd.backcolor</b></font>, and 
+'<font color="maroon"><b>lcd.setpixel </b></font>are interpreted. Also, the output produced by 
+'<font color="maroon"><b>lcd.bmp </b></font>is affected by this.
+    get = syscall(366,LCD_DRIVER_TDL2) as pl_lcd_paneltype
+end property
+
+'--------------------------------------------------------------------
+property lcd.pixelpacking
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_VERTICAL (vertically adjacent pixels are packed into each byte).</b><br><br>
+'Indicates how pixels are packed into controller memory for the currently selected controller/panel: 
+'<font color="olive"><b>0- PL_VERTICAL </b></font>when vertically adjacent pixels are packed into each byte,
+'<font color="olive"><b>1- PL_HORIZONTAL </b></font>when horizontally adjacent pixels are packed into each byte.
+'<br><br>
+'This property is only relevant for controllers/panels whose 
+'<font color="maroon"><b>lcd.bitsperpixel </b></font> value is less than 8. In this case, 2, 4, or 8 pixels are packed into a single byte of controller memory.
+'<br><br>
+'This property is purely informational and largely has no influence over how you write your application. The only exception is related to working with text.
+'Fonts can also have vertical or horizontal packing and the speed at which you can output the text onto the screen is improved when the 
+'<font color="maroon"><b>lcd.pixelpacking </b></font>and
+'<font color="maroon"><b>lcd.fontpixelpacking </b></font>have the same value, i.e. controller memory pixels and font encoding are "aligned".
+    get = syscall(327,LCD_DRIVER_TDL2) as ver_hor
+end property
+
+'--------------------------------------------------------------------
+syscall(344,"58.TDL") lcd.print(byref str as string,x as word,y as word) as word
+'<b>METHOD. </b><br><br>
+'Prints a <b>str </b>line of text at <b>x</b>, <b>y </b>coordinates. Returns total width of created output in pixels.
+'<br><br>
+'For this method to work, a font must first be selected with the 
+'<font color="maroon"><b>lcd.setfont </b></font>method. The 
+'<font color="maroon"><b>lcd.textorientation </b></font>and 
+'<font color="maroon"><b>lcd.texthorizontalspacing </b></font>properties affect how the text is printed.  This method always produces a single-line text output. Use 
+'<font color="maroon"><b>lcd.printaligned </b></font>if you want to print several lines of text at once.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.getprintwidth</b></font>.
+
+'--------------------------------------------------------------------
+syscall(345,"58.TDL") lcd.printaligned(byref str as string,x as word,y as word,width as word,height as word) as byte
+'<b>METHOD. </b><br><br>
+'Print texts, on several lines if necessary, within a specified rectangular area. Returns total number of text lines produced.
+'<br><br>
+'<b>str</b> -- Text to print. Inserting ` character will create a line break.
+'<br>
+'<b>x</b> -- X coordinate of the top-left point of the print area. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y</b> -- Y coordinate of the top-left point of the print area. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>width</b> -- Width of the print area in pixels.
+'<br>
+'<b>height</b> -- Height of the print area in pixels.
+'<br><br>
+'For this method to work, a font must first be selected with the 
+'<font color="maroon"><b>lcd.setfont </b></font>method.  The 
+'<font color="maroon"><b>lcd.textalignment</b></font>, 
+'<font color="maroon"><b>lcd.textorientation</b></font>, 
+'<font color="maroon"><b>lcd.texthorizontalspacing</b></font>, and 
+'<font color="maroon"><b>lcd.textverticalspacing </b></font>properties will affect how the text is printed.
+'<br><br>
+'This method breaks the text into lines to stay within the specified rectangular output area. Whenever possible, text is split without breaking up the words.
+'A word will be split if it is wider than the width of the print area. You can add arbitrary line brakes by inserting ` (ASCII code 96).
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+
+'--------------------------------------------------------------------
+syscall(360,"61.TDL") lcd.rectangle(x1 as word,y1 as word,x2 as word,y2 as word)
+'<b>METHOD. </b><br><br>
+'Draws an unfilled rectangle.
+'<br><br>
+'<b>x1</b> -- X coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y1</b> -- Y coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>x2</b> -- X coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y2</b> -- Y coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br><br>
+'The rectangle is drawn with the specified line width (
+'<font color="maroon"><b>lcd.linewidth</b></font>) and "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).  The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.line</b></font>, 
+'<font color="maroon"><b>lcd.verline</b></font>, 
+'<font color="maroon"><b>lcd.horline</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>, 
+'<font color="maroon"><b>lcd.fill</b></font>.
+
+'--------------------------------------------------------------------
+property lcd.redbits
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'A 16-bit value packing two 8-bit parameters: number of "red" bits per pixel (high byte) and the position of the least significant red bit within the color word (low byte).
+'<br><br>
+'The value of this property depends on the currently selected controller/panel. This property is only relevant for color panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>).
+'<br><br>
+'Together with 
+'<font color="maroon"><b>lcd.bluebits </b></font>and 
+'<font color="maroon"><b>lcd.greenbits</b></font>, this property allows you to understand the composition of a color word used in 
+'<font color="maroon"><b>lcd.setpixel</b></font>, 
+'<font color="maroon"><b>lcd.forecolor</b></font>, and 
+'<font color="maroon"><b>lcd.backcolor</b></font>.
+    get = syscall(367,LCD_DRIVER_TDL2) as word
+end property
+
+'--------------------------------------------------------------------
+property lcd.rotated
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (not rotated).</b><br><br>
+'Specifies whether the image on the display panel is to be rotated 180 degrees: 
+'<font color="olive"><b>0- NO </b></font>(not rotated), or 
+'<font color="olive"><b>1- YES </b></font>(rotated 180 degrees).
+'<br><br>
+'Set this property according to the orientation of the display panel in your device.
+'<br><br>
+'This property can only be changed when the display is disabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>0- NO</b></font>). 
+
+    get = syscall(317,"57.TDL"+) as no_yes
+    set = syscall(318,"57.TDL"+) (rotation as no_yes)
+end property
+
+'--------------------------------------------------------------------
+syscall(323,"59.TDL") lcd.setfont(offset as dword) as ok_ng
+'<b>METHOD. </b><br><br>
+'Selects a font to use for printing text. Returns 
+'<font color="olive"><b>0- OK </b></font>if the font was found and the data appears to be valid. Returns 
+'<font color="olive"><b>1- NG </b></font>if there is no valid font data at specified offset.
+'<br><br>
+'<b>Offset </b>is the offset within the compiled binary of your application at which the font file is stored.
+'<br><br>
+'A valid font file must be selected before you can use the 
+'<font color="maroon"><b>lcd.print</b></font>, 
+'<font color="maroon"><b>lcd.printaligned</b></font>, or 
+'<font color="maroon"><b>lcd.getprintwidth </b></font>methods.
+'Naturally, the font file must be present in your project for this to work (see how to add a font file).
+'To obtain correct offset, open the file using the romfile.open method, then read the offset of this file from the 
+'<font color="maroon"><b>romfile.offset </b></font>R/O property.
+'<br><br>
+'When the font file is successfully selected, the 
+'<font color="maroon"><b>lcd.fontheight </b></font>and 
+'<font color="maroon"><b>lcd.fontpixelpacking </b></font>R/O properties will be updated to reflect actual font parameters.
+
+'--------------------------------------------------------------------
+syscall(342,LCD_DRIVER_TDL) lcd.setpixel(dt as word,x as word,y as word)
+'<b>METHOD. </b><br><br>
+'Directly writes pixel data <b>dt </b>for a single pixel at <b>x</b>, <b>y </b>coordinates.
+'<br><br>
+'Interpretation of the dt argument depends on the selected controller/panel. Only 
+'<font color="maroon"><b>lcd.bitsperpixel </b></font> lower bits of this value will be relevant. All higher bits will be ignored.
+'<br><br>
+'For monochrome and grayscale controllers/panels (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>0- PL_LCD_PANELTYPE_GRAYSCALE</b></font>), the value of the dt argument sets the brightness of the pixel.
+'For color panels/controllers (
+'<font color="maroon"><b>lcd.paneltype</b></font>= 
+'<font color="olive"><b>1- PL_LCD_PANELTYPE_COLOR</b></font>) the value is composed of three fields -- one for the red, green, and blue "channels".  Check 
+'<font color="maroon"><b>lcd.redbits</b></font>, 
+'<font color="maroon"><b>lcd.greenbits</b></font>, and 
+'<font color="maroon"><b>lcd.bluebits </b></font>properties to see how the fields are combined into the dt word.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+
+'--------------------------------------------------------------------
+syscall(544,LCD_DRIVER_TDL4) lcd.getpixel(x as word,y as word) as word
+'<b>METHOD. </b><br><br>
+'UNDOCUMENTED
+
+'--------------------------------------------------------------------
+enum pl_lcd_text_alignment 
+    PL_LCD_TEXT_ALIGNMENT_TOP_LEFT,      '<b>PLATFORM CONSTANT.</b><br> Top, left.
+    PL_LCD_TEXT_ALIGNMENT_TOP_CENTER,    '<b>PLATFORM CONSTANT.</b><br> Top, center.
+    PL_LCD_TEXT_ALIGNMENT_TOP_RIGHT,     '<b>PLATFORM CONSTANT.</b><br> Top, right.
+    PL_LCD_TEXT_ALIGNMENT_MIDDLE_LEFT,   '<b>PLATFORM CONSTANT.</b><br> Middle, left.
+    PL_LCD_TEXT_ALIGNMENT_MIDDLE_CENTER, '<b>PLATFORM CONSTANT.</b><br> Middle, center.
+    PL_LCD_TEXT_ALIGNMENT_MIDDLE_RIGHT,  '<b>PLATFORM CONSTANT.</b><br> Middle, right.
+    PL_LCD_TEXT_ALIGNMENT_BOTTOM_LEFT,   '<b>PLATFORM CONSTANT.</b><br> Bottom, left.
+    PL_LCD_TEXT_ALIGNMENT_BOTTOM_CENTER, '<b>PLATFORM CONSTANT.</b><br> Bottom, center.
+    PL_LCD_TEXT_ALIGNMENT_BOTTOM_RIGHT   '<b>PLATFORM CONSTANT.</b><br> Bottom, right.
+end enum
+
+'--------------------------------------------------------------------
+property lcd.textalignment
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LCD_TEXT_ALIGNMENT_TOP_LEFT (top, left).</b><br><br>
+'Specifies the alignment for text output produced by the 
+'<font color="maroon"><b>lcd.printaligned </b></font>method. There are 9 alignment choices from "top, left" to "bottom, right". 
+'<br><br>
+'<font color="maroon"><b>Lcd.printaligned </b></font>fits the text within a specified rectangular area. 
+'<font color="maroon"><b>lcd.textalignment </b></font>defines how the text will be aligned within this area.
+'The property has no bearing on the output produced by 
+'<font color="maroon"><b>lcd.print</b></font>.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.textorientation</b></font>, 
+'<font color="maroon"><b>lcd.texthorizontalspacing</b></font>, 
+'<font color="maroon"><b>lcd.textverticalspacing</b></font>.
+    get = syscall(334,"57.TDL"+) as pl_lcd_text_alignment
+    set = syscall(335,"57.TDL"+) (alignment as pl_lcd_text_alignment)
+end property
+
+'--------------------------------------------------------------------
+property lcd.texthorizontalspacing
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
+'Specifies the gap, in pixels, between characters of text output produced by the 
+'<font color="maroon"><b>lcd.print </b></font>and 
+'<font color="maroon"><b>lcd.printaligned </b></font>methods.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.textalignment</b></font>, 
+'<font color="maroon"><b>lcd.textorientation</b></font>, 
+'<font color="maroon"><b>lcd.textverticalspacing</b></font>.
+    get = syscall(336,"57.TDL"+) as byte
+    set = syscall(337,"57.TDL"+) (spacing as byte)
+end property
+
+'--------------------------------------------------------------------
+enum pl_lcd_text_orientation 
+    PL_LCD_TEXT_ORIENTATION_0,   '<b>PLATFORM CONSTANT.</b><br> At 0 degrees.
+    PL_LCD_TEXT_ORIENTATION_90,  '<b>PLATFORM CONSTANT.</b><br> At 90 degrees.
+    PL_LCD_TEXT_ORIENTATION_180, '<b>PLATFORM CONSTANT.</b><br> At 180 degrees.
+    PL_LCD_TEXT_ORIENTATION_270  '<b>PLATFORM CONSTANT.</b><br> At 270 degrees.
+end enum
+
+property lcd.textorientation
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_LCD_TEXT_ORIENTATION_0 (at 0 degrees).</b><br><br>
+'Specifies the print angle for text output produced by the 
+'<font color="maroon"><b>lcd.print </b></font>and 
+'<font color="maroon"><b>lcd.printaligned </b></font>methods.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.textalignment</b></font>, 
+'<font color="maroon"><b>lcd.texthorizontalspacing</b></font>, 
+'<font color="maroon"><b>lcd.textverticalspacing</b></font>.
+    get = syscall(332,"57.TDL"+) as pl_lcd_text_orientation
+    set = syscall(333,"57.TDL"+) (orientation as pl_lcd_text_orientation)
+end property
+
+'--------------------------------------------------------------------
+property lcd.textverticalspacing
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
+'Specifies the gap, in pixels, between the lines of text output produced by the 
+'<font color="maroon"><b>lcd.printaligned </b></font>method.
+'<br><br>
+'The property has no bearing on the output produced by 
+'<font color="maroon"><b>lcd.print</b></font>, because this method always creates a single-line output.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.textalignment</b></font>, 
+'<font color="maroon"><b>lcd.textorientation</b></font>, 
+'<font color="maroon"><b>lcd.texthorizontalspacing</b></font>.
+    get = syscall(338,"57.TDL"+) as byte
+    set = syscall(339,"57.TDL"+) (spacing as byte)
+end property
+
+'--------------------------------------------------------------------
+syscall(341,LCD_DRIVER_TDL) lcd.unlock()
+'<b>METHOD. </b><br><br>
+'Unfreezes display output (on controllers/panels that support this feature).
+'<br><br>
+'When the display is locked (see 
+'<font color="maroon"><b>lcd.lock</b></font>), you can make changes to the display data without showing these changes on the screen.
+'You can then unlock the display (<font color="maroon"><b> lcd.unlock</b></font>) and
+'show all the changes made at once. This usually greatly improves the display agility perception by the user.
+'<br><br>
+'Each time you execute this method on a previously locked display, the value of the 
+'<font color="maroon"><b>lcd.lockcount </b></font>R/O property decreases by 1.  Once this value reaches 0, the display is unlocked and the user sees updated display data.  The 
+'<font color="maroon"><b>lcd.lockcount </b></font>allows you to nest locks/unlocks.
+
+'--------------------------------------------------------------------
+syscall(359,"61.TDL") lcd.verline(x as word,y1 as word,y2 as word)
+'<b>METHOD. </b><br><br>
+'Draws a vertical line.
+'<br><br>
+'<b>x</b> -- X coordinates of the first and second points. Value range is 0 to 
+'<font color="maroon"><b>lcd.width</b></font>-1.
+'<br>
+'<b>y1</b> -- Y coordinate of the first point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br>
+'<b>y2</b> -- Y coordinate of the second point. Value range is 0 to 
+'<font color="maroon"><b>lcd.height</b></font>-1.
+'<br><br>
+'The line is drawn with the specified line widht (
+'<font color="maroon"><b>lcd.linewidth</b></font>) and "pen" color (
+'<font color="maroon"><b>lcd.forecolor</b></font>).
+'Drawing horizontal (
+'<font color="maroon"><b>lcd.horline</b></font>) or vertical lines is more efficient than drawing generic lines (
+'<font color="maroon"><b>lcd.line</b></font>) and should be used whenever possible.
+'<br><br>
+'The display panel must be enabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>1- YES</b></font>) for this method to work.
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.rectangle</b></font>, 
+'<font color="maroon"><b>lcd.filledrectangle</b></font>, 
+'<font color="maroon"><b>lcd.fill</b></font>.
+
+'--------------------------------------------------------------------
+property lcd.width
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
+'Sets the horizontal resolution of the display panel in pixels.
+'<br><br>
+'Set this property according to the characteristics of your display panel.
+'The reason why this value is not set automatically when you select a certain controller is because the capability of the controller may exceed the actual resolution of the panel,
+'i.e. only "part" of the controller may be utilized.
+'<br><br>
+'This property can only be changed when the display is disabled (
+'<font color="maroon"><b>lcd.enabled</b></font>= 
+'<font color="olive"><b>0- NO</b></font>). 
+'<br><br>
+'See also: 
+'<font color="maroon"><b>lcd.height</b></font>.
+    get = syscall(311,"57.TDL"+) as word
+    set = syscall(312,LCD_DRIVER_TDL2) (width as word)
+end property
+
+'--------------------------------------------------------------------
+syscall(347,LCD_DRIVER_TDL) !lcd.set8pixelsver(dt as byte,numbits as byte,x as word,y as word)
+
+'--------------------------------------------------------------------
+syscall(348,LCD_DRIVER_TDL) !lcd.set8pixelshor(dt as byte,numbits as byte,x as word,y as word)
+
+'--------------------------------------------------------------------
+syscall(365,LCD_DRIVER_TDL) !lcd.hsfill(color as word, x as word, y as word, width as word, height as word)
+
+'--------------------------------------------------------------------
+syscall(371,"35.TDL") !lcd.buffrq(numpages as byte) as byte
+
+'--------------------------------------------------------------------
+property !lcd.buffsize
+    get = syscall(355,"57.TDL"+) as word
+end property
+
+#endif

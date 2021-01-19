@@ -1,0 +1,22 @@
+'***********************************************************************************************************
+'			FILE NUMBER ALLOCATION LIBRARY
+'***********************************************************************************************************
+
+#ifndef FILENUM_DEBUG_PRINT
+	#define FILENUM_DEBUG_PRINT 0
+#endif
+
+'Maximum length of the file number user's signature string
+#ifndef FILENUM_MAX_SIGNATURE_LEN
+	#define FILENUM_MAX_SIGNATURE_LEN 0
+#endif
+
+#ifndef FILENUM_MAX_FILENAME_LEN
+	#define FILENUM_MAX_FILENAME_LEN 0
+#endif
+
+'------------------------------------------------------------------------------
+declare function filenum_open(byref signature as string, byref filename as string, byref status as pl_fd_status_codes) as byte
+declare function filenum_get(byref signature as string) as byte
+declare function filenum_who_uses(file_num as byte) as string
+declare sub filenum_release(file_num as byte)

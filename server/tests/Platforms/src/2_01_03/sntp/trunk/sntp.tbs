@@ -1,0 +1,504 @@
+'***********************************************************************************************************
+'			SNTP LIBRARY
+'			(Obtains date/time from an SNTP server)
+'
+'
+'                           1                   2                   3
+'       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |LI | VN  |Mode |    Stratum    |     Poll      |   Precision   |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                          Root Delay                           |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                       Root Dispersion                         |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                     Reference Identifier                      |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                                                               |
+'      |                   Reference Timestamp (64) T1                 |
+'      |                                                               |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                                                               |
+'      |                   Originate Timestamp (64) T2                 |
+'      |                                                               |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                                                               |
+'      |                    Receive Timestamp (64) T3                  |
+'      |                                                               |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                                                               |
+'      |                    Transmit Timestamp (64) T4                 |
+'      |                                                               |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                 Key Identifier (optional) (32)                |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'      |                                                               |
+'      |                                                               |
+'      |                 Message Digest (optional) (128)               |
+'      |                                                               |
+'      |                                                               |
+'      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'
+'
+'
+'		64bits Timestamp format
+'
+'		0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+'		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'		| Seconds                                                       |
+'		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'		| Seconds Fraction (0-padded)                                   |
+'		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+'		
+'
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'------------------------------------------------------------------------------
+const SNTP_STAMP="SNTP> "
+const SNTP_CR_LF=chr(13)+chr(10)
+const SNTP_STD_SERVER_IP="192.43.244.18"
+const SNTP_STD_SERVER_PORT=123
+
+'------------------------------------------------------------------------------
+enum en_sntp_phases 
+	SNTP_PHASE_IDLE,
+	SNTP_PHASE_CONNECTING,
+	SNTP_PHASE_RQUESTING
+end enum
+
+'------------------------------------------------------------------------------
+declare sub sntp_release_buffer()
+declare sub sntp_convert_to_time(ts_val as dword, byref w_daycount as word,byref w_mincount as word,byref b_sec as byte)
+declare sub sntp_debug_print_status(status as en_sntp_status_codes)
+declare sub sntp_debugprint(byref print_data as string)
+declare sub sntp_send_request()
+declare function sntp_ts_to_dword(ts as string(4)) as dword
+
+#if SNTP_OFFSET_CALCULATION
+	declare function sntp_dword_to_ts(ts_val as dword) as string(4)
+	declare function sntp_get_clock_ts() as dword
+#endif
+'------------------------------------------------------------------------------
+dim sntp_sock as byte
+dim sntp_phase as en_sntp_phases
+dim sntp_retry_ctr as byte
+dim sntp_reply_timer as byte
+
+'==============================================================================
+public sub sntp_init()
+'Initialize the sock for SNTP connection
+
+	sntp_phase=SNTP_PHASE_IDLE
+	sntp_sock=255
+end sub
+
+'------------------------------------------------------------------------------
+public function sntp_start(interface as pl_sock_interfaces,byref server_ip as string,server_port as word,socket as byte) as en_sntp_status_codes
+'Connect to SNTP Time Server specified by sntp_server_ip, at sntp_server_port.
+
+	sntp_sock=socket
+	sntp_start=SNTP_STATUS_OK
+		
+	if socket>=sock.numofsock then
+		#if SNTP_DEBUG_PRINT
+			SNTP_debug_print_status(SNTP_STATUS_INVALID_SOCKET)
+			SNTP_debugprint("---FAILURE---")
+		#endif
+		SNTP_start=SNTP_STATUS_INVALID_SOCKET
+		exit function
+	end if
+	
+	if sntp_phase<>SNTP_PHASE_IDLE then
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Already started")
+		#endif
+		exit function
+	end if
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("---START---")
+	#endif
+
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			goto sntp_start_continue
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			goto sntp_start_continue
+		end if
+	#endif
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debug_print_status(SNTP_STATUS_INVALID_INTERFACE)
+		sntp_debugprint("---FAILURE---")
+	#endif
+	sntp_start=SNTP_STATUS_INVALID_INTERFACE
+	exit function 'invalid interface specified
+
+sntp_start_continue:
+	sock.num=sntp_sock
+	sock.protocol=PL_SOCK_PROTOCOL_UDP
+	sock.targetinterface=interface
+
+	if server_ip="" then
+		sock.targetip=SNTP_STD_SERVER_IP
+	else
+		sock.targetip=server_ip
+	end if
+	
+	if server_port=0 then
+		sock.targetport=SNTP_STD_SERVER_PORT
+	else
+		sock.targetport=server_port
+	end if
+
+	if sys.freebuffpages<2 then 
+		callback_sntp_pre_buffrq(2-sys.freebuffpages)
+	end if
+	
+	sock.num=sntp_sock
+	sock.txbuffrq(1)
+	sock.rxbuffrq(1)
+	sys.buffalloc
+	
+	if sock.rxbuffsize<1 or sock.txbuffsize<1 then 
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE)
+			sntp_debugprint("---FAILURE---")
+		#endif	
+		sntp_release_buffer()
+		sntp_start=SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE
+		exit function
+	end if
+
+	sock.num=sntp_sock
+
+	sock.connect
+	sntp_phase=SNTP_PHASE_CONNECTING
+	sntp_reply_timer=SNTP_REPLY_TIMEOUT
+	sntp_retry_ctr=SNTP_RETRY
+	
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("Connecting to SNTP server at "+sock.targetip+":"+str(sock.targetport))
+	#endif
+end function
+
+'------------------------------------------------------------------------------
+public sub sntp_proc_timer()
+	dim w as word
+	
+	if sntp_reply_timer>0 then
+		sntp_reply_timer=sntp_reply_timer-1
+		if sntp_reply_timer>0 then
+			exit sub
+		end if
+	end if
+	
+	select case sntp_phase
+	case SNTP_PHASE_IDLE:
+		'---
+		
+	case SNTP_PHASE_CONNECTING:
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_CONNECTION_TIMEOUT)
+		#endif		
+
+		sntp_retry_ctr=sntp_retry_ctr-1
+		if sntp_retry_ctr=0 then
+			goto sntp_failed
+		end if
+
+		sock.num=sntp_sock
+		if sock.statesimple=PL_SSTS_CLOSED then
+			sock.connect
+		end if
+		sntp_reply_timer=SNTP_REPLY_TIMEOUT
+		
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Connecting to SNTP server at "+sock.targetip+":"+str(sock.targetport))
+		#endif		
+
+	case SNTP_PHASE_RQUESTING:
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_REPLY_TIMEOUT)
+		#endif
+
+		sntp_retry_ctr=sntp_retry_ctr-1
+		if sntp_retry_ctr=0 then
+			goto sntp_failed
+		end if
+
+		sntp_send_request()
+		sntp_reply_timer=SNTP_REPLY_TIMEOUT
+	end select
+	exit sub
+
+sntp_failed:
+	sntp_release_buffer()
+	if sntp_phase=SNTP_PHASE_CONNECTING then
+		callback_sntp_failure(SNTP_STATUS_CONNECTION_TIMEOUT)
+	else
+		callback_sntp_failure(SNTP_STATUS_REPLY_TIMEOUT)
+	end if
+	sntp_phase=SNTP_PHASE_IDLE
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("---FAILURE---")
+	#endif					
+end sub
+
+'------------------------------------------------------------------------------
+public sub sntp_proc_sock_event(state as pl_sock_state_simple)
+
+	if sock.num<>sntp_sock then exit sub
+	if sock.statesimple=PL_SSTS_EST then
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Connection established")
+		#endif
+		sntp_send_request()
+		sntp_reply_timer=SNTP_REPLY_TIMEOUT
+		sntp_retry_ctr=SNTP_RETRY
+		sntp_phase=SNTP_PHASE_RQUESTING
+	end if
+end sub
+
+'------------------------------------------------------------------------------
+sub sntp_send_request()
+	dim s as string(48)
+	
+	s=chr(&h0b)+strgen(47,chr(&h0))
+	#if SNTP_OFFSET_CALCULATION	
+		dim s1 as string(4)
+		s1=sntp_dword_to_ts(sntp_get_clock_ts())
+		insert(s,41,s1)
+	#endif
+	
+	sock.setdata(s)
+	sock.send	
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("TX request")
+	#endif
+end sub
+
+'------------------------------------------------------------------------------
+public sub sntp_proc_data()
+	dim w_days,w_mins as word
+	dim b_seconds as byte
+	dim s as string(64)
+	dim t4 as string(4)
+	dim d4 as dword
+	
+	#if SNTP_OFFSET_CALCULATION	
+		dim t1, t2, t3 as string(4)
+		dim d1, d2, d3 as dword
+	#endif 
+	
+	if sock.num<>sntp_sock then exit sub
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("RX reply")
+	#endif
+
+	sock.num=sntp_sock
+	s=sock.getdata(255)
+	
+	if len(s)<>48 then
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_REPLY_DATA_ERROR)
+		#endif
+		
+		sntp_reply_timer=1
+		exit sub
+	end if
+
+	t4=mid(s,41,4)
+	d4=sntp_ts_to_dword(t4)	
+
+#if SNTP_OFFSET_CALCULATION	
+	t1=mid(s,17,4)
+	t2=mid(s,25,4)
+	t3=mid(s,33,4)
+	
+	d1=sntp_ts_to_dword(t2)	
+	d2=sntp_ts_to_dword(t3)	
+	d3=sntp_get_clock_ts()
+	
+	if d1>0 then
+		'get the roundtrip delay
+		d3=d3-d1
+		d2=d4-d2
+		d3=d3-d2
+		d3=d3/2
+		d4=d4+d3
+	end if
+#endif
+
+	sntp_convert_to_time(d4, w_days,w_mins,b_seconds)	'call convert_to_time, to convert the 64bits timestamp into daycount, mincount, sec
+	
+	sntp_phase=SNTP_PHASE_IDLE
+	sntp_release_buffer()
+	
+	#if SNTP_DEBUG_PRINT
+		s="---OK(GMT+0="+str(2000+year(w_days))+"/"+str(month(w_days))+"/"+str(date(w_days))+" "+str(hours(w_mins))+":"+str(minutes(w_mins))+":"+str(b_seconds)+")---"
+		sntp_debugprint(s)
+	#endif	
+	callback_sntp_ok(w_days,w_mins,b_seconds)
+end sub
+
+'------------------------------------------------------------------------------
+sub sntp_convert_to_time(
+	ts_val as dword,				'least significant word
+	byref w_daycount as word,	'day count from 1st of Jan 1900
+	byref w_mincount as word,	'minute count from 00:00
+	byref b_sec as byte			'seconds
+	)	
+'Take 4 bytes value from sock, which is the amount of seconds from 1st of Jan 1900 00:00:00 to now
+'convert this value into days,hours,mins,secs. 
+	dim w_remain,w_factor,w_temp,w_temp1,w_temp2,w_temp3 as word
+	dim w_days,w_mins,w_seconds as word
+	dim i,j as integer
+	dim w_msw, w_lsw as word
+	
+	w_msw=ts_val/65536
+	w_lsw=ts_val mod 65536
+	w_remain=0
+	w_factor=0
+	w_temp1=0
+	w_temp2=0
+	w_temp3=0
+
+	w_remain=w_msw mod 24
+	w_factor=w_msw/24
+	w_days=w_factor * 18
+	w_temp1=0
+	 
+	for i=1 to w_factor
+		w_temp1=w_temp1 + 736
+		if w_temp1 > 3600 then 
+			w_days=w_days + 1
+			w_temp1=w_temp1 - 3600
+		end if
+	next i 
+	for j=1 to 18
+		w_temp2=w_temp2 + w_remain
+		if w_temp2 > 24 then
+			w_days=w_days + 1
+			w_temp2=w_temp2 -24
+		end if
+	next j
+	
+	'Put w_temp1 into Minutes and Seconds
+	w_temp3=w_remain * 736
+	w_temp=w_temp1/60
+	w_mins=w_temp * 24
+	
+	'put w_temp2 into Minutes and Seconds
+	w_seconds=(w_temp1 mod 60) * 24
+	w_mins=w_mins + w_temp2 * 60
+	
+	'put w_temp3 into Minutes and Seconds
+	w_mins=w_mins + w_temp3/60
+	w_seconds=w_seconds + (w_temp3 mod 60) 
+	
+	'Add w_lsw to Minutes and seconds
+	w_mins=w_mins + w_lsw/60
+	w_seconds=w_seconds + (w_lsw mod 60)
+	
+	'redistribute seconds to days.
+	w_mins=w_mins + w_seconds/60
+	b_sec=w_seconds mod 60	
+	
+	w_mincount=w_mins mod 1440
+	w_daycount=w_days+(w_mins/1440)+ 1-36525 			'+1 because it counts start from 1st of January, (that is starting from 1)
+
+end sub
+
+'------------------------------------------------------------------------------
+sub sntp_release_buffer()
+
+	sock.num=sntp_sock
+	sock.inconmode=PL_SOCK_INCONMODE_NONE
+	sock.discard()
+	while sock.statesimple<>PL_SSTS_CLOSED
+	wend
+	sock.txbuffrq(0)
+	sock.rxbuffrq(0)
+	sys.buffalloc
+end sub
+
+'------------------------------------------------------------------------------
+#if SNTP_DEBUG_PRINT
+sub sntp_debug_print_status(status as en_sntp_status_codes)
+	dim s as string(64)
+	
+	select case status
+	case SNTP_STATUS_INVALID_INTERFACE:  s="invalid interface"
+	case SNTP_STATUS_INVALID_SOCKET: s="invalid socket ("+str(sntp_sock)+")"
+	case SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE: s="insufficient buffer space"
+	case SNTP_STATUS_CONNECTION_TIMEOUT: s="timeout while trying to connect"
+	case SNTP_STATUS_REPLY_TIMEOUT: s="timeout while waiting for the reply"
+	case SNTP_STATUS_REPLY_DATA_ERROR: s="incoming data is invalid (reply discarded)"
+	end select
+	s="ERROR: "+s
+	sntp_debugprint(s)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if SNTP_DEBUG_PRINT
+sub sntp_debugprint(byref print_data as string)
+
+	sys.debugprint(SNTP_STAMP+print_data+SNTP_CR_LF)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+function sntp_ts_to_dword(ts as string(4)) as dword
+'convert 4 bytes of string to dword value
+	dim f as byte
+	dim ts_val as dword
+	
+	'the rtc is incapable of dealing Seconds Fraction, therefore we only exam the 4 most significant byte from NTP timestamp
+	ts_val=0
+	for f=1 to 4
+		ts_val=ts_val*256+asc(mid(ts,f,1))
+	next f
+	
+	sntp_ts_to_dword=ts_val
+end function
+
+'------------------------------------------------------------------------------
+function sntp_dword_to_ts(ts_val as dword) as string(4)
+'convert 4 bytes of string to dword value
+	dim f as byte
+	dim b as byte
+	
+	sntp_dword_to_ts=ts_val
+	sntp_dword_to_ts="/x00/x00/x00/x00"
+	for f=0 to 3
+		b=ts_val mod 256
+		ts_val=ts_val/256
+		insert(sntp_dword_to_ts,4-f,chr(b))
+	next f
+end function
+
+'------------------------------------------------------------------------------
+#if SNTP_OFFSET_CALCULATION
+function sntp_get_clock_ts() as dword
+	dim w_days, w_mins as word
+	dim b_seconds as byte
+	dim d as dword
+	
+	callback_sntp_get_rtc(w_days,w_mins,b_seconds)
+	sntp_get_clock_ts=w_days
+	sntp_get_clock_ts=sntp_get_clock_ts*60*60*24
+	d=w_mins
+	d=d*60
+	sntp_get_clock_ts=sntp_get_clock_ts+d
+	sntp_get_clock_ts=sntp_get_clock_ts+b_seconds
+end function
+#endif

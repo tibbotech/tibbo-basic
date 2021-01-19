@@ -1,0 +1,55 @@
+include "global.tbh"
+
+declare sub dosomething()
+type foo_struct 'structure with two members, and both are arrays  
+	x as byte
+	s as string
+end type
+
+sub boot()
+    
+    dim f as byte
+    for f=0 to MAX_NUM_INTERFACES-1
+		interface_ready(f)=NO
+	next f
+
+    'Ethernet setup
+    '================================================================
+    'ethernet dhcp
+    dhcp_start(PL_SOCK_INTERFACE_NET,"192.168.1.137","")
+    '-----------------------------------------------------------------
+	
+    dim i as byte = 42
+	dim j as byte = 32
+	sys.debugprint(str(i))
+	sys.debugprint(str(j))
+    net.ip=DEVICE_NET_IP
+    net.netmask=DEVICE_NET_MASK
+    net.gatewayip=DEVICE_NET_GATEWAY
+	dim aa as boolean = true
+	dim bb as byte = 3
+	dim cc as char = 4
+	dim dd as word = 5
+	dim ee as short = 35767
+	dim ff as dword = 65531
+	dim gg as long = 65577
+	dim hh as real = 0.123
+	dim ii as string = "aabbcc"
+	dim jj as pl_wln_association_states = PL_WLN_OWN_NETWORK
+	dim kk as byte(3) = {1,2,3}
+	dim ll as foo_struct
+	ll.x = 9
+	ll.s = "bcd"
+	
+	for i = 0 to 3
+		ll.s = str(i)
+	next i
+	dosomething()
+    pat.play("B-B-B-",PL_PAT_CANINT)
+
+end sub
+
+sub dosomething()
+	dim zz as byte = 3
+	sys.debugprint("asdf\r\n")
+end sub

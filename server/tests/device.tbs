@@ -1,0 +1,74 @@
+include "global.tbh"
+
+
+
+sub close_interface_sockets(interface as pl_sock_interfaces)
+    dim f,sock_num_bup as byte
+    dim i as word
+    
+    sock_num_bup=sock.num
+    
+    for f=0 to sock.numofsock-1
+        sock.num=f
+        if sock.currentinterface=interface and sock.statesimple<>PL_SSTS_CLOSED then
+            sock.discard
+        end if
+    next f
+
+    i=sys.timercount
+
+wait_close_interface_sockets:
+    for f=0 to sock.numofsock-1
+        sock.num=f
+        if sock.currentinterface=interface and sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i then
+            goto wait_close_interface_sockets
+        end if
+    next f
+
+    sock.num=sock_num_bup
+    
+end sub
+            
+
+sub callback_dhcp_ok(renew as no_yes, interface as pl_sock_interfaces, byref ip as string, byref gateway_ip as string, byref netmask as string, lease_time as dword)
+    
+    if interface=PL_SOCK_INTERFACE_NET then
+        if renew=YES and net.ip<>ip then
+            'this is a lease renewal and the DHCP server has issues new IP
+            'it is better to reboot than deal with the implications of the changed IP
+            sys.reboot
+        end if
+
+        #if DEV_DEBUG_PRINT
+            dev_debugprint("Ethernet DHCP OK ("+ip+")")
+        #endif
+
+        if net.ip<>ip then
+            sock.inconenabledmaster=NO
+            close_interface_sockets(PL_SOCK_INTERFACE_NET)
+            net.ip=ip
+            if gateway_ip<>"" then net.gatewayip=gateway_ip
+            if netmask<>"" then net.netmask=netmask
+            sock.inconenabledmaster=YES
+        end if
+    end if
+            
+
+end sub
+        
+sub callback_dhcp_failure(interface as pl_sock_interfaces,failure_code as en_dhcp_status_codes)
+    
+end sub
+        
+sub callback_dhcp_pre_clear_ip(interface as pl_sock_interfaces)
+    
+end sub
+        
+sub callback_dhcp_pre_buffrq(required_buff_pages as byte)
+    
+end sub
+        
+sub callback_dhcp_buff_released()
+    
+end sub
+        
