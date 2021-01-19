@@ -1,6 +1,6 @@
 {
-    "name": "lsp-sample",
-    "description": "A language server example",
+    "name": "tibbo-basic",
+    "description": "Tibbo Basic Language Support",
     "author": {
         "name": "Jimmy Hu",
         "email": "jimmy.hu@tibbo.com"
@@ -51,6 +51,7 @@
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -b",
         "watch": "tsc -b -w",
+        "package": "vsce package -o out",
         "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
     },
     "devDependencies": {
