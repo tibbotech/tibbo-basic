@@ -1,7 +1,7 @@
 import fs = require('fs');
 // import path = require('path');
 // import ini = require('ini');
-import TibboBasicErrorListener from './tibbobasicErrorListener';
+import TibboBasicErrorListener from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
 import { TBObject, TBEnum, TBFunction, TBSub, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange } from './types';
 import { CommonToken } from 'antlr4/Token';
