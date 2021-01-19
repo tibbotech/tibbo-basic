@@ -15,4 +15,13 @@ client/node_modules/**
 client
 server/**
 !server/out/**
-!server/node_modules/**
+# !server/node_modules/**
+!server/node_modules/vscode-jsonrpc/**
+!server/node_modules/vscode-languageserver/**
+!server/node_modules/vscode-languageserver-protocol/**
+!server/node_modules/vscode-languageserver-textdocument/**
+!server/node_modules/vscode-languageserver-types/**
+!server/node_modules/antlr4/**
+!server/node_modules/await-notify/**
+!server/node_modules/ini/**
+!server/language/**

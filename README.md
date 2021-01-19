@@ -12,3 +12,4 @@ More information on Tibbo Basic [here](https://docs.tibbo.com/taiko/lang).
 
 More about out IoT Platform [here](https://tibbo.com).
 
+![Screenshot](screenshot.jpg)
