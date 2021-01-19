@@ -1,12 +1,13 @@
 {
     "name": "tibbo-basic",
+    "displayName": "Tibbo Basic Language",
     "description": "Tibbo Basic Language Support",
     "author": {
         "name": "Jimmy Hu",
         "email": "jimmy.hu@tibbo.com"
     },
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "repository": "https://github.com/tibbotech/tibbo-basic",
     "publisher": "tibbotech",
     "categories": [],
