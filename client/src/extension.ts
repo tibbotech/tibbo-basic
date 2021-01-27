@@ -8,7 +8,7 @@ import {
 	LanguageClientOptions,
 	ServerOptions,
 	TransportKind
-} from 'vscode-languageclient/node';
+} from 'vscode-languageclient';
 
 let client: LanguageClient;
 let platformsPath: string | undefined = '';

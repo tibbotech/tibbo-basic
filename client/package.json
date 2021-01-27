@@ -9,9 +9,7 @@
         "prepublish": "tsc",
         "compile": "tsc",
         "build": "tsc",
-        "watch": "tsc -w",
-        "package": "vsce package -o bin",
-        "publish": "vsce publish"
+        "watch": "tsc -w"
     },
     "author": {
         "name": "Jimmy Hu",
@@ -22,7 +20,7 @@
     },
     "license": "MIT",
     "dependencies": {
-        "vscode-languageclient": "7.0.0"
+        "vscode-languageclient": "6.1.4"
     },
     "devDependencies": {
         "@types/node": "^14.14.21",
