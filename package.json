@@ -7,7 +7,7 @@
         "email": "jimmy.hu@tibbo.com"
     },
     "license": "MIT",
-    "version": "1.0.8",
+    "version": "1.0.10",
     "repository": {
         "type": "git",
         "url": "https://github.com/tibbotech/tibbo-basic.git"
@@ -26,6 +26,16 @@
     ],
     "icon": "images/icon.png",
     "main": "./out/extension",
+    "scripts": {
+        "compile": "tsc -b",
+        "build": "tsc -b",
+        "watch": "tsc -b -w",
+        "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
+        "webpack": "webpack --mode development",
+        "webpack-dev": "webpack --mode development --watch",
+        "vscode:prepublish": "webpack --mode production",
+        "package": "vsce package"
+    },
     "contributes": {
         "configuration": [
             {
@@ -61,16 +71,6 @@
                 "path": "./syntaxes/tibbo-basic.tmLanguage.json"
             }
         ]
-    },
-    "scripts": {
-        "compile": "tsc -b",
-        "build": "tsc -b",
-        "watch": "tsc -b -w",
-        "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
-        "webpack": "webpack --mode development",
-        "webpack-dev": "webpack --mode development --watch",
-        "vscode:prepublish": "webpack --mode production",
-        "package": "vsce package"
     },
     "devDependencies": {
         "@types/node": "^12.12.0",

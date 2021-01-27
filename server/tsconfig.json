@@ -5,11 +5,12 @@
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"sourceMap": true,
+		"allowJs": true,
 		"strict": true,
 		"outDir": "out",
 		"rootDir": "src",
 		"noImplicitAny": false
 	},
-	"include": ["src"],
+	"include": ["src/**/*"],
 	"exclude": ["node_modules"]
 }

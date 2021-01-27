@@ -23,9 +23,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		extDir = ext.extensionPath;
 	}
 
-	const serverModule = context.asAbsolutePath(
-		path.join('server', 'out', 'server.js')
-	);
+	let serverPath = path.join('server', 'out', 'server.js');
+	if (process.env.NODE_ENV == 'production') {
+		serverPath = path.join('out', 'server.js');
+	}
+	const serverModule = context.asAbsolutePath(serverPath);
 	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
 	const serverOptions: ServerOptions = {
