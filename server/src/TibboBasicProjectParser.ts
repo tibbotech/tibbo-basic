@@ -57,6 +57,8 @@ export default class TibboBasicProjectParser {
         const parser = new TibboBasicParser(tokens);
         parser.buildParseTrees = true;
         const errorListener = new TibboBasicErrorListener();
+        lexer.removeErrorListeners();
+        // lexer.addErrorListener(errorListener);
         parser.removeErrorListeners();
         parser.addErrorListener(errorListener);
         const tree = parser.startRule();

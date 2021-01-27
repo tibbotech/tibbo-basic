@@ -93,6 +93,8 @@ export default class TibboBasicPreprocessor {
         const parser = new TibboBasicPreprocessorParser(tokens);
         parser.buildParseTrees = true;
         const errorListener = new TibboBasicErrorListener();
+        lexer.removeErrorListeners();
+        // lexer.addErrorListener(errorListener);
         parser.removeErrorListeners();
         parser.addErrorListener(errorListener);
         const tree = parser.preprocessor();

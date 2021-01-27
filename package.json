@@ -7,8 +7,11 @@
         "email": "jimmy.hu@tibbo.com"
     },
     "license": "MIT",
-    "version": "1.0.3",
-    "repository": "https://github.com/tibbotech/tibbo-basic",
+    "version": "1.0.4",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/tibbotech/tibbo-basic.git"
+    },
     "publisher": "tibbotech",
     "categories": [],
     "keywords": [
@@ -18,8 +21,10 @@
         "vscode": "^1.43.0"
     },
     "activationEvents": [
-        "onLanguage:tibbo-basic"
+        "onLanguage:tibbo-basic",
+        "workspaceContains:*.tpr"
     ],
+    "icon": "images/icon.png",
     "main": "./out/extension",
     "contributes": {
         "configuration": [
