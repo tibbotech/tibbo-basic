@@ -68,7 +68,8 @@
         "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
         "webpack": "webpack --mode development",
         "webpack-dev": "webpack --mode development --watch",
-        "vscode:prepublish": "webpack --mode production"
+        "vscode:prepublish": "webpack --mode production",
+        "package": "vsce package"
     },
     "devDependencies": {
         "@types/node": "^12.12.0",
