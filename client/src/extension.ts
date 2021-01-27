@@ -12,7 +12,7 @@ import {
 
 let client: LanguageClient;
 let platformsPath: string | undefined = '';
-const TIDEOutput = vscode.window.createOutputChannel("Tibbo-Basic");
+const TIDEOutput = vscode.window.createOutputChannel("Tibbo Basic");
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	TIDEOutput.show();
