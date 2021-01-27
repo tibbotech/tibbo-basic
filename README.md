@@ -8,8 +8,10 @@ Tibbo BASIC use the static memory model: all RAM is allocated at compile time, a
 
 Tibbo BASIC is "pure" in that they contain no I/O facilities of any kind (no PRINT, INPUT, etc.). Instead, all I/O is handled by objects.
 
+To create a new project, go to [Cody](https://cody.tibbo.tech), our project configuration tool.
+
 More information on Tibbo Basic [here](https://docs.tibbo.com/taiko/lang).
 
-More about out IoT Platform [here](https://tibbo.com).
+More about our IoT Platform [here](https://tibbo.com).
 
 ![Screenshot](images/screenshot.jpg)
