@@ -8,16 +8,7 @@
 		"strict": true,
 		"outDir": "out",
 		"rootDir": "src",
-		"allowJs": true,
-		"noImplicitAny": false,
-		"removeComments": false,
-		"noUnusedLocals": true,
-		"noImplicitThis": true,
-		"inlineSourceMap": false,
-		"preserveConstEnums": true,
-		"strictNullChecks": true,
-		"noUnusedParameters": false
-
+		"noImplicitAny": false
 	},
 	"include": ["src"],
 	"exclude": ["node_modules"]

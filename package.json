@@ -64,6 +64,7 @@
     },
     "scripts": {
         "compile": "tsc -b",
+        "build": "tsc -b",
         "watch": "tsc -b -w",
         "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
         "webpack": "webpack --mode development",
