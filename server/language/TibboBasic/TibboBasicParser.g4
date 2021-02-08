@@ -223,7 +223,7 @@ unaryOperator
 
 postfixExpression
     : primaryExpression postfix*
-    | postfixExpression DOT IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
+    | postfixExpression DOT symbol=IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
     ;
 
 postfix

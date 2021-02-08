@@ -7,7 +7,7 @@
         "email": "jimmy.hu@tibbo.com"
     },
     "license": "MIT",
-    "version": "1.0.11",
+    "version": "1.0.13",
     "repository": {
         "type": "git",
         "url": "https://github.com/tibbotech/tibbo-basic.git"
@@ -25,30 +25,17 @@
         "workspaceContains:*.tpr"
     ],
     "icon": "images/icon.png",
-    "main": "./out/extension",
+    "main": "./client/out/extension",
     "scripts": {
         "compile": "tsc -b",
         "build": "tsc -b",
         "watch": "tsc -b -w",
         "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
-        "webpack": "webpack --mode development",
-        "webpack-dev": "webpack --mode development --watch",
-        "vscode:prepublish": "webpack --mode production",
+        "webpack": "webpack --mode production --config ./client/webpack.config.js && webpack --mode production --config ./server/webpack.config.js",
+        "vscode:prepublish": "npm run webpack",
         "package": "vsce package"
     },
     "contributes": {
-        "configuration": [
-            {
-                "title": "TIDE",
-                "properties": {
-                    "tide.platformsPath": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Path to Platforms"
-                    }
-                }
-            }
-        ],
         "languages": [
             {
                 "id": "tibbo-basic",
@@ -79,6 +66,7 @@
         "typescript": "^4.0.2",
         "webpack": "^4.43.0",
         "webpack-cli": "^3.3.11",
+        "merge-options": "^3.0.4",
         "ts-loader": "^7.0.5"
     }
 }

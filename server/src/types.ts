@@ -14,6 +14,8 @@ export interface TBVariable {
     location: TBRange,
     declaration?: TBRange,
     comments: Array<CommonToken>,
+    parentScope?: TBScope,
+    references: Array<TBRange>
 }
 
 export interface TBParameter {
@@ -105,18 +107,11 @@ export interface TBEnum {
 export interface TBFunction {
     name: string,
     parameters: Array<TBParameter>,
-    dataType: string,
+    dataType?: string,
     location: TBRange,
     declaration?: TBRange,
     comments: Array<CommonToken>,
-}
-
-export interface TBSub {
-    name: string,
-    parameters: Array<TBParameter>,
-    location: TBRange,
-    declaration?: TBRange,
-    comments: Array<CommonToken>,
+    references: Array<TBRange>
 }
 
 export interface TBConst {

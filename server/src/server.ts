@@ -25,10 +25,12 @@ import {
     WorkspaceEdit,
     RenameParams,
     PrepareRenameParams,
-    DocumentSymbol
+    DocumentSymbol,
+    ReferenceParams,
+    Location
 } from 'vscode-languageserver';
 import {
-	createConnection,
+    createConnection,
 } from 'vscode-languageserver/node';
 import TibboBasicDocumentFormatter from './TibboBasicDocumentFormatter';
 import fs = require('fs');
@@ -532,8 +534,8 @@ connection.onCompletion(
                                     variableType = syscall.parameters[commaCount].dataType;
                                 }
                             }
-                            else if (projectParser.subs[text] != undefined) {
-                                const sub = projectParser.subs[text];
+                            else if (projectParser.functions[text] != undefined) {
+                                const sub = projectParser.functions[text];
                                 if (sub.parameters[commaCount] != undefined) {
                                     variableType = sub.parameters[commaCount].dataType;
                                 }
@@ -659,8 +661,8 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     result.value += '\n```\n'
                     result.value += getComments(obj.comments);
                 }
-                else if (projectParser.subs[text] != undefined) {
-                    const sub = projectParser.subs[text];
+                else if (projectParser.functions[text] != undefined) {
+                    const sub = projectParser.functions[text];
                     if (sub.location != undefined) {
                         result.value = '```tibbo-basic\n';
                         result.value += `sub ${sub.name}(${sub.parameters.map(param => {
@@ -780,8 +782,8 @@ connection.onDeclaration(({ textDocument, position }): Declaration | undefined =
         let location: TBRange | undefined = undefined;
         switch (token.symbol.type) {
             case TibboBasicParser.IDENTIFIER:
-                if (projectParser.subs[text] != undefined) {
-                    location = projectParser.subs[text].declaration;
+                if (projectParser.functions[text] != undefined) {
+                    location = projectParser.functions[text].declaration;
                 }
                 if (projectParser.functions[text] != undefined) {
                     location = projectParser.functions[text].declaration;
@@ -823,8 +825,8 @@ connection.onDefinition(({ textDocument, position }): Definition | undefined => 
         const varD = getVariable(text, filePath, offset);
         switch (token.symbol.type) {
             case TibboBasicParser.IDENTIFIER:
-                if (projectParser.subs[text] != undefined) {
-                    location = projectParser.subs[text].location;
+                if (projectParser.functions[text] != undefined) {
+                    location = projectParser.functions[text].location;
                     for (let i = 0; i < projectParser.scopes.length; i++) {
                         if (location.startToken.start == projectParser.scopes[i].start.start) {
                             return {
@@ -919,7 +921,7 @@ connection.onDocumentSymbol(({ textDocument }): DocumentSymbol[] | undefined => 
             kind: SymbolKind.Function//Function
         },
         {
-            structure: projectParser.subs,
+            structure: projectParser.functions,
             kind: SymbolKind.Method//Method
         },
         {
@@ -1022,7 +1024,7 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                             break;
                         }
                         let methodParams: Array<TBParameter> = [];
-                        let returnValue = '';
+                        let returnValue: string | undefined = '';
                         let strIndex = 0;
                         if (token.parentCtx.ruleIndex == TibboBasicParser.RULE_postfixExpression) {
                             const obj = getObjectAtToken(token);
@@ -1050,9 +1052,9 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                                 value: getComments(syscall.comments)
                             };
                         }
-                        else if (projectParser.subs[text] != undefined) {
+                        else if (projectParser.functions[text] != undefined) {
                             found = true;
-                            const sub = projectParser.subs[text];
+                            const sub = projectParser.functions[text];
                             info.label = 'sub ' + sub.name;
                             methodParams = sub.parameters;
                             info.documentation = {
@@ -1172,6 +1174,50 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null | undefi
     return result;
 });
 
+connection.onReferences((params: ReferenceParams) => {
+    const result: Location[] = [];
+    const document = documents.get(params.textDocument.uri);
+    let refs: TBRange[] = [];
+    if (document) {
+        const offset = document.offsetAt(params.position);
+        const filePath = getFileName(params.textDocument.uri);
+        let token;
+        let currentPosition = offset - 1;
+        while (token == undefined) {
+            token = projectParser.getTokenAtPosition(filePath, offset);
+            currentPosition++;
+            if (currentPosition > offset + 1) {
+                break;
+            }
+        }
+
+        if (token != undefined) {
+            let text = token.getText();
+            const varD: TBVariable | undefined = getVariable(text, token.symbol.source[1].name, token.symbol.start);
+            if (varD != undefined) {
+                refs = varD.references;
+            }
+            else if (projectParser.functions[text] != undefined) {
+                refs = projectParser.functions[text].references;
+            }
+        }
+    }
+    for (let i = 0; i < refs.length; i++) {
+        const ref = refs[i];
+        result.push({
+            uri: getFileUrl(ref.startToken.source[1].name),
+            range: {
+                start: { line: ref.startToken.line - 1, character: ref.startToken.column },
+                // end: doc.positionAt(parserError.symbol.stop)
+                end: { line: ref.stopToken.line - 1, character: ref.stopToken.column + (ref.stopToken.stop - ref.stopToken.start) + 1 }
+            }
+
+        });
+    }
+
+    return result;
+});
+
 connection.onPrepareRename((params: PrepareRenameParams) => {
     const document = documents.get(params.textDocument.uri);
     if (document != undefined) {
@@ -1199,8 +1245,8 @@ connection.onPrepareRename((params: PrepareRenameParams) => {
                         if (projectParser.objects[text] != undefined) {
                             return null;
                         }
-                        if (projectParser.subs[text] != undefined) {
-                            const sub = projectParser.subs[text];
+                        if (projectParser.functions[text] != undefined) {
+                            const sub = projectParser.functions[text];
                             if (sub.location.startToken.source[1].name.indexOf(PLATFORMS_PATH) == 0) {
                                 return null;
                             }
@@ -1485,7 +1531,7 @@ function getTokenSymbol(token: TerminalNode): TBSymbolType | undefined {
             else if (projectParser.objects[text.toLowerCase()] != undefined) {
                 symbolType = TBSymbolType.OBJECT;
             }
-            else if (projectParser.subs[text] != undefined) {
+            else if (projectParser.functions[text] != undefined) {
                 symbolType = TBSymbolType.SUB;
             }
             else if (projectParser.functions[text] != undefined) {
