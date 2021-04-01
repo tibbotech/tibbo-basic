@@ -15,14 +15,35 @@ const TibboBasicParserListener = require('../language/TibboBasic/lib/TibboBasicP
 
 export default class TibboBasicTranspiler {
 
+    output = '';
 
     parseFile(filePath: string): void {
-        const output = '';
+        const contents = fs.readFileSync(filePath, 'utf-8');
 
-        
+        const chars = new antlr4.InputStream(contents);
+        chars.name = filePath;
+        const lexer = new TibboBasicLexer(chars);
+        const tokens = new antlr4.CommonTokenStream(lexer);
+        const parser = new TibboBasicParser(tokens);
+        parser.buildParseTrees = true;
+        const errorListener = new TibboBasicErrorListener();
+        lexer.removeErrorListeners();
+        // lexer.addErrorListener(errorListener);
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        const tree = parser.startRule();
+
+        const listener = new ParserListener(this);
+        antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+
+        const newFileName = filePath.substr(0, filePath.length - 4) + '.tbc';
+        fs.writeFileSync(newFileName, this.output);
+
     }
 
-    
+    writeCode(code: string) {
+        this.output += code;
+    }
 
 }
 
@@ -39,4 +60,12 @@ class ParserListener extends TibboBasicParserListener {
         this.transpiler = transpiler;
     }
 
+
+    enterIncludeStmt(ctx) {
+        this.transpiler.writeCode(`#${ctx.children[0].getText()} ${ctx.children[1].getText()}\r\n`);
+    }
+
+    enterSubStmt(ctx) {
+        const code = `void ${ctx.children[1].getText()}`
+    }
 }

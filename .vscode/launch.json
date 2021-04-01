@@ -27,7 +27,23 @@
 			"outFiles": [
 				"${workspaceRoot}/server/out/**/*.js"
 			]
-		}
+		},
+		{
+            "name": "Transpile",
+            "type": "node",
+            "request": "launch",
+            "args": [
+                "${workspaceFolder}/server/src/testTranspiler.ts"
+            ],
+            "runtimeArgs": [
+                "--nolazy",
+                "-r",
+                "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector"
+        }
 	],
 	"compounds": [
 		{
