@@ -3,7 +3,7 @@ import fs = require('fs');
 // import ini = require('ini');
 import TibboBasicErrorListener from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
-import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange } from './types';
+import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
 import { CommonToken } from 'antlr4/Token';
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { CommonTokenStream } from 'antlr4/CommonTokenStream';
@@ -32,6 +32,7 @@ export default class TibboBasicProjectParser {
     variables: Array<TBVariable> = [];
     scopes: Array<TBScope> = [];
     symbolDeclarations: { [fileName: string]: number[] } = {};
+    references: { [symbolName: string]: TBSymbol[] } = {};
 
     parseFile(filePath: string, fileContents?: string): void {
         // const t1 = new Date().getTime();
@@ -292,17 +293,6 @@ export default class TibboBasicProjectParser {
         }
     }
 
-    addVariableReference(range: TBRange, variableName: string): void {
-        //TODO set scope of variable
-        let found = false;
-        for (let i = 0; i < this.variables.length; i++) {
-            if (variableName == this.variables[i].name) {
-                this.variables[i].references.push(range);
-                break;
-            }
-        }
-    }
-
     resetFileSymbols(filePath: string): void {
         // enums: { [name: string]: TBEnum } = {};
         // functions: { [name: string]: TBFunction } = {};
@@ -321,8 +311,20 @@ export default class TibboBasicProjectParser {
         }
 
         for (const key in this.functions) {
-            if (this.functions[key].location && this.functions[key].location.startToken.source[1].name == filePath) {
-                delete this.functions[key];
+            if (this.events[key] == undefined) {
+                const location = this.functions[key].location;
+                const func = this.functions[key];
+                if (location != undefined) {
+                    if (location.startToken.source[1].name == filePath) {
+                        delete this.functions[key];
+                    }
+                }
+                for (let i = 0; i < func.references.length; i++) {
+                    if (func.references[i].startToken.source[1].name == filePath) {
+                        func.references.splice(i, 1);
+                        i--;
+                    }
+                }
             }
         }
 
@@ -491,28 +493,12 @@ class ParserListener extends TibboBasicParserListener {
     enterSubStmt(ctx) {
         if (ctx.name) {
             const name = ctx.name.text;
-            if (this.parser.functions[name] == undefined) {
-                this.parser.functions[name] = {
-                    name: name,
-                    parameters: [],
-                    location: {
-                        startToken: ctx.start,
-                        stopToken: ctx.start
-                    },
-                    references: [],
-                    comments: []
-                };
-            }
-            else {
-                this.parser.functions[name] = {
-                    ...this.parser.functions[name],
-                    location: {
-                        startToken: ctx.start,
-                        stopToken: ctx.start
-                    },
-                };
-            }
-
+            this.addFunction(name, {
+                location: {
+                    startToken: ctx.start,
+                    stopToken: ctx.name
+                },
+            });
 
             const scope: TBScope = {
                 file: ctx.start.source[1].name,
@@ -563,22 +549,10 @@ class ParserListener extends TibboBasicParserListener {
                     this.parser.addVariable(variable);
                 }
             }
-            if (this.parser.functions[name] == undefined) {
-                this.parser.functions[name] = {
-                    name: name,
-                    parameters: [],
-                    dataType: ctx.returnType.children[1].getText(),
-                    location: location,
-                    references: [],
-                    comments: []
-                };
-            }
-            else {
-                this.parser.functions[name] = {
-                    ...this.parser.functions[name],
-                    location: location
-                };
-            }
+            this.addFunction(name, {
+                dataType: ctx.returnType.children[1].getText(),
+                location: location,
+            })
             const scope: TBScope = {
                 file: ctx.start.source[1].name,
                 start: ctx.start,
@@ -704,32 +678,22 @@ class ParserListener extends TibboBasicParserListener {
 
     enterDeclareSubStmt(ctx) {
         const name = ctx.children[2].symbol.text;
-        this.parser.functions[name] = {
-            ...this.parser.functions[name],
-            name: name,
-            parameters: [],
+        this.addFunction(name, {
             declaration: {
                 startToken: ctx.start,
                 stopToken: ctx.start
             },
-            references: [],
-            comments: []
-        };
+        });
     }
 
     enterDeclareFuncStmt(ctx) {
         const name = ctx.children[2].symbol.text;
-        this.parser.functions[name] = {
-            ...this.parser.functions[name],
-            name: name,
-            parameters: [],
-            references: [],
-            comments: [],
+        this.addFunction(name, {
             declaration: {
                 startToken: ctx.start,
                 stopToken: ctx.start
             }
-        };
+        });
     }
 
     enterInlineIfThenElse(ctx) {
@@ -825,17 +789,12 @@ class ParserListener extends TibboBasicParserListener {
                     stopToken: ctx.start
                 };
                 let symbolName = item.start.text;
-                this.parser.addVariableReference(location, symbolName);
-                if (this.parser.functions[symbolName] != undefined) {
-                    this.parser.functions[symbolName].references.push(location);
-                }
-                if (this.parser.functions[symbolName] != undefined) {
-                    this.parser.functions[symbolName].references.push(location);
-                }
+
+                this.addSymbolReference(symbolName, location);
+                this.addFunction(symbolName, {});
+                this.parser.functions[symbolName].references.push(location);
             }
-
         }
-
     }
 
     enterExpression(ctx) {
@@ -847,6 +806,26 @@ class ParserListener extends TibboBasicParserListener {
             }
             // console.log(ctx.getText());
         }
+
+    }
+
+    addFunction(name: string, func: any): void {
+        if (name != undefined) {
+            if (this.parser.functions[name] == undefined) {
+                this.parser.functions[name] = {
+                    name: name,
+                    parameters: [],
+                    comments: [],
+                    references: []
+                }
+            }
+        }
+        for (const key in func) {
+            this.parser.functions[name][key] = func[key];
+        }
+    }
+
+    addSymbolReference(name: string, location: TBRange): void {
 
     }
 

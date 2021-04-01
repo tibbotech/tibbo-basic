@@ -223,3 +223,5 @@ DIRECTIVE_TEXT_MULTI_COMMENT:     '/*' .*? '*/'    -> channel(COMMENTS_CHANNEL);
 DIRECTIVE_TEXT_SINGLE_COMMENT:    '//' ~[\r\n]*    -> channel(COMMENTS_CHANNEL);
 DIRECTIVE_SLASH:                  '/'              -> channel(DIRECTIVE_CHANNEL), type(DIRECTIVE_TEXT);
 DIRECTIVE_TEXT:                   ~[\r\n\\/]+      -> channel(DIRECTIVE_CHANNEL);
+
+ANY: . ;

@@ -108,7 +108,7 @@ export interface TBFunction {
     name: string,
     parameters: Array<TBParameter>,
     dataType?: string,
-    location: TBRange,
+    location?: TBRange,
     declaration?: TBRange,
     comments: Array<CommonToken>,
     references: Array<TBRange>
@@ -119,6 +119,10 @@ export interface TBConst {
     value: string,
     location: TBRange,
     comments: Array<CommonToken>
+}
+
+export interface TBSymbol {
+    location: TBRange
 }
 
 export interface TBScope {

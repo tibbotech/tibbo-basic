@@ -23,6 +23,7 @@ export default class TibboBasicPreprocessor {
     defines: { [name: string]: TBDefine } = {};
     codes: { [filename: string]: Array<TerminalNodeImpl> } = {};
     files: { [filename: string]: string } = {};
+    filePriorities: string[] = [];
     originalFiles: { [filename: string]: string } = {};
 
     constructor(projectPath: string, platformsPath: string) {
@@ -78,6 +79,7 @@ export default class TibboBasicPreprocessor {
         }
         let deviceRootFile = '';
         if (this.originalFiles[filePath] == undefined) {
+            this.filePriorities.push(filePath);
             deviceRootFile = fs.readFileSync(filePath, 'utf-8');
             this.originalFiles[filePath] = deviceRootFile;
         }

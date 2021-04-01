@@ -298,10 +298,11 @@ function validateTextDocument() {
             preprocessor.originalFiles[currentFilePath] = text;
             preprocessor.parseFile(dirName, path.basename(currentFilePath), true);
             projectParser.parseFile(currentFilePath, text);
-            notifyDiagnostics(currentFilePath);
         }
     }
+    
     if (updated) {
+        notifyDiagnostics();
         getProjectStructure();
         projectParser.constructComments();
     }
@@ -347,7 +348,6 @@ function validateTextDocument() {
 
                 const fileContents = preprocessor.files[filePath];
                 projectParser.parseFile(filePath, fileContents);
-                notifyDiagnostics(filePath);
 
 
             }
@@ -367,6 +367,7 @@ function validateTextDocument() {
         needsUpdate = false;
         const timeEnd = new Date().getTime();
         const secondsElapsed = (timeEnd - timeStart) / 1000;
+        notifyDiagnostics();
         connection.console.log(`parsed in ${secondsElapsed} s`);
     }
 }
@@ -535,12 +536,6 @@ connection.onCompletion(
                                 }
                             }
                             else if (projectParser.functions[text] != undefined) {
-                                const sub = projectParser.functions[text];
-                                if (sub.parameters[commaCount] != undefined) {
-                                    variableType = sub.parameters[commaCount].dataType;
-                                }
-                            }
-                            else if (projectParser.functions[text] != undefined) {
                                 const func = projectParser.functions[text];
                                 if (func.parameters[commaCount] != undefined) {
                                     variableType = func.parameters[commaCount].dataType;
@@ -630,7 +625,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                         if (func != undefined) {
                             result.value += '```tibbo-basic\n';
                             result.value += `${obj.name}.${func.name}\n`;
-                            result.value += '```\n';
+                            result.value += '```\n'; ''
                             result.value += getComments(func.comments);
                         }
                         else if (prop != undefined) {
@@ -662,24 +657,15 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     result.value += getComments(obj.comments);
                 }
                 else if (projectParser.functions[text] != undefined) {
-                    const sub = projectParser.functions[text];
-                    if (sub.location != undefined) {
-                        result.value = '```tibbo-basic\n';
-                        result.value += `sub ${sub.name}(${sub.parameters.map(param => {
-                            return `${param.byref ? 'byref' : ''} ${param.name} as ${param.dataType}`
-                        }).join(',')})`
-                        result.value += '\n```\n'
-                        result.value += getComments(sub.comments);
-                    }
-                }
-                else if (projectParser.functions[text] != undefined) {
                     const func = projectParser.functions[text];
                     if (func.location != undefined) {
                         result.value = '```tibbo-basic\n';
-                        result.value += `function ${func.name}(${func.parameters.map(param => {
+                        result.value += `sub ${func.name}(${func.parameters.map(param => {
                             return `${param.byref ? 'byref' : ''} ${param.name} as ${param.dataType}`
-                        }).join(',')})`
-                        result.value += ` as ${func.dataType}`;
+                        }).join(',')})`;
+                        if (func.dataType != undefined) {
+                            result.value += ` as ${func.dataType}`;
+                        }
                         result.value += '\n```\n'
                         result.value += getComments(func.comments);
                     }
@@ -785,9 +771,6 @@ connection.onDeclaration(({ textDocument, position }): Declaration | undefined =
                 if (projectParser.functions[text] != undefined) {
                     location = projectParser.functions[text].declaration;
                 }
-                if (projectParser.functions[text] != undefined) {
-                    location = projectParser.functions[text].declaration;
-                }
         }
         if (location != undefined) {
             const uri = getFileUrl(location.startToken.source[1].name);
@@ -828,21 +811,7 @@ connection.onDefinition(({ textDocument, position }): Definition | undefined => 
                 if (projectParser.functions[text] != undefined) {
                     location = projectParser.functions[text].location;
                     for (let i = 0; i < projectParser.scopes.length; i++) {
-                        if (location.startToken.start == projectParser.scopes[i].start.start) {
-                            return {
-                                uri: getFileUrl(location.startToken.source[1].name),
-                                range: {
-                                    start: { line: projectParser.scopes[i].start.line - 1, character: projectParser.scopes[i].start.column },
-                                    end: { line: projectParser.scopes[i].end.line, character: projectParser.scopes[i].end.column },
-                                }
-                            }
-                        }
-                    }
-                }
-                if (projectParser.functions[text] != undefined) {
-                    location = projectParser.functions[text].location;
-                    for (let i = 0; i < projectParser.scopes.length; i++) {
-                        if (location.startToken.start == projectParser.scopes[i].start.start) {
+                        if (location && location.startToken.start == projectParser.scopes[i].start.start) {
                             return {
                                 uri: getFileUrl(location.startToken.source[1].name),
                                 range: {
@@ -1054,20 +1023,12 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                         }
                         else if (projectParser.functions[text] != undefined) {
                             found = true;
-                            const sub = projectParser.functions[text];
-                            info.label = 'sub ' + sub.name;
-                            methodParams = sub.parameters;
-                            info.documentation = {
-                                kind: MarkupKind.Markdown,
-                                value: getComments(sub.comments)
-                            };
-                        }
-                        else if (projectParser.functions[text] != undefined) {
-                            found = true;
                             const func = projectParser.functions[text];
-                            info.label = 'function ' + func.name;
+                            info.label = 'sub ' + func.name;
                             methodParams = func.parameters;
-                            returnValue = func.dataType;
+                            if (func.dataType != undefined) {
+                                returnValue = func.dataType;
+                            }
                             info.documentation = {
                                 kind: MarkupKind.Markdown,
                                 value: getComments(func.comments)
@@ -1246,18 +1207,10 @@ connection.onPrepareRename((params: PrepareRenameParams) => {
                             return null;
                         }
                         if (projectParser.functions[text] != undefined) {
-                            const sub = projectParser.functions[text];
-                            if (sub.location.startToken.source[1].name.indexOf(PLATFORMS_PATH) == 0) {
-                                return null;
-                            }
-
-                        }
-                        if (projectParser.functions[text] != undefined) {
                             const func = projectParser.functions[text];
-                            if (func.location.startToken.source[1].name.indexOf(PLATFORMS_PATH) == 0) {
+                            if (func.location && func.location.startToken.source[1].name.indexOf(PLATFORMS_PATH) == 0) {
                                 return null;
                             }
-
                         }
                         if (projectParser.consts[text] != undefined) {
                             const cc = projectParser.consts[text];
@@ -1386,62 +1339,131 @@ function parseFile(fileUri: string) {
     projectParser.parseFile(filePath, fileContents);
 }
 
-function notifyDiagnostics(filePath: string) {
-    const fileURI = getFileUrl(filePath);
-    const diagnostics: Diagnostic[] = [];
-    if (projectParser.errors[filePath] != undefined) {
-        for (let i = 0; i < projectParser.errors[filePath].length; i++) {
+function notifyDiagnostics() {
+    for (const filePath in preprocessor.files) {
 
-            const parserError = projectParser.errors[filePath][i];
-            const diagnostic: Diagnostic = {
-                severity: DiagnosticSeverity.Error,
-                range: {
-                    start: { line: parserError.symbol.line - 1, character: parserError.symbol.column },
-                    // end: doc.positionAt(parserError.symbol.stop)
-                    end: { line: parserError.symbol.line - 1, character: parserError.symbol.column + (parserError.symbol.stop - parserError.symbol.start) + 1 }
-                },
-                message: parserError.message,
-                source: 'ex'
-            };
-            diagnostic.relatedInformation = [
-                {
-                    location: {
-                        uri: getFileUrl(filePath),
-                        range: Object.assign({}, diagnostic.range)
+
+        const fileURI = getFileUrl(filePath);
+        const diagnostics: Diagnostic[] = [];
+        if (projectParser.errors[filePath] != undefined) {
+            for (let i = 0; i < projectParser.errors[filePath].length; i++) {
+
+                const parserError = projectParser.errors[filePath][i];
+                const diagnostic: Diagnostic = {
+                    severity: DiagnosticSeverity.Error,
+                    range: {
+                        start: { line: parserError.symbol.line - 1, character: parserError.symbol.column },
+                        // end: doc.positionAt(parserError.symbol.stop)
+                        end: { line: parserError.symbol.line - 1, character: parserError.symbol.column + (parserError.symbol.stop - parserError.symbol.start) + 1 }
                     },
-                    message: parserError.message
-                }
-            ];
-            diagnostics.push(diagnostic);
+                    message: parserError.message,
+                    source: 'ex'
+                };
+                diagnostic.relatedInformation = [
+                    {
+                        location: {
+                            uri: getFileUrl(filePath),
+                            range: Object.assign({}, diagnostic.range)
+                        },
+                        message: parserError.message
+                    }
+                ];
+                diagnostics.push(diagnostic);
+            }
+            // connection.sendDiagnostics({ uri: fileURI, diagnostics });
         }
-        // connection.sendDiagnostics({ uri: fileURI, diagnostics });
+
+        for (let i = 0; i < projectParser.variables.length; i++) {
+            const variable = projectParser.variables[i];
+            if (variable.references.length == 0) {
+                const loc = variable.location;
+                if (loc.startToken.source[1].name != filePath) {
+                    continue;
+                }
+                const diagnostic: Diagnostic = {
+                    severity: DiagnosticSeverity.Warning,
+                    range: {
+                        start: { line: loc.startToken.line - 1, character: loc.startToken.column },
+                        // end: doc.positionAt(parserError.symbol.stop)
+                        end: { line: loc.stopToken.line - 1, character: loc.stopToken.column + loc.stopToken.text.length }
+                    },
+                    message: `${variable.name} is not used anywhere`,
+                    source: 'ex'
+                };
+                diagnostic.relatedInformation = [
+                    {
+                        location: {
+                            uri: getFileUrl(filePath),
+                            range: Object.assign({}, diagnostic.range)
+                        },
+                        message: `Unused variable`,
+                    }
+                ];
+                diagnostics.push(diagnostic);
+            }
+        }
+
+        for (const funcName in projectParser.functions) {
+            if (projectParser.functions[funcName].references.length == 0 && projectParser.functions[funcName].declaration != undefined) {
+                if (projectParser.events[funcName] != undefined) {
+                    continue;
+                }
+                const loc = projectParser.functions[funcName].location;
+                if (loc) {
+                    if (loc.startToken.source[1].name != filePath) {
+                        continue;
+                    }
+                    const diagnostic: Diagnostic = {
+                        severity: DiagnosticSeverity.Warning,
+                        range: {
+                            start: { line: loc.startToken.line - 1, character: loc.startToken.column },
+                            // end: doc.positionAt(parserError.symbol.stop)
+                            end: { line: loc.stopToken.line - 1, character: loc.stopToken.column + loc.stopToken.text.length }
+                        },
+                        message: `${funcName} is not called anywhere`,
+                        source: 'ex'
+                    };
+                    diagnostic.relatedInformation = [
+                        {
+                            location: {
+                                uri: getFileUrl(filePath),
+                                range: Object.assign({}, diagnostic.range)
+                            },
+                            message: `${funcName} is not called anywhere`,
+                        }
+                    ];
+                    diagnostics.push(diagnostic);
+                }
+
+            }
+        }
+
+
+        // diagnostics = [];
+        // let index = 0;
+        // const oLines = preprocessor.originalFiles[filePath].split('\n');
+        // const nLines = preprocessor.files[filePath].split('\n');
+        // const contents = preprocessor.originalFiles[filePath];
+        // for (let i = 0; i < oLines.length; i++) {
+        //     if (oLines[i] != nLines[i]) {
+        //         const range = {
+        //             start: getPosition(contents, index),
+        //             end: getPosition(contents, index + oLines[i].length)
+        //         };
+        //         diagnostics.push({
+        //             range: range,
+        //             severity: 4,
+        //             message: 'not included',
+        //             tags: [
+        //                 DiagnosticTag.Unnecessary
+        //             ]
+        //         });
+        //     }
+        //     index += oLines[i].length + 1;
+        // }
+
+        connection.sendDiagnostics({ uri: fileURI, diagnostics });
     }
-
-
-    // diagnostics = [];
-    // let index = 0;
-    // const oLines = preprocessor.originalFiles[filePath].split('\n');
-    // const nLines = preprocessor.files[filePath].split('\n');
-    // const contents = preprocessor.originalFiles[filePath];
-    // for (let i = 0; i < oLines.length; i++) {
-    //     if (oLines[i] != nLines[i]) {
-    //         const range = {
-    //             start: getPosition(contents, index),
-    //             end: getPosition(contents, index + oLines[i].length)
-    //         };
-    //         diagnostics.push({
-    //             range: range,
-    //             severity: 4,
-    //             message: 'not included',
-    //             tags: [
-    //                 DiagnosticTag.Unnecessary
-    //             ]
-    //         });
-    //     }
-    //     index += oLines[i].length + 1;
-    // }
-
-    connection.sendDiagnostics({ uri: fileURI, diagnostics });
 }
 
 function copyProperties() {
@@ -1532,10 +1554,13 @@ function getTokenSymbol(token: TerminalNode): TBSymbolType | undefined {
                 symbolType = TBSymbolType.OBJECT;
             }
             else if (projectParser.functions[text] != undefined) {
-                symbolType = TBSymbolType.SUB;
-            }
-            else if (projectParser.functions[text] != undefined) {
-                symbolType = TBSymbolType.FUNCTION;
+                if (projectParser.functions[text].dataType != undefined) {
+                    symbolType = TBSymbolType.FUNCTION;
+                }
+                else {
+                    symbolType = TBSymbolType.SUB;
+                }
+
             }
             else if (projectParser.consts[text] != undefined) {
                 symbolType = TBSymbolType.CONST;
