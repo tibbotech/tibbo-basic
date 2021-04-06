@@ -66,9 +66,9 @@ constSubStmt : name=IDENTIFIER (asTypeClause)? EQ value=expression;
 
 declareVariableStmt : visibility? DECLARE variableListStmt;
 
-declareSubStmt : DECLARE SUB (IDENTIFIER DOT)? IDENTIFIER paramList?;
+declareSubStmt : DECLARE SUB (IDENTIFIER DOT)? name=IDENTIFIER paramList?;
 
-declareFuncStmt : DECLARE FUNCTION (IDENTIFIER DOT)? IDENTIFIER paramList? asTypeClause;
+declareFuncStmt : DECLARE FUNCTION (IDENTIFIER DOT)? name=IDENTIFIER paramList? returnType=asTypeClause;
 
 doLoopStmt
     : DO block LOOP
@@ -87,7 +87,7 @@ enumerationStmt_Constant : IDENTIFIER (EQ expression)? COMMA?;
 exitStmt : EXIT_DO | EXIT_FOR | EXIT_FUNCTION | EXIT_PROPERTY | EXIT_SUB | EXIT_WHILE;
 
 forNextStmt :
-	FOR expression TO expression (STEP expression)? 
+	FOR expression TO expression (STEP step=expression)?
 	block
 	NEXT expression?
 ;
@@ -177,12 +177,12 @@ subStmt :
 	block
 	END_SUB
 ;
-typeStmt: visibility? TYPE IDENTIFIER 
+typeStmt: visibility? TYPE name=IDENTIFIER
 		typeStmtElement*
 	END_TYPE;
 
 typeStmtElement:
-	IDENTIFIER (LPAREN literal RPAREN)? asTypeClause ;
+	IDENTIFIER (LPAREN literal RPAREN)? valueType=asTypeClause ;
 
 // operator precedence is represented by rule order
 

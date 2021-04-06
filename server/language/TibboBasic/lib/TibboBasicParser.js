@@ -1,4 +1,4 @@
-// Generated from /Users/jimmyhu/Projects/TIDEDesktopService/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
+// Generated from /Users/jimmyhu/Projects/tibbo-basic/server/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
 // jshint ignore: start
 var antlr4 = require('antlr4/index');
 var TibboBasicParserListener = require('./TibboBasicParserListener').TibboBasicParserListener;
@@ -8,7 +8,7 @@ var grammarFileName = "TibboBasicParser.g4";
 
 
 var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
-    "\u0003\u0091\u030b\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004",
+    "\u0003\u0092\u030b\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004",
     "\t\u0004\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007",
     "\u0004\b\t\b\u0004\t\t\t\u0004\n\t\n\u0004\u000b\t\u000b\u0004\f\t\f",
     "\u0004\r\t\r\u0004\u000e\t\u000e\u0004\u000f\t\u000f\u0004\u0010\t\u0010",
@@ -583,7 +583,8 @@ var symbolicNames = [ null, "OBJECT", "AND", "AS", "BOOLEAN", "REAL", "BYREF",
                       "DIRECTIVE_FLOAT", "DIRECTIVE_NEWLINE", "DIRECTIVE_SINGLE_COMMENT", 
                       "DIRECTIVE_BACKSLASH_NEWLINE", "DIRECTIVE_TEXT_NEWLINE", 
                       "DIRECTIVE_TEXT_BACKSLASH_NEWLINE", "DIRECTIVE_TEXT_MULTI_COMMENT", 
-                      "DIRECTIVE_TEXT_SINGLE_COMMENT", "DIRECTIVE_TEXT" ];
+                      "DIRECTIVE_TEXT_SINGLE_COMMENT", "DIRECTIVE_TEXT", 
+                      "ANY" ];
 
 var ruleNames =  [ "startRule", "topLevelDeclaration", "includeStmt", "includeppStmt", 
                    "block", "statement", "constStmt", "constSubStmt", "declareVariableStmt", 
@@ -765,6 +766,7 @@ TibboBasicParser.DIRECTIVE_TEXT_BACKSLASH_NEWLINE = 140;
 TibboBasicParser.DIRECTIVE_TEXT_MULTI_COMMENT = 141;
 TibboBasicParser.DIRECTIVE_TEXT_SINGLE_COMMENT = 142;
 TibboBasicParser.DIRECTIVE_TEXT = 143;
+TibboBasicParser.ANY = 144;
 
 TibboBasicParser.RULE_startRule = 0;
 TibboBasicParser.RULE_topLevelDeclaration = 1;
@@ -1832,6 +1834,7 @@ function DeclareSubStmtContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_declareSubStmt;
+    this.name = null; // Token
     return this;
 }
 
@@ -1913,7 +1916,7 @@ TibboBasicParser.prototype.declareSubStmt = function() {
 
         }
         this.state = 201;
-        this.match(TibboBasicParser.IDENTIFIER);
+        localctx.name = this.match(TibboBasicParser.IDENTIFIER);
         this.state = 203;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
@@ -1947,6 +1950,8 @@ function DeclareFuncStmtContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_declareFuncStmt;
+    this.name = null; // Token
+    this.returnType = null; // AsTypeClauseContext
     return this;
 }
 
@@ -2032,7 +2037,7 @@ TibboBasicParser.prototype.declareFuncStmt = function() {
 
         }
         this.state = 211;
-        this.match(TibboBasicParser.IDENTIFIER);
+        localctx.name = this.match(TibboBasicParser.IDENTIFIER);
         this.state = 213;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
@@ -2042,7 +2047,7 @@ TibboBasicParser.prototype.declareFuncStmt = function() {
         }
 
         this.state = 215;
-        this.asTypeClause();
+        localctx.returnType = this.asTypeClause();
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
 	        localctx.exception = re;
@@ -2508,6 +2513,7 @@ function ForNextStmtContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_forNextStmt;
+    this.step = null; // ExpressionContext
     return this;
 }
 
@@ -2592,7 +2598,7 @@ TibboBasicParser.prototype.forNextStmt = function() {
             this.state = 259;
             this.match(TibboBasicParser.STEP);
             this.state = 260;
-            this.expression(0);
+            localctx.step = this.expression(0);
         }
 
         this.state = 263;
@@ -5098,6 +5104,7 @@ function TypeStmtContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_typeStmt;
+    this.name = null; // Token
     return this;
 }
 
@@ -5108,12 +5115,12 @@ TypeStmtContext.prototype.TYPE = function() {
     return this.getToken(TibboBasicParser.TYPE, 0);
 };
 
-TypeStmtContext.prototype.IDENTIFIER = function() {
-    return this.getToken(TibboBasicParser.IDENTIFIER, 0);
-};
-
 TypeStmtContext.prototype.END_TYPE = function() {
     return this.getToken(TibboBasicParser.END_TYPE, 0);
+};
+
+TypeStmtContext.prototype.IDENTIFIER = function() {
+    return this.getToken(TibboBasicParser.IDENTIFIER, 0);
 };
 
 TypeStmtContext.prototype.visibility = function() {
@@ -5174,7 +5181,7 @@ TibboBasicParser.prototype.typeStmt = function() {
         this.state = 511;
         this.match(TibboBasicParser.TYPE);
         this.state = 512;
-        this.match(TibboBasicParser.IDENTIFIER);
+        localctx.name = this.match(TibboBasicParser.IDENTIFIER);
         this.state = 516;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
@@ -5212,6 +5219,7 @@ function TypeStmtElementContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_typeStmtElement;
+    this.valueType = null; // AsTypeClauseContext
     return this;
 }
 
@@ -5285,7 +5293,7 @@ TibboBasicParser.prototype.typeStmtElement = function() {
         }
 
         this.state = 528;
-        this.asTypeClause();
+        localctx.valueType = this.asTypeClause();
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
 	        localctx.exception = re;
@@ -5866,6 +5874,7 @@ function PostfixExpressionContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_postfixExpression;
+    this.symbol = null; // Token
     return this;
 }
 
@@ -5967,7 +5976,7 @@ TibboBasicParser.prototype.postfixExpression = function(_p) {
                 this.state = 579;
                 this.match(TibboBasicParser.DOT);
                 this.state = 580;
-                this.match(TibboBasicParser.IDENTIFIER);
+                localctx.symbol = this.match(TibboBasicParser.IDENTIFIER);
                 this.state = 584;
                 this._errHandler.sync(this);
                 var _alt = this._interp.adaptivePredict(this._input,69,this._ctx)
