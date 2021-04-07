@@ -611,7 +611,7 @@ case "U":
 				break;
 			case `B`,`W`,`U`:
 
-check_for_p1_p2:check_for_p1_p2: 
+check_for_p1_p2: 
 				if (s == "^") {
 					dw = 0;
 				} else {
@@ -728,7 +728,7 @@ check_for_p1_p2:check_for_p1_p2:
 		
 		num_fields = field_index-tbl_item.field_num_offset;
 		if (num_fields == 0) {
-no_field_found:		no_field_found: 
+no_field_found: 
 			#if TBL_DEBUG_PRINT
 				 tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): No fields defined. There must be at least one field in each table.");
 			#endif
@@ -884,7 +884,7 @@ en_tbl_status_codes tbl_select(string table_name_or_num, string file_name) {
 	#endif
 
 	//open file (or switch filenum)
-file_open:file_open: 
+file_open: 
 	i = filenum_open("TBL",file_name,fd_status);
 	switch (fd_status) {
 	case PL_FD_STATUS_NOT_FOUND:
@@ -917,7 +917,7 @@ case PL_FD_STATUS_ALREADY_OPENED:
 		
 	default:
 		//some other problem
-fail_to_open:		fail_to_open: 
+fail_to_open: 
 		if (callback_tbl_fail_to_open(file_name,fd_status,i) == YES) {
 			goto file_open;
 		} else {
@@ -952,7 +952,7 @@ fail_to_open:		fail_to_open:
 	}
 	goto tbl_ok;
 	
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -967,19 +967,19 @@ fd_error:fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_select = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_select = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_select = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_select = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_select = EN_TBL_STATUS_FAILURE;
 	if (tbl_select != EN_TBL_STATUS_OK) {
@@ -1037,7 +1037,7 @@ en_tbl_status_codes tbl_select_for_read(string table_name_or_num, string file_na
 	#endif
 
 	//open file (or switch filenum)
-file_open:file_open: 
+file_open: 
 	i = filenum_open("TBL",file_name,fd_status);
 	switch (fd_status) {
 	case PL_FD_STATUS_NOT_FOUND:
@@ -1070,7 +1070,7 @@ case PL_FD_STATUS_ALREADY_OPENED:
 		
 	default:
 		//some other problem
-fail_to_open:		fail_to_open: 
+fail_to_open: 
 		if (callback_tbl_fail_to_open(file_name,fd_status,i) == YES) {
 			goto file_open;
 		} else {
@@ -1095,7 +1095,7 @@ fail_to_open:		fail_to_open:
 	
 	goto tbl_ok;
 	
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1110,19 +1110,19 @@ fd_error:fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_select_for_read = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_select_for_read = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_select_for_read = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_select_for_read = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_select_for_read = EN_TBL_STATUS_FAILURE;
 	if (tbl_select_for_read != EN_TBL_STATUS_OK) {
@@ -1141,13 +1141,13 @@ en_tbl_status_codes tbl_close(string file_name) {
 
 
 
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_close = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_close = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_close = EN_TBL_STATUS_FAILURE;
 	if (tbl_close != EN_TBL_STATUS_OK) {
@@ -1191,13 +1191,13 @@ en_tbl_status_codes tbl_clear() {
 	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_CLEAR);
 	goto tbl_ok;
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_clear = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_clear = EN_TBL_STATUS_FAILURE;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_clear = EN_TBL_STATUS_FAILURE;
 	if (tbl_clear != EN_TBL_STATUS_OK) {
@@ -1263,7 +1263,7 @@ en_tbl_status_codes tbl_replace(string old_file_name, string new_file_name) {
 	callback_tbl_modified(old_file_name,EN_TBL_MODIFIED_REPLACE);
 	goto tbl_ok;
 	
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1278,15 +1278,15 @@ fd_error:fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_replace = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_replace = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_replace = EN_TBL_STATUS_FAILURE;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_replace = EN_TBL_STATUS_FAILURE;
 	if (tbl_replace != EN_TBL_STATUS_OK) {
@@ -1371,7 +1371,7 @@ en_tbl_status_codes tbl_record_sg(unsigned int rec_num, en_tbl_rdwr op) {
 	
 	goto tbl_ok;
 	
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1385,19 +1385,19 @@ fd_error:fd_error:
 	break;
 	break;
 	}
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_record_sg = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_not_found:tbl_not_found: 
+tbl_not_found: 
 	tbl_record_sg = EN_TBL_STATUS_NOT_FOUND;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_record_sg = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_record_sg = EN_TBL_STATUS_FAILURE;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_record_sg = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_sg != EN_TBL_STATUS_OK) {
@@ -1492,7 +1492,7 @@ en_tbl_status_codes tbl_record_add(string<32> uid) {
 		if (tbl_info(tbl_info_index).clean_start == NO) {
 			daddr1 = fd.find(1,TBL_DELETE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
 			if (daddr1 == 0) {
-add_at_bottom:			add_at_bottom: 
+add_at_bottom: 
 				//check if table is full
 				dwtemp = tbl_info(tbl_info_index).rec_size;
 				dwtemp = dwtemp*tbl_info(tbl_info_index).maxrecs;
@@ -1522,7 +1522,7 @@ add_at_bottom:			add_at_bottom:
 	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_ADD);
 	goto tbl_ok;
 	
-fd_error:	fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1539,26 +1539,26 @@ fd_error:	fd_error:
 	break;
 	}
 	 
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	#if TBL_AGGREGATE_HASH				
 		tbl_mod_hash(md5_val);
 	#endif
 	//set the pointer to the record position (it might be the last record, or the first deleted record position)
 	tbl_record_add = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_record_add = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_record_add = EN_TBL_STATUS_FAILURE;//fd errors, and other errors
 	goto finish;
-tbl_full:tbl_full: 
+tbl_full: 
 	tbl_record_add = EN_TBL_STATUS_FULL;
 	goto finish;
-tbl_key_violate:tbl_key_violate: 
+tbl_key_violate: 
 	tbl_record_add = EN_TBL_STATUS_KEY_VIOLATION;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_record_add = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_add != EN_TBL_STATUS_OK) {
@@ -1631,7 +1631,7 @@ en_tbl_status_codes tbl_record_edit(unsigned int rec_num) {
 #endif
 	}
 
-finish:finish: 
+finish: 
 	if (fd.ready == NO) then tbl_record_edit = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_edit != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_record_edit);
@@ -1676,7 +1676,7 @@ en_tbl_status_codes tbl_record_read_active(unsigned int rec_num) {
 	daddr = fd.find(fd.pointer,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
 
 	if (daddr == 0) {
-not_found:	not_found: 
+not_found: 
 		rec_num = 0;
 		tbl_record_read_active = EN_TBL_STATUS_END_OF_TABLE;
 		return tbl_record_read_active;
@@ -1685,7 +1685,7 @@ not_found:	not_found:
 	rec_num = (daddr/tbl_info(tbl_info_index).rec_size)+1;
 	
 	tbl_record_read_active = tbl_record_sg(rec_num,EN_TBL_GET);
-finish:finish: 
+finish: 
 	return tbl_record_read_active;
 	#if TBL_DEBUG_PRINT
 		tbl_debug_print_error("tbl_record_read_active()",tbl_record_read_active);
@@ -1752,7 +1752,7 @@ en_tbl_status_codes tbl_record_delete(unsigned int rec_num) {
 	}
 	goto tbl_ok;
 
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1767,7 +1767,7 @@ fd_error:fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 #if TBL_AGGREGATE_HASH
 	unsigned long md5_val;
 	tbl_record_sg(rec_num,EN_TBL_GET);
@@ -1776,16 +1776,16 @@ tbl_ok:tbl_ok:
 #endif
 	tbl_record_delete = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_record_delete = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_file:tbl_unknown_file: 
+tbl_unknown_file: 
 	tbl_record_delete = EN_TBL_STATUS_UNKNOWN_FILE;
 	goto finish;
-tbl_deleted:tbl_deleted: 
+tbl_deleted: 
 	tbl_record_delete = EN_TBL_STATUS_DELETED;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_record_delete = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_delete != EN_TBL_STATUS_OK) {
@@ -1847,7 +1847,7 @@ en_tbl_status_codes tbl_record_undelete(unsigned int rec_num) {
 	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_UNDELETE);
 	goto tbl_ok;
 	
-fd_error:fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -1860,22 +1860,22 @@ fd_error:fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 #if TBL_AGGREGATE_HASH == 1
 	tbl_set_md5();
 #endif
 	tbl_record_undelete = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_record_undelete = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_record_undelete = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_not_found:tbl_not_found: 
+tbl_not_found: 
 	tbl_record_undelete = EN_TBL_STATUS_NOT_FOUND;
 	goto finish;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_record_undelete = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_undelete != EN_TBL_STATUS_OK) {
@@ -2049,7 +2049,7 @@ en_tbl_status_codes tbl_record_find(en_tbl_record_states record_type, string sea
 				daddr_offset = daddr_offset+tbl_get_field_size(i-1);
 			}
 		}
-query:		query: 
+query: 
 		//extended partial equal string search
 		if (find_method == PL_FD_FIND_PARTIAL_EQUAL) {
 			if (tbl_field_info(field_index).field_type != `S`) {
@@ -2078,7 +2078,7 @@ query:		query:
 	case EN_TBL_RECORD_DELETED:
 
 		daddr_temp = fd.find(daddr,TBL_DELETE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
-check_record:check_record: 
+check_record: 
 		if (daddr_temp == 0) {
 			goto tbl_not_found;
 		}
@@ -2093,25 +2093,25 @@ check_record:check_record:
 	//set the pointer to the record.
 	rec_num = daddr/tbl_info(tbl_info_index).rec_size+1;
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_record_find = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	rec_num = 0;
 	tbl_record_find = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	rec_num = 0;
 	tbl_record_find = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_unknown_fld:tbl_unknown_fld: 
+tbl_unknown_fld: 
 	rec_num = 0;
 	tbl_record_find = EN_TBL_STATUS_UNKNOWN_FIELD;
 	goto finish;
-tbl_not_found:tbl_not_found: 
+tbl_not_found: 
 	rec_num = 0;
 	tbl_record_find = EN_TBL_STATUS_NOT_FOUND;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_record_find = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_find != EN_TBL_STATUS_OK) {
@@ -2175,7 +2175,7 @@ en_tbl_status_codes tbl_multi_field_record_find(en_tbl_record_states record_type
 				daddr_offset = daddr_offset+tbl_get_field_size(i-1);
 			}
 		}
-query:		query: 
+query: 
 		daddr = daddr+daddr_offset;
 		daddr_temp = fd.find(daddr,search_data,1,direction,tbl_info(tbl_info_index).rec_size,find_method);
 		if (daddr_temp == 0) {
@@ -2194,7 +2194,7 @@ query:		query:
 	case EN_TBL_RECORD_DELETED:
 
 		daddr_temp = fd.find(daddr,TBL_DELETE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
-check_record:check_record: 
+check_record: 
 		if (daddr_temp == 0) {
 			goto tbl_not_found;
 		}
@@ -2209,25 +2209,25 @@ check_record:check_record:
 	//set the pointer to the record.
 	rec_num = daddr/tbl_info(tbl_info_index).rec_size+1;
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_multi_field_record_find = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	rec_num = 0;
 	tbl_multi_field_record_find = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	rec_num = 0;
 	tbl_multi_field_record_find = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_unknown_fld:tbl_unknown_fld: 
+tbl_unknown_fld: 
 	rec_num = 0;
 	tbl_multi_field_record_find = EN_TBL_STATUS_UNKNOWN_FIELD;
 	goto finish;
-tbl_not_found:tbl_not_found: 
+tbl_not_found: 
 	rec_num = 0;
 	tbl_multi_field_record_find = EN_TBL_STATUS_NOT_FOUND;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_multi_field_record_find = EN_TBL_STATUS_FAILURE;
 	if (tbl_multi_field_record_find != EN_TBL_STATUS_OK) {
@@ -2423,18 +2423,18 @@ case EN_TBL_DT_ALL:
 		tbl_record_string = temp1+s+temp2;
 		goto tbl_ok;
 	}
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_field_sg = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_field_sg = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_unknown_fld:tbl_unknown_fld: 
+tbl_unknown_fld: 
 	tbl_field_sg = EN_TBL_STATUS_UNKNOWN_FIELD;
 	goto finish;
-tbl_invalid:tbl_invalid: 
+tbl_invalid: 
 	tbl_field_sg = EN_TBL_STATUS_INVALID;
-finish:finish: 
+finish: 
 	if (tbl_field_sg != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_field_sg);
 		#if TBL_DEBUG_PRINT
@@ -2511,15 +2511,15 @@ en_tbl_status_codes tbl_get_field_def(string table_name_or_num, string field_nam
 		}
 	}
 	goto tbl_unknown_fld;
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_get_field_def = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_get_field_def = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_unknown_fld:tbl_unknown_fld: 
+tbl_unknown_fld: 
 	tbl_get_field_def = EN_TBL_STATUS_UNKNOWN_FIELD;
-finish:finish: 
+finish: 
 	if (tbl_get_field_def != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_get_field_def);
 		#if TBL_DEBUG_PRINT
@@ -2608,7 +2608,7 @@ en_tbl_status_codes tbl_get_num_records(unsigned int num_of_records, no_yes incl
 		num_of_records = tbl_selected_active_rc;
 	}
 	tbl_get_num_records = EN_TBL_STATUS_OK;
-finish:finish: 
+finish: 
 	if (fd.ready == NO) then tbl_get_num_records = EN_TBL_STATUS_FAILURE;
 	if (tbl_get_num_records != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_get_num_records);
@@ -2668,7 +2668,7 @@ en_tbl_status_codes tbl_timestamp_sg(struct_tbl_timestamp timestamp, en_tbl_rdwr
 	}
 	goto tbl_ok;
 
-fd_error:	fd_error: 
+fd_error: 
 	switch (fd.laststatus) {
 	goto tbl_ok;
 	break;
@@ -2683,15 +2683,15 @@ fd_error:	fd_error:
 	break;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_timestamp_sg = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_timestamp_sg = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_timestamp_sg = EN_TBL_STATUS_UNKNOWN_TABLE;
-finish:finish: 
+finish: 
 	if (fd.transactionstarted == YES) then fd.transactioncommit();
 	if (fd.ready == NO) then tbl_timestamp_sg = EN_TBL_STATUS_FAILURE;
 	if (tbl_timestamp_sg != EN_TBL_STATUS_OK) {
@@ -2857,18 +2857,18 @@ en_tbl_status_codes tbl_adjust_size() {
 		goto tbl_ok;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_adjust_size = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_unknown_tbl:tbl_unknown_tbl: 
+tbl_unknown_tbl: 
 	tbl_adjust_size = EN_TBL_STATUS_UNKNOWN_TABLE;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_adjust_size = EN_TBL_STATUS_FAILURE;
 	goto finish;
-tbl_invalid:tbl_invalid: 
+tbl_invalid: 
 	tbl_adjust_size = EN_TBL_STATUS_INVALID;
-finish:finish: 
+finish: 
 	if (fd.ready == NO) then tbl_adjust_size = EN_TBL_STATUS_FAILURE;
 	if (tbl_adjust_size != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_adjust_size);
@@ -2898,16 +2898,16 @@ en_tbl_status_codes tbl_info_find(string table_name_or_num, unsigned char index)
 		}
 	}
 	goto tbl_not_found;
-check_index:check_index: 
+check_index: 
 	if (i<TBL_MAX_NUM_TABLES) {
 		index = i;
 		tbl_info_find = EN_TBL_STATUS_OK;
 	} else {
-tbl_not_found:tbl_not_found: 
+tbl_not_found: 
 		index = 0;
 		tbl_info_find = EN_TBL_STATUS_UNKNOWN_TABLE;
 	}
-finish:finish: 
+finish: 
 	if (tbl_info_find != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_info_find);
 		#if TBL_DEBUG_PRINT
@@ -2947,12 +2947,12 @@ en_tbl_status_codes tbl_record_ptr_sg(unsigned int rec_num, en_tbl_rdwr op) {
 		goto tbl_ok;
 	}
 	
-tbl_ok:tbl_ok: 
+tbl_ok: 
 	tbl_record_ptr_sg = EN_TBL_STATUS_OK;
 	goto finish;
-tbl_fail:tbl_fail: 
+tbl_fail: 
 	tbl_record_ptr_sg = EN_TBL_STATUS_FAILURE;//fd errors, and other errors
-finish:finish: 
+finish: 
 	if (fd.ready == NO) then tbl_record_ptr_sg = EN_TBL_STATUS_FAILURE;
 	if (tbl_record_ptr_sg != EN_TBL_STATUS_OK) {
 		callback_tbl_error(tbl_record_ptr_sg);
@@ -3090,7 +3090,7 @@ no_yes tbl_check_key_violation(unsigned int key_ptr) {
 	daddr_offset = daddr_offset+8;//offset for uid(4bytes) + offset for md5(4bytes)
 #endif
 	daddr1 = 1+daddr_offset;
-find_key:	find_key: 
+find_key: 
 		daddr1 = fd.find(daddr1,skeyfield,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
 		if (daddr1>0) {//check if it's a deleted record
 			daddr2 = fd.find(daddr1-daddr_offset,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL);
@@ -3104,7 +3104,7 @@ find_key:	find_key:
 	}
 	tbl_check_key_violation = NO;
 	return tbl_check_key_violation;
-tbl_key_violate:tbl_key_violate: 
+tbl_key_violate: 
 	dtemp = tbl_info(tbl_info_index).rec_size;
 	dtemp = daddr1/dtemp+1;
 	key_ptr = dtemp;

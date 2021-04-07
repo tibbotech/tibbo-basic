@@ -280,7 +280,7 @@ en_gprs_status_codes gprs_start(string at_dt_command_param, string apn, string u
 	gprs_pap_required = NO;
 	return gprs_start;
 	
-gprs_start_error:gprs_start_error: 
+gprs_start_error: 
 	#if GPRS_DEBUG_PRINT
 		gprs_debugprint("---FAILURE---");
 	#endif

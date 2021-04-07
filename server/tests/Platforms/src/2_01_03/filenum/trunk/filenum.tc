@@ -81,7 +81,7 @@ unsigned char filenum_open(string signature, string filename, pl_fd_status_codes
 	fd.filenum = filenum_open;
 	fd.open(filename);
 	if (fd.laststatus != PL_FD_STATUS_OK) {
-filenum_opened_failed:		filenum_opened_failed: 
+filenum_opened_failed: 
 		#if FILENUM_DEBUG_PRINT
 			filenum_debugprint("ERROR: '"+signature+"' failed to open file '"+filename+"' on file number "+str(filenum_open));
 		#endif

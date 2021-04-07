@@ -275,7 +275,7 @@ en_wln_status_codes wln_start(string ap_name, pl_wln_security_modes security_mod
 	wln_association_holdoff_timer = 1;//will start scanning and associating on the next timer event
 	return wln_start;
 
-wln_start_error:wln_start_error: 
+wln_start_error: 
 	#if WLN_DEBUG_PRINT
 		wln_debug_print_status(wln_start);
 		wln_debugprint("---FAILURE---");
@@ -333,7 +333,7 @@ en_wln_status_codes wln_change(string ap_name, pl_wln_security_modes security_mo
 	wln.disassociate;
 	return wln_change;
 
-wln_change_error:wln_change_error: 
+wln_change_error: 
 	#if WLN_DEBUG_PRINT
 		wln_debug_print_status(wln_change);
 		wln_debugprint("---FAILURE---");
@@ -384,7 +384,7 @@ void wln_stop() {
 			sock.discard();
 
 			i = sys.timercount;
-wait_close_kal_socket:wait_close_kal_socket: 
+wait_close_kal_socket: 
 			if (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
 			goto wait_close_kal_socket;
 			}
@@ -404,7 +404,7 @@ wait_close_kal_socket:wait_close_kal_socket:
 					sock.discard();
 
 					i = sys.timercount;
-	wait_close_wpa_socket:wait_close_wpa_socket: 
+	wait_close_wpa_socket: 
 					if (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
 					goto wait_close_wpa_socket;
 					}
@@ -984,7 +984,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 		break;
 	}
 
-finish:finish: 
+finish: 
 	wln_scan_and_assoc_in_prog = NO;
 	if (wln_result != WLN_STATUS_OK) {
 		#if WLN_DEBUG_PRINT
@@ -1052,14 +1052,14 @@ void wln_check_for_better_ap(unsigned char rssi_lvl) {
 					}
 				} else {
 					wln_rescan_tmr = WLN_RESCAN_TMR_CTR_NO_CONNECT;
-rescan:				rescan: 
+rescan: 
 					callback_wln_rescan_for_better_ap();
 					wln_start_rescan();//if TCP not established we rescan periodically no matter whata
 				}
 			}
 		}
 	}
-finish:finish: 
+finish: 
 	sock.num = sock_backup;
 }
 

@@ -17,7 +17,7 @@ void close_interface_sockets(pl_sock_interfaces interface) {
 
     i = sys.timercount;
 
-wait_close_interface_sockets:wait_close_interface_sockets: 
+wait_close_interface_sockets: 
     for (f=0; f <= sock.numofsock-1; f++) {
         sock.num = f;
         if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {

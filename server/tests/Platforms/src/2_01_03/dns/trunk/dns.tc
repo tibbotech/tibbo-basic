@@ -121,7 +121,7 @@ en_dns_status_codes dns_connect(pl_sock_interfaces interface, string dns_server_
 	
 	dns_connect = EN_STATUS_DNS_INVALID_INTERFACE;
 	return dns_connect;//invalid interface specified	
-l1:	l1: 
+l1: 
 	sock.targetip = dns_server_ip;
 	if (dns_port == 0) {
 		sock.targetport = DNS_SERVER_PORT;

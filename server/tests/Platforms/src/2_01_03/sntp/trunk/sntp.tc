@@ -141,7 +141,7 @@ en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string server_ip, 
 	sntp_start = SNTP_STATUS_INVALID_INTERFACE;
 	return sntp_start;//invalid interface specified
 
-sntp_start_continue:sntp_start_continue: 
+sntp_start_continue: 
 	sock.num = sntp_sock;
 	sock.protocol = PL_SOCK_PROTOCOL_UDP;
 	sock.targetinterface = interface;
@@ -246,7 +246,7 @@ void sntp_proc_timer() {
 	}
 	return;
 
-sntp_failed:sntp_failed: 
+sntp_failed: 
 	sntp_release_buffer();
 	if (sntp_phase == SNTP_PHASE_CONNECTING) {
 		callback_sntp_failure(SNTP_STATUS_CONNECTION_TIMEOUT);

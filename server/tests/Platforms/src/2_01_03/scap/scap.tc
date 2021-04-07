@@ -150,7 +150,7 @@ string<4> scap_size_convertion(unsigned long v) {
 	for (q=k; q <= 7; q++) {
 		p(q) = 0;
 	}
-next_size:next_size: 
+next_size: 
 	
 	p(0) = p(0)+p(1)*16;
 	p(2) = p(2)+p(3)*16;

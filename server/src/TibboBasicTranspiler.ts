@@ -117,7 +117,8 @@ export default class TibboBasicTranspiler {
     writeLine(line: number) {
         let lineContent = this.lines[line - 1];
         let res = lineContent.search(/\S|$/);
-        if (lineContent.match(/^\s*[a-zA-Z][a-zA-Z0-9_]+:\s*$/) !== null) {
+        const exp = /^\s*[a-zA-Z][a-zA-Z0-9_]+:\s*$/;
+        if (lineContent.match(exp) !== null && this.currentLine.match(exp) == null) {
             this.lines[line - 1] += this.currentLine;
         }
         else {

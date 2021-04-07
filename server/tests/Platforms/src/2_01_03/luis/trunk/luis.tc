@@ -333,33 +333,33 @@ void luis_proc_bt_cmd(string cmd_str) {
 	
 	}
 
-reply_rejected:reply_rejected: 
+reply_rejected: 
 	reply_str = "R";
 	goto send;
 
-reply_err:reply_err: 
+reply_err: 
 	reply_str = "C";
 	goto send;
 
-reply_failed:reply_failed: 
+reply_failed: 
 	reply_str = "F";
 	goto send;
 
-reply_ok:reply_ok: 
+reply_ok: 
 	reply_str = "A";
 	goto send;
 
-reply_ok_have_data:reply_ok_have_data: 
+reply_ok_have_data: 
 	reply_str = "A"+reply_str;
 	goto send;
 
-send:send: 
+send: 
 	reply_str = chr(2)+reply_str+chr(13);//add encapsulation
 	
 	bt.setdata(reply_str);
 	bt.send();
 	
-reply_null:reply_null: 
+reply_null: 
 }
 
 en_luis_status_codes luis_on_bt_data_arrival() {

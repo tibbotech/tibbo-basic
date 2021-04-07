@@ -133,7 +133,7 @@ en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string requested_i
 	dhcp_start = DHCP_STATUS_INVALID_INTERFACE;
 	return dhcp_start;//invalid interface specified
 
-dhcp_start_continue:dhcp_start_continue: 
+dhcp_start_continue: 
 	if (NUM_INTERFACES == 1) {
 		dhcp_i = 0;
 	} else {
@@ -195,7 +195,7 @@ en_dhcp_status_codes dhcp_stop(pl_sock_interfaces interface) {
 	dhcp_stop = DHCP_STATUS_INVALID_INTERFACE;
 	return dhcp_stop;//invalid interface specified
 
-dhcp_stop_continue:dhcp_stop_continue: 
+dhcp_stop_continue: 
 	if (NUM_INTERFACES == 1) {
 		dhcp_i = 0;
 	} else {
@@ -432,7 +432,7 @@ void dhcp_proc_data() {
 	}
 	return;
 
-dhcp_is_active:dhcp_is_active: 
+dhcp_is_active: 
 	if (sock.num != dhcp_sock) {
 		return;
 	}
@@ -465,7 +465,7 @@ dhcp_is_active:dhcp_is_active:
 
 	goto dhcp_proc_data_error;
 
-decode_packet:decode_packet: 
+decode_packet: 
 	if (NUM_INTERFACES == 1) {
 		dhcp_i = 0;
 	} else {
@@ -623,10 +623,10 @@ get_lease: if (asc(mid(s,f+1,1)) != 4) {
 			break;
 		
 		}
-next_option:	next_option: 
+next_option: 
 	}
 
-exit_options:	exit_options: 
+exit_options: 
 	//packet decoded successfully
 	switch (dhcp_phase(dhcp_i)) {
 	case DHCP_PHASE_DISCOVER_REPLY:
@@ -659,7 +659,7 @@ exit_options:	exit_options:
 	}
 	return;
 
-dhcp_proc_data_error:dhcp_proc_data_error: 
+dhcp_proc_data_error: 
 	#if DHCP_DEBUG_PRINT
 		dhcp_debugprint(interface,"INFO: RX unexpected, invalid, or unrelated message (it was discarded)");
 	#endif
@@ -780,7 +780,7 @@ ok_ng dhcp_sock_open(pl_sock_interfaces interface, en_dhcp_phases phase) {
 	if (sock.statesimple == PL_SSTS_CLOSED) {
 		i = sys.timercount;
 		sock.connect();
-dhcp_1:dhcp_1: 
+dhcp_1: 
 		if (sock.statesimple != PL_SSTS_EST && sys.timercount-i<3 && sys.timercount>=i) {
 			goto dhcp_1;
 		}
@@ -960,7 +960,7 @@ void discard_sockets(pl_sock_interfaces interface) {
 	}
 
 	i = sys.timercount;
-wait_discard:wait_discard: 
+wait_discard: 
 	for (f=0; f <= sock.numofsock-1; f++) {
 		sock.num = f;
 		if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
@@ -1033,7 +1033,7 @@ void dhcp_debugprint(pl_sock_interfaces interface, string print_data) {
 	
 	s = str(interface)+"??";
 	
-dhcp_debugprint_1:	dhcp_debugprint_1: 
+dhcp_debugprint_1: 
 	sys.debugprint(DHCP_STAMP1+s+DHCP_STAMP2+print_data+DHCP_CR_LF);
 }
 #endif

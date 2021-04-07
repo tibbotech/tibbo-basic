@@ -286,7 +286,7 @@ en_stg_status_codes stg_start() {
 
 		break;
 		default:
-unknown_setting_type:unknown_setting_type: 
+unknown_setting_type: 
 			#if STG_DEBUG_PRINT
 				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): unknown setting type '"+s+"', use 'B', 'W', 'S' or 'D' only.");
 			#endif
@@ -356,7 +356,7 @@ unknown_setting_type:unknown_setting_type:
 		case `D`:
 
 			if (val(s)>63) {
-p1_too_large:p1_too_large: 
+p1_too_large: 
 				#if STG_DEBUG_PRINT
 					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): minimum value (P1 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s);
 				#endif
@@ -409,7 +409,7 @@ p1_too_large:p1_too_large:
 		case `D`:
 
 			if (val(s)>63) {
-p2_too_large:p2_too_large: 
+p2_too_large: 
 				#if STG_DEBUG_PRINT
 					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): maximum value (P2 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s);
 				#endif
@@ -537,7 +537,7 @@ p2_too_large:p2_too_large:
 
 		break;
 		default:
-unknown_init_mode:unknown_init_mode: 
+unknown_init_mode: 
 			#if STG_DEBUG_PRINT
 				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): unknown initialization mode '"+s+"', use 'I', or 'A' only.");
 			#endif
@@ -680,7 +680,7 @@ unknown_init_mode:unknown_init_mode:
 			s = mid(s,pos+1,255);
 			goto skip_def_value_check;
 		}
-skip_def_value_check:skip_def_value_check: 
+skip_def_value_check: 
 
 
 		//done with this setting, move to next one
@@ -733,7 +733,7 @@ skip_def_value_check:skip_def_value_check:
 	if (newfile == YES) {
 		//create a file of required size
 		
-create_newfile:create_newfile: 
+create_newfile: 
 		fd_status = fd.setfilesize(0);
 		if (fd_status != PL_FD_STATUS_OK) {
 			#if STG_DEBUG_PRINT
@@ -1028,13 +1028,13 @@ en_stg_status_codes stg_restore_multiple(en_stg_init_modes init_mode) {
 				x = stg_sg(stg_sdr(f).name,f2,s,EN_STG_GET);//here is where X is set -- we check it below
 				goto stgl1;
 			}
-stgl1:			stgl1: 
+stgl1: 
 			#if STG_TIMESTAMP != 0
 				stg_timestamp = stg_timestamp_bup;
 			#endif
 
 			if (x != EN_STG_STATUS_OK) {//x is set above (see "here is where X is set")
-init_this:				init_this: 
+init_this: 
 				//yes, initialization is required- get default value
 				romfile.pointer = stg_sdr(f).romaddr_def;
 				pos = romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1);
@@ -1089,7 +1089,7 @@ init_this:				init_this:
 					}
 				}
 			}
-skip_this:		skip_this: 
+skip_this: 
 		}
 	}
 
