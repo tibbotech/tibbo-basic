@@ -108,10 +108,10 @@ enum en_stg_init_modes {
 
 //--------------------------------------------------------------------------------
 struct struct_stg_timestamp {
-	unsigned int ts_daycount
-	unsigned int ts_mincount
-	unsigned char ts_seconds
-	unsigned int ts_milsec
+	unsigned int ts_daycount;
+	unsigned int ts_mincount;
+	unsigned char ts_seconds;
+	unsigned int ts_milsec;
 };
 
 //--------------------------------------------------------------------------------

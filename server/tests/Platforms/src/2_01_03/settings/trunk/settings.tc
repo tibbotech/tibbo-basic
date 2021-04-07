@@ -14,17 +14,17 @@
 
 //--------------------------------------------------------------------------------
 struct en_sdr_type {
-	string<STG_MAX_SETTING_NAME_LEN> name//name
-	unsigned char storage
-	unsigned char stype
-	unsigned char members
-	unsigned int p1
-	unsigned int p2
-	unsigned char ini
-	unsigned int memaddr
-	unsigned int romaddr_def
-	unsigned char member_size
-	unsigned char setting_size
+	string<STG_MAX_SETTING_NAME_LEN> name;//name
+	unsigned char storage;
+	unsigned char stype;
+	unsigned char members;
+	unsigned int p1;
+	unsigned int p2;
+	unsigned char ini;
+	unsigned int memaddr;
+	unsigned int romaddr_def;
+	unsigned char member_size;
+	unsigned char setting_size;
 };
 
 //--------------------------------------------------------------------------------

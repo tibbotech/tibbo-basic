@@ -2,8 +2,8 @@
 
 void dosomething();
 struct foo_struct {//structure with two members, and both are arrays  
-	unsigned char x
-	string s
+	unsigned char x;
+	string s;
 };
 
 void boot();

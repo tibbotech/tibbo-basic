@@ -62,31 +62,31 @@ enum en_agg_element_get_status {
 };
 
 struct agg_entity {
-	string<AGG_MAX_CONTEXT_NAME_LEN> context_name
-	en_agg_entity entity_type
-	unsigned int romaddr_script
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	en_agg_entity entity_type;
+	unsigned int romaddr_script;
 };
 
 struct agg_item {
-	string<AGG_MAX_CONTEXT_NAME_LEN> context_name
-	en_agg_entity entity_type
-	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> item_name
-	string<2> p1
-	unsigned int romaddr_script
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	en_agg_entity entity_type;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> item_name;
+	string<2> p1;
+	unsigned int romaddr_script;
 };
 
 struct agg_command {
-	string<AGG_MAX_CONTEXT_NAME_LEN> context_name
-	string<1> code
-	string<8> id
-	string<1> msg_code
-	string<1> op_code
-	string<AGG_MAX_FUNCTION_NAME_LEN> item_name
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	string<1> code;
+	string<8> id;
+	string<1> msg_code;
+	string<1> op_code;
+	string<AGG_MAX_FUNCTION_NAME_LEN> item_name;
 };
 
 struct agg_stored_event_info {
-	unsigned char agg_item_index
-	no_yes agg_unsent_stored_event
+	unsigned char agg_item_index;
+	no_yes agg_unsent_stored_event;
 };
 //------------------------------------------------------------------------------
 

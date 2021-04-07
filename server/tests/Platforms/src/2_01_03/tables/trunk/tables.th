@@ -112,30 +112,30 @@ enum en_tbl_modified_operation {
 };
 //--------------------------------------------------------------------------------
 struct tbl_field_type {
-	string<TBL_MAX_FIELD_NAME_LEN> field_name
-	unsigned char field_type
-	unsigned long p1
-	unsigned long p2
-	no_yes key
-	unsigned int romaddr_def
+	string<TBL_MAX_FIELD_NAME_LEN> field_name;
+	unsigned char field_type;
+	unsigned long p1;
+	unsigned long p2;
+	no_yes key;
+	unsigned int romaddr_def;
 };
 
 struct tbl_type {
-	string<TBL_MAX_TABLE_NAME_LEN> table_name
-	unsigned int maxrecs
-	unsigned char numkeyf
-	en_tbl_struct struct
-	unsigned char rec_size
-	unsigned int field_num_offset
-	unsigned char num_of_fields
-	no_yes clean_start
+	string<TBL_MAX_TABLE_NAME_LEN> table_name;
+	unsigned int maxrecs;
+	unsigned char numkeyf;
+	en_tbl_struct struct;
+	unsigned char rec_size;
+	unsigned int field_num_offset;
+	unsigned char num_of_fields;
+	no_yes clean_start;
 };
 
 struct struct_tbl_timestamp {
-	unsigned int ts_daycount
-	unsigned int ts_mincount
-	unsigned char ts_seconds
-	unsigned int ts_milsec
+	unsigned int ts_daycount;
+	unsigned int ts_mincount;
+	unsigned char ts_seconds;
+	unsigned int ts_milsec;
 };
 
 //--------------------------------------------------------------------------------

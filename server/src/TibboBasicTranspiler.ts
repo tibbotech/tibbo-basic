@@ -586,7 +586,7 @@ class ParserListener extends TibboBasicParserListener {
         if (ctx.children.length > 2) {
             name += `[${ctx.children[2]}]`;
         }
-        this.transpiler.addCode(`${valueType} ${name}`);
+        this.transpiler.addCode(`${valueType} ${name};`);
         this.transpiler.writeLine(ctx.start.line);
     }
 
