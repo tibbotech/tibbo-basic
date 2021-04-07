@@ -158,7 +158,7 @@ paramInternal : (BYVAL | BYREF)? IDENTIFIER asTypeClause?;
 selectCaseStmt :
 	SELECT CASE expression COLON?
 	sC_Case*
-	(CASE_ELSE COLON? block)?
+	sC_Default?
 	END_SELECT
 ;
 
@@ -167,9 +167,13 @@ sC_Case :
 	block
 ;
 
+sC_Default :
+    CASE_ELSE COLON? block
+;
+
 // ELSE first, so that it is not interpreted as a variable call
 sC_Cond :
-    expression (COMMA expression)*
+    expression
 ;
 
 subStmt :
@@ -186,7 +190,7 @@ typeStmtElement:
 
 // operator precedence is represented by rule order
 
-assignment: unaryExpression EQ expression;
+//assignment: IDENTIFIER EQ expression;
 
 //expression
 //    : ('-' | NOT) expression
@@ -222,8 +226,7 @@ unaryOperator
     ;
 
 postfixExpression
-    : primaryExpression postfix*
-    | postfixExpression DOT symbol=IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
+    : primaryExpression (DOT property=IDENTIFIER)? postfix*
     ;
 
 postfix
