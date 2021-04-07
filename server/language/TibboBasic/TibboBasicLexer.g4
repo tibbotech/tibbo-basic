@@ -49,7 +49,7 @@ FOR: F O R;
 FUNCTION: F U N C T I O N;
 GET: G E T;
 GOTO: G O T O;
-IF: I F;
+IF: I F -> mode(INLINE_MODE);
 IFDEF: I F D E F;
 IFNDEF: I F N D E F;
 INCLUDE: I N C L U D E;
@@ -223,5 +223,71 @@ DIRECTIVE_TEXT_MULTI_COMMENT:     '/*' .*? '*/'    -> channel(COMMENTS_CHANNEL);
 DIRECTIVE_TEXT_SINGLE_COMMENT:    '//' ~[\r\n]*    -> channel(COMMENTS_CHANNEL);
 DIRECTIVE_SLASH:                  '/'              -> channel(DIRECTIVE_CHANNEL), type(DIRECTIVE_TEXT);
 DIRECTIVE_TEXT:                   ~[\r\n\\/]+      -> channel(DIRECTIVE_CHANNEL);
+
+mode INLINE_MODE;
+
+//keywords
+AND2: A N D -> type(AND);
+ELSE2: E L S E -> type(ELSE);
+END2: E N D -> type(END);
+EXIT_DO2 : E X I T WS D O -> type(EXIT_DO);
+EXIT_FOR2 : E X I T WS F O R -> type(EXIT_FOR);
+EXIT_FUNCTION2 : E X I T WS F U N C T I O N -> type(EXIT_FUNCTION);
+EXIT_SUB2 : E X I T WS S U B -> type(EXIT_SUB);
+EXIT_WHILE2 : E X I T WS W H I L E -> type(EXIT_WHILE);
+FALSE2: F A L S E -> type(FALSE);
+GOTO2: G O T O -> type(GOTO);
+MOD2: M O D -> type(MOD);
+NOT2: N O T -> type(NOT);
+OR2: O R -> type(OR);
+SHL2: S H L -> type(SHL);
+SHR2: S H R -> type(SHR);
+SIZEOF2: S I Z E O F -> type(SIZEOF);
+THEN2: T H E N -> type(THEN);
+TRUE2: T R U E -> type(TRUE);
+XOR2: X O R -> type(XOR);
+
+// literals
+STRINGLITERAL2 : ["`] (~["\r\n] | '""')* ["`] -> type(STRINGLITERAL);
+HEXLITERAL2 : '&' H [0-9A-Fa-f]+ -> type(HEXLITERAL);
+BINLITERAL2 : '&' B [0-9A-F]+ -> type(BINLITERAL);
+INTEGERLITERAL2 : DIGIT+ -> type(INTEGERLITERAL);
+
+
+// symbols
+DIV2: ('\\' | '/') -> type(DIV);
+EQ2: '=' -> type(EQ);
+GEQ2: '>=' -> type(GEQ);
+GT2: '>' -> type(GT);
+LEQ2: '<=' -> type(LEQ);
+LPAREN2: '(' -> type(LPAREN);
+LT2: '<' -> type(LT);
+MINUS2: '-' -> type(MINUS);
+MULT2: '*' -> type(MULT);
+NEQ2: '<>' -> type(NEQ);
+PLUS2: '+' -> type(PLUS);
+RPAREN2: ')' -> type(RPAREN);
+
+//NEWLINE: [\r\n\u2028\u2029]+ -> channel(HIDDEN);
+NEWLINE2
+   : ('\r'? '\n') -> mode(DEFAULT_MODE), type(NEWLINE)
+   ;
+COMMENT2
+//: SINGLEQUOTE (LINE_CONTINUATION | ~[\r\n\u2028\u2029])*;
+    : SINGLEQUOTE2 ~[\r\n]* -> channel(COMMENTS_CHANNEL)
+    ;
+SINGLEQUOTE2: '\'' -> type(SINGLEQUOTE);
+COLON2: ':' -> type(COLON);
+COMMA2: ',' -> type(COMMA);
+DOT2: '.' -> type(DOT);
+BANG2: '!' -> type(BANG);
+UNDERSCORE2: '_' -> type(UNDERSCORE);
+WS2
+    : [ \t]+ -> channel(HIDDEN)
+    ;
+
+
+// identifier
+IDENTIFIER2 :  LETTER LETTERORDIGIT* -> type(IDENTIFIER);
 
 ANY: . ;

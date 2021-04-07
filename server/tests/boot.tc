@@ -10,7 +10,7 @@ void boot();
     
     unsigned char f;
     for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
-		interface_ready(f)=NO;
+		interface_ready(f) = NO;
 	}
 
     //Ethernet setup
@@ -23,9 +23,9 @@ void boot();
 	unsigned char j;
 	sys.debugprint(str(i));
 	sys.debugprint(str(j));
-    net.ip=DEVICE_NET_IP;
-    net.netmask=DEVICE_NET_MASK;
-    net.gatewayip=DEVICE_NET_GATEWAY;
+    net.ip = DEVICE_NET_IP;
+    net.netmask = DEVICE_NET_MASK;
+    net.gatewayip = DEVICE_NET_GATEWAY;
 	bool aa;
 	unsigned char bb;
 	char cc;
@@ -38,11 +38,11 @@ void boot();
 	pl_wln_association_states jj;
 	byte(3) kk;
 	foo_struct ll;
-	ll.x=9;
-	ll.s="bcd";
+	ll.x = 9;
+	ll.s = "bcd";
 	
 	for (i=0; i <= 3; i++) {
-		ll.s=str(i);
+		ll.s = str(i);
 	}
 	dosomething();
     pat.play("B-B-B-",PL_PAT_CANINT);

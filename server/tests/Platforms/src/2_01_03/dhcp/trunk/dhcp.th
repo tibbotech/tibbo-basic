@@ -48,14 +48,14 @@ enum DHCP_info_elements {
 };
 
 //------------------------------------------------------------------------------
-string dhcp_get_info(dhcp_info_elements info_element, string *extra_data);
-en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string *requested_ip, string *host_name);
+string dhcp_get_info(dhcp_info_elements info_element, string extra_data);
+en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string requested_ip, string host_name);
 en_dhcp_status_codes dhcp_stop(pl_sock_interfaces interface);
 void dhcp_set_link_disconnect_behavior(pl_sock_interfaces interface, no_yes behavior);
 void dhcp_proc_timer();
 void dhcp_proc_data();
 
-void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string *ip, string *gateway_ip, string *netmask, unsigned long lease_time);
+void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string ip, string gateway_ip, string netmask, unsigned long lease_time);
 //Callback procedure, informs of the successul procurement of configuration parameters from the DHCP server.
 //Procedure body has to be created elsewhere in the project (externally with respect to the library).
 

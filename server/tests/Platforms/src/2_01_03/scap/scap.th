@@ -1,0 +1,35 @@
+//***********************************************************************************************************
+//			SCREEN CAPTURE LIBRARY
+//***********************************************************************************************************
+
+//1- debug output in console.
+//0- no debug output.
+#ifndef SCAP_DEBUG_PRINT
+	#define SCAP_DEBUG_PRINT 0
+#endif
+
+//The following will be divided between all sockets allocated by the library.
+//The number of sockets is equal to SCAP_NUM_OF_SOCK (defined in scap.tbs).
+//Allocating fewer pages decreases the performance.
+#ifndef SCAP_HTTP_TX_BUFF_PAGES 
+	#define SCAP_HTTP_TX_BUFF_PAGES 16 
+#endif
+
+//The following will be divided between all sockets allocated by the library.
+//The number of sockets is equal to SCAP_NUM_OF_SOCK (defined in scap.tbs).
+//Allocating fewer pages decreases the performance.
+#ifndef SCAP_HTTP_VAR_BUFF_PAGES 
+	#define SCAP_HTTP_VAR_BUFF_PAGES 4 
+#endif
+
+//--------------------------------------------------------------------------------
+//Status codes
+enum en_scap_status_codes {
+	EN_SCAP_STATUS_OK,//Operation completed successfully
+	EN_SCAP_STATUS_OUT_OF_SOCKETS//No free sockets left
+};
+
+//--------------------------------------------------------------------------------
+en_scap_status_codes scap_start();
+void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize, unsigned int Ysize);
+string<4> scap_size_convertion(unsigned long v);

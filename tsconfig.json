@@ -17,5 +17,6 @@
 	"references": [
 		{ "path": "./client" },
 		{ "path": "./server" }
-	]
+	],
+	"composite": true
 }

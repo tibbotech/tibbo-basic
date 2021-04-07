@@ -6,50 +6,50 @@ void close_interface_sockets(pl_sock_interfaces interface) {
     unsigned char f, sock_num_bup;
     unsigned int i;
     
-    sock_num_bup=sock.num;
+    sock_num_bup = sock.num;
     
     for (f=0; f <= sock.numofsock-1; f++) {
-        sock.num=f;
+        sock.num = f;
         if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED) {
-            sock.discard;
+            sock.discard();
         }
     }
 
-    i=sys.timercount;
+    i = sys.timercount;
 
-wait_close_interface_sockets:
+wait_close_interface_sockets:wait_close_interface_sockets: 
     for (f=0; f <= sock.numofsock-1; f++) {
-        sock.num=f;
-        if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED && sys.timercount - i < 3 && sys.timercount >= i) {
+        sock.num = f;
+        if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
             goto wait_close_interface_sockets;
         }
     }
 
-    sock.num=sock_num_bup;
+    sock.num = sock_num_bup;
     
 }
             
 
-void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string *ip, string *gateway_ip, string *netmask, unsigned long lease_time) {
+void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string ip, string gateway_ip, string netmask, unsigned long lease_time) {
     
     if (interface == PL_SOCK_INTERFACE_NET) {
-        ifrenew=YESandnet.ip<>ipthensys.reboot;
+        if (renew == YES && net.ip != ip) {
             //this is a lease renewal and the DHCP server has issues new IP
             //it is better to reboot than deal with the implications of the changed IP
-            sys.reboot
+            sys.reboot();
         }
 
         #if DEV_DEBUG_PRINT
             dev_debugprint("Ethernet DHCP OK ("+ip+")");
         #endif
 
-        ifnet.ip<>ipthensock.inconenabledmaster=NO;
-            sock.inconenabledmaster=NO
+        if (net.ip != ip) {
+            sock.inconenabledmaster = NO;
             close_interface_sockets(PL_SOCK_INTERFACE_NET);
-            net.ip=ip;
-            net.gatewayip=gateway_ip;
-            net.netmask=netmask;
-            sock.inconenabledmaster=YES;
+            net.ip = ip;
+            if (gateway_ip != "") then net.gatewayip = gateway_ip;
+            if (netmask != "") then net.netmask = netmask;
+            sock.inconenabledmaster = YES;
         }
     }
             

@@ -10,6 +10,6 @@
 #include "dhcp\trunk\dhcp.th"
 #include "sock\trunk\sock.th"
 //DECLARATIONS--------------------------------------------------------
-extern no_yes interface_ready(MAX_NUM_INTERFACES);
+extern no_yes interface_ready[MAX_NUM_INTERFACES];
 void close_interface_sockets(pl_sock_interfaces interface);
 void boot();

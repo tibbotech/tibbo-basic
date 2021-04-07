@@ -38,7 +38,7 @@ includeppStmt
 // block ----------------------------------
 
 block
-    : statement*
+    : (lineLabel? statement)*
     ;
 
 statement
@@ -106,8 +106,8 @@ jumpStmt
 goToStmt : GOTO IDENTIFIER;
 
 ifThenElseStmt
-    : IF expression THEN (expression | jumpStmt) (ELSE (expression | jumpStmt))? # inlineIfThenElse
-    | IF expression THEN block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
+    : IF expression THEN (expression | jumpStmt) (ELSE (expression | jumpStmt))? NEWLINE # inlineIfThenElse
+    | IF expression THEN NEWLINE+ block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
     ;
 
 ifConditionStmt : expression;
@@ -226,7 +226,8 @@ unaryOperator
     ;
 
 postfixExpression
-    : primaryExpression (DOT property=IDENTIFIER)? postfix*
+    : primaryExpression postfix*
+    | postfixExpression DOT property=IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
     ;
 
 postfix

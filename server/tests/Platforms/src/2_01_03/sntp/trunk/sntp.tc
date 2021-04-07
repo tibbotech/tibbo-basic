@@ -1,0 +1,521 @@
+//***********************************************************************************************************
+//			SNTP LIBRARY
+//			(Obtains date/time from an SNTP server)
+//
+//
+//                           1                   2                   3
+//       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |LI | VN  |Mode |    Stratum    |     Poll      |   Precision   |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                          Root Delay                           |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                       Root Dispersion                         |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                     Reference Identifier                      |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      |                   Reference Timestamp (64) T1                 |
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      |                   Originate Timestamp (64) T2                 |
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      |                    Receive Timestamp (64) T3                  |
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      |                    Transmit Timestamp (64) T4                 |
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                 Key Identifier (optional) (32)                |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      |                                                               |
+//      |                 Message Digest (optional) (128)               |
+//      |                                                               |
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//
+//
+//
+//		64bits Timestamp format
+//
+//		0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//		| Seconds                                                       |
+//		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//		| Seconds Fraction (0-padded)                                   |
+//		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//		
+//
+//***********************************************************************************************************
+
+#include "global.th"
+
+//------------------------------------------------------------------------------
+#define SNTP_STAMP "SNTP> "
+#define SNTP_CR_LF chr(13)+chr(10)
+#define SNTP_STD_SERVER_IP "192.43.244.18"
+#define SNTP_STD_SERVER_PORT 123
+
+//------------------------------------------------------------------------------
+enum en_sntp_phases {
+	SNTP_PHASE_IDLE,
+	SNTP_PHASE_CONNECTING,
+	SNTP_PHASE_RQUESTING
+};
+
+//------------------------------------------------------------------------------
+void sntp_release_buffer();
+void sntp_convert_to_time(unsigned long ts_val, unsigned int w_daycount, unsigned int w_mincount, unsigned char b_sec);
+void sntp_debug_print_status(en_sntp_status_codes status);
+void sntp_debugprint(string print_data);
+void sntp_send_request();
+unsigned long sntp_ts_to_dword(string<4> ts);
+
+#if SNTP_OFFSET_CALCULATION
+	string<4> sntp_dword_to_ts(unsigned long ts_val);
+	unsigned long sntp_get_clock_ts();
+#endif
+//------------------------------------------------------------------------------
+unsigned char sntp_sock;
+en_sntp_phases sntp_phase;
+unsigned char sntp_retry_ctr;
+unsigned char sntp_reply_timer;
+
+//==============================================================================
+void sntp_init();
+//Initialize the sock for SNTP connection
+
+	sntp_phase = SNTP_PHASE_IDLE;
+	sntp_sock = 255;
+}
+
+//------------------------------------------------------------------------------
+en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string server_ip, unsigned int server_port, unsigned char socket) {
+//Connect to SNTP Time Server specified by sntp_server_ip, at sntp_server_port.
+
+    en_sntp_status_codes sntp_start;
+	sntp_sock = socket;
+	sntp_start = SNTP_STATUS_OK;
+		
+	if (socket>=sock.numofsock) {
+		#if SNTP_DEBUG_PRINT
+			SNTP_debug_print_status(SNTP_STATUS_INVALID_SOCKET);
+			SNTP_debugprint("---FAILURE---");
+		#endif
+		SNTP_start = SNTP_STATUS_INVALID_SOCKET;
+		return sntp_start;
+	}
+	
+	if (sntp_phase != SNTP_PHASE_IDLE) {
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Already started");
+		#endif
+		return sntp_start;
+	}
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("---START---");
+	#endif
+
+	#if NET_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_NET) {
+			goto sntp_start_continue;
+		}
+	#endif
+
+	#if WLN_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_WLN) {
+			goto sntp_start_continue;
+		}
+	#endif
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debug_print_status(SNTP_STATUS_INVALID_INTERFACE);
+		sntp_debugprint("---FAILURE---");
+	#endif
+	sntp_start = SNTP_STATUS_INVALID_INTERFACE;
+	return sntp_start;//invalid interface specified
+
+sntp_start_continue:sntp_start_continue: 
+	sock.num = sntp_sock;
+	sock.protocol = PL_SOCK_PROTOCOL_UDP;
+	sock.targetinterface = interface;
+
+	if (server_ip == "") {
+		sock.targetip = SNTP_STD_SERVER_IP;
+	} else {
+		sock.targetip = server_ip;
+	}
+	
+	if (server_port == 0) {
+		sock.targetport = SNTP_STD_SERVER_PORT;
+	} else {
+		sock.targetport = server_port;
+	}
+
+	if (sys.freebuffpages<2) {
+		callback_sntp_pre_buffrq(2-sys.freebuffpages);
+	}
+	
+	sock.num = sntp_sock;
+	sock.txbuffrq(1);
+	sock.rxbuffrq(1);
+	sys.buffalloc();
+	
+	if (sock.rxbuffsize<1 || sock.txbuffsize<1) {
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE);
+			sntp_debugprint("---FAILURE---");
+		#endif	
+		sntp_release_buffer();
+		sntp_start = SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE;
+		return sntp_start;
+	}
+
+	sock.num = sntp_sock;
+
+	sock.connect();
+	sntp_phase = SNTP_PHASE_CONNECTING;
+	sntp_reply_timer = SNTP_REPLY_TIMEOUT;
+	sntp_retry_ctr = SNTP_RETRY;
+	
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("Connecting to SNTP server at "+sock.targetip+":"+str(sock.targetport));
+	#endif
+	return sntp_start;
+}
+
+//------------------------------------------------------------------------------
+void sntp_proc_timer() {
+	unsigned int w;
+	
+	if (sntp_reply_timer>0) {
+		sntp_reply_timer = sntp_reply_timer-1;
+		if (sntp_reply_timer>0) {
+			return;
+		}
+	}
+	
+	switch (sntp_phase) {
+	case SNTP_PHASE_IDLE:
+
+	break;
+		//---
+		
+	case SNTP_PHASE_CONNECTING:
+
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_CONNECTION_TIMEOUT);
+		#endif		
+
+		sntp_retry_ctr = sntp_retry_ctr-1;
+		if (sntp_retry_ctr == 0) {
+			goto sntp_failed;
+		}
+
+		sock.num = sntp_sock;
+		if (sock.statesimple == PL_SSTS_CLOSED) {
+			sock.connect();
+		}
+		sntp_reply_timer = SNTP_REPLY_TIMEOUT;
+		
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Connecting to SNTP server at "+sock.targetip+":"+str(sock.targetport));
+			break;
+		#endif		
+
+	case SNTP_PHASE_RQUESTING:
+
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_REPLY_TIMEOUT);
+		#endif
+
+		sntp_retry_ctr = sntp_retry_ctr-1;
+		if (sntp_retry_ctr == 0) {
+			goto sntp_failed;
+		}
+
+		sntp_send_request();
+		sntp_reply_timer = SNTP_REPLY_TIMEOUT;
+		break;
+	}
+	return;
+
+sntp_failed:sntp_failed: 
+	sntp_release_buffer();
+	if (sntp_phase == SNTP_PHASE_CONNECTING) {
+		callback_sntp_failure(SNTP_STATUS_CONNECTION_TIMEOUT);
+	} else {
+		callback_sntp_failure(SNTP_STATUS_REPLY_TIMEOUT);
+	}
+	sntp_phase = SNTP_PHASE_IDLE;
+
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("---FAILURE---");
+	#endif					
+}
+
+//------------------------------------------------------------------------------
+void sntp_proc_sock_event(pl_sock_state_simple state) {
+
+	return;
+	if (sock.statesimple == PL_SSTS_EST) {
+		#if SNTP_DEBUG_PRINT
+			sntp_debugprint("Connection established");
+		#endif
+		sntp_send_request();
+		sntp_reply_timer = SNTP_REPLY_TIMEOUT;
+		sntp_retry_ctr = SNTP_RETRY;
+		sntp_phase = SNTP_PHASE_RQUESTING;
+	}
+}
+
+//------------------------------------------------------------------------------
+void sntp_send_request() {
+	string<48> s;
+	
+	s = chr(&h0b)+strgen(47,chr(&h0));
+	#if SNTP_OFFSET_CALCULATION	
+		string<4> s1;
+		s1 = sntp_dword_to_ts(sntp_get_clock_ts());
+		insert(s,41,s1);
+	#endif
+	
+	sock.setdata(s);
+	sock.send();
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("TX request");
+	#endif
+}
+
+//------------------------------------------------------------------------------
+void sntp_proc_data() {
+	unsigned int w_days, w_mins;
+	unsigned char b_seconds;
+	string<64> s;
+	string<4> t4;
+	unsigned long d4;
+	
+	#if SNTP_OFFSET_CALCULATION	
+		string<4> t1, t2, t3;
+		unsigned long d1, d2, d3;
+	#endif 
+	
+	return;
+	#if SNTP_DEBUG_PRINT
+		sntp_debugprint("RX reply");
+	#endif
+
+	sock.num = sntp_sock;
+	s = sock.getdata(255);
+	
+	if (len(s) != 48) {
+		#if SNTP_DEBUG_PRINT
+			sntp_debug_print_status(SNTP_STATUS_REPLY_DATA_ERROR);
+		#endif
+		
+		sntp_reply_timer = 1;
+		return;
+	}
+
+	t4 = mid(s,41,4);
+	d4 = sntp_ts_to_dword(t4);
+
+#if SNTP_OFFSET_CALCULATION	
+	t1 = mid(s,17,4);
+	t2 = mid(s,25,4);
+	t3 = mid(s,33,4);
+	
+	d1 = sntp_ts_to_dword(t2);
+	d2 = sntp_ts_to_dword(t3);
+	d3 = sntp_get_clock_ts();
+	
+	if (d1>0) {
+		//get the roundtrip delay
+		d3 = d3-d1;
+		d2 = d4-d2;
+		d3 = d3-d2;
+		d3 = d3/2;
+		d4 = d4+d3;
+	}
+#endif
+
+	sntp_convert_to_time(d4,w_days,w_mins,b_seconds);//call convert_to_time, to convert the 64bits timestamp into daycount, mincount, sec
+	
+	sntp_phase = SNTP_PHASE_IDLE;
+	sntp_release_buffer();
+	
+	#if SNTP_DEBUG_PRINT
+		s == "---OK(GMT+0="+str(2000+year(w_days))+"/"+str(month(w_days))+"/"+str(date(w_days))+" "+str(hours(w_mins))+":"+str(minutes(w_mins))+":"+str(b_seconds)+")---";
+		sntp_debugprint(s);
+	#endif	
+	callback_sntp_ok(w_days,w_mins,b_seconds);
+}
+
+//------------------------------------------------------------------------------
+void sntp_convert_to_time(unsigned long ts_val, unsigned int w_daycount, unsigned int w_mincount, unsigned char b_sec) {
+	//least significant word
+	//day count from 1st of Jan 1900
+	//minute count from 00:00
+	//seconds
+	)	
+//Take 4 bytes value from sock, which is the amount of seconds from 1st of Jan 1900 00:00:00 to now
+//convert this value into days,hours,mins,secs. 
+	unsigned int w_remain, w_factor, w_temp, w_temp1, w_temp2, w_temp3;
+	unsigned int w_days, w_mins, w_seconds;
+	int i, j;
+	unsigned int w_msw, w_lsw;
+	
+	w_msw = ts_val/65536;
+	w_lsw = ts_val % 65536;
+	w_remain = 0;
+	w_factor = 0;
+	w_temp1 = 0;
+	w_temp2 = 0;
+	w_temp3 = 0;
+
+	w_remain = w_msw % 24;
+	w_factor = w_msw/24;
+	w_days = w_factor*18;
+	w_temp1 = 0;
+	 
+	for (i=1; i <= w_factor; i++) {
+		w_temp1 = w_temp1+736;
+		if (w_temp1>3600) {
+			w_days = w_days+1;
+			w_temp1 = w_temp1-3600;
+		}
+	}
+	for (j=1; j <= 18; j++) {
+		w_temp2 = w_temp2+w_remain;
+		if (w_temp2>24) {
+			w_days = w_days+1;
+			w_temp2 = w_temp2-24;
+		}
+	}
+	
+	//Put w_temp1 into Minutes and Seconds
+	w_temp3 = w_remain*736;
+	w_temp = w_temp1/60;
+	w_mins = w_temp*24;
+	
+	//put w_temp2 into Minutes and Seconds
+	w_seconds = (w_temp1 % 60)*24;
+	w_mins = w_mins+w_temp2*60;
+	
+	//put w_temp3 into Minutes and Seconds
+	w_mins = w_mins+w_temp3/60;
+	w_seconds = w_seconds+(w_temp3 % 60);
+	
+	//Add w_lsw to Minutes and seconds
+	w_mins = w_mins+w_lsw/60;
+	w_seconds = w_seconds+(w_lsw % 60);
+	
+	//redistribute seconds to days.
+	w_mins = w_mins+w_seconds/60;
+	b_sec = w_seconds % 60;
+	
+	w_mincount = w_mins % 1440;
+	w_daycount = w_days+(w_mins/1440)+1-36525;//+1 because it counts start from 1st of January, (that is starting from 1)
+
+}
+
+//------------------------------------------------------------------------------
+void sntp_release_buffer() {
+
+	sock.num = sntp_sock;
+	sock.inconmode = PL_SOCK_INCONMODE_NONE;
+	sock.discard();
+	while (sock.statesimple != PL_SSTS_CLOSED) {
+	}
+	sock.txbuffrq(0);
+	sock.rxbuffrq(0);
+	sys.buffalloc();
+}
+
+//------------------------------------------------------------------------------
+#if SNTP_DEBUG_PRINT
+void sntp_debug_print_status(en_sntp_status_codes status) {
+	string<64> s;
+	
+	switch (status) {
+	s = "invalid interface";
+	break;
+	s = "invalid socket ("+str(sntp_sock)+")";
+	break;
+	s = "insufficient buffer space";
+	break;
+	s = "timeout while trying to connect";
+	break;
+	s = "timeout while waiting for the reply";
+	break;
+	s = "incoming data is invalid (reply discarded)";
+	break;
+	}
+	s = "ERROR: "+s;
+	sntp_debugprint(s);
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if SNTP_DEBUG_PRINT
+void sntp_debugprint(string print_data) {
+
+	sys.debugprint(SNTP_STAMP+print_data+SNTP_CR_LF);
+}
+#endif
+
+//------------------------------------------------------------------------------
+unsigned long sntp_ts_to_dword(string<4> ts) {
+//convert 4 bytes of string to dword value
+	unsigned char f;
+	unsigned long ts_val;
+	
+	//the rtc is incapable of dealing Seconds Fraction, therefore we only exam the 4 most significant byte from NTP timestamp
+	ts_val = 0;
+	for (f=1; f <= 4; f++) {
+		ts_val = ts_val*256+asc(mid(ts,f,1));
+	}
+	
+	sntp_ts_to_dword = ts_val;
+	return sntp_ts_to_dword;
+}
+
+//------------------------------------------------------------------------------
+string<4> sntp_dword_to_ts(unsigned long ts_val) {
+//convert 4 bytes of string to dword value
+	unsigned char f;
+	unsigned char b;
+	
+	sntp_dword_to_ts = ts_val;
+	sntp_dword_to_ts = "/x00/x00/x00/x00";
+	for (f=0; f <= 3; f++) {
+		b = ts_val % 256;
+		ts_val = ts_val/256;
+		insert(sntp_dword_to_ts,4-f,chr(b));
+	}
+	return sntp_dword_to_ts;
+}
+
+//------------------------------------------------------------------------------
+#if SNTP_OFFSET_CALCULATION
+unsigned long sntp_get_clock_ts() {
+	unsigned int w_days, w_mins;
+	unsigned char b_seconds;
+	unsigned long d;
+	
+	callback_sntp_get_rtc(w_days,w_mins,b_seconds);
+	sntp_get_clock_ts = w_days;
+	sntp_get_clock_ts = sntp_get_clock_ts*60*60*24;
+	d = w_mins;
+	d = d*60;
+	sntp_get_clock_ts = sntp_get_clock_ts+d;
+	sntp_get_clock_ts = sntp_get_clock_ts+b_seconds;
+	return sntp_get_clock_ts;
+}
+#endif

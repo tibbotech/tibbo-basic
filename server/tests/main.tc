@@ -2,7 +2,7 @@
 
 
 
-no_yes interface_ready(MAX_NUM_INTERFACES);
+no_yes interface_ready[MAX_NUM_INTERFACES];
 
 
 void on_sys_init() {
