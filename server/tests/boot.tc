@@ -10,7 +10,7 @@ void boot();
     
     unsigned char f;
     for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
-		interface_ready(f) = NO;
+		interface_ready[f] = NO;
 	}
 
     //Ethernet setup

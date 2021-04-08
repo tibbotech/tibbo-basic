@@ -23,7 +23,7 @@ enum pppoe_info_elements {
 };
 
 //--------------------------------------------------------------------
-en_pppoe_status_codes pppoe_start(string login, string password);
+en_pppoe_status_codes pppoe_start(string *login, string *password);
 void pppoe_stop();
 void pppoe_proc_data();
 void pppoe_proc_timer();

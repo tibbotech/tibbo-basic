@@ -28,14 +28,14 @@ unsigned char dns_conn_tmr, dns_rpl_tmr;
 
 #if DNS_DEBUG_PRINT
 void dns_debug_print_status(en_dns_status_codes status);
-void dns_debugprint(string print_data);
+void dns_debugprint(string *print_data);
 #endif
 //====================================================================
 
 en_dns_status_codes dns_start(unsigned char dns_sock_num) {
+    en_dns_status_codes dns_start;
 	unsigned char x;
 
-    en_dns_status_codes dns_start;
 	#if DNS_DEBUG_PRINT
 		dns_debugprint("---START---");
 	#endif
@@ -81,7 +81,8 @@ en_dns_status_codes dns_start(unsigned char dns_sock_num) {
 	return dns_start;
 }
 
-en_dns_status_codes dns_connect(pl_sock_interfaces interface, string dns_server_ip, unsigned int dns_port) {
+en_dns_status_codes dns_connect(pl_sock_interfaces interface, string *dns_server_ip, unsigned int dns_port) {
+    en_dns_status_codes dns_connect;
 	
 	if (dns_init_flag != DNS_INIT_SIGNATURE) {
 		#if DNS_DEBUG_PRINT
@@ -122,7 +123,7 @@ en_dns_status_codes dns_connect(pl_sock_interfaces interface, string dns_server_
 	dns_connect = EN_STATUS_DNS_INVALID_INTERFACE;
 	return dns_connect;//invalid interface specified	
 l1: 
-	sock.targetip = dns_server_ip;
+	sock.targetip = *dns_server_ip;
 	if (dns_port == 0) {
 		sock.targetport = DNS_SERVER_PORT;
 	} else {
@@ -155,7 +156,7 @@ void dns_disconnect() {
 	sock.close();
 }
 
-void dns_query(string query_name) {
+void dns_query(string *query_name) {
 	string dns_query_question;
 	unsigned int query_flag;
 	unsigned char pos1, pos2, l;
@@ -180,13 +181,13 @@ void dns_query(string query_name) {
 	//convert query name
 	do 
 		pos2 = pos1;
-		pos1 = instr(pos1+1,query_name,".",1);
+		pos1 = instr(pos1+1,*query_name,".",1);
 		if (pos1>0) {
 			l = pos1-pos2-1;
 		} else {
-			l = len(query_name)-pos2;
+			l = len(*query_name)-pos2;
 		}
-		dns_query_question = dns_query_question+chr(l)+mid(query_name,pos2+1,l);
+		dns_query_question = dns_query_question+chr(l)+mid(*query_name,pos2+1,l);
 	loop while pos1>0
 	
 	//end with chr(0)
@@ -196,7 +197,7 @@ void dns_query(string query_name) {
 	dns_name_len = len(dns_query_question);
 	
 	//query structure id(2)+flag(2)+number of question(2)+number of answer RRs(2)+number of authority RRs(2)+number of additional RRs(2)+query name(?)+query type(2)+query class(2)
-	dns_query_question = dns_id+chr(query_flag/256)+chr(query_flagmod256)+chr(DNS_NUMBER_QUESTION/256)+chr(DNS_NUMBER_QUESTIONmod256)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+dns_query_question+chr(DNS_QUERY_TYPE/256)+chr(DNS_QUERY_TYPEmod256)+chr(DNS_QUERY_CLASS/256)+chr(DNS_QUERY_CLASSmod256);
+	dns_query_question = dns_id+chr(query_flag/256)+chr(query_flag % 256)+chr(DNS_NUMBER_QUESTION/256)+chr(DNS_NUMBER_QUESTION % 256)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+dns_query_question+chr(DNS_QUERY_TYPE/256)+chr(DNS_QUERY_TYPE % 256)+chr(DNS_QUERY_CLASS/256)+chr(DNS_QUERY_CLASS % 256);
 
 	sock.num = dns_sock;
 	sock.setdata(dns_query_question);
@@ -465,8 +466,8 @@ void dns_debug_print_status(en_dns_status_codes status) {
 #endif
 
 #if DNS_DEBUG_PRINT
-void dns_debugprint(string print_data) {
+void dns_debugprint(string *print_data) {
 
-	sys.debugprint(DNS_STAMP+print_data+DNS_CR_LF);
+	sys.debugprint(DNS_STAMP+*print_data+DNS_CR_LF);
 }
 #endif

@@ -16,7 +16,7 @@
 #endif
 
 //------------------------------------------------------------------------------
-unsigned char filenum_open(string signature, string filename, pl_fd_status_codes status);
-unsigned char filenum_get(string signature);
+unsigned char filenum_open(string *signature, string *filename, pl_fd_status_codes *status);
+unsigned char filenum_get(string *signature);
 string filenum_who_uses(unsigned char file_num);
 void filenum_release(unsigned char file_num);

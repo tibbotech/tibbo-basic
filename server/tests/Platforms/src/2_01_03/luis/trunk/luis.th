@@ -67,7 +67,7 @@ enum en_luis_status_codes {
 };
 
 
-en_luis_status_codes luis_start(string bt_name);
+en_luis_status_codes luis_start(string *bt_name);
 //Boots the WA2000, enables Bluetooth, and sets the advertised name of the device
 
 en_luis_status_codes luis_on_bt_data_arrival();

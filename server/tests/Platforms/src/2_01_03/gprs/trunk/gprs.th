@@ -189,8 +189,8 @@ enum gprs_info_elements {
 };
 
 //--------------------------------------------------------------------
-string gprs_get_info(gprs_info_elements info_element, string extra_data);
-en_gprs_status_codes gprs_start(string at_dt_command_param, string apn, string username, string password);
+string gprs_get_info(gprs_info_elements info_element, string *extra_data);
+en_gprs_status_codes gprs_start(string *at_dt_command_param, string *apn, string *username, string *password);
 void gprs_stop();
 void gprs_proc_ser_data();
 void gprs_proc_sock_data();

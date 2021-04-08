@@ -28,7 +28,7 @@ void mqtt_start();
 //API procedure, starts the MQTT library.
 //MUST be called first, before any other procedure in this library is used.
 
-ok_ng mqtt_connect(string dst_ip, unsigned int dst_port, string user, string password, unsigned char keep_alive);
+ok_ng mqtt_connect(string *dst_ip, unsigned int dst_port, string *user, string *password, unsigned char keep_alive);
 //API function, instructs the library to connect to the MQTT server (broker).<br><br>
 //<b>dst_ip</b>- the IP address of the MQTT server,<br>
 //<b>dst_port</b>- target port on the MATT server,<br>
@@ -43,15 +43,15 @@ ok_ng mqtt_reconnect();
 void mqtt_disconnect();
 //API procedure, disconnects the device from the MQTT server (broker).	
 
-void mqtt_publish(string topic, string data, en_qos_choices qos);
+void mqtt_publish(string *topic, string *data, en_qos_choices qos);
 //API procedure, publishes a <b>topic</b> and its <b>data</b> to the MQTT server (broker).
 
-void mqtt_sub(string topic, en_qos_choices qos);
+void mqtt_sub(string *topic, en_qos_choices qos);
 //API procedure, subscribes the device to the specified topic on the MQTT server (broker).<br><br>
 //<b>topic</b>- the topic to subscribe to,<br>
 //<b>qos</b>- requested quality of service, according to the en_qos_choices enum.
 
-void mqtt_unsub(string topic);
+void mqtt_unsub(string *topic);
 //API procedure, unsubscribes the device from the specified topic.<br><br>
 //<b>topic</b>- message to unsubscribe from.
 
@@ -69,7 +69,7 @@ void callback_mqtt_connect_lost();
 //MQTT callback procedure. Must be implemented elsewhere in the user's program.
 //Called when connection to the MQTT server is lost.
 
-void callback_mqtt_notif(string topic, string data);
+void callback_mqtt_notif(string *topic, string *data);
 //MQTT callback function. Must be implemented elsewhere in the user's program.
 //Called when the subscriber receives a message from the MQTT server for the topic this subscriber is subscribed to.
 

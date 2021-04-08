@@ -51,13 +51,13 @@ enum en_td_date_formats {
 };
 
 //------------------------------------------------------------------------------
-ok_ng td_gmt_to_local(unsigned int day_count, unsigned int min_count, en_td_timezones timezone, off_on dst);
-ok_ng td_local_to_gmt(unsigned int day_count, unsigned int min_count, en_td_timezones timezone, off_on dst);
-ok_ng td_to_str(string td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
-ok_ng td_from_str(string td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
-ok_ng td_to_binstr(string td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
-ok_ng td_from_binstr(string td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
-ok_ng td_str_to_binstr(string td_str);
-ok_ng td_binstr_to_str(string td_str);
-ok_ng td_str_date_time_reformat(string td_str, en_td_string_ops op, en_td_date_formats date_format);
-ok_ng td_str_time_reformat(string t_str, en_td_string_ops op);
+ok_ng td_gmt_to_local(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst);
+ok_ng td_local_to_gmt(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst);
+ok_ng td_to_str(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
+ok_ng td_from_str(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds);
+ok_ng td_to_binstr(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds);
+ok_ng td_from_binstr(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds);
+ok_ng td_str_to_binstr(string *td_str);
+ok_ng td_binstr_to_str(string *td_str);
+ok_ng td_str_date_time_reformat(string *td_str, en_td_string_ops op, en_td_date_formats date_format);
+ok_ng td_str_time_reformat(string *t_str, en_td_string_ops op);

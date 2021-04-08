@@ -30,25 +30,25 @@ wait_close_interface_sockets:
 }
             
 
-void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string ip, string gateway_ip, string netmask, unsigned long lease_time) {
+void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string *ip, string *gateway_ip, string *netmask, unsigned long lease_time) {
     
     if (interface == PL_SOCK_INTERFACE_NET) {
-        if (renew == YES && net.ip != ip) {
+        if (renew == YES && net.ip != *ip) {
             //this is a lease renewal and the DHCP server has issues new IP
             //it is better to reboot than deal with the implications of the changed IP
             sys.reboot();
         }
 
         #if DEV_DEBUG_PRINT
-            dev_debugprint("Ethernet DHCP OK ("+ip+")");
+            dev_debugprint("Ethernet DHCP OK ("+*ip+")");
         #endif
 
-        if (net.ip != ip) {
+        if (net.ip != *ip) {
             sock.inconenabledmaster = NO;
             close_interface_sockets(PL_SOCK_INTERFACE_NET);
-            net.ip = ip;
-            if (gateway_ip != "") then net.gatewayip = gateway_ip;
-            if (netmask != "") then net.netmask = netmask;
+            net.ip = *ip;
+            if (*gateway_ip != "") { net.gatewayip = *gateway_ip; };
+            if (*netmask != "") { net.netmask = *netmask; };
             sock.inconenabledmaster = YES;
         }
     }

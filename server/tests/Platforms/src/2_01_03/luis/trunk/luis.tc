@@ -25,7 +25,7 @@ enum en_luis_html_send_states {
 };
 
 //--------------------------------------------------------------------------------
-void luis_debugprint(string print_data);
+void luis_debugprint(string *print_data);
 void luis_delay_ms(int delay);
 string luis_dot_decimal_to_hex(string stored_mac);
 
@@ -39,7 +39,8 @@ unsigned long luis_html_read_pointer;
 en_luis_html_send_states luis_html_send_state;
 
 //================================================================================
-en_luis_status_codes luis_start(string bt_name) {
+en_luis_status_codes luis_start(string *bt_name) {
+    en_luis_status_codes luis_start;
 	luis_start = EN_LUIS_STATUS_OK;
 	if (luis_init_flag == LUIS_INIT_SIGNATURE) {
 		return luis_start;
@@ -86,7 +87,7 @@ en_luis_status_codes luis_start(string bt_name) {
 		luis_init_flag = 0;
 		luis_start = EN_LUIS_BT_FAILURE;
 	} else {
-		bt.name = bt_name;
+		bt.name = *bt_name;
 		bt.emulation = PL_WLN_BT_EMULATION_MODE_MICROCHIP;
 		bt.txbuffrq(LUIS_BT_TX_BUF_SIZE);
 		bt.rxbuffrq(LUIS_BT_RX_BUF_SIZE);
@@ -226,7 +227,7 @@ void luis_on_bt_data_sent() {
 	
 }
 
-void luis_proc_bt_cmd(string cmd_str) {
+void luis_proc_bt_cmd(string *cmd_str) {
 	string<LUIS_MAX_BT_RPL_LEN> reply_str;
 	unsigned char x;
 	string<STG_MAX_SETTING_NAME_LEN> setting_name;
@@ -235,12 +236,12 @@ void luis_proc_bt_cmd(string cmd_str) {
 	string<64> s2;
 	string<32> stg_data;
 	explicit_index = NO;
-	if (left(cmd_str,1) != "D") {
-		x = instr(1,cmd_str,LUIS_CMD_ESC_CHAR,1);
+	if (left(*cmd_str,1) != "D") {
+		x = instr(1,*cmd_str,LUIS_CMD_ESC_CHAR,1);
 		if (x>0) {
 			//yes, the sequence is included -- extract it
-			setting_name = mid(cmd_str,2,x-2);
-			stg_data = mid(cmd_str,x+1,len(cmd_str)-x);
+			setting_name = mid(*cmd_str,2,x-2);
+			stg_data = mid(*cmd_str,x+1,len(*cmd_str)-x);
 			explicit_index = YES;
 		}
 	}
@@ -250,11 +251,11 @@ void luis_proc_bt_cmd(string cmd_str) {
 	unsigned int mac_num;
 	unsigned int i;
 
-	switch (left(cmd_str,1)) {
+	switch (left(*cmd_str,1)) {
 
 	case "G":
 //get setting --------------------------------------
-		setting_name = mid(cmd_str,2,STG_MAX_SETTING_NAME_LEN);
+		setting_name = mid(*cmd_str,2,STG_MAX_SETTING_NAME_LEN);
 		if (setting_name == "OP") {
 			luis_html_send_state = EN_LUIS_HTML_GOP_RESULT;
 			luis_current_send_chunk = luis_GOP_result;
@@ -283,8 +284,8 @@ void luis_proc_bt_cmd(string cmd_str) {
 	case "S":
 //set setting --------------------------------------
 		if (explicit_index == NO) {
-			setting_name = mid(cmd_str,2,2);
-			stg_data = right(cmd_str,len(cmd_str)-3);
+			setting_name = mid(*cmd_str,2,2);
+			stg_data = right(*cmd_str,len(*cmd_str)-3);
 		}
 		switch (stg_sg(setting_name,0,stg_data,EN_STG_SET)) {
 		case EN_STG_STATUS_OK:
@@ -363,6 +364,7 @@ reply_null:
 }
 
 en_luis_status_codes luis_on_bt_data_arrival() {
+    en_luis_status_codes luis_on_bt_data_arrival;
 	unsigned char x, y;
 	string<LUIS_MAX_BT_CMD_LEN> bt_cmd_str;
 	luis_on_bt_data_arrival = EN_LUIS_STATUS_OK;
@@ -397,8 +399,8 @@ en_luis_status_codes luis_on_bt_data_arrival() {
 }
 
 #if LUIS_DEBUG_PRINT
-void luis_debugprint(string print_data) {
-	sys.debugprint(LUIS_STAMP+print_data+LUIS_CR_LF);
+void luis_debugprint(string *print_data) {
+	sys.debugprint(LUIS_STAMP+*print_data+LUIS_CR_LF);
 }
 #endif
 

@@ -70,9 +70,9 @@ enum en_sntp_phases {
 
 //------------------------------------------------------------------------------
 void sntp_release_buffer();
-void sntp_convert_to_time(unsigned long ts_val, unsigned int w_daycount, unsigned int w_mincount, unsigned char b_sec);
+void sntp_convert_to_time(unsigned long ts_val, unsigned int *w_daycount, unsigned int *w_mincount, unsigned char *b_sec);
 void sntp_debug_print_status(en_sntp_status_codes status);
-void sntp_debugprint(string print_data);
+void sntp_debugprint(string *print_data);
 void sntp_send_request();
 unsigned long sntp_ts_to_dword(string<4> ts);
 
@@ -95,7 +95,7 @@ void sntp_init();
 }
 
 //------------------------------------------------------------------------------
-en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string server_ip, unsigned int server_port, unsigned char socket) {
+en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string *server_ip, unsigned int server_port, unsigned char socket) {
 //Connect to SNTP Time Server specified by sntp_server_ip, at sntp_server_port.
 
     en_sntp_status_codes sntp_start;
@@ -146,10 +146,10 @@ sntp_start_continue:
 	sock.protocol = PL_SOCK_PROTOCOL_UDP;
 	sock.targetinterface = interface;
 
-	if (server_ip == "") {
+	if (*server_ip == "") {
 		sock.targetip = SNTP_STD_SERVER_IP;
 	} else {
-		sock.targetip = server_ip;
+		sock.targetip = *server_ip;
 	}
 	
 	if (server_port == 0) {
@@ -358,7 +358,7 @@ void sntp_proc_data() {
 }
 
 //------------------------------------------------------------------------------
-void sntp_convert_to_time(unsigned long ts_val, unsigned int w_daycount, unsigned int w_mincount, unsigned char b_sec) {
+void sntp_convert_to_time(unsigned long ts_val, unsigned int *w_daycount, unsigned int *w_mincount, unsigned char *b_sec) {
 	//least significant word
 	//day count from 1st of Jan 1900
 	//minute count from 00:00
@@ -418,10 +418,10 @@ void sntp_convert_to_time(unsigned long ts_val, unsigned int w_daycount, unsigne
 	
 	//redistribute seconds to days.
 	w_mins = w_mins+w_seconds/60;
-	b_sec = w_seconds % 60;
+	*b_sec = w_seconds % 60;
 	
-	w_mincount = w_mins % 1440;
-	w_daycount = w_days+(w_mins/1440)+1-36525;//+1 because it counts start from 1st of January, (that is starting from 1)
+	*w_mincount = w_mins % 1440;
+	*w_daycount = w_days+(w_mins/1440)+1-36525;//+1 because it counts start from 1st of January, (that is starting from 1)
 
 }
 
@@ -464,9 +464,9 @@ void sntp_debug_print_status(en_sntp_status_codes status) {
 
 //------------------------------------------------------------------------------
 #if SNTP_DEBUG_PRINT
-void sntp_debugprint(string print_data) {
+void sntp_debugprint(string *print_data) {
 
-	sys.debugprint(SNTP_STAMP+print_data+SNTP_CR_LF);
+	sys.debugprint(SNTP_STAMP+*print_data+SNTP_CR_LF);
 }
 #endif
 
@@ -505,6 +505,7 @@ string<4> sntp_dword_to_ts(unsigned long ts_val) {
 //------------------------------------------------------------------------------
 #if SNTP_OFFSET_CALCULATION
 unsigned long sntp_get_clock_ts() {
+    unsigned long sntp_get_clock_ts;
 	unsigned int w_days, w_mins;
 	unsigned char b_seconds;
 	unsigned long d;

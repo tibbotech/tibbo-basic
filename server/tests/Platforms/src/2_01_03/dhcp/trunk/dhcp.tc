@@ -36,12 +36,12 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface);
 void dhcp_error(pl_sock_interfaces interface);
 ok_ng dhcp_sock_open(pl_sock_interfaces interface, en_dhcp_phases phase);
 void dhcp_sock_close();
-void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interfaces interface);
+void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfaces interface);
 void dhcp_check_if_all_finished();
 void discard_sockets(pl_sock_interfaces interface);
 void dhcp_init();
 void dhcp_debug_print_status(pl_sock_interfaces interface, en_dhcp_status_codes status);
-void dhcp_debugprint(pl_sock_interfaces interface, string print_data);
+void dhcp_debugprint(pl_sock_interfaces interface, string *print_data);
 
 //------------------------------------------------------------------------------
 unsigned char dhcp_sock;
@@ -69,7 +69,7 @@ string<DHCP_MAX_HOST_NAME_LEN> dhcp_host_name[NUM_INTERFACES];
 no_yes dhcp_ingnore_link_disconnects[NUM_INTERFACES];
 
 //==============================================================================
-string dhcp_get_info(dhcp_info_elements info_element, string extra_data) {
+string dhcp_get_info(dhcp_info_elements info_element, string *extra_data) {
 //Returns library-specific information for the requested info element
 
     string dhcp_get_info;
@@ -85,7 +85,7 @@ string dhcp_get_info(dhcp_info_elements info_element, string extra_data) {
 }
 
 //--------------------------------------------------------------------
-en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string requested_ip, string host_name) {
+en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string *requested_ip, string *host_name) {
 //API procedure, starts DHCP client on the specified network interface.
 
     en_dhcp_status_codes dhcp_start;
@@ -140,18 +140,18 @@ dhcp_start_continue:
 		dhcp_i = interface-1;
 	}
 
-	if (len(ddval(requested_ip)) == 4) {
-		dhcp_obtained_ip(dhcp_i) = requested_ip;
+	if (len(ddval(*requested_ip)) == 4) {
+		dhcp_obtained_ip[dhcp_i] = *requested_ip;
 	} else {
-		dhcp_obtained_ip(dhcp_i) = "";
+		dhcp_obtained_ip[dhcp_i] = "";
 	}
 	
-	dhcp_host_name(dhcp_i) = host_name;
+	dhcp_host_name[dhcp_i] = *host_name;
 
-	if (dhcp_phase(dhcp_i) == DHCP_PHASE_OFF) {
-		dhcp_timer(dhcp_i) = 1;
-		dhcp_retry_ctr(dhcp_i) = DHCP_MAX_RETRIES;
-		dhcp_phase(dhcp_i) = DHCP_PHASE_DISCOVER;
+	if (dhcp_phase[dhcp_i] == DHCP_PHASE_OFF) {
+		dhcp_timer[dhcp_i] = 1;
+		dhcp_retry_ctr[dhcp_i] = DHCP_MAX_RETRIES;
+		dhcp_phase[dhcp_i] = DHCP_PHASE_DISCOVER;
 	} else {
 		#if DHCP_DEBUG_PRINT
 			dhcp_debugprint(interface,"Already started");
@@ -202,8 +202,8 @@ dhcp_stop_continue:
 		dhcp_i = interface-1;
 	}
 
-	dhcp_timer(dhcp_i) = 0;
-	dhcp_phase(dhcp_i) = DHCP_PHASE_OFF;
+	dhcp_timer[dhcp_i] = 0;
+	dhcp_phase[dhcp_i] = DHCP_PHASE_OFF;
 	return dhcp_stop;
 }
 
@@ -220,7 +220,7 @@ void dhcp_set_link_disconnect_behavior(pl_sock_interfaces interface, no_yes beha
 	} else {
 		dhcp_i = interface-1;
 	}
-	dhcp_ingnore_link_disconnects(dhcp_i) = behavior;
+	dhcp_ingnore_link_disconnects[dhcp_i] = behavior;
 }
 
 //------------------------------------------------------------------------------
@@ -265,24 +265,24 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 
 	#if NET_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
-			if (dhcp_phase(dhcp_i) != DHCP_PHASE_OFF) {
+			if (dhcp_phase[dhcp_i] != DHCP_PHASE_OFF) {
 				if (net.linkstate == PL_NET_LINKSTAT_NOLINK) {
 					return;
 					
-					dhcp_phase(dhcp_i) = DHCP_PHASE_IDLE;
-					dhcp_renew(dhcp_i) = NO;
-					dhcp_timer(dhcp_i) = 1;
-					dhcp_retry_ctr(dhcp_i) = DHCP_MAX_RETRIES;
+					dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
+					dhcp_renew[dhcp_i] = NO;
+					dhcp_timer[dhcp_i] = 1;
+					dhcp_retry_ctr[dhcp_i] = DHCP_MAX_RETRIES;
 					#if DHCP_DEBUG_PRINT
-						dhcp_media_linked(dhcp_i) = NO;
+						dhcp_media_linked[dhcp_i] = NO;
 					#endif
 					return;
 				} else {
 					#if DHCP_DEBUG_PRINT
-						if (dhcp_media_linked(dhcp_i) == NO) {
+						if (dhcp_media_linked[dhcp_i] == NO) {
 							dhcp_debugprint(interface,"Ethernet cable plugged in -- DHCP (re)started");
 						}
-						dhcp_media_linked(dhcp_i) = YES;
+						dhcp_media_linked[dhcp_i] = YES;
 					#endif
 				}
 			}
@@ -291,17 +291,17 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 
 	#if WLN_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_WLN) {
-			if (dhcp_phase(dhcp_i) != DHCP_PHASE_OFF) {
+			if (dhcp_phase[dhcp_i] != DHCP_PHASE_OFF) {
 				if (wln_check_association() == PL_WLN_NOT_ASSOCIATED) {
 					return;
 					
 					dhcp_wln_exchange_delay = DHCP_WLN_EXCHANGE_DELAY_CONST;
-					dhcp_phase(dhcp_i) = DHCP_PHASE_IDLE;
-					dhcp_renew(dhcp_i) = NO;
-					dhcp_timer(dhcp_i) = 1;
-					dhcp_retry_ctr(dhcp_i) = DHCP_MAX_RETRIES;
+					dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
+					dhcp_renew[dhcp_i] = NO;
+					dhcp_timer[dhcp_i] = 1;
+					dhcp_retry_ctr[dhcp_i] = DHCP_MAX_RETRIES;
 					#if DHCP_DEBUG_PRINT
-						dhcp_media_linked(dhcp_i) = NO;
+						dhcp_media_linked[dhcp_i] = NO;
 					#endif
 					return;
 				} else {
@@ -311,55 +311,55 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 					}
 					
 					#if DHCP_DEBUG_PRINT
-						if (dhcp_media_linked(dhcp_i) == NO) {
+						if (dhcp_media_linked[dhcp_i] == NO) {
 							dhcp_debugprint(interface,"Wi-Fi interface associated with the AP -- DHCP (re)started");
 						}
-						dhcp_media_linked(dhcp_i) = YES;
+						dhcp_media_linked[dhcp_i] = YES;
 					#endif
 				}
 			}
 		}
 	#endif
 
-	if (dhcp_timer(dhcp_i) == 0) {
+	if (dhcp_timer[dhcp_i] == 0) {
 		return;
 	} else {
-		dhcp_timer(dhcp_i) = dhcp_timer(dhcp_i)-1;
-		if (dhcp_timer(dhcp_i)>0) {
+		dhcp_timer[dhcp_i] = dhcp_timer[dhcp_i]-1;
+		if (dhcp_timer[dhcp_i]>0) {
 			return;
 		}
 	}
 	
 	#if NET_AVAILABLE && WLN_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
-			if (dhcp_interface_token == PL_SOCK_INTERFACE_WLN && dhcp_phase(PL_SOCK_INTERFACE_NET-1) != DHCP_PHASE_OFF) {
-				if (dhcp_timer(PL_SOCK_INTERFACE_NET-1) == 0) {
-					dhcp_timer(PL_SOCK_INTERFACE_NET-1) = 1;
+			if (dhcp_interface_token == PL_SOCK_INTERFACE_WLN && dhcp_phase[PL_SOCK_INTERFACE_NET-1] != DHCP_PHASE_OFF) {
+				if (dhcp_timer[PL_SOCK_INTERFACE_NET-1] == 0) {
+					dhcp_timer[PL_SOCK_INTERFACE_NET-1] = 1;
 				}
 				return;
 			}
 		} else {
-			if (dhcp_interface_token == PL_SOCK_INTERFACE_NET && dhcp_phase(PL_SOCK_INTERFACE_WLN-1) != DHCP_PHASE_OFF) {
-				if (dhcp_timer(PL_SOCK_INTERFACE_WLN-1) == 0) {
-					dhcp_timer(PL_SOCK_INTERFACE_WLN-1) = 1;
+			if (dhcp_interface_token == PL_SOCK_INTERFACE_NET && dhcp_phase[PL_SOCK_INTERFACE_WLN-1] != DHCP_PHASE_OFF) {
+				if (dhcp_timer[PL_SOCK_INTERFACE_WLN-1] == 0) {
+					dhcp_timer[PL_SOCK_INTERFACE_WLN-1] = 1;
 				}
 				return;
 			}
 		}
 	#endif
 
-	switch (dhcp_phase(dhcp_i)) {
+	switch (dhcp_phase[dhcp_i]) {
 		
 	case DHCP_PHASE_IDLE:
 
-		if (dhcp_renew(dhcp_i) == NO) {
-			dhcp_phase(dhcp_i) = DHCP_PHASE_DISCOVER;
+		if (dhcp_renew[dhcp_i] == NO) {
+			dhcp_phase[dhcp_i] = DHCP_PHASE_DISCOVER;
 			goto label1;
 		} else {
 			#if DHCP_DEBUG_PRINT
 				dhcp_debugprint(interface,"Time to renew the lease");
 			#endif
-			dhcp_phase(dhcp_i) = DHCP_PHASE_REQUEST;
+			dhcp_phase[dhcp_i] = DHCP_PHASE_REQUEST;
 			goto label2;
 		}
 		break;
@@ -373,9 +373,9 @@ label1: if (dhcp_sock_open(interface,DHCP_PHASE_DISCOVER) != OK) {
 		#if DHCP_DEBUG_PRINT
 			dhcp_debugprint(interface,"TX discovery message");
 		#endif
-		send_dhcp(dhcp_obtained_ip(dhcp_i),device_name,interface);
-		dhcp_phase(dhcp_i) = DHCP_PHASE_DISCOVER_REPLY;
-		dhcp_timer(dhcp_i) = DHCP_WAIT_TIME;
+		send_dhcp(dhcp_obtained_ip[dhcp_i],device_name,interface);
+		dhcp_phase[dhcp_i] = DHCP_PHASE_DISCOVER_REPLY;
+		dhcp_timer[dhcp_i] = DHCP_WAIT_TIME;
 		return;
 		break;
 	
@@ -397,9 +397,9 @@ label2: if (dhcp_sock_open(interface,DHCP_PHASE_REQUEST) != OK) {
 		#if DHCP_DEBUG_PRINT
 			dhcp_debugprint(interface,"TX request message");
 		#endif
-		send_dhcp(dhcp_obtained_ip(dhcp_i),device_name,interface);
-		dhcp_phase(dhcp_i) = DHCP_PHASE_REQUEST_REPLY;
-		dhcp_timer(dhcp_i) = DHCP_WAIT_TIME;
+		send_dhcp(dhcp_obtained_ip[dhcp_i],device_name,interface);
+		dhcp_phase[dhcp_i] = DHCP_PHASE_REQUEST_REPLY;
+		dhcp_timer[dhcp_i] = DHCP_WAIT_TIME;
 		return;
 		break;
 		
@@ -426,7 +426,7 @@ void dhcp_proc_data() {
 	string<6> mac;
 
 	for (f=0; f <= NUM_INTERFACES-1; f++) {
-		if (dhcp_init_flag == DHCP_INIT_SIGNATURE && dhcp_phase(f) != DHCP_PHASE_OFF) {
+		if (dhcp_init_flag == DHCP_INIT_SIGNATURE && dhcp_phase[f] != DHCP_PHASE_OFF) {
 			goto dhcp_is_active;
 		}
 	}
@@ -473,7 +473,7 @@ decode_packet:
 	}
 
 	//branch according to the phase
-	switch (dhcp_phase(dhcp_i)) {
+	switch (dhcp_phase[dhcp_i]) {
 	case DHCP_PHASE_DISCOVER_REPLY:
 
 		//make sure IP-address being offered is valid
@@ -489,7 +489,7 @@ decode_packet:
 		}
 		
 		//IP-address being offered is correct- extract it!
-		dhcp_obtained_ip(dhcp_i) = ddstr(mid(s,17,4));
+		dhcp_obtained_ip[dhcp_i] = ddstr(mid(s,17,4));
 		break;
 	
 	case DHCP_PHASE_REQUEST_REPLY:
@@ -497,7 +497,7 @@ decode_packet:
 		//Make sure that the IP-address the DHCP supplied now (ACK) is the same as in OFFER message
 		//(or the same we've been using if we are extending the lease)
 		s2 = ddstr(mid(s,17,4));
-		if (dhcp_obtained_ip(dhcp_i) != s2) {
+		if (dhcp_obtained_ip[dhcp_i] != s2) {
 			goto dhcp_proc_data_error;
 		}
 		break;
@@ -524,7 +524,7 @@ decode_packet:
 		goto dhcp_proc_data_error;
 	}
 
-	dhcp_obtained_lease_time(dhcp_i) = 4294967295;//first, assume max lease time
+	dhcp_obtained_lease_time[dhcp_i] = 4294967295;//first, assume max lease time
 	t1_found = NO;
 
 	//Look through options and extract the ones we need. Only one option-
@@ -548,7 +548,7 @@ decode_packet:
 			}
 			//now get the message type and see if it is correct
 			message_type = asc(mid(s,f+2,1));
-			switch (dhcp_phase(dhcp_i)) {
+			switch (dhcp_phase[dhcp_i]) {
 			case DHCP_PHASE_DISCOVER_REPLY:
 
 				if (message_type != 2) {
@@ -574,7 +574,7 @@ decode_packet:
 			if (asc(mid(s,f+1,1)) != 4) {
 				goto dhcp_proc_data_error;
 			}
-			dhcp_obtained_netmask(dhcp_i) = ddstr(mid(s,f+2,4));
+			dhcp_obtained_netmask[dhcp_i] = ddstr(mid(s,f+2,4));
 			f = f+5;
 			break;
 
@@ -584,7 +584,7 @@ decode_packet:
 			if (x<4 || x-(x/4)*4 != 0) {
 				goto dhcp_proc_data_error;
 			}
-			dhcp_obtained_gateway(dhcp_i) = ddstr(mid(s,f+2,4));
+			dhcp_obtained_gateway[dhcp_i] = ddstr(mid(s,f+2,4));
 			f = f+1+x;
 			break;
 
@@ -605,7 +605,7 @@ get_lease: if (asc(mid(s,f+1,1)) != 4) {
 			}
 
 			//renewal time is a 4-byte value (in seconds)
-			dhcp_obtained_lease_time(dhcp_i) = asc(mid(s,f+2,1))*16777216+asc(mid(s,f+3,1))*65536+asc(mid(s,f+4,1))*256+asc(mid(s,f+5,1));
+			dhcp_obtained_lease_time[dhcp_i] = asc(mid(s,f+2,1))*16777216+asc(mid(s,f+3,1))*65536+asc(mid(s,f+4,1))*256+asc(mid(s,f+5,1));
 			f = f+5;
 			break;
 		
@@ -614,7 +614,7 @@ get_lease: if (asc(mid(s,f+1,1)) != 4) {
 			if (asc(mid(s,f+1,1)) != 4) {
 				goto dhcp_proc_data_error;
 			}
-			dhcp_server_ip(dhcp_i) = ddstr(mid(s,f+2,4));
+			dhcp_server_ip[dhcp_i] = ddstr(mid(s,f+2,4));
 			f = f+5;
 			break;
 			
@@ -628,14 +628,14 @@ next_option:
 
 exit_options: 
 	//packet decoded successfully
-	switch (dhcp_phase(dhcp_i)) {
+	switch (dhcp_phase[dhcp_i]) {
 	case DHCP_PHASE_DISCOVER_REPLY:
 
 		#if DHCP_DEBUG_PRINT
 			dhcp_debugprint(interface,"RX offer message");
 		#endif
-		dhcp_phase(dhcp_i) = DHCP_PHASE_REQUEST;
-		dhcp_timer(dhcp_i) = 1;
+		dhcp_phase[dhcp_i] = DHCP_PHASE_REQUEST;
+		dhcp_timer[dhcp_i] = 1;
 		dhcp_sock_close();
 		break;
 		
@@ -645,16 +645,16 @@ exit_options:
 			dhcp_debugprint(interface,"RX confirmation message");
 		#endif
 		//DHCP interaction completed successfully
-		dhcp_phase(dhcp_i) = DHCP_PHASE_IDLE;
-		dhcp_timer(dhcp_i) = (dhcp_obtained_lease_time(dhcp_i)/10)*9;
+		dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
+		dhcp_timer[dhcp_i] = (dhcp_obtained_lease_time[dhcp_i]/10)*9;
 		dhcp_sock_close();
 		dhcp_check_if_all_finished();
 		#if DHCP_DEBUG_PRINT
-			dhcp_debugprint(interface,"---OK(ip: "+dhcp_obtained_ip(dhcp_i)+", gateway: "+dhcp_obtained_gateway(dhcp_i)+", netmask: "+dhcp_obtained_netmask(dhcp_i)+", lease: "+lstr(dhcp_obtained_lease_time(dhcp_i))+" sec.)---");
+			dhcp_debugprint(interface,"---OK(ip: "+dhcp_obtained_ip[dhcp_i]+", gateway: "+dhcp_obtained_gateway[dhcp_i]+", netmask: "+dhcp_obtained_netmask[dhcp_i]+", lease: "+lstr(dhcp_obtained_lease_time[dhcp_i])+" sec.)---");
 		#endif
-		callback_dhcp_ok(dhcp_renew(dhcp_i),interface,dhcp_obtained_ip(dhcp_i),dhcp_obtained_gateway(dhcp_i),dhcp_obtained_netmask(dhcp_i),dhcp_obtained_lease_time(dhcp_i));
+		callback_dhcp_ok(dhcp_renew[dhcp_i],interface,dhcp_obtained_ip[dhcp_i],dhcp_obtained_gateway[dhcp_i],dhcp_obtained_netmask[dhcp_i],dhcp_obtained_lease_time[dhcp_i]);
 		sock.num = dhcp_sock;
-		dhcp_renew(dhcp_i) = YES;
+		dhcp_renew[dhcp_i] = YES;
 		break;
 	}
 	return;
@@ -670,17 +670,17 @@ void dhcp_error(pl_sock_interfaces interface) {
 	//DHCP error
 	dhcp_sock_close();
 
-	if (dhcp_phase(dhcp_i) != DHCP_PHASE_OFF) {
-		dhcp_phase(dhcp_i) = DHCP_PHASE_IDLE;
+	if (dhcp_phase[dhcp_i] != DHCP_PHASE_OFF) {
+		dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
 		dhcp_check_if_all_finished();
 	}
 
-	if (dhcp_retry_ctr(dhcp_i)>0) {
-		dhcp_timer(dhcp_i) = ((asc(random(1))) % DHCP_MAX_RETRY_DELAY)+1;
-		dhcp_retry_ctr(dhcp_i) = dhcp_retry_ctr(dhcp_i)-1;
+	if (dhcp_retry_ctr[dhcp_i]>0) {
+		dhcp_timer[dhcp_i] = ((asc(random(1))) % DHCP_MAX_RETRY_DELAY)+1;
+		dhcp_retry_ctr[dhcp_i] = dhcp_retry_ctr[dhcp_i]-1;
 	} else {
-		dhcp_retry_ctr(dhcp_i) = DHCP_MAX_RETRIES;
-		dhcp_timer(dhcp_i) = DHCP_POST_FAIL_DELAY;//DHCP failed, try again in 3 mins
+		dhcp_retry_ctr[dhcp_i] = DHCP_MAX_RETRIES;
+		dhcp_timer[dhcp_i] = DHCP_POST_FAIL_DELAY;//DHCP failed, try again in 3 mins
 		#if DHCP_DEBUG_PRINT
 			dhcp_debug_print_status(interface,DHCP_STATUS_FAILURE);
 		#endif
@@ -691,6 +691,7 @@ void dhcp_error(pl_sock_interfaces interface) {
 
 //------------------------------------------------------------------------------
 ok_ng dhcp_sock_open(pl_sock_interfaces interface, en_dhcp_phases phase) {
+    ok_ng dhcp_sock_open;
 	unsigned char x;
 	unsigned int i;
 	
@@ -805,7 +806,7 @@ void dhcp_check_if_all_finished() {
 	unsigned char f;
 	
 	for (f=0; f <= NUM_INTERFACES-1; f++) {
-		if (dhcp_phase(f) != DHCP_PHASE_IDLE && dhcp_phase(f) != DHCP_PHASE_OFF) {
+		if (dhcp_phase[f] != DHCP_PHASE_IDLE && dhcp_phase[f] != DHCP_PHASE_OFF) {
 			return;
 		}
 	}
@@ -819,7 +820,7 @@ void dhcp_check_if_all_finished() {
 }
 
 //------------------------------------------------------------------------------
-void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interfaces interface) {
+void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfaces interface) {
 	string s;
 	string<6> mac;
 	string<4> ip;
@@ -847,7 +848,7 @@ void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interface
 	//128.0- set broadcast flag
 	s = s+ddval("0.0.128.0");
 
-	switch (dhcp_phase(dhcp_i)) {
+	switch (dhcp_phase[dhcp_i]) {
 	case DHCP_PHASE_DISCOVER:
 
 		//for DISCOVER message all fields until MAC-address are unused	
@@ -881,7 +882,7 @@ void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interface
 	//continue...
 	s = ddval("99.130.83.99");//magic cookie
 
-	switch (dhcp_phase(dhcp_i)) {
+	switch (dhcp_phase[dhcp_i]) {
 	case DHCP_PHASE_DISCOVER:
 
 		//53.1.1- set message type to DISCOVER
@@ -894,8 +895,8 @@ void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interface
 		s = s+ddval("61.7.1.")+mac;
 	
 		//50.4- suggest our current IP only if IP was assigned already
-		if (obtained_ip != "") {
-			s = s+ddval("50.4."+obtained_ip);//suggest our current IP
+		if (*obtained_ip != "") {
+			s = s+ddval("50.4."+*obtained_ip);//suggest our current IP
 		} else {
 			s = s+ddval("50.4.")+ip;
 		}
@@ -916,14 +917,14 @@ void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interface
 		s = s+ddval("61.7.1")+mac;
 		
 		//54.4- specify the DHCP server we are addressing
-		s = s+ddval("54.4")+ddval(dhcp_server_ip(dhcp_i));
+		s = s+ddval("54.4")+ddval(dhcp_server_ip[dhcp_i]);
 
 		//50.4- requested IP (this is the IP-address that the DHCP server has suggested)
-		s = s+ddval("50.4")+ddval(obtained_ip);
+		s = s+ddval("50.4")+ddval(*obtained_ip);
 
 		//add host name option if not empty
-		if (dhcp_host_name(dhcp_i) != "") {
-			s = s+chr(12)+chr(len(dhcp_host_name(dhcp_i)))+dhcp_host_name(dhcp_i);
+		if (dhcp_host_name[dhcp_i] != "") {
+			s = s+chr(12)+chr(len(dhcp_host_name[dhcp_i]))+dhcp_host_name[dhcp_i];
 		}
 
 		//55.2.1.3- provide a list of parameters we need
@@ -935,8 +936,8 @@ void send_dhcp(string<16> obtained_ip, string<32> device_name, pl_sock_interface
 	}
 
 	//add host name option if our owner name or device name is set
-	if (device_name != "") {
-		s = s+chr(12)+chr(len(device_name))+device_name;
+	if (*device_name != "") {
+		s = s+chr(12)+chr(len(*device_name))+*device_name;
 	}
 	
 	//end of all options and send!
@@ -977,13 +978,13 @@ void dhcp_init() {
 
 	dhcp_sock = 255;//important!
 	for (f=0; f <= NUM_INTERFACES-1; f++) {
-		dhcp_phase(f) = DHCP_PHASE_OFF;
-		dhcp_renew(f) = NO;
-		dhcp_timer(f) = 0;
+		dhcp_phase[f] = DHCP_PHASE_OFF;
+		dhcp_renew[f] = NO;
+		dhcp_timer[f] = 0;
 		#if DHCP_DEBUG_PRINT
-			dhcp_media_linked(f) = YES;//correct, it is YES
+			dhcp_media_linked[f] = YES;//correct, it is YES
 		#endif
-		dhcp_ingnore_link_disconnects(f) = NO;
+		dhcp_ingnore_link_disconnects[f] = NO;
 	}
 	dhcp_current_interface = 0;
 	
@@ -1014,7 +1015,7 @@ void dhcp_debug_print_status(pl_sock_interfaces interface, en_dhcp_status_codes 
 
 //------------------------------------------------------------------------------
 #if DHCP_DEBUG_PRINT
-void dhcp_debugprint(pl_sock_interfaces interface, string print_data) {
+void dhcp_debugprint(pl_sock_interfaces interface, string *print_data) {
 	string<16> s;
 	
 	#if NET_AVAILABLE
@@ -1034,6 +1035,6 @@ void dhcp_debugprint(pl_sock_interfaces interface, string print_data) {
 	s = str(interface)+"??";
 	
 dhcp_debugprint_1: 
-	sys.debugprint(DHCP_STAMP1+s+DHCP_STAMP2+print_data+DHCP_CR_LF);
+	sys.debugprint(DHCP_STAMP1+s+DHCP_STAMP2+*print_data+DHCP_CR_LF);
 }
 #endif

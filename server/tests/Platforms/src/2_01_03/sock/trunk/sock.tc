@@ -14,7 +14,7 @@
 
 //--------------------------------------------------------------------
 void sock_init();
-void sock_debugprint(string print_data);
+void sock_debugprint(string *print_data);
 
 //--------------------------------------------------------------------
 no_yes sock_in_use[SOCK_MAX_SOCKETS];
@@ -22,7 +22,7 @@ string<SOCK_MAX_SIGNATURE_LEN> sock_user_signature[SOCK_MAX_SOCKETS];
 unsigned int sock_init_flag;
 
 //==============================================================================
-unsigned char sock_get(string signature) {
+unsigned char sock_get(string *signature) {
 //Returns a free socket number or 255 if no free sockets left.
 
     unsigned char sock_get;
@@ -34,12 +34,12 @@ unsigned char sock_get(string signature) {
 	}
 	
 	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
-		if (sock_in_use(f) == NO) {
-			sock_in_use(f) = YES;
-			sock_user_signature(f) = signature;
+		if (sock_in_use[f] == NO) {
+			sock_in_use[f] = YES;
+			sock_user_signature[f] = *signature;
 			sock_get = f;
 			#if SOCK_DEBUG_PRINT
-				sock_debugprint("'"+sock_user_signature(f)+"' got socket #"+str(f));
+				sock_debugprint("'"+sock_user_signature[f]+"' got socket #"+str(f));
 			#endif
 			return sock_get;
 		}
@@ -47,7 +47,7 @@ unsigned char sock_get(string signature) {
 
 	//no free socket found
 	#if SOCK_DEBUG_PRINT
-		sock_debugprint("'"+signature+"' could not get a socket: no free sockets left");
+		sock_debugprint("'"+*signature+"' could not get a socket: no free sockets left");
 	#endif
 	sock_get = 255;
 	return sock_get;
@@ -63,10 +63,10 @@ string sock_who_uses(unsigned char sock_num) {
 		sock_init_flag = SOCK_INIT_SIGNATURE;
 	}
 
-	if (sock_in_use(sock_num) == NO) {
+	if (sock_in_use[sock_num] == NO) {
 		sock_who_uses = SOCK_UNUSED_SIGNATURE;
 	} else {
-		sock_who_uses = sock_user_signature(sock_num);
+		sock_who_uses = sock_user_signature[sock_num];
 	}
 	return sock_who_uses;
 }
@@ -130,11 +130,11 @@ void sock_release(unsigned char sock_num) {
 	sock.urlsubstitutes = "";
 
 	#if SOCK_DEBUG_PRINT
-		sock_debugprint("'"+sock_user_signature(sock_num)+"' released socket #"+str(sock_num));
+		sock_debugprint("'"+sock_user_signature[sock_num]+"' released socket #"+str(sock_num));
 	#endif
 	
-	sock_in_use(sock_num) = NO;
-	sock_user_signature(sock_num) = SOCK_UNUSED_SIGNATURE;
+	sock_in_use[sock_num] = NO;
+	sock_user_signature[sock_num] = SOCK_UNUSED_SIGNATURE;
 	sock.num = sock_bup;
 }
 
@@ -143,15 +143,15 @@ void sock_init() {
 	unsigned char f;
 	
 	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
-		sock_in_use(f) = NO;
-		sock_user_signature(f) = SOCK_UNUSED_SIGNATURE;
+		sock_in_use[f] = NO;
+		sock_user_signature[f] = SOCK_UNUSED_SIGNATURE;
 	}
 }
 
 //------------------------------------------------------------------------------
 #if SOCK_DEBUG_PRINT
-void sock_debugprint(string print_data) {
+void sock_debugprint(string *print_data) {
 
-	sys.debugprint(SOCK_STAMP+print_data+SOCK_CR_LF);
+	sys.debugprint(SOCK_STAMP+*print_data+SOCK_CR_LF);
 }
 #endif

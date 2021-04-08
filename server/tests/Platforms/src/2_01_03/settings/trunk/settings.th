@@ -116,35 +116,35 @@ struct struct_stg_timestamp {
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_start();
-en_stg_status_codes stg_check_all(string problem_stg);
-en_stg_status_codes stg_get_def(string stg_name_or_num, unsigned char index, string def_value);
-en_stg_status_codes stg_restore_member(string stg_name_or_num, unsigned char index);
+en_stg_status_codes stg_check_all(string *problem_stg);
+en_stg_status_codes stg_get_def(string *stg_name_or_num, unsigned char index, string *def_value);
+en_stg_status_codes stg_restore_member(string *stg_name_or_num, unsigned char index);
 en_stg_status_codes stg_restore_multiple(en_stg_init_modes init_mode);
 unsigned char stg_get_num_settings();
-en_stg_status_codes stg_get_num_members(string stg_name_or_num, unsigned char num_members);
-string stg_get(string stg_name_or_num, unsigned char index);
-void stg_set(string stg_name_or_num, unsigned char index, string stg_value);
-en_stg_status_codes stg_sg(string stg_name_or_num, unsigned char index, string stg_value, en_stg_rdwr op);
-en_stg_status_codes stg_set_ts(string stg_name_or_num);
-unsigned char stg_find(string stg_name_or_num);
-unsigned char stg_stype_get(string stg_name_or_num);
+en_stg_status_codes stg_get_num_members(string *stg_name_or_num, unsigned char *num_members);
+string stg_get(string *stg_name_or_num, unsigned char index);
+void stg_set(string *stg_name_or_num, unsigned char index, string *stg_value);
+en_stg_status_codes stg_sg(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op);
+en_stg_status_codes stg_set_ts(string *stg_name_or_num);
+unsigned char stg_find(string *stg_name_or_num);
+unsigned char stg_stype_get(string *stg_name_or_num);
 
-void callback_stg_error(string stg_name_or_num, unsigned char index, en_stg_status_codes status);
+void callback_stg_error(string *stg_name_or_num, unsigned char index, en_stg_status_codes status);
 //Callback procedure, informs of the error during the execution of stg_get() or set_set().
 //Procedure body has to be created elsewhere in the project (externally with respect to the library).
 
-void callback_stg_pre_get(string stg_name_or_num, unsigned char index, string stg_value);
+void callback_stg_pre_get(string *stg_name_or_num, unsigned char index, string *stg_value);
 //Callback procedure, informs that the setting member's value is being read through one of the STG library's procedures;
 //allows to update the setting member's value before it is returned by the STG library.
 //Procedure body has to be created elsewhere in the project (externally with respect to the library).
 
-void callback_stg_post_set(string stg_name_or_num, unsigned char index, string stg_value);
+void callback_stg_post_set(string *stg_name_or_num, unsigned char index, string *stg_value);
 //Callback procedure, informs that the setting member's value is being written to through one of the STG library's procedures;
 //allows to respond to the value change.
 //Procedure body has to be created elsewhere in the project (externally with respect to the library).
 
 #if STG_ENABLE_VALIDATION_CALLBACK
-void callback_stg_validation_check(string stg_name_or_num, unsigned char index, string stg_value);
+void callback_stg_validation_check(string *stg_name_or_num, unsigned char index, string *stg_value);
 //Callback procedure, before writing a value to a setting member, allow doing validation check according to the system rules;
 //For example: validation to a field that holds email address, or not allowing to set value '80' to a system port (creates a collision).
 //Procedure body has to be created elsewhere in the project (externally with respect to the library).

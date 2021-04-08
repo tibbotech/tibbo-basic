@@ -32,15 +32,15 @@ enum en_dns_return_type {
 };
 
 en_dns_status_codes dns_start(unsigned char dns_sock_num);
-en_dns_status_codes dns_connect(pl_sock_interfaces interface, string dns_server_ip, unsigned int dns_port);
+en_dns_status_codes dns_connect(pl_sock_interfaces interface, string *dns_server_ip, unsigned int dns_port);
 void dns_disconnect();
-void dns_query(string question);
+void dns_query(string *question);
 void dns_proc_data();
 void dns_proc_timer();
 void dns_stop();
 
 void callback_dns_failure(en_dns_status_codes status);
-void callback_dns_answer_acquired(en_dns_return_type return_type, string return_string);
+void callback_dns_answer_acquired(en_dns_return_type return_type, string *return_string);
 void callback_dns_ok();
 void callback_dns_pre_buffrq(unsigned char num_of_pages_required);
 void callback_dns_buff_released();

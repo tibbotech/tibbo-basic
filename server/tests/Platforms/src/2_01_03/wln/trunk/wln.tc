@@ -41,29 +41,29 @@
 
 //------------------------------------------------------------------------------
 
-	void wln_sha1_prf(string pmk, string label, string data1, string buf, unsigned char buf_len);
-	void wln_wpa_pmk_to_ptk(string pmk, string label, string addr1, string addr2, string nonce1, string nonce2, string ptk);
-	void wln_wpa_supplicant_process_1_of_4(string snonce, string anonce, string ptk);
-	void wln_hmac_sha1_vector(string key, string addr_element, string mac, unsigned char pos);
-	void wln_hmac_md5_vector(string key, unsigned char num_elem, string addr_element, string mac, unsigned char pos);
-	string wln_md5_vector(string key, string data);
-	string wln_sha1_vector(string key, string data);
-	void wln_wpa_supplicant_send_2_of_4(unsigned char ver, string key_len, string replay_counter, string snonce, string mic_key);
-	bool wln_wpa_supplicant_process_3_of_4(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key, string ptk);
-	void wln_wpa_supplicant_send_4_of_4(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key);
-	void wln_wpa_supplicant_process_1_of_2(unsigned int key_info, string key_iv, string ptk, string gtk);
-	void wln_wpa_supplicant_send_2_of_2(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key);
-	bool wln_aes_unwrap(string aes_kek, string aes_cipher, string aes_plain, unsigned char n);
-	string wln_wpa_supplicant_parse_ies(string key_data);
-	void wln_pbkdf2_sha1_f(string passphrase, string ssid, unsigned char pass, unsigned int iterations, unsigned char count, string digest);
+	void wln_sha1_prf(string *pmk, string *label, string *data1, string *buf, unsigned char buf_len);
+	void wln_wpa_pmk_to_ptk(string *pmk, string *label, string *addr1, string *addr2, string *nonce1, string *nonce2, string *ptk);
+	void wln_wpa_supplicant_process_1_of_4(string *snonce, string *anonce, string *ptk);
+	void wln_hmac_sha1_vector(string *key, string *addr_element, string *mac, unsigned char pos);
+	void wln_hmac_md5_vector(string *key, unsigned char num_elem, string *addr_element, string *mac, unsigned char pos);
+	string wln_md5_vector(string *key, string *data);
+	string wln_sha1_vector(string *key, string *data);
+	void wln_wpa_supplicant_send_2_of_4(unsigned char ver, string *key_len, string *replay_counter, string *snonce, string *mic_key);
+	bool wln_wpa_supplicant_process_3_of_4(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key, string *ptk);
+	void wln_wpa_supplicant_send_4_of_4(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key);
+	void wln_wpa_supplicant_process_1_of_2(unsigned int key_info, string *key_iv, string *ptk, string *gtk);
+	void wln_wpa_supplicant_send_2_of_2(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key);
+	bool wln_aes_unwrap(string *aes_kek, string *aes_cipher, string *aes_plain, unsigned char n);
+	string wln_wpa_supplicant_parse_ies(string *key_data);
+	void wln_pbkdf2_sha1_f(string *passphrase, string *ssid, unsigned char pass, unsigned int iterations, unsigned char count, string *digest);
 
 #endif
 
-en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string key);
+en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string *key);
 ok_ng wln_start_scan();
 en_wln_status_codes wln_rescan();
 void wln_debug_print_status(en_wln_status_codes status);
-void wln_debugprint(string print_data);
+void wln_debugprint(string *print_data);
 
 
 //----------------------------------------------------------------
@@ -116,13 +116,13 @@ no_yes wln_active_scan;
 pl_wln_module_types wln_module_type;
 unsigned char wln_rescan_tmr;
 //==============================================================================
-string wln_get_info(wln_info_elements info_element, string extra_data) {
+string wln_get_info(wln_info_elements info_element, string *extra_data) {
 //Returns library-specific information for the requested info element
 	pl_wln_security_modes security_mode;
 	unsigned char x;
 
 	wln_get_info = "";
-	security_mode = val(extra_data);
+	security_mode = val(*extra_data);
 	switch (info_element) {
 	case WLN_INFO_ELEMENT_REQUIRED_BUFFERS:
 
@@ -145,18 +145,18 @@ string wln_get_info(wln_info_elements info_element, string extra_data) {
 }
 
 //--------------------------------------------------------------------
-en_wln_status_codes wln_start(string ap_name, pl_wln_security_modes security_mode, string key, pl_wln_domains domain, no_yes active_scan, pl_wln_scan_filter scanfilter) {
+en_wln_status_codes wln_start(string *ap_name, pl_wln_security_modes security_mode, string *key, pl_wln_domains domain, no_yes active_scan, pl_wln_scan_filter scanfilter) {
+    en_wln_status_codes wln_start;
 	unsigned char x;
 	#if GA1000
-	    en_wln_status_codes wln_start;
-		zero_replay_count_data(0) = 0;
-		zero_replay_count_data(1) = 0;
-		zero_replay_count_data(2) = 0;
-		zero_replay_count_data(3) = 0;
-		zero_replay_count_data(4) = 0;
-		zero_replay_count_data(5) = 0;
-		zero_replay_count_data(6) = 0;
-		zero_replay_count_data(7) = 1;
+		zero_replay_count_data[0] = 0;
+		zero_replay_count_data[1] = 0;
+		zero_replay_count_data[2] = 0;
+		zero_replay_count_data[3] = 0;
+		zero_replay_count_data[4] = 0;
+		zero_replay_count_data[5] = 0;
+		zero_replay_count_data[6] = 0;
+		zero_replay_count_data[7] = 1;
 	#endif
 	
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
@@ -166,9 +166,9 @@ en_wln_status_codes wln_start(string ap_name, pl_wln_security_modes security_mod
 
 	wln_start = WLN_STATUS_OK;
 	wln_rescan_tmr = 0;
-	wln_ap_name = ap_name;
+	wln_ap_name = *ap_name;
 	wln_security_mode = security_mode;
-	wln_key = key;
+	wln_key = *key;
 	wln_active_scan = active_scan;
 	wln.scanfilter = scanfilter;
 
@@ -269,7 +269,7 @@ en_wln_status_codes wln_start(string ap_name, pl_wln_security_modes security_mod
 		wln_mac_binary = ddval(wln.mac);
 	#endif
 	
-	wln_start = wln_prepare_security(security_mode,key);
+	wln_start = wln_prepare_security(security_mode,*key);
 	goto wln_start_error;
 
 	wln_association_holdoff_timer = 1;//will start scanning and associating on the next timer event
@@ -294,7 +294,8 @@ wln_start_error:
 }
 
 //----------------------------------------------------------------------------
-en_wln_status_codes wln_change(string ap_name, pl_wln_security_modes security_mode, string key) {
+en_wln_status_codes wln_change(string *ap_name, pl_wln_security_modes security_mode, string *key) {
+    en_wln_status_codes wln_change;
 
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
@@ -307,9 +308,9 @@ en_wln_status_codes wln_change(string ap_name, pl_wln_security_modes security_mo
 		wln_debugprint("---CHANGE---");
 	#endif
 
-	wln_ap_name = ap_name;
+	wln_ap_name = *ap_name;
 	wln_security_mode = security_mode;
-	wln_key = key;
+	wln_key = *key;
 	wln_associated = WLN_ASSOCIATION_RETVAL_NO;
 
 	if (wln.enabled == NO) {
@@ -398,7 +399,7 @@ wait_close_kal_socket:
 
 	#if GA1000
 		#if WLN_WPA
-			if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_GA1000) {
+			if (wln.getmoduletype()) {
 				if (wln_wpa_socket<sock.numofsock) {
 					sock.num = wln_wpa_socket;
 					sock.discard();
@@ -425,6 +426,7 @@ wait_close_kal_socket:
 
 //----------------------------------------------------------------------------
 en_wln_status_codes wln_rescan() {
+    en_wln_status_codes wln_rescan;
 	
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
@@ -507,6 +509,7 @@ void wln_update_rssi() {
 
 //----------------------------------------------------------------------------
 pl_wln_check_association_retval wln_check_association() {
+    pl_wln_check_association_retval wln_check_association;
 	wln_check_association = wln_associated;
 	return wln_check_association;
 }
@@ -567,7 +570,7 @@ void wln_proc_timer() {
 	} else {
 	#if GA1000
 		#if WLN_WPA
-			if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_GA1000) {
+			if (wln.getmoduletype()) {
 				if (wln.associationstate == PL_WLN_ASSOCIATED) {
 					if (wln_wpa_handshake_timer>0) {
 						wln_wpa_handshake_timer = wln_wpa_handshake_timer-1;
@@ -591,7 +594,8 @@ void wln_proc_timer() {
 //----------------------------------------------------------------------------
 #if GA1000
 	#if WLN_WPA
-		int compare_replay_counters(string replay_counter1, string replay_counter2) {
+		int compare_replay_counters(string *replay_counter1, string *replay_counter2) {
+		    int compare_replay_counters;
 		
 		int i;
 		int result;
@@ -619,7 +623,7 @@ void wln_proc_timer() {
 //----------------------------------------------------------------------------
 void wln_proc_data() {
 #if WLN_WPA
-	if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_GA1000) {
+	if (wln.getmoduletype()) {
 		string rx_data;
 		string<32> anonce, snonce, gtk;
 		unsigned char ver, x;
@@ -706,7 +710,7 @@ void wln_proc_data() {
 						return;
 				}
 				insert(rx_data,98,chr(keydatalen/256));
-				insert(rx_data,99,chr(keydatalenmod256));
+				insert(rx_data,99,chr(keydatalen % 256));
 			}
 		}
 
@@ -892,7 +896,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 			//WA2000 Note: We need security not to be reset to make the module more responsive. 				
 			case WLN_SECURITY_MODE_WPA1:
 
-				if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_WA2000) {
+				if (wln.getmoduletype()) {
 					if (wln.setwpa(PL_WLN_WPA_WPA1_PSK,PL_WLN_WPA_ALGORITHM_TKIP,wln_key,PL_WLN_WPA_CAST_MULTICAST) != ACCEPTED) {
 						wln_result = WLN_STATUS_UNEXPECTED_ERROR;
 						goto finish;
@@ -901,7 +905,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 				break;
 			case WLN_SECURITY_MODE_WPA2:
 
-				if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_WA2000) {
+				if (wln.getmoduletype()) {
 					if (wln.setwpa(PL_WLN_WPA_WPA2_PSK,PL_WLN_WPA_ALGORITHM_AES,wln_key,PL_WLN_WPA_CAST_MULTICAST) != ACCEPTED) {
 						wln_result = WLN_STATUS_UNEXPECTED_ERROR;
 						goto finish;
@@ -937,7 +941,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 		
 			#if WLN_WPA	
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1 || wln_security_mode == WLN_SECURITY_MODE_WPA2) {
-                    if (wln.getmoduletype() == PL_WLN_MODULE_TYPE_GA1000) {
+                    if (wln.getmoduletype()) {
 #if WLN_DEBUG_PRINT
                         //GA1000 Note The handshake timer is only available in WLN_WPA for the GA1000
 					    wln_debugprint("Pre-associated for WPA1/2-PSK, starting handshake");
@@ -1065,9 +1069,9 @@ finish:
 
 //----------------------------------------------------------------------------
 ok_ng wln_start_scan() {
+    ok_ng wln_start_scan;
 	accepted_rejected res;
 	
-	    ok_ng wln_start_scan;
 	wln_start_scan = NG;
 	
 	return wln_start_scan;
@@ -1102,10 +1106,10 @@ ok_ng wln_start_scan() {
 
 
 //----------------------------------------------------------------------------
-en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string key) {
+en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string *key) {
+    en_wln_status_codes wln_prepare_security;
 	int algorithm;
 	
-	    en_wln_status_codes wln_prepare_security;
 
 	wln_prepare_security = WLN_STATUS_OK;
 
@@ -1153,7 +1157,7 @@ case WLN_SECURITY_MODE_WPA2:
 		
 	case WLN_SECURITY_MODE_WEP64:
 
-		if (len(key) != 10) {
+		if (len(*key) != 10) {
 			wln_prepare_security = WLN_STATUS_INVALID_WEP_KEY;
 			return wln_prepare_security;
 		}
@@ -1161,7 +1165,7 @@ case WLN_SECURITY_MODE_WPA2:
 		
 	case WLN_SECURITY_MODE_WEP128:
 
-		if (len(key) != 26) {
+		if (len(*key) != 26) {
 			wln_prepare_security = WLN_STATUS_INVALID_WEP_KEY;
 			return wln_prepare_security;
 		}
@@ -1178,7 +1182,8 @@ case WLN_SECURITY_MODE_WPA2:
 //------------------------------------------------------------------------------
 
 #if WLN_WPA
-string wln_wpa_mkey_get(string password, string ssid) {
+string wln_wpa_mkey_get(string *password, string *ssid) {
+    string wln_wpa_mkey_get;
 	#if GA1000
 	unsigned long count;
 	unsigned char pos, plen, left1;
@@ -1191,7 +1196,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 	pos = 1;
 	for (f=0; f <= 1; f++) {
 		count = count+1;
-		wln_pbkdf2_sha1_f(password,ssid,f,4096,count,digest);
+		wln_pbkdf2_sha1_f(*password,*ssid,f,4096,count,digest);
 		if (left1>SHA1_MAC_LEN) {
 			plen = SHA1_MAC_LEN;
 		} else {
@@ -1205,7 +1210,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 	wln_wpa_mkey_get = buf;
 	callback_wln_mkey_progress_update(100);
 	#else 
-	wln_wpa_mkey_get = password;
+	wln_wpa_mkey_get = *password;
 	#endif 
 	return wln_wpa_mkey_get;
 }
@@ -1214,69 +1219,69 @@ string wln_wpa_mkey_get(string password, string ssid) {
 #if GA1000
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_wpa_supplicant_process_1_of_4(string snonce, string anonce, string ptk) {
+		void wln_wpa_supplicant_process_1_of_4(string *snonce, string *anonce, string *ptk) {
 			string<32> addr1, addr2;
 			string<8> temp1, temp2;
 
 			addr1 = wln_mac_binary;
 			addr2 = wln_bssid_binary;
-			wln_wpa_pmk_to_ptk(wln_key,LABEL1,addr1,addr2,snonce,anonce,ptk);
+			wln_wpa_pmk_to_ptk(wln_key,LABEL1,addr1,addr2,*snonce,*anonce,*ptk);
 
-			temp1 = right(ptk,8);
-			temp2 = mid(ptk,49,8);
-			insert(ptk,49,temp1);
-			insert(ptk,57,temp2);
+			temp1 = right(*ptk,8);
+			temp2 = mid(*ptk,49,8);
+			insert(*ptk,49,temp1);
+			insert(*ptk,57,temp2);
 			wpa_should_set_key = true;
 		}
 		#endif
 
 		//------------------------------------------------------------------------------
 		#if WLN_WPA
-		void wln_wpa_pmk_to_ptk(string pmk, string label, string addr1, string addr2, string nonce1, string nonce2, string ptk) {
+		void wln_wpa_pmk_to_ptk(string *pmk, string *label, string *addr1, string *addr2, string *nonce1, string *nonce2, string *ptk) {
 			string<128> data1;
 
-			if (addr1<addr2) {
-				data1 = addr1+addr2;
+			if (*addr1<*addr2) {
+				data1 = *addr1+*addr2;
 			} else {
-				data1 = addr2+addr1;
+				data1 = *addr2+*addr1;
 			}
 			
-			if (nonce1<nonce2) {
-				data1 = data1+nonce1+nonce2;
+			if (*nonce1<*nonce2) {
+				data1 = data1+*nonce1+*nonce2;
 			} else {
-				data1 = data1+nonce2+nonce1;
+				data1 = data1+*nonce2+*nonce1;
 			}
-			wln_sha1_prf(pmk,label,data1,ptk,64);
+			wln_sha1_prf(*pmk,*label,data1,*ptk,64);
 			
 		}
 		#endif
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_sha1_prf(string pmk, string label, string data1, string buf, unsigned char buf_len) {
+		void wln_sha1_prf(string *pmk, string *label, string *data1, string *buf, unsigned char buf_len) {
 			unsigned char len1[3];
 			unsigned char counter;
 			unsigned char pos, plen;
 			string<20> s;
 			string s1;
 			
-			len1(0) = len(label);
-			len1(1) = len(data1);
-			len1(2) = 1;
+			len1[0] = len(*label);
+			len1[1] = len(*data1);
+			len1[2] = 1;
 			
 			pos = 1;
 			counter = 0;
 				
 			while (pos<buf_len) {
-				s1 = label+data1+chr(counter);
+				s1 = *label+*data1+chr(counter);
 				plen = buf_len-pos+1;
 				if (plen>=SHA1_MAC_LEN) {
-					wln_hmac_sha1_vector(pmk,s1,buf,pos);
+					wln_hmac_sha1_vector(*pmk,s1,*buf,pos);
 					pos = pos+SHA1_MAC_LEN;
 				} else {
-					wln_hmac_sha1_vector(pmk,s1,s,0);
+					wln_hmac_sha1_vector(*pmk,s1,s,0);
 					s = left(s,plen);
-					insert(buf,pos,s);
+					insert(*buf,pos,s);
 					return;
 				}
 				counter = counter+1;
@@ -1286,44 +1291,45 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_hmac_sha1_vector(string key, string addr_element, string mac, unsigned char pos) {
+		void wln_hmac_sha1_vector(string *key, string *addr_element, string *mac, unsigned char pos) {
 
 			string<64> k_pad, stemp, null_str;
 			string<20> tk1, tk2;
 			unsigned char l;
 			
-			l = 64-len(key);
+			l = 64-len(*key);
 			null_str = left(NULL_64,l);
-			k_pad = key+null_str;
+			k_pad = *key+null_str;
 			
 			stemp = CH36_64;
 			k_pad = strxor(k_pad,stemp);
 			
-			tk1 = wln_sha1_vector(k_pad,addr_element);
+			tk1 = wln_sha1_vector(k_pad,*addr_element);
 			
-			k_pad = key+null_str;
+			k_pad = *key+null_str;
 			
 			
 			stemp = CH5C_64;
 			k_pad = strxor(k_pad,stemp);
 			
 			tk2 = wln_sha1_vector(k_pad,tk1);
-			insert(mac,pos,tk2);
+			insert(*mac,pos,tk2);
 		}
 		#endif
 
 		//--------------------------------------------------------------------------------------------- 
-		string wln_sha1_vector(string key, string data) {
+		string wln_sha1_vector(string *key, string *data) {
+		    string wln_sha1_vector;
 
 			string s;
 			string hash;
 			unsigned char l;
 			
-			s = key;
+			s = *key;
 			l = len(s);
 			hash = sha1(s,"",SHA1_UPDATE,0);
 
-			s = data;
+			s = *data;
 			l = l+len(s);
 			hash = sha1(s,hash,SHA1_FINISH,l);
 
@@ -1333,7 +1339,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_wpa_supplicant_send_2_of_4(unsigned char ver, string key_len, string replay_counter, string snonce, string mic_key) {
+		void wln_wpa_supplicant_send_2_of_4(unsigned char ver, string *key_len, string *replay_counter, string *snonce, string *mic_key) {
 			unsigned int length;
 			unsigned char lsb, msb;
 			string reply;
@@ -1369,13 +1375,13 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			reply = reply+chr(msb)+chr(lsb);
 			
 			//key_length(2)
-			reply = reply+key_len;
+			reply = reply+*key_len;
 			
 			//replay_counter(8)
-			reply = reply+replay_counter;
+			reply = reply+*replay_counter;
 			
 			//key_nonce(32)
-			reply = reply+snonce;
+			reply = reply+*snonce;
 			
 			//key_iv(16), key_rsc(8), key_id(8)
 			stemp = NULL_32;
@@ -1400,9 +1406,9 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			
 			//overwrite mac (82 to 98)
 			if (ver == 1) {
-				wln_hmac_md5_vector(mic_key,1,reply,mac,0);
+				wln_hmac_md5_vector(*mic_key,1,reply,mac,0);
 			} else {
-				wln_hmac_sha1_vector(mic_key,reply,mac,0);
+				wln_hmac_sha1_vector(*mic_key,reply,mac,0);
 			}
 			length = len(reply);
 			stemp = right(reply,length-mac_pos-16+1);
@@ -1416,40 +1422,41 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_hmac_md5_vector(string key, unsigned char num_elem, string addr_element, string mac, unsigned char pos) {
+		void wln_hmac_md5_vector(string *key, unsigned char num_elem, string *addr_element, string *mac, unsigned char pos) {
 			string<64> k_pad, stemp, null_str;
 			string<20> tk1, tk2;
 			unsigned char l;
 			
-			l = 64-len(key);
+			l = 64-len(*key);
 			null_str = left(NULL_64,l);
-			k_pad = key+null_str;
+			k_pad = *key+null_str;
 			
 			stemp = CH36_64;
 			k_pad = strxor(k_pad,stemp);
 
-			tk1 = wln_md5_vector(k_pad,addr_element);
-			k_pad = key+null_str;
+			tk1 = wln_md5_vector(k_pad,*addr_element);
+			k_pad = *key+null_str;
 
 			stemp = CH5C_64;
 			k_pad = strxor(k_pad,stemp);
 			
 			tk2 = wln_md5_vector(k_pad,tk1);
-			insert(mac,pos,tk2);
+			insert(*mac,pos,tk2);
 		}
 		#endif
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		string wln_md5_vector(string key, string data) {
+		string wln_md5_vector(string *key, string *data) {
+		    string wln_md5_vector;
 			string<16> hash;
 			unsigned char l;
 			
-			l = len(key);
-			hash = md5(key,"",MD5_UPDATE,0);
+			l = len(*key);
+			hash = md5(*key,"",MD5_UPDATE,0);
 			
-			l = l+len(data);
-			hash = md5(data,hash,MD5_FINISH,l);
+			l = l+len(*data);
+			hash = md5(*data,hash,MD5_FINISH,l);
 
 			wln_md5_vector = hash;
 			return wln_md5_vector;
@@ -1458,26 +1465,27 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		bool wln_wpa_supplicant_process_3_of_4(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key, string ptk) {
+		bool wln_wpa_supplicant_process_3_of_4(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key, string *ptk) {
+		    bool wln_wpa_supplicant_process_3_of_4;
 			string<32> s;
 			bool key_was_set;
 			key_was_set = false;
 			
-			mic_key = left(ptk,16);
+			*mic_key = left(*ptk,16);
 			#if WLN_DEBUG_PRINT
 				wln_debugprint("Pairwise step 4/4");
 			#endif	
-			wln_wpa_supplicant_send_4_of_4(key_info,ver,replay_counter,mic_key);
+			wln_wpa_supplicant_send_4_of_4(key_info,ver,*replay_counter,*mic_key);
 			if ((key_info && &h40) != 0) {
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
-					s = right(ptk,32);
+					s = right(*ptk,32);
 					wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,s,PL_WLN_WPA_CAST_UNICAST);
 				} else {
 
 					//--------------------------------------------------------------------------------
 					//Fix #1 for Krack attack. Ensure the key is only installed once. 
 					if (wpa_should_set_key == true) {
-					s = mid(ptk,33,16);
+					s = mid(*ptk,33,16);
 					wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_AES,s,PL_WLN_WPA_CAST_UNICAST);
 						wpa_should_set_key = false;
 						key_was_set = true;
@@ -1492,7 +1500,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_wpa_supplicant_send_4_of_4(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key) {
+		void wln_wpa_supplicant_send_4_of_4(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key) {
 			unsigned int length;
 			unsigned char lsb, msb;
 			string reply;
@@ -1524,7 +1532,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			reply = reply+NULL_2;
 			
 			//replay_counter(8)
-			reply = reply+replay_counter;
+			reply = reply+*replay_counter;
 			
 			//key_nonce(32)
 			stemp = NULL_32;
@@ -1544,9 +1552,9 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 			//overwrite mac
 			if (ver == 1) {
-				wln_hmac_md5_vector(mic_key,1,reply,mac,0);
+				wln_hmac_md5_vector(*mic_key,1,reply,mac,0);
 			} else {
-				wln_hmac_sha1_vector(mic_key,reply,mac,0);
+				wln_hmac_sha1_vector(*mic_key,reply,mac,0);
 			}
 			length = len(reply);
 			stemp = right(reply,length-mac_pos-16+1);
@@ -1560,7 +1568,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_wpa_supplicant_process_1_of_2(unsigned int key_info, string key_iv, string ptk, string gtk) {
+		void wln_wpa_supplicant_process_1_of_2(unsigned int key_info, string *key_iv, string *ptk, string *gtk) {
 			unsigned char gd_keyidx;
 			string<32> ek;
 			string<8> stemp1, stemp2;
@@ -1568,22 +1576,22 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			gd_keyidx == key_info && &h30;
 			gd_keyidx = gd_keyidx/&h10;
 			
-			ek = left(key_iv,16)+right(ptk,16);
+			ek = left(*key_iv,16)+right(*ptk,16);
 			
-			gtk = rc4(ek,256,gtk);
+			*gtk = rc4(ek,256,*gtk);
 			
-			stemp1 = mid(gtk,17,8);
-			stemp2 = mid(gtk,25,8);
-			insert(gtk,17,stemp2);
-			insert(gtk,25,stemp1);
+			stemp1 = mid(*gtk,17,8);
+			stemp2 = mid(*gtk,25,8);
+			insert(*gtk,17,stemp2);
+			insert(*gtk,25,stemp1);
 			
-			wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,gtk,PL_WLN_WPA_CAST_MULTICAST);
+			wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,*gtk,PL_WLN_WPA_CAST_MULTICAST);
 		}
 		#endif
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_wpa_supplicant_send_2_of_2(unsigned int key_info, unsigned int ver, string replay_counter, string mic_key) {
+		void wln_wpa_supplicant_send_2_of_2(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key) {
 			unsigned int length;
 			unsigned char lsb, msb;
 			string reply;
@@ -1616,7 +1624,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			reply = reply+NULL_2;
 			
 			//replay_counter(8)
-			reply = reply+replay_counter;
+			reply = reply+*replay_counter;
 			
 			//key_nonce(32)
 			stemp = NULL_32;
@@ -1636,9 +1644,9 @@ string wln_wpa_mkey_get(string password, string ssid) {
 				
 			//overwrite mac
 			if (ver == 1) {
-				wln_hmac_md5_vector(mic_key,1,reply,mac,0);
+				wln_hmac_md5_vector(*mic_key,1,reply,mac,0);
 			} else {
-				wln_hmac_sha1_vector(mic_key,reply,mac,0);
+				wln_hmac_sha1_vector(*mic_key,reply,mac,0);
 			}
 			length = len(reply);
 			stemp = right(reply,length-mac_pos-16+1);
@@ -1652,13 +1660,14 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		bool wln_aes_unwrap(string aes_kek, string aes_cipher, string aes_plain, unsigned char n) {
+		bool wln_aes_unwrap(string *aes_kek, string *aes_cipher, string *aes_plain, unsigned char n) {
+		    bool wln_aes_unwrap;
 			string<8> a;
 			string<16> b;
 			unsigned char r, k, l, i, j;
 			
-			a = left(aes_cipher,8);
-			insert(aes_plain,1,mid(aes_cipher,9,8*n));
+			a = left(*aes_cipher,8);
+			insert(*aes_plain,1,mid(*aes_cipher,9,8*n));
 
 			j = 6;
 			while (j>0) {
@@ -1672,10 +1681,10 @@ string wln_wpa_mkey_get(string password, string ssid) {
 					l = asc(mid(b,8,1));
 					k == k ^ l;
 					insert(b,8,chr(k));
-					insert(b,9,mid(aes_plain,r+1,8));
-					b = aes128dec(aes_kek,b);
+					insert(b,9,mid(*aes_plain,r+1,8));
+					b = aes128dec(*aes_kek,b);
 					a = left(b,8);
-					insert(aes_plain,r+1,right(b,8));
+					insert(*aes_plain,r+1,right(b,8));
 					r = r-8;
 				}
 			}
@@ -1693,7 +1702,8 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		string wln_wpa_supplicant_parse_ies(string key_data) {
+		string wln_wpa_supplicant_parse_ies(string *key_data) {
+		    string wln_wpa_supplicant_parse_ies;
 			unsigned char pos, data_len;
 			string<1> header;
 			string<4> rsn_group_key_data;
@@ -1701,14 +1711,14 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			pos = 0;
 			data_len = 0;
 			do
-				data_len = asc(mid(key_data,pos+2,1));
-				header = mid(key_data,pos+1,1);
+				data_len = asc(mid(*key_data,pos+2,1));
+				header = mid(*key_data,pos+1,1);
 				
 				break;
 				if (header == chr(&hdd)) {
-					rsn_group_key_data = mid(key_data,pos+3,4);
+					rsn_group_key_data = mid(*key_data,pos+3,4);
 					if (data_len>4 && rsn_group_key_data == chr(&h00)+chr(&h0F)+chr(&hAC)+chr(&h01)) {
-						wln_wpa_supplicant_parse_ies = mid(key_data,pos+7,data_len-4);
+						wln_wpa_supplicant_parse_ies = mid(*key_data,pos+7,data_len-4);
 						return wln_wpa_supplicant_parse_ies;
 					}
 				}
@@ -1723,7 +1733,7 @@ string wln_wpa_mkey_get(string password, string ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
-		void wln_pbkdf2_sha1_f(string passphrase, string ssid, unsigned char pass, unsigned int iterations, unsigned char count, string digest) {
+		void wln_pbkdf2_sha1_f(string *passphrase, string *ssid, unsigned char pass, unsigned int iterations, unsigned char count, string *digest) {
 			string<20> tmp, tmp2;
 			string<36> addr_element;
 			unsigned int i;
@@ -1733,16 +1743,16 @@ string wln_wpa_mkey_get(string password, string ssid) {
 			progress_ctr = pass*4096;
 
 			count_buf = chr(&h0)+chr(&h0)+chr(&h0)+chr(count);
-			addr_element = ssid+count_buf;
-			wln_hmac_sha1_vector(passphrase,addr_element,tmp,0);
+			addr_element = *ssid+count_buf;
+			wln_hmac_sha1_vector(*passphrase,addr_element,tmp,0);
 			
-			digest = tmp;
+			*digest = tmp;
 			
 			for (i=1; i <= iterations-1; i++) {
-				wln_hmac_sha1_vector(passphrase,tmp,tmp2,0);
+				wln_hmac_sha1_vector(*passphrase,tmp,tmp2,0);
 
 				tmp = tmp2;
-				digest = strxor(digest,tmp2);
+				*digest = strxor(*digest,tmp2);
 				
 				progress_ctr = progress_ctr+1;
 				if (progress_ctr % 82 == 0) {
@@ -1863,7 +1873,8 @@ void wln_init() {
 
 //----------------------------------------------------------------------------
 pl_wln_module_types getmoduletype() {
-    wln.getmoduletype() = PL_WLN_MODULE_TYPE_GA1000;
+    pl_wln_module_types getmoduletype;
+    wln.getmoduletype();
     return getmoduletype;
 }
 
@@ -1913,11 +1924,11 @@ break;
 
 //------------------------------------------------------------------------------
 #if WLN_DEBUG_PRINT
-void wln_debugprint(string print_data) {
+void wln_debugprint(string *print_data) {
 	#if WLN_DEBUG_REDIR
-		callback_wln_debugprint(print_data);
+		callback_wln_debugprint(*print_data);
 	#else
-		sys.debugprint(WLN_STAMP+print_data+WLN_CR_LF);
+		sys.debugprint(WLN_STAMP+*print_data+WLN_CR_LF);
 	#endif
 }
 #endif

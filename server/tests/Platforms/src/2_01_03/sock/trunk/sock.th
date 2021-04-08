@@ -21,6 +21,6 @@
 #endif
 
 //------------------------------------------------------------------------------
-unsigned char sock_get(string signature);
+unsigned char sock_get(string *signature);
 string sock_who_uses(unsigned char sock_num);
 void sock_release(unsigned char sock_num);

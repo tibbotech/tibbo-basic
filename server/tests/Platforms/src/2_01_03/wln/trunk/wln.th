@@ -119,9 +119,9 @@ enum wln_info_elements {
 };
 
 //------------------------------------------------------------------------------
-string wln_get_info(wln_info_elements info_element, string extra_data);
-en_wln_status_codes wln_start(string ap_name, pl_wln_security_modes security_mode, string key, pl_wln_domains domain, no_yes active_scan, pl_wln_scan_filter scanfilter);
-en_wln_status_codes wln_change(string ap_name, pl_wln_security_modes security_mode, string key);
+string wln_get_info(wln_info_elements info_element, string *extra_data);
+en_wln_status_codes wln_start(string *ap_name, pl_wln_security_modes security_mode, string *key, pl_wln_domains domain, no_yes active_scan, pl_wln_scan_filter scanfilter);
+en_wln_status_codes wln_change(string *ap_name, pl_wln_security_modes security_mode, string *key);
 void wln_stop();
 pl_wln_check_association_retval wln_check_association();
 void wln_proc_timer();
@@ -133,7 +133,7 @@ extern pl_wln_module_types wln_module_type;
 void wln_proc_data();
 
 #if WLN_WPA
-string wln_wpa_mkey_get(string password, string ssid);
+string wln_wpa_mkey_get(string *password, string *ssid);
 #endif
 
 void wln_update_rssi();
