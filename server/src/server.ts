@@ -1380,26 +1380,26 @@ function notifyDiagnostics() {
                 if (loc.startToken.source[1].name != filePath) {
                     continue;
                 }
-                const diagnostic: Diagnostic = {
-                    severity: DiagnosticSeverity.Warning,
-                    range: {
-                        start: { line: loc.startToken.line - 1, character: loc.startToken.column },
-                        // end: doc.positionAt(parserError.symbol.stop)
-                        end: { line: loc.stopToken.line - 1, character: loc.stopToken.column + loc.stopToken.text.length }
-                    },
-                    message: `${variable.name} is not used anywhere`,
-                    source: 'ex'
-                };
-                diagnostic.relatedInformation = [
-                    {
-                        location: {
-                            uri: getFileUrl(filePath),
-                            range: Object.assign({}, diagnostic.range)
-                        },
-                        message: `Unused variable`,
-                    }
-                ];
-                diagnostics.push(diagnostic);
+                // const diagnostic: Diagnostic = {
+                //     severity: DiagnosticSeverity.Warning,
+                //     range: {
+                //         start: { line: loc.startToken.line - 1, character: loc.startToken.column },
+                //         // end: doc.positionAt(parserError.symbol.stop)
+                //         end: { line: loc.stopToken.line - 1, character: loc.stopToken.column + loc.stopToken.text.length }
+                //     },
+                //     message: `${variable.name} is not used anywhere`,
+                //     source: 'ex'
+                // };
+                // diagnostic.relatedInformation = [
+                //     {
+                //         location: {
+                //             uri: getFileUrl(filePath),
+                //             range: Object.assign({}, diagnostic.range)
+                //         },
+                //         message: `Unused variable`,
+                //     }
+                // ];
+                // diagnostics.push(diagnostic);
             }
         }
 

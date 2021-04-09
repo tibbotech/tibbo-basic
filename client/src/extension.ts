@@ -2,7 +2,6 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { Uri, workspace } from 'vscode';
 import {
 	LanguageClient,
 	LanguageClientOptions,
@@ -23,7 +22,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		extDir = ext.extensionPath;
 	}
 
-	const serverModule = Uri.joinPath(context.extensionUri, 'server', 'out', 'server.js').fsPath;
+	// const serverModule = vscode.Uri.joinPath(context.extensionUri, 'server', 'out', 'server.js').fsPath;
+	const serverModule = context.asAbsolutePath(
+		path.join('server', 'out', 'server.js')
+	);
 	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
 	const serverOptions: ServerOptions = {
@@ -43,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ scheme: 'file', language: 'tibbo-basic' }],
 		synchronize: {
-			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
+			fileEvents: vscode.workspace.createFileSystemWatcher('**/.clientrc')
 		},
 		outputChannel: TIDEOutput,
 		initializationOptions: {
