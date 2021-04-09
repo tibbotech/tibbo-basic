@@ -38,7 +38,7 @@ includeppStmt
 // block ----------------------------------
 
 block
-    : statement*
+    : (lineLabel? statement)*
     ;
 
 statement
@@ -66,9 +66,9 @@ constSubStmt : name=IDENTIFIER (asTypeClause)? EQ value=expression;
 
 declareVariableStmt : visibility? DECLARE variableListStmt;
 
-declareSubStmt : DECLARE SUB (IDENTIFIER DOT)? IDENTIFIER paramList?;
+declareSubStmt : DECLARE SUB (IDENTIFIER DOT)? name=IDENTIFIER paramList?;
 
-declareFuncStmt : DECLARE FUNCTION (IDENTIFIER DOT)? IDENTIFIER paramList? asTypeClause;
+declareFuncStmt : DECLARE FUNCTION (IDENTIFIER DOT)? name=IDENTIFIER paramList? returnType=asTypeClause;
 
 doLoopStmt
     : DO block LOOP
@@ -87,7 +87,7 @@ enumerationStmt_Constant : IDENTIFIER (EQ expression)? COMMA?;
 exitStmt : EXIT_DO | EXIT_FOR | EXIT_FUNCTION | EXIT_PROPERTY | EXIT_SUB | EXIT_WHILE;
 
 forNextStmt :
-	FOR expression TO expression (STEP expression)? 
+	FOR expression TO expression (STEP step=expression)?
 	block
 	NEXT expression?
 ;
@@ -106,8 +106,8 @@ jumpStmt
 goToStmt : GOTO IDENTIFIER;
 
 ifThenElseStmt
-    : IF expression THEN (expression | jumpStmt) (ELSE (expression | jumpStmt))? # inlineIfThenElse
-    | IF expression THEN block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
+    : IF expression THEN (expression | jumpStmt) (ELSE (expression | jumpStmt))? NEWLINE # inlineIfThenElse
+    | IF expression THEN NEWLINE+ block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
     ;
 
 ifConditionStmt : expression;
@@ -158,7 +158,7 @@ paramInternal : (BYVAL | BYREF)? IDENTIFIER asTypeClause?;
 selectCaseStmt :
 	SELECT CASE expression COLON?
 	sC_Case*
-	(CASE_ELSE COLON? block)?
+	sC_Default?
 	END_SELECT
 ;
 
@@ -167,9 +167,13 @@ sC_Case :
 	block
 ;
 
+sC_Default :
+    CASE_ELSE COLON? block
+;
+
 // ELSE first, so that it is not interpreted as a variable call
 sC_Cond :
-    expression (COMMA expression)*
+    expression
 ;
 
 subStmt :
@@ -177,16 +181,16 @@ subStmt :
 	block
 	END_SUB
 ;
-typeStmt: visibility? TYPE IDENTIFIER 
+typeStmt: visibility? TYPE name=IDENTIFIER
 		typeStmtElement*
 	END_TYPE;
 
 typeStmtElement:
-	IDENTIFIER (LPAREN literal RPAREN)? asTypeClause ;
+	IDENTIFIER (LPAREN literal RPAREN)? valueType=asTypeClause ;
 
 // operator precedence is represented by rule order
 
-assignment: unaryExpression EQ expression;
+//assignment: IDENTIFIER EQ expression;
 
 //expression
 //    : ('-' | NOT) expression
@@ -223,7 +227,7 @@ unaryOperator
 
 postfixExpression
     : primaryExpression postfix*
-    | postfixExpression DOT IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
+    | postfixExpression DOT property=IDENTIFIER postfix*  // TODO: get rid of property and postfix expression.
     ;
 
 postfix

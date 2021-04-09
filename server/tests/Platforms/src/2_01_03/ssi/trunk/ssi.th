@@ -1,0 +1,19 @@
+//***********************************************************************************************************
+//			SSI CHANNEL ALLOCATION LIBRARY
+//***********************************************************************************************************
+
+//1- debug output in console
+//0- no debug output
+#ifndef SSI_DEBUG_PRINT
+	#define SSI_DEBUG_PRINT 0
+#endif
+
+//Maximum length of the SSI channel user's signature string
+#ifndef SSI_MAX_SIGNATURE_LEN
+	#define SSI_MAX_SIGNATURE_LEN 0
+#endif
+
+//------------------------------------------------------------------------------
+unsigned char ssi_get(string *signature);
+string ssi_who_uses(unsigned char ssi_num);
+void ssi_release(unsigned char ssi_num);

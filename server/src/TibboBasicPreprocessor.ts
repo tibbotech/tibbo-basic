@@ -23,6 +23,7 @@ export default class TibboBasicPreprocessor {
     defines: { [name: string]: TBDefine } = {};
     codes: { [filename: string]: Array<TerminalNodeImpl> } = {};
     files: { [filename: string]: string } = {};
+    filePriorities: string[] = [];
     originalFiles: { [filename: string]: string } = {};
 
     constructor(projectPath: string, platformsPath: string) {
@@ -78,6 +79,7 @@ export default class TibboBasicPreprocessor {
         }
         let deviceRootFile = '';
         if (this.originalFiles[filePath] == undefined) {
+            this.filePriorities.push(filePath);
             deviceRootFile = fs.readFileSync(filePath, 'utf-8');
             this.originalFiles[filePath] = deviceRootFile;
         }
@@ -316,7 +318,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
             if (item.ruleIndex == TibboBasicPreprocessorParser.RULE_preprocessor_expression && item.op != undefined) {
                 switch (item.op.type) {
                     case TibboBasicPreprocessorParser.AND:
-                        result = this.evaluate(item.children[0].children) && this.evaluate(item.children[2].children);
+                        result = this.evaluate([item.children[0]]) && this.evaluate([item.children[2]]);
                         break;
                     case TibboBasicPreprocessorParser.OR:
                         result = this.evaluate([items[i].children[0]]) || this.evaluate([items[i].children[2]]);

@@ -1,4 +1,4 @@
-// Generated from /Users/jimmyhu/Projects/TIDEDesktopService/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
+// Generated from /Users/jimmyhu/Projects/tibbo-basic/server/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
 // jshint ignore: start
 var antlr4 = require('antlr4/index');
 
@@ -317,6 +317,15 @@ TibboBasicParserListener.prototype.exitSC_Case = function(ctx) {
 };
 
 
+// Enter a parse tree produced by TibboBasicParser#sC_Default.
+TibboBasicParserListener.prototype.enterSC_Default = function(ctx) {
+};
+
+// Exit a parse tree produced by TibboBasicParser#sC_Default.
+TibboBasicParserListener.prototype.exitSC_Default = function(ctx) {
+};
+
+
 // Enter a parse tree produced by TibboBasicParser#sC_Cond.
 TibboBasicParserListener.prototype.enterSC_Cond = function(ctx) {
 };
@@ -350,15 +359,6 @@ TibboBasicParserListener.prototype.enterTypeStmtElement = function(ctx) {
 
 // Exit a parse tree produced by TibboBasicParser#typeStmtElement.
 TibboBasicParserListener.prototype.exitTypeStmtElement = function(ctx) {
-};
-
-
-// Enter a parse tree produced by TibboBasicParser#assignment.
-TibboBasicParserListener.prototype.enterAssignment = function(ctx) {
-};
-
-// Exit a parse tree produced by TibboBasicParser#assignment.
-TibboBasicParserListener.prototype.exitAssignment = function(ctx) {
 };
 
 

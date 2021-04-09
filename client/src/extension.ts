@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { workspace } from 'vscode';
+import { Uri, workspace } from 'vscode';
 import {
 	LanguageClient,
 	LanguageClientOptions,
@@ -23,11 +23,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		extDir = ext.extensionPath;
 	}
 
-	let serverPath = path.join('server', 'out', 'server.js');
-	if (process.env.NODE_ENV == 'production') {
-		serverPath = path.join('out', 'server.js');
-	}
-	const serverModule = context.asAbsolutePath(serverPath);
+	const serverModule = Uri.joinPath(context.extensionUri, 'server', 'out', 'server.js').fsPath;
 	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
 	const serverOptions: ServerOptions = {

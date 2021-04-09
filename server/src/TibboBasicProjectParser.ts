@@ -3,7 +3,7 @@ import fs = require('fs');
 // import ini = require('ini');
 import TibboBasicErrorListener from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
-import { TBObject, TBEnum, TBFunction, TBSub, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange } from './types';
+import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
 import { CommonToken } from 'antlr4/Token';
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { CommonTokenStream } from 'antlr4/CommonTokenStream';
@@ -25,7 +25,6 @@ export default class TibboBasicProjectParser {
 
     enums: { [name: string]: TBEnum } = {};
     functions: { [name: string]: TBFunction } = {};
-    subs: { [name: string]: TBSub } = {};
     consts: { [name: string]: TBConst } = {};
     types: { [name: string]: TBType } = {};
 
@@ -33,6 +32,7 @@ export default class TibboBasicProjectParser {
     variables: Array<TBVariable> = [];
     scopes: Array<TBScope> = [];
     symbolDeclarations: { [fileName: string]: number[] } = {};
+    references: { [symbolName: string]: TBSymbol[] } = {};
 
     parseFile(filePath: string, fileContents?: string): void {
         // const t1 = new Date().getTime();
@@ -124,10 +124,10 @@ export default class TibboBasicProjectParser {
         for (let i = 0; i < this.variables.length; i++) {
             const variable = this.variables[i];
             if (variable.location.startToken.source[1].name == scope.file) {
-                if (variable.location.startToken.start >= scope.start.start 
+                if (variable.location.startToken.start >= scope.start.start
                     && variable.location.startToken.start < scope.end.start) {
-                        variables.push(variable);
-                    }
+                    variables.push(variable);
+                }
             }
         }
         return variables;
@@ -166,7 +166,6 @@ export default class TibboBasicProjectParser {
         let queue = [
             this.enums,
             this.consts,
-            this.subs,
             this.functions,
             this.variables,
             this.types,
@@ -220,7 +219,6 @@ export default class TibboBasicProjectParser {
         });
 
         queue = [
-            this.subs,
             this.functions,
             this.syscalls
         ];
@@ -301,7 +299,7 @@ export default class TibboBasicProjectParser {
         // subs: { [name: string]: TBSub } = {};
         // consts: { [name: string]: TBConst } = {};
         // types: { [name: string]: TBType } = {};
-    
+
         // comments: { [fileName: string]: CommonToken[] } = {};
         // variables: Array<TBVariable> = [];
         // scopes: Array<TBScope> = [];
@@ -313,14 +311,20 @@ export default class TibboBasicProjectParser {
         }
 
         for (const key in this.functions) {
-            if (this.functions[key].location && this.functions[key].location.startToken.source[1].name == filePath) {
-                delete this.functions[key];
-            }
-        }
-
-        for (const key in this.subs) {
-            if (this.subs[key].location && this.subs[key].location.startToken.source[1].name == filePath) {
-                delete this.subs[key];
+            if (this.events[key] == undefined) {
+                const location = this.functions[key].location;
+                const func = this.functions[key];
+                if (location != undefined) {
+                    if (location.startToken.source[1].name == filePath) {
+                        delete this.functions[key];
+                    }
+                }
+                for (let i = 0; i < func.references.length; i++) {
+                    if (func.references[i].startToken.source[1].name == filePath) {
+                        func.references.splice(i, 1);
+                        i--;
+                    }
+                }
             }
         }
 
@@ -489,16 +493,12 @@ class ParserListener extends TibboBasicParserListener {
     enterSubStmt(ctx) {
         if (ctx.name) {
             const name = ctx.name.text;
-            this.parser.subs[name] = {
-                ...this.parser.subs[name],
-                name: name,
-                parameters: [],
+            this.addFunction(name, {
                 location: {
                     startToken: ctx.start,
-                    stopToken: ctx.start
+                    stopToken: ctx.name
                 },
-                comments: []
-            };
+            });
 
             const scope: TBScope = {
                 file: ctx.start.source[1].name,
@@ -532,7 +532,7 @@ class ParserListener extends TibboBasicParserListener {
                         startToken: ctx.start,
                         stopToken: ctx.children[i].stop
                     }
-                    const variable = {
+                    const variable: TBVariable = {
                         name: name,
                         value: '',
                         length: length,
@@ -541,18 +541,18 @@ class ParserListener extends TibboBasicParserListener {
                             startToken: ctx.name,
                             stopToken: ctx.name
                         },
+                        references: [],
                         comments: []
                     }
+                    variable.parentScope = this.scopeStack[this.scopeStack.length - 1];
+
                     this.parser.addVariable(variable);
                 }
             }
-            this.parser.functions[name] = {
-                name: name,
-                parameters: [],
+            this.addFunction(name, {
                 dataType: ctx.returnType.children[1].getText(),
                 location: location,
-                comments: []
-            };
+            })
             const scope: TBScope = {
                 file: ctx.start.source[1].name,
                 start: ctx.start,
@@ -582,7 +582,7 @@ class ParserListener extends TibboBasicParserListener {
             length = ctx.children[2].getText();
         }
         const name = ctx.children[0].symbol.text;
-        const variable = {
+        const variable: TBVariable = {
             name: name,
             value: '',
             length: length,
@@ -591,8 +591,10 @@ class ParserListener extends TibboBasicParserListener {
                 startToken: ctx.start,
                 stopToken: ctx.start
             },
+            references: [],
             comments: []
         };
+        variable.parentScope = this.scopeStack[this.scopeStack.length - 1];
         this.parser.addVariable(variable);
     }
 
@@ -621,6 +623,7 @@ class ParserListener extends TibboBasicParserListener {
                     startToken: ctx.name,
                     stopToken: ctx.name
                 },
+                references: [],
                 comments: []
             };
             const param = {
@@ -630,7 +633,7 @@ class ParserListener extends TibboBasicParserListener {
             };
             this.parser.addVariable(variable);
             if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_subStmt) {
-                this.parser.subs[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
+                this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
             }
             if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_functionStmt) {
                 this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
@@ -675,26 +678,22 @@ class ParserListener extends TibboBasicParserListener {
 
     enterDeclareSubStmt(ctx) {
         const name = ctx.children[2].symbol.text;
-        let location: TBRange = {
-            startToken: ctx.start,
-            stopToken: ctx.start
-        };
-        this.parser.subs[name] = {
-            ...this.parser.subs[name],
-            declaration: location
-        }
+        this.addFunction(name, {
+            declaration: {
+                startToken: ctx.start,
+                stopToken: ctx.start
+            },
+        });
     }
 
     enterDeclareFuncStmt(ctx) {
         const name = ctx.children[2].symbol.text;
-        let location: TBRange = {
-            startToken: ctx.start,
-            stopToken: ctx.start
-        };
-        this.parser.functions[name] = {
-            ...this.parser.functions[name],
-            declaration: location
-        }
+        this.addFunction(name, {
+            declaration: {
+                startToken: ctx.start,
+                stopToken: ctx.start
+            }
+        });
     }
 
     enterInlineIfThenElse(ctx) {
@@ -738,6 +737,7 @@ class ParserListener extends TibboBasicParserListener {
                         startToken: item.start,
                         stopToken: item.start
                     },
+                    references: [],
                     comments: []
                 };
                 members.push(variable);
@@ -783,22 +783,53 @@ class ParserListener extends TibboBasicParserListener {
     enterPrimaryExpression(ctx) {
         for (let i = 0; i < ctx.children.length; i++) {
             let item = ctx.children[i];
-            if (item.ruleIndex == undefined || item.ruleIndex == TibboBasicParser.RULE_literal) {
-                continue;
+            if (item.ruleIndex == TibboBasicParser.RULE_literal && item.start.type == TibboBasicParser.IDENTIFIER) {
+                let location: TBRange = {
+                    startToken: ctx.start,
+                    stopToken: ctx.start
+                };
+                let symbolName = item.start.text;
+
+                this.addSymbolReference(symbolName, location);
+                this.addFunction(symbolName, {});
+                this.parser.functions[symbolName].references.push(location);
             }
-            // console.log(ctx.getText());
         }
-        
     }
 
     enterExpression(ctx) {
         for (let i = 0; i < ctx.children.length; i++) {
             let item = ctx.children[i];
-            if (item.ruleIndex == undefined || item.ruleIndex == TibboBasicParser.RULE_literal) {
-                continue;
+            if (item.ruleIndex == TibboBasicParser.RULE_literal && item.start.type == TibboBasicParser.IDENTIFIER) {
+                let symbolName = item.start.text;
+                console.log(symbolName);
             }
             // console.log(ctx.getText());
         }
-        
+
     }
+
+    addFunction(name: string, func: any): void {
+        if (name != undefined) {
+            if (this.parser.functions[name] == undefined) {
+                this.parser.functions[name] = {
+                    name: name,
+                    parameters: [],
+                    comments: [],
+                    references: []
+                }
+            }
+        }
+        for (const key in func) {
+            this.parser.functions[name][key] = func[key];
+        }
+    }
+
+    addSymbolReference(name: string, location: TBRange): void {
+
+    }
+
+    // enterPostfixExpression(ctx) {
+    //     console.log(ctx.getText());
+    // }
 }

@@ -1,0 +1,55 @@
+#include "global.th"
+
+void dosomething();
+struct foo_struct {//structure with two members, and both are arrays  
+	unsigned char x;
+	string s;
+};
+
+void boot();
+    
+    unsigned char f;
+    for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
+		interface_ready[f] = NO;
+	}
+
+    //Ethernet setup
+    //================================================================
+    //ethernet dhcp
+    dhcp_start(PL_SOCK_INTERFACE_NET,"192.168.1.137","");
+    //-----------------------------------------------------------------
+	
+    unsigned char i;
+	unsigned char j;
+	sys.debugprint(str(i));
+	sys.debugprint(str(j));
+    net.ip = DEVICE_NET_IP;
+    net.netmask = DEVICE_NET_MASK;
+    net.gatewayip = DEVICE_NET_GATEWAY;
+	bool aa;
+	unsigned char bb;
+	char cc;
+	unsigned int dd;
+	short ee;
+	unsigned long ff;
+	long gg;
+	float hh;
+	string ii;
+	pl_wln_association_states jj;
+	byte(3) kk;
+	foo_struct ll;
+	ll.x = 9;
+	ll.s = "bcd";
+	
+	for (i=0; i <= 3; i++) {
+		ll.s = str(i);
+	}
+	dosomething();
+    pat.play("B-B-B-",PL_PAT_CANINT);
+
+}
+
+void dosomething() {
+	unsigned char zz;
+	sys.debugprint("asdf\r\n");
+}

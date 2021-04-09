@@ -13,6 +13,7 @@ client/node_modules/**
 !client/node_modules/vscode-languageserver-types/**
 !client/node_modules/semver/**
 client
+!client/out/**
 server/**
 !server/out/**
 # !server/node_modules/**

@@ -1,0 +1,2924 @@
+//*************************************************************************************************************************
+//           AggreGate Agent Library
+//	Agent Libarary is the interface for TIDE project to work with Tibbo AggreGate Server,
+//	for more details on Agent and AggreGate please visit the website
+//	http://aggregate.tibbo.com/docs/
+//
+//*************************************************************************************************************************
+
+#include "global.th"
+
+//------------------------------------------------------------------------------
+
+#define AGG_STAMP1 "AGG("
+#define AGG_STAMP2 ")> "
+#define AGG_SOCK_GET_SIGNATURE "AGG"
+#define AGG_COMMAND_START 0x02
+#define AGG_COMMAND_END 0x0d
+#define AGG_COMMAND_PARAMETERS_SEPARATOR 0x17
+#define AGG_ELEMENT_START 0x1c
+#define AGG_ELEMENT_END 0x1d
+#define AGG_ELEMENT_NAME_VALUE_SEPARATOR 0x1e
+#define AGG_NULL 0x1a
+#define AGG_SCRIPT_FIELD_SEPARATOR 0x9
+#define AGG_CR_LF chr(0x0d)+chr(&h0a)
+#define AGG_INIT_SIGNATURE 0xEF4E
+#define AGG_TX_BUF_SIZE 2//AGG_TX_BUFF_PAGES
+#define AGG_RX_BUF_SIZE 2//AGG_RX_BUFF_PAGES
+#define AGG_FIRMWARE_GET_FAIL_COUNT 250
+
+#define AGG_MSG_TBL_STATUS_FAILURE "Data disk error."
+#define AGG_MSG_TBL_STATUS_UNKNOWN_TABLE "Unknown table."
+#define AGG_MSG_TBL_STATUS_UNKNOWN_FIELD "Unknown field."
+#define AGG_MSG_TBL_STATUS_INVALID "Field value invalid."
+#define AGG_MSG_TBL_STATUS_FULL "Max record number for this table reached || the disk is full."
+#define AGG_MSG_TBL_STATUS_KEY_VIOLATION "Key field violation."
+#define AGG_MSG_STG_STATUS_UNKNOWN "Unknown setting || invalid setting number."
+#define AGG_MSG_STG_STATUS_FAILURE "Read failure || write failure (checksum error, hardware malfunction, etc.)"
+#define AGG_MSG_STG_STATUS_INVALID "Invalid setting value."
+
+#if AGG_MAX_SCRIPT_LINE_NAME_LEN>AGG_MAX_FUNCTION_NAME_LEN 
+	#define AGG_ITEM_BUFF_LEN AGG_MAX_SCRIPT_LINE_NAME_LEN
+#else
+	#define AGG_ITEM_BUFF_LEN AGG_MAX_FUNCTION_NAME_LEN
+#endif
+
+#if AGG_MULTI_CONTEXT == 0
+	#define AGG_MAX_CONTEXT_NAME_LEN 0
+#endif
+//------------------------------------------------------------------------------
+
+enum en_agg_entity {
+	EN_AGG_ENTITY_INFO,
+	EN_AGG_ENTITY_VARIABLES,
+	EN_AGG_ENTITY_FUNCTIONS,
+	EN_AGG_ENTITY_EVENTS
+};
+
+enum en_agg_element_get_status {
+	EN_ELEMENT_FOUND,
+	EN_ELEMENT_NOT_FOUND,
+	EN_ELEMENT_TOO_LONG
+};
+
+struct agg_entity {
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	en_agg_entity entity_type;
+	unsigned int romaddr_script;
+};
+
+struct agg_item {
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	en_agg_entity entity_type;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> item_name;
+	string<2> p1;
+	unsigned int romaddr_script;
+};
+
+struct agg_command {
+	string<AGG_MAX_CONTEXT_NAME_LEN> context_name;
+	string<1> code;
+	string<8> id;
+	string<1> msg_code;
+	string<1> op_code;
+	string<AGG_MAX_FUNCTION_NAME_LEN> item_name;
+};
+
+struct agg_stored_event_info {
+	unsigned char agg_item_index;
+	no_yes agg_unsent_stored_event;
+};
+//------------------------------------------------------------------------------
+
+agg_entity(AGG_MAX_NUM_ENTITY_TYPES) agg_entities;
+agg_item(AGG_MAX_NUM_SCRIPT_LINES) agg_items;
+agg_stored_event_info(AGG_MAX_NUM_STORED_EVENTS) agg_stored_event_flag;
+unsigned int agg_init_flag;
+unsigned char agg_sock;
+no_yes agg_connected;
+no_yes agg_sychronized;
+no_yes agg_auto_register;
+string<32> agg_owner_name;
+string<32> agg_device_name;
+string<8> agg_password;
+string agg_rx;
+unsigned char agg_timer;
+agg_command agg_cmd;
+unsigned char agg_start_cmd_recieved;
+string<AGG_MAX_SCRIPT_LINE_NAME_LEN> agg_selected_tbl_info;
+no_yes agg_event_in_proc;
+unsigned char agg_event_item_index;
+unsigned int agg_cur_event_rec_num;
+en_agg_link_states agg_link_state;
+no_yes agg_first_conn;
+unsigned char agg_reboot_timer;
+unsigned char agg_keepalive_timer;
+
+#if AGG_REMOTE_FIRMWARE_UPLOAD
+	no_yes agg_firmware_recieved;
+#endif
+//------------------------------------------------------------------------------
+en_agg_status_codes agg_init();
+string agg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos);
+en_agg_status_codes agg_connect();
+void agg_debug_print_status(en_agg_status_codes status);
+void agg_debugprint(string *print_data);
+void agg_sock_close();
+string agg_rx_getdata(string *substr);
+void agg_rx_clr(unsigned char l);
+void agg_send_script();
+void agg_get_items();
+void agg_data_send(string s);
+en_agg_element_get_status agg_element_get(string *element_level, string *element_str, string *opening_chr, string *closing_chr, string *element_result_str);
+en_agg_entity agg_entity_get(string *s);
+void agg_invisible_separators(string *s);
+void agg_replace_chr(string *s, string *a, string *b);
+ok_ng agg_call_function(string *op, string *context_name, string *func_input);
+string agg_root_login(string *function_input);
+string agg_hex_to_hexstr(string *is);
+ok_ng agg_send_all_record(string *tbl_name);
+ok_ng agg_disk_download();
+ok_ng agg_set_variable();
+void agg_convert_disk_data(string *data_string);
+
+#if AGG_REMOTE_FIRMWARE_UPLOAD
+	ok_ng agg_firmware_upload();
+	void agg_convert_data_block(string *data_string, string *left_over_str);
+#endif
+
+#if AGG_CUSTOM_RTC<2
+	ok_ng agg_modtime_sg(agg_item selected_item, string *date_time, en_agg_rdwr op);
+	void agg_systime_sg(string<23> *date_time, en_agg_rdwr op);
+	void agg_rtc_sg(unsigned int *wdaycount, unsigned int *wmincount, unsigned char *bsec, unsigned int *wmilsec, en_agg_rdwr op);
+#endif
+
+#if AGG_SETTING_CONTROL
+	en_stg_status_codes agg_settings_sg(string *setting_name, string *setting_val, unsigned char index, en_stg_rdwr rw);
+	string agg_stg_msg(en_stg_status_codes stg_result);
+#endif
+
+#if AGG_TABLE_CONTROL
+	void agg_date_time_formating(string *td_str, en_tbl_date_time_format tbl_date_time_format, en_agg_rdwr op);
+	string agg_tbl_msg(en_tbl_status_codes tbl_result);
+	ok_ng agg_tbl_hash(string *contain, string *msg);
+	ok_ng agg_tbl_add_record(string *contain, string *msg);
+	ok_ng agg_tbl_put_record(string *contain, string *msg);
+	ok_ng agg_tbl_update_record(string *contain, string *msg);
+	ok_ng agg_tbl_remove_record(string *contain, string *msg);
+	ok_ng agg_tbl_start_table(string *contain, string *msg);
+	ok_ng agg_tbl_finish_table(string *contain, string *msg);
+#endif
+
+//================================================================================
+void agg_record_encode(string *encode_string, string *field_value);
+	unsigned char l;
+	string stemp;
+	
+	if (instr(1,*encode_string,chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START),1) == 0) {
+		*encode_string = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_END);
+	}
+	l = len(*encode_string);
+	stemp = left(*encode_string,l-1);
+	*encode_string = stemp+chr(AGG_ELEMENT_START)+*field_value+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END);
+}
+
+//------------------------------------------------------------------------------
+string agg_record_decode(string *encode_string, unsigned char field_index) {
+    string agg_record_decode;
+	string s;
+	unsigned char l;
+	
+	agg_element_get("1/"+str(field_index+1)+"/",*encode_string,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),s);
+	l = len(s);
+	
+	agg_record_decode = mid(s,2,l-2);
+	return agg_record_decode;
+}
+
+//------------------------------------------------------------------------------
+en_agg_status_codes agg_start(pl_sock_interfaces interface, string *owner_name, string *device_name, string *password, string *agg_server_ip, unsigned int agg_server_port, unsigned int agg_server_tout, no_yes auto_reg) {
+//API procedure, allocate the sock, and opens the connection to AggreGate server
+	en_agg_status_codes agg_result;
+	unsigned int i;
+	
+	//check if properly initialized
+	if (agg_init_flag != AGG_INIT_SIGNATURE) {
+		agg_result = agg_init();
+		if (agg_result != EN_AGG_STATUS_OK) {
+			agg_start = agg_result;
+			return agg_start;
+		}
+		agg_init_flag = AGG_INIT_SIGNATURE;
+	}
+	
+	agg_start = EN_AGG_STATUS_OK;
+
+	//we only need to obtain a socket once
+	if (agg_sock>=sock.numofsock) {
+		agg_sock = sock_get(AGG_SOCK_GET_SIGNATURE);
+	}
+	
+	if (agg_sock>=sock.numofsock) {
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: Out of socket.");
+		#endif
+		agg_start = EN_AGG_STATUS_OUT_OF_SOCKETS;
+		return agg_start;
+	}
+	
+	sock.num = agg_sock;
+	
+	//check if already connected to the AggreGate server
+	return agg_start;
+	
+	sock.allowedinterfaces = "WLN,NET,PPP";
+	sock.protocol = PL_SOCK_PROTOCOL_TCP;
+	sock.connectiontout = agg_server_tout;
+	sock.targetip = *agg_server_ip;
+	sock.targetport = agg_server_port;
+	
+	#if NET_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_NET) {
+			sock.targetinterface = PL_SOCK_INTERFACE_NET;
+			goto l1;
+		}
+	#endif
+	
+	#if WLN_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_WLN) {
+			sock.targetinterface = PL_SOCK_INTERFACE_WLN;
+			goto l1;
+		}
+	#endif
+
+	#if SUPPORTS_GPRS
+		if (interface == PL_SOCK_INTERFACE_PPP) {
+			sock.targetinterface = PL_SOCK_INTERFACE_PPP;
+			goto l1;
+		}
+	#endif
+
+	#if AGG_DEBUG_PRINT
+		agg_debug_print_status(EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE);
+	#endif
+	
+	agg_start = EN_AGG_STATUS_INVALID_INTERFACE;
+	return agg_start;//invalid interface specified
+
+l1: 
+	agg_connected = YES;
+	agg_sychronized = NO;
+	agg_event_in_proc = NO;
+	agg_event_item_index = 0;
+	agg_cur_event_rec_num = 0;
+	agg_timer = 0;
+	agg_auto_register = auto_reg;
+	agg_owner_name = *owner_name;
+	agg_device_name = *device_name;
+	agg_password = *password;
+	agg_rx = "";
+	agg_selected_tbl_info = "";
+	agg_first_conn = YES;
+	agg_start = agg_connect();
+	agg_keepalive_timer = 0;
+	return agg_start;
+}
+
+//-------------------------------------------------------------
+en_agg_status_codes agg_init() {
+//API procedure, initialize the AggreGate agent library, parses the descriptor file, checks compilation options, and exams the memory usage.
+
+    en_agg_status_codes agg_init;
+	unsigned int i, j, line_end, field_start_pos;
+	unsigned char agg_entity_index, agg_item_index, b, context_name_len, item_name_len, stored_event_index;
+	string s;
+	agg_entity agg_temp_entity;
+	agg_item agg_temp_item;
+	
+	agg_init = EN_AGG_STATUS_OK;
+	agg_sock = 255;
+	agg_link_state = EN_AGG_LINK_STATE_IDLE;
+	agg_reboot_timer = 0;
+	
+	#if AGG_REMOTE_FIRMWARE_UPLOAD
+		agg_firmware_recieved = NO;
+	#endif
+	
+	#if AGG_DEBUG_PRINT
+		agg_debugprint("---START---");
+	#endif
+	
+	//varify all #defines
+	if (AGG_MAX_SCRIPT_LINE_NAME_LEN<1 || AGG_MAX_SCRIPT_LINE_NAME_LEN>255) {
+		#if	AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: AGG_MAX_SCRIPT_LINE_NAME_LEN must be between 1 and 255, you now have '#AGG_MAX_SCRIPT_LINE_NAME_LEN "+str(AGG_MAX_SCRIPT_LINE_NAME_LEN)+"'.");
+		#endif
+		agg_entity_index = 0;
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+
+	if (AGG_MAX_NUM_ENTITY_TYPES<2 || AGG_MAX_NUM_ENTITY_TYPES>255) {
+		#if	AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: AGG_MAX_NUM_ENTITY_TYPES must be between 2 and 255, you now have '#AGG_MAX_NUM_ENTITY_TYPES "+str(AGG_MAX_NUM_ENTITY_TYPES)+"'.");
+		#endif
+		agg_entity_index = 0;
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+	
+	if (AGG_MAX_NUM_SCRIPT_LINES>255) {
+		#if	AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: AGG_MAX_NUM_SCRIPT_LINES must be between 0 and 255, you now have '#AGG_MAX_NUM_SCRIPT_LINES "+str(AGG_MAX_NUM_SCRIPT_LINES)+"'.");
+		#endif
+		agg_entity_index = 0;
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+	
+	agg_entity_index = 0;
+	agg_item_index = 0;
+	context_name_len = 0;
+	item_name_len = 12;
+	stored_event_index = 0;
+	
+	//read descriptor file
+	romfile.open(AGG_DESCRIPTOR_FILE);//this file is a table descriptor file
+	if (romfile.size == 0) {
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: '"+AGG_DESCRIPTOR_FILE+"' is not in your project or file is empty.");
+		#endif
+		agg_entity_index = 0;//table descriptor file is not in your project (or file is empty)
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+	
+	i == romfile.find(romfile.pointer,"==",1);
+	while (i != 0) {
+		//we are now at the "==" pointing at the beginning of one table descriptor line
+		romfile.pointer = i+2;
+		
+		//find the end of this table descriptor line
+		line_end = romfile.find(romfile.pointer,AGG_CR_LF,1);
+		if (line_end == 0) {
+			line_end = romfile.size+1;
+		}
+
+		//extract entity type
+		s = agg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing entity type field
+			#if AGG_DEBUG_PRINT
+				agg_debugprint("ERROR (entity #"+str(agg_entity_index)+"'): entity type field not found (entity are counted from 0).");
+			#endif
+			agg_entity_index = 0;
+			agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+			return agg_init;
+		}
+		
+		agg_temp_entity.entity_type = agg_entity_get(s);
+		if (s == "") {
+			#if AGG_DEBUG_PRINT
+				agg_debugprint("ERROR (entity #"+str(agg_entity_index)+"'): cannot recongize the entity type.");
+			#endif
+			agg_entity_index = 0;
+			agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+			return agg_init;
+		}
+		//extract context name
+		s = agg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing context name field
+			#if AGG_DEBUG_PRINT
+				agg_debugprint("ERROR (entity #"+str(agg_entity_index)+"'): context name field not found (entity are counted from 0).");
+			#endif
+			agg_entity_index = 0;
+			agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+			return agg_init;
+		}
+		
+		if (s == "root") { s = ""; };
+		b = len(s);
+		if (b>AGG_MAX_CONTEXT_NAME_LEN) {
+			#if AGG_DEBUG_PRINT
+				agg_debugprint("ERROR (entity #"+str(agg_entity_index)+"'): context name length is "+str(len(s))+", while you have 'AGG_MAX_CONTEXT_NAME_LEN "+str(AGG_MAX_CONTEXT_NAME_LEN)+"'.");
+			#endif
+			agg_entity_index = 0;
+			agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+			return agg_init;
+		}
+		agg_temp_entity.context_name = s;
+		
+		if (b>context_name_len) { context_name_len = b; };
+		
+		//extract romaddr of the script
+		s = agg_get_descriptor_field(line_end,field_start_pos);
+		
+		if (s == "") {
+			romfile.pointer = line_end;
+			agg_temp_entity.romaddr_script = romfile.pointer;
+		} else {
+			agg_temp_entity.romaddr_script = field_start_pos;
+		}
+		
+		i == romfile.find(romfile.pointer,"==",1);
+		j = romfile.find(romfile.pointer,AGG_CR_LF+">>",1)+2;
+
+		while ((j>2 && j<i) || (i == 0 && j>2)) {
+			romfile.pointer = j+2;
+			
+			agg_temp_item.entity_type = agg_temp_entity.entity_type;
+			agg_temp_item.context_name = agg_temp_entity.context_name;
+			
+			//find the end of this table descriptor line
+			line_end = romfile.find(romfile.pointer,AGG_CR_LF,1);
+			if (line_end == 0) {
+				line_end = romfile.size+1;
+			}
+
+			//extract item name
+			s = agg_get_descriptor_field(line_end,field_start_pos);
+			if (s == "") {
+				//missing item name field
+				#if AGG_DEBUG_PRINT
+					agg_debugprint("ERROR (item #"+str(agg_item_index)+"'): item name field not found (item are counted from 0).");
+				#endif
+				agg_item_index = 0;
+				agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+				return agg_init;
+			}
+			
+			b = len(s);
+			if (b>AGG_MAX_SCRIPT_LINE_NAME_LEN) {
+				#if AGG_DEBUG_PRINT
+					agg_debugprint("ERROR (item #"+str(agg_item_index)+"'): item name length is "+str(len(s))+", while you have 'AGG_MAX_SCRIPT_LINE_NAME_LEN "+str(AGG_MAX_SCRIPT_LINE_NAME_LEN)+"'.");
+				#endif
+				agg_item_index = 0;
+				agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+				return agg_init;
+			}
+			if (b>item_name_len) { item_name_len = b; };
+			agg_temp_item.item_name = s;
+			
+			if (agg_temp_item.entity_type != EN_AGG_ENTITY_FUNCTIONS) {
+				//extract parameter romaddr
+				s = agg_get_descriptor_field(line_end,field_start_pos);
+				if (s == "") {
+					//missing parameter field
+					#if AGG_DEBUG_PRINT
+						agg_debugprint("ERROR (item #"+str(agg_item_index)+"'): item paramter field not found (item are counted from 0).");
+					#endif
+					agg_item_index = 0;
+					agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+					return agg_init;
+				}
+				agg_temp_item.p1 = s;
+			} else {
+				agg_temp_item.p1 = "";
+			}
+			
+			//extract script romaddr
+			s = agg_get_descriptor_field(line_end,field_start_pos);
+			if (s == "") {
+				//missing item script
+				#if AGG_DEBUG_PRINT
+					agg_debugprint("ERROR (item #"+str(agg_item_index)+"'): item script not found (item are counted from 0).");
+				#endif
+				agg_item_index = 0;
+				agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+				return agg_init;
+			}
+			agg_temp_item.romaddr_script = field_start_pos;
+
+			if (agg_item_index<AGG_MAX_NUM_SCRIPT_LINES) {
+				agg_items[agg_item_index] = agg_temp_item;
+				//if the agg_item is a stored event, initialize the agg_stored_event_flag
+				if (agg_temp_item.entity_type == EN_AGG_ENTITY_EVENTS && left(agg_temp_item.p1,1) == "S") {
+					if (stored_event_index<AGG_MAX_NUM_STORED_EVENTS) {
+						agg_stored_event_flag[stored_event_index].agg_item_index = agg_item_index;
+						agg_stored_event_flag[stored_event_index].agg_unsent_stored_event = YES;
+						stored_event_index = stored_event_index+1;
+					} else {
+						#if AGG_DEBUG_PRINT
+							agg_debugprint("ERROR: total number of stored events is "+str(stored_event_index+1)+" while you have 'AGG_MAX_NUM_STORED_EVENTS "+str(AGG_MAX_NUM_STORED_EVENTS)+"'.");
+						#endif
+						agg_item_index = 0;
+						agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+						return agg_init;
+					}
+				}
+			}
+			
+			j = romfile.find(field_start_pos,AGG_CR_LF+">>",1)+2;
+			agg_item_index = agg_item_index+1;
+		}
+		
+		if (agg_entity_index<AGG_MAX_NUM_ENTITY_TYPES) {
+			agg_entities[agg_entity_index] = agg_temp_entity;
+		}
+		agg_entity_index = agg_entity_index+1;
+	}
+	
+	if (agg_item_index>AGG_MAX_NUM_SCRIPT_LINES) {
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: total number of items is "+str(agg_item_index)+" while you have 'AGG_MAX_NUM_SCRIPT_LINES "+str(AGG_MAX_NUM_SCRIPT_LINES)+"'.");
+		#endif
+		agg_item_index = 0;
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+	
+	if (agg_entity_index>AGG_MAX_NUM_ENTITY_TYPES) {
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("ERROR: total number of entities is "+str(agg_entity_index)+" while you have 'AGG_MAX_NUM_ENTITY_TYPES "+str(AGG_MAX_NUM_ENTITY_TYPES)+"'.");
+		#endif
+		agg_entity_index = 0;
+		agg_init = EN_AGG_STATUS_WRONG_DESCRIPTOR;
+		return agg_init;
+	}
+
+	//check for memory wastage
+	#if AGG_DEBUG_PRINT	
+		if (context_name_len<AGG_MAX_CONTEXT_NAME_LEN) {
+			agg_debugprint("YOU ARE WASTING MEMORY!!! Set AGG_MAX_CONTEXT_NAME_LEN to "+str(context_name_len)+". It is now "+str(AGG_MAX_CONTEXT_NAME_LEN)+".");
+		}
+		
+		if (item_name_len<AGG_MAX_SCRIPT_LINE_NAME_LEN) {
+			agg_debugprint("YOU ARE WASTING MEMORY!!! Set AGG_MAX_SCRIPT_LINE_NAME_LEN to "+str(item_name_len)+". It is now "+str(AGG_MAX_SCRIPT_LINE_NAME_LEN)+".");
+		}
+		
+		if (agg_item_index<AGG_MAX_NUM_SCRIPT_LINES) {
+			agg_debugprint("YOU ARE WASTING MEMORY!!! Set AGG_MAX_NUM_SCRIPT_LINES to "+str(agg_item_index)+". It is now "+str(AGG_MAX_NUM_SCRIPT_LINES)+".");
+		}
+		
+		if (agg_entity_index<AGG_MAX_NUM_ENTITY_TYPES) {
+			agg_debugprint("YOU ARE WASTING MEMORY!!! Set AGG_MAX_NUM_ENTITY_TYPES to "+str(agg_entity_index)+". It is now "+str(AGG_MAX_NUM_ENTITY_TYPES)+".");
+		}
+		
+		if (stored_event_index<AGG_MAX_NUM_STORED_EVENTS) {
+			agg_debugprint("YOU ARE WASTING MEMORY!!! Set AGG_MAX_NUM_STORED_EVENTS to "+str(stored_event_index)+". It is now "+str(AGG_MAX_NUM_STORED_EVENTS)+".");
+		}
+	#endif
+	agg_init_flag = AGG_INIT_SIGNATURE;
+	
+	return agg_init;
+}
+
+//------------------------------------------------------------------------------
+void agg_stop() {
+//API procedure, close the AggreGate server connection, and release the buffer.
+
+	return;
+	
+	#if AGG_DEBUG_PRINT
+		agg_debugprint("---STOP---");
+	#endif
+
+	#if AGG_LOGIN_CONTROL
+		if (login_mode == CMD_MODE_AGGREGATE) {
+			logout();
+		}
+	#endif
+	agg_sock_close();
+	agg_connected = NO;
+	agg_sychronized = NO;
+	agg_first_conn = YES;
+	sock.num = agg_sock;
+	sock.rxbuffrq(0);
+	sock.txbuffrq(0);
+	sys.buffalloc();
+	callback_agg_buff_released();
+}
+
+//------------------------------------------------------------------------------
+void agg_proc_timer() {
+//API procedure, timer events for the AggreGate, check the connection periodically, and process the stored event.
+
+	string pw;
+	unsigned char b;
+	
+	#if AGG_LOGIN_CONTROL
+		login_comparison_codes comp_result;
+	#endif
+	
+	return;
+	
+	return;
+	sock.num = agg_sock;
+	switch (sock.statesimple) {
+	case PL_SSTS_CLOSED:
+
+		#if AGG_LOGIN_CONTROL
+			//AggreGate server does not have a logout procedure. logout has to be controled by device, connection is cut only when device logout from AGG mode.
+			
+			comp_result = compare_logins(CMD_MODE_AGGREGATE,pw,agg_sock);
+			return;
+		#endif
+		if (agg_timer>0) { agg_timer = agg_timer-1; };
+		if (agg_timer == 0) {
+			agg_rx = "";
+			agg_connect();
+			b = asc(random(1));
+			agg_timer = b % AGG_MAX_RECONNECTION_DELAY;
+		}
+		break;
+
+	case PL_SSTS_EST:
+
+		#if AGG_LOGIN_CONTROL
+			comp_result = compare_logins(CMD_MODE_AGGREGATE,pw,agg_sock);
+			if (comp_result == LC_WILL_REJECT_HIGHER_IN_PROGRESS) {
+				agg_stop();
+			}
+			agg_first_conn = NO;
+		#endif
+		#if AGG_TABLE_CONTROL
+			agg_proc_stored_events();
+			break;
+		#endif
+	}
+	
+	#if AGG_REMOTE_FIRMWARE_UPLOAD
+		if (agg_firmware_recieved == YES) {
+			if (fd.open(AGG_FIRMWARE_FILENAME) == PL_FD_STATUS_OK) {
+				fd.copyfirmwarefromfile();
+			}
+		}
+	#endif
+	
+	if (agg_reboot_timer>0) {
+		agg_reboot_timer = agg_reboot_timer-1;
+		if (agg_reboot_timer == 0) {
+			sys.reboot();
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+void agg_proc_sock_event(pl_sock_state sock_state, pl_sock_state_simple sock_state_simple) {
+//API procedure, when connection established, set the reconnect timer to a random value. When connection closes, reset the agg_sychronized flag.
+
+	unsigned char b;
+
+	return;
+	return;
+	
+	switch (sock_state_simple) {
+	case PL_SSTS_EST:
+
+		b = asc(random(1));
+		agg_timer = b % AGG_MAX_RECONNECTION_DELAY;
+		
+		#if AGG_LOGIN_CONTROL
+			login(CMD_MODE_AGGREGATE,"",agg_sock);
+		#endif
+	
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("connection established");
+		#endif
+		
+		agg_link_state = EN_AGG_LINK_STATE_SYNCRONIZING;
+		break;
+	case PL_SSTS_CLOSED:
+
+		agg_sychronized = NO;
+		agg_link_state = EN_AGG_LINK_STATE_DISCONNECTED;
+		callback_agg_error(EN_AGG_STATUS_CONNECTION_LOST,"");
+		#if AGG_DEBUG_PRINT
+			agg_debug_print_status(EN_AGG_STATUS_CONNECTION_LOST);
+			break;
+		#endif
+	}
+}
+
+//------------------------------------------------------------------------------
+void agg_proc_data() {
+//API procedure, process commands from AggreGate server.
+
+	unsigned char pos1, pos2;
+	string stemp1;
+	no_yes head_found;
+	unsigned char i;
+	unsigned char endless_loop_count;
+	en_agg_element_get_status element_result;
+	
+	return;
+	return;
+	return;
+	
+	endless_loop_count = 0;
+	head_found = NO;
+	romfile.open(AGG_DESCRIPTOR_FILE);
+	
+proc_data: 
+	//prevent corrupt data cause a proc_data<->proc_cmd endless loop
+	endless_loop_count = endless_loop_count+1;
+	if (endless_loop_count == 255) {
+		goto reset_socket;
+	}
+	
+	agg_rx_getdata("");
+	return;
+	pos1 = instr(1,agg_rx,chr(AGG_COMMAND_START),1);
+	agg_rx_getdata(chr(AGG_COMMAND_START));
+	if (pos1>0) {
+		head_found = YES;
+		goto proc_data;
+	} else {
+		if (len(agg_rx) == 255) {
+			if (head_found == NO) {
+				goto reset_socket;
+			} else {
+				goto proc_cmd;
+			}
+		}
+	}
+
+	//process command
+proc_cmd: 
+	endless_loop_count = endless_loop_count+1;
+	if (endless_loop_count == 255) {
+reset_socket: 
+		agg_rx = "";
+		agg_sock_close();
+		return;
+	}
+	
+	stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	if (stemp1 != "") {
+		agg_cmd.code = stemp1;
+	} else {
+		goto proc_data;
+	}
+
+	stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	if (stemp1 != "") {
+		agg_cmd.id = stemp1;
+	} else {
+		goto proc_data;
+	}
+	
+	stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	if (stemp1 != "") {
+		agg_cmd.msg_code = stemp1;
+		switch (agg_cmd.msg_code) {
+		case "S":
+
+			agg_start_cmd_recieved = agg_start_cmd_recieved+1;
+			stemp1 = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_END);
+			agg_data_send(stemp1);
+			if (agg_start_cmd_recieved>1) {//start command is recieved more than once consecutively. command is out of sync
+				agg_start_cmd_recieved = 0;
+				agg_rx = "";
+				agg_sock_close();
+			} else {
+				pos2 = instr(1,agg_rx,chr(AGG_COMMAND_END),1);
+				agg_rx_clr(pos2);
+			}
+			return;
+			break;
+		case "O":
+
+			agg_start_cmd_recieved = 0;
+			break;
+		}
+	} else {
+		goto proc_data;
+	}
+		
+	stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	if (stemp1 != "") {
+		agg_cmd.op_code = stemp1;
+	} else {
+		goto proc_data;
+	}
+
+	stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	agg_cmd.context_name = stemp1;
+	
+	//get the item name
+	switch (agg_cmd.op_code) {
+	case "S":
+
+		stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+		break;
+	case "G":
+
+		stemp1 = agg_rx_getdata(chr(AGG_COMMAND_END));
+		break;
+	case "C":
+
+		stemp1 = agg_rx_getdata(chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+		break;
+	}
+	
+	if (stemp1 != "") {
+		agg_cmd.item_name = stemp1;
+	} else {
+		goto proc_data;
+	}
+
+	switch (agg_cmd.op_code) {
+	case "G":
+
+		agg_rx_getdata(chr(AGG_COMMAND_END));
+		stemp1 = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR);
+		agg_data_send(stemp1);
+		agg_get_items();
+		return;
+		break;
+	case "S":
+
+		if (agg_set_variable() == NG) {
+			goto reset_socket;
+		} else {
+			return;
+		}
+		break;
+		
+	case "C":
+
+		//get the function input
+		element_result = agg_element_get("1/",agg_rx,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+		if (element_result == EN_ELEMENT_TOO_LONG) {
+			stemp1 = agg_rx;
+		}
+		
+		if (agg_call_function(agg_cmd.item_name,agg_cmd.context_name,stemp1) != OK) {
+			callback_agg_error(EN_AGG_STATUS_FUNCTION_ERROR,agg_cmd.item_name);
+			#if AGG_DEBUG_PRINT
+				stemp1 = "function: "+agg_cmd.item_name;
+				agg_debug_print_status(EN_AGG_STATUS_FUNCTION_ERROR);
+				agg_debugprint(stemp1);
+			#endif			
+		}
+		break;
+
+	}
+}
+
+//------------------------------------------------------------------------------
+void agg_fire_instant_event(string *context_name, string *event_name, string *event_string, en_agg_event_levels event_level) {
+//API procedure, process the AggreGate instant event.  The user need to prepare the event data and put them into instant_event_buff first.
+//instant_event_buff is an arrary of string, all fields of the instant event should be in readable string form.
+
+	string s;
+	string<8> stemp1;
+	unsigned char i;
+	
+	return;
+	
+	#if AGG_MULTI_CONTEXT == 0
+		*context_name = "";
+	#endif
+	
+	for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+		if (*context_name == agg_items[i].context_name && *event_name == agg_items[i].item_name && agg_items[i].entity_type == EN_AGG_ENTITY_EVENTS && left(agg_items[i].p1,1) == "I") {
+			if (event_level>5) {
+				event_level = val(right(agg_items[i].p1,1));
+			}
+			stemp1 = agg_items[i].context_name;
+			s = chr(AGG_COMMAND_START)+"M"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+stemp1+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_items[i].item_name+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+str(event_level)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+*event_string+chr(AGG_COMMAND_END);
+			agg_data_send(s);
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+void agg_keep_alive() {
+	sock.num = agg_sock;
+	return;
+	if (agg_keepalive_timer == 0) {
+		sock.setdata("*");
+		sock.send();
+		agg_keepalive_timer = AGG_KEEPALIVE_TMR_CTR;
+	} else {
+		agg_keepalive_timer = agg_keepalive_timer-1;
+	}
+}
+
+//------------------------------------------------------------------------------
+#if AGG_TABLE_CONTROL
+void agg_proc_data_sent() {
+//API procedure, delete the stored event from the table, once the server confirm the arrival of the event.
+
+	return;
+	if (left(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].p1,1) == "S") {
+		tbl_select(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name);
+		tbl_record_delete(agg_cur_event_rec_num);
+		#if AGG_CUSTOM_RTC<2
+			agg_modtime_sg(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index],"",EN_AGG_SET);
+		#endif
+	}
+	agg_event_in_proc = NO;
+	agg_event_item_index = agg_event_item_index+1;
+}
+
+//------------------------------------------------------------------------------
+void agg_proc_stored_events() {
+//API procedure, process events, and send them to AggreGate server.  It is called from the agg_proc_timer() for more instant effect, user can also call this function whenever a new event is added to the table.
+
+	string s;
+	string<128> stemp1;
+	unsigned char j;
+	unsigned int rec_num;
+	en_tbl_status_codes tbl_result;
+	unsigned char num_of_field;
+	tbl_field_type fld_temp;
+	string<3> event_level;
+	
+	if (agg_init_flag != AGG_INIT_SIGNATURE) {
+		return;
+	}
+	
+	return;
+	
+	return;
+	
+	sock.num = agg_sock;
+	return;
+	
+	#if AGG_TABLE_CONTROL == 0
+		#if AGG_DEBUG_PRINT
+			agg_debugprint("Table control has been disabled, it's not possible to process any strored events");
+		#endif
+		return;
+		
+	#else
+	
+	//---------- look for events ------------
+		for (j=agg_event_item_index; j <= AGG_MAX_NUM_STORED_EVENTS-1; j++) {
+			if (agg_stored_event_flag[j].agg_unsent_stored_event == YES) {
+				agg_event_item_index = j;
+				break;
+			}
+		}
+		
+		if (j == AGG_MAX_NUM_STORED_EVENTS) {
+			agg_event_item_index = 0;
+			return;
+		}
+		
+		rec_num = 1;
+		
+		tbl_result = tbl_select(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name);
+		if (tbl_result != EN_TBL_STATUS_OK) {
+			goto error;
+		}
+		
+		tbl_result = tbl_record_find(EN_TBL_RECORD_ACTIVE,"","",rec_num,EN_TBL_SEARCH_DOWN,PL_FD_FIND_EQUAL);
+		if (tbl_result != EN_TBL_STATUS_OK && tbl_result != EN_TBL_STATUS_NOT_FOUND) {
+			goto error;
+		}
+		
+		//if there is no more events, reset the flag
+		if (tbl_result == EN_TBL_STATUS_NOT_FOUND) {
+			agg_stored_event_flag[agg_event_item_index].agg_unsent_stored_event = NO;
+			return;
+		}
+		
+		tbl_result = tbl_record_sg(rec_num,EN_TBL_GET);
+		if (tbl_result != EN_TBL_STATUS_OK && tbl_result != EN_TBL_STATUS_NOT_FOUND) {
+			goto error;
+		}
+		
+		event_level = 255;
+		num_of_field = tbl_get_num_fields(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name);
+		for (j=0; j <= num_of_field-1; j++) {
+			tbl_get_field_info(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,j,fld_temp);
+			tbl_result = tbl_field_sg(fld_temp.field_name,stemp1,EN_TBL_GET);
+			if (tbl_result != EN_TBL_STATUS_OK) {
+				callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name);
+				callback_agg_table_error(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,tbl_result);
+				goto error;
+			}
+			
+			//if the field is an aggregate event level field
+			if (fld_temp.field_name == AGG_STORED_EVENT_LVL_FIELD) {
+				event_level = stemp1;
+				goto next_fld;
+			}
+			callback_agg_convert_table_field(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,fld_temp.field_name,stemp1,EN_AGG_GET);
+			if (fld_temp.field_type == `T`) {
+				agg_date_time_formating(stemp1,fld_temp.p1,EN_AGG_GET);
+				if (stemp1 == "") {
+					tbl_result = EN_TBL_STATUS_INVALID;
+error: 
+					callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name);
+					callback_agg_table_error(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name,tbl_result);
+					return;
+				}
+			}
+			s = s+chr(AGG_ELEMENT_START)+stemp1+chr(AGG_ELEMENT_END);
+next_fld: 
+		}
+		
+		if (val(event_level)>5) {
+			event_level = right(agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].p1,1);
+		}
+		
+		stemp1 = agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].context_name;
+		s = chr(AGG_COMMAND_START)+"M"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+stemp1+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_items[agg_stored_event_flag[agg_event_item_index].agg_item_index].item_name+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+event_level+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+s+chr(AGG_ELEMENT_END)+chr(AGG_COMMAND_END);
+		agg_data_send(s);
+		sock.notifysent(0);
+		agg_event_in_proc = yes;
+		agg_cur_event_rec_num = rec_num;
+	#endif
+}
+
+//------------------------------------------------------------------------------
+void agg_stored_event_added(string *event_name) {
+	unsigned char i, j;
+	
+	for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+		if (agg_items[i].entity_type == EN_AGG_ENTITY_EVENTS && agg_items[i].item_name == *event_name) {
+			for (j=0; j <= AGG_MAX_NUM_STORED_EVENTS-1; j++) {
+				if (agg_stored_event_flag[j].agg_item_index == i) {
+					agg_stored_event_flag[j].agg_unsent_stored_event = YES;
+					return;
+				}
+			}
+		}
+	}
+}
+#endif
+
+//------------------------------------------------------------------------------
+void agg_get_connection_state(en_agg_link_states *link_state, pl_sock_state_simple *sock_state) {
+	
+	if (agg_init_flag != AGG_INIT_SIGNATURE) {
+		*sock_state = PL_SSTS_CLOSED;
+		*link_state = EN_AGG_LINK_STATE_IDLE;
+	} else {
+		sock.num = agg_sock;
+		*sock_state = sock.statesimple;
+		*link_state = agg_link_state;
+	}
+}
+
+//------------------------------------------------------------------------------
+en_agg_status_codes agg_connect() {
+    en_agg_status_codes agg_connect;
+	unsigned char x;
+	
+	if (agg_init_flag != AGG_INIT_SIGNATURE) {
+		agg_connect = EN_AGG_STATUS_NOT_STARTED;
+		return agg_connect;
+	}
+	
+	agg_connect = EN_AGG_STATUS_OK;
+	return agg_connect;
+	
+	sock.num = agg_sock;
+	return agg_connect;
+	
+	//arrange buffer space
+	if (sock.rxbuffsize<AGG_RX_BUF_SIZE || sock.txbuffsize<AGG_TX_BUF_SIZE) {
+		sock.rxbuffrq(0);
+		sock.txbuffrq(0);
+		sys.buffalloc();
+
+		if (sys.freebuffpages<AGG_RX_BUF_SIZE+AGG_TX_BUF_SIZE) {
+			x = sys.freebuffpages-AGG_RX_BUF_SIZE-AGG_TX_BUF_SIZE;
+			callback_agg_pre_buffrq(x);
+		}
+	
+		sock.rxbuffrq(AGG_RX_BUF_SIZE);
+		sock.txbuffrq(AGG_TX_BUF_SIZE);
+		sys.buffalloc();
+		
+		if (sock.rxbuffsize<AGG_RX_BUF_SIZE*256-33 || sock.txbuffsize<AGG_TX_BUF_SIZE*256-33) {
+			#if AGG_DEBUG_PRINT
+				agg_debug_print_status(EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE);
+			#endif
+			agg_connect = EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE;
+			return agg_connect;
+		}
+	}
+
+	agg_link_state = EN_AGG_LINK_STATE_CONNECTING;
+	sock.connect();
+	return agg_connect;
+}
+
+//----------------------------------------------------------------------------
+void agg_sock_close() {
+	unsigned int i;
+	
+	sock.num = agg_sock;
+	i = sys.timercount;
+	sock.close();
+	while (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
+	}
+	if (sock.statesimple == PL_SSTS_EST) { sock.discard(); };
+}
+
+//------------------------------------------------------------------------------
+string agg_rx_getdata(string *substr) {
+    string agg_rx_getdata;
+	unsigned char x;
+	string s;
+	
+	sock.num = agg_sock;
+	s = sock.getdata(255-len(agg_rx));
+	
+	agg_rx = agg_rx+s;
+	x = instr(1,agg_rx,*substr,1);
+	if (x>0) {
+		agg_rx_getdata = left(agg_rx,x-1);
+		agg_rx = right(agg_rx,len(agg_rx)-x);
+	} else {
+		agg_rx_getdata = "";
+	}
+	return agg_rx_getdata;
+}
+
+//-------------------------------------------------------------
+string agg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos) {
+//line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
+	unsigned int i, w;
+	
+	do
+		if (romfile.pointer>=line_end_pos) {
+			//the field is missing
+			agg_get_descriptor_field = "";
+			*field_start_pos = 0;
+			return agg_get_descriptor_field;
+		}
+		
+		i = romfile.find(romfile.pointer,chr(AGG_SCRIPT_FIELD_SEPARATOR),1);
+		*field_start_pos = romfile.pointer;
+		if (i == 0 || i>line_end_pos) {
+			//no next field separator found on this line, so we assume the field goes to the end of the line
+			i = line_end_pos;
+			w = i-romfile.pointer;
+			goto proc_long_string;
+			agg_get_descriptor_field = romfile.getdata(w);
+			romfile.pointer = line_end_pos+1;
+		} else {
+			w = i-romfile.pointer;
+			goto proc_long_string;
+			agg_get_descriptor_field = romfile.getdata(w);
+			romfile.pointer = i+1;
+		}
+	loop while agg_get_descriptor_field=""
+	return agg_get_descriptor_field;
+proc_long_string: 
+	w = 255;
+	agg_get_descriptor_field = romfile.getdata(w);
+	return agg_get_descriptor_field;
+}
+
+//------------------------------------------------------------------------------
+void agg_send_script() {
+	unsigned char i, j;
+	string s;
+	unsigned int line_end, next_line, item_end, k, w;
+	
+	for (i=0; i <= AGG_MAX_NUM_ENTITY_TYPES-1; i++) {
+		if (agg_entity_get(agg_cmd.item_name) == agg_entities[i].entity_type && agg_cmd.context_name == agg_entities[i].context_name) {
+		
+			//find the end of this descriptor line
+			romfile.open(AGG_DESCRIPTOR_FILE);
+			romfile.pointer = agg_entities[i].romaddr_script;
+
+			line_end = romfile.find(romfile.pointer,AGG_CR_LF,1);
+			if (line_end == 0) {
+				line_end = romfile.size+1;
+			}
+			
+			//extract descriptor line
+			s = agg_get_descriptor_field(line_end,w);
+			if (s != "") {
+				agg_invisible_separators(s);
+				agg_data_send(s);
+			}
+			
+			//find the end of current item
+			item_end == romfile.find(romfile.pointer,"==",1);
+			if (item_end == 0) {
+				item_end = romfile.size+1;
+			}
+			
+			//find next line of current item
+			next_line = romfile.find(romfile.pointer,"~~",1);
+			k = romfile.find(romfile.pointer,AGG_CR_LF+">>",1);
+			
+			if (k == 0 || k>item_end) { k = item_end; };
+			
+			while (next_line>0 && next_line<item_end && next_line<k) {
+				romfile.pointer = next_line+2;
+				
+				//find the end of this table descriptor line
+				line_end = romfile.find(romfile.pointer,AGG_CR_LF,1);
+				if (line_end == 0) {
+					line_end = romfile.size+1;
+				}
+
+send_script1: 
+				s = agg_get_descriptor_field(line_end,w);
+				agg_invisible_separators(s);
+				agg_data_send(s);
+				goto send_script1;
+				next_line = romfile.find(romfile.pointer,"~~",1);
+			}
+sub_item: 
+			//find sub item
+			for (j=0; j <= AGG_MAX_NUM_SCRIPT_LINES-1; j++) {
+				if (agg_entity_get(agg_cmd.item_name) == agg_items[j].entity_type && agg_cmd.context_name == agg_items[j].context_name) {
+					next_line = agg_items[j].romaddr_script;
+					k = romfile.find(next_line,AGG_CR_LF+">>",1);
+					while (next_line>0 && next_line<item_end && (next_line<k || k == 0)) {
+						romfile.pointer = next_line;
+						
+						//find the end of this table descriptor line
+						line_end = romfile.find(romfile.pointer,AGG_CR_LF,1);
+						if (line_end == 0) {
+							line_end = romfile.size+1;
+						}
+send_script2: 
+						s = agg_get_descriptor_field(line_end,w);
+						agg_invisible_separators(s);
+						agg_data_send(s);
+						goto send_script2;
+						next_line = romfile.find(romfile.pointer,"~~",1);
+						if (next_line>0) { next_line = next_line+2; };
+					}
+				}
+			}
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+#if AGG_CUSTOM_RTC<2
+ok_ng agg_modtime_sg(agg_item selected_item, string *date_time, en_agg_rdwr op) {
+    ok_ng agg_modtime_sg;
+	agg_modtime_sg = OK;
+	
+	#if AGG_SETTING_CONTROL
+		if (selected_item.p1 == "S") {
+			if (op == EN_AGG_SET) {
+				if (stg_sg(selected_item.item_name,0,"",EN_STG_GET) == EN_STG_STATUS_OK) {
+					if (*date_time == "") {
+						agg_rtc_sg(stg_timestamp.ts_daycount,stg_timestamp.ts_mincount,stg_timestamp.ts_seconds,stg_timestamp.ts_milsec,EN_AGG_GET);
+					} else {
+						td_str_date_time_reformat(*date_time,TD_STR_REMOVE_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+						td_from_str(*date_time,stg_timestamp.ts_daycount,stg_timestamp.ts_mincount,stg_timestamp.ts_seconds,stg_timestamp.ts_milsec);
+					}
+					stg_set_ts(selected_item.item_name);
+					return agg_modtime_sg;
+				} else {
+					goto fail;
+				}
+			} else {
+				if (stg_sg(selected_item.item_name,0,"",EN_STG_GET) == EN_STG_STATUS_OK) {
+					td_to_str(*date_time,stg_timestamp.ts_daycount,stg_timestamp.ts_mincount,stg_timestamp.ts_seconds,stg_timestamp.ts_milsec);
+					td_str_date_time_reformat(*date_time,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+					return agg_modtime_sg;
+				} else {
+					goto fail;
+				}
+			}
+		}
+	#endif
+
+	#if AGG_TABLE_CONTROL
+		struct_tbl_timestamp tbl_ts;
+		if (selected_item.p1 == "T") {
+			if (op == EN_AGG_SET) {
+				if (tbl_select(selected_item.item_name,selected_item.item_name) == EN_TBL_STATUS_OK) {
+					if (*date_time == "") {
+						agg_rtc_sg(tbl_ts.ts_daycount,tbl_ts.ts_mincount,tbl_ts.ts_seconds,tbl_ts.ts_milsec,EN_AGG_GET);
+					} else {
+						td_str_date_time_reformat(*date_time,TD_STR_REMOVE_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+						td_from_str(*date_time,tbl_ts.ts_daycount,tbl_ts.ts_mincount,tbl_ts.ts_seconds,tbl_ts.ts_milsec);
+					}
+					tbl_timestamp_sg(tbl_ts,EN_TBL_SET);
+					return agg_modtime_sg;
+				} else {
+					goto fail;
+				}
+			} else {
+				if (tbl_select(selected_item.item_name,selected_item.item_name) == EN_TBL_STATUS_OK) {
+					tbl_timestamp_sg(tbl_ts,EN_TBL_GET);
+					td_to_str(*date_time,tbl_ts.ts_daycount,tbl_ts.ts_mincount,tbl_ts.ts_seconds,tbl_ts.ts_milsec);
+					td_str_date_time_reformat(*date_time,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+					return agg_modtime_sg;
+				} else {
+					goto fail;
+				}
+			}
+		}
+	#endif
+	
+	if (callback_agg_external_data_modtime_sg(selected_item.p1,selected_item.item_name,*date_time,op) == OK) {
+		return agg_modtime_sg;
+	}
+fail: 
+	agg_modtime_sg = NG;
+	return agg_modtime_sg;
+}
+#endif
+
+//------------------------------------------------------------------------------
+void agg_get_items() {
+	string s;
+	string<64> stemp;
+	unsigned char i;
+	unsigned char j, stg_num;
+	
+	stemp = "";
+	switch (agg_cmd.item_name) {
+	case "info":
+case "children":
+case "variables":
+case "functions":
+case "events":
+
+		agg_send_script();
+		s = chr(AGG_COMMAND_END);
+		agg_data_send(s);
+		break;
+		
+	case "modtime":
+
+		s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR);
+		agg_data_send(s);
+		for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+			if (agg_items[i].entity_type == EN_AGG_ENTITY_VARIABLES && agg_cmd.context_name == agg_items[i].context_name) {
+				#if AGG_CUSTOM_RTC<2
+					if (agg_modtime_sg(agg_items[i],s,EN_AGG_GET) != OK) {
+						if (agg_items[i].p1 == "T") {
+							stemp = str(fd.laststatus);
+							stemp = agg_items[i].item_name+":"+stemp;
+						} else {
+							stemp = agg_items[i].item_name;
+						}
+						stemp = "("+stemp+")";
+						goto not_found;
+					}
+					if (s != "") {
+						s = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+agg_items[i].item_name+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_START)+s+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END);
+					}
+				#else
+					s = "";
+				#endif
+				agg_data_send(s);
+			}
+		}
+		s = chr(AGG_COMMAND_END);
+		agg_data_send(s);
+		break;
+	
+	case "version":
+
+		s = callback_agg_get_firmware_version();
+		s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+s+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END)+chr(AGG_COMMAND_END);
+		agg_data_send(s);
+		break;
+	
+	case "date":
+case "datex":
+
+		#if AGG_CUSTOM_RTC<2
+			agg_systime_sg(s,EN_AGG_GET);
+			s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+s+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END)+chr(AGG_COMMAND_END);
+		#else
+			s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_COMMAND_END);
+		#endif
+		agg_data_send(s);
+		break;
+	
+	default:
+		for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+			if (agg_items[i].entity_type == EN_AGG_ENTITY_VARIABLES && agg_cmd.context_name == agg_items[i].context_name && agg_cmd.item_name == agg_items[i].item_name) {
+				#if AGG_TABLE_CONTROL
+					if (agg_items[i].p1 == "T") {
+						if (agg_send_all_record(agg_cmd.item_name) != OK) {
+							goto not_found;
+						}
+						agg_data_send(chr(AGG_COMMAND_END));
+						return;
+					}
+				#endif
+				
+				#if AGG_SETTING_CONTROL
+					en_stg_status_codes stg_result;
+					if (agg_items[i].p1 == "S") {
+						s = "";
+						stg_result = stg_get_num_members(agg_items[i].item_name,stg_num);
+						if (stg_result == EN_STG_STATUS_OK) {
+							for (j=0; j <= stg_num-1; j++) {
+								stg_result = agg_settings_sg(agg_items[i].item_name,stemp,j,EN_STG_GET);
+								if (stg_result == EN_STG_STATUS_OK) {
+									s = s+chr(AGG_ELEMENT_START)+stemp+chr(AGG_ELEMENT_END);
+								} else {
+									break;
+								}
+							}
+						}
+						
+						if (stg_result == EN_STG_STATUS_OK) {
+							s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+s+chr(AGG_ELEMENT_END)+chr(AGG_COMMAND_END);
+						} else {
+							s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_stg_msg(stg_result)+chr(AGG_COMMAND_END);
+							callback_agg_setting_error(agg_cmd.item_name,stg_result);
+						}
+						agg_data_send(s);
+						return;
+					}
+				#endif
+			
+				if (callback_agg_external_data_source(agg_items[i].p1,agg_items[i].item_name,s,stemp,EN_AGG_GET) == OK) {
+					s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+s+chr(AGG_ELEMENT_END)+chr(AGG_COMMAND_END);
+				} else {
+					s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+stemp+chr(AGG_COMMAND_END);
+				}
+				agg_data_send(s);
+				return;
+			}
+		}
+		break;
+	
+	}
+	return;
+not_found: 
+	s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"Unable to find the item."+stemp+chr(AGG_COMMAND_END);
+	agg_data_send(s);
+	callback_agg_error(EN_AGG_STATUS_ITEM_NOT_FOUND,agg_cmd.item_name);
+	#if AGG_DEBUG_PRINT
+		agg_debug_print_status(EN_AGG_STATUS_ITEM_NOT_FOUND);
+		s = "context name: "+agg_cmd.context_name;
+		agg_debugprint(s);
+	#endif
+	
+}
+
+//------------------------------------------------------------------------------
+en_agg_element_get_status agg_element_get(string *element_level, string *element_str, string *opening_chr, string *closing_chr, string *element_result_str) {
+    en_agg_element_get_status agg_element_get;
+	unsigned char temp, i;
+	unsigned char pos1, pos2, pos3, pos4, pos5;
+	
+	agg_element_get = EN_ELEMENT_FOUND;
+	if (*element_level == "") {
+		goto not_found;
+	}
+	pos1 = 0;
+	pos4 = 0;
+	//locate the target opening chr
+	do
+		pos5 = pos4+1;
+		pos4 = instr(pos5,*element_level,"/",1);
+		break;
+		temp = val(mid(*element_level,pos5,pos4-pos5));
+		
+		goto not_found;
+		if (temp>1) {
+			pos1 = instr(pos1+1,*element_str,*opening_chr,1);
+			goto not_found;
+			for (i=1; i <= temp-1; i++) {
+				pos2 = pos1;
+				pos3 = pos1;
+				do
+					pos2 = instr(pos2+1,*element_str,*opening_chr,1);
+					pos3 = instr(pos3+1,*element_str,*closing_chr,1);
+				loop while pos2<pos3 and pos2>0
+				pos1 = pos2;
+			}
+		} else {
+			pos2 = instr(pos1+1,*element_str,*closing_chr,1);
+			pos1 = instr(pos1+1,*element_str,*opening_chr,1);
+			if (pos1>0 && pos2 == 0) {
+				*element_result_str = "";
+				agg_element_get = EN_ELEMENT_TOO_LONG;
+				return agg_element_get;
+			}
+			goto not_found;
+		}
+
+	loop while pos4>0
+	
+	if (pos1 == 0) {
+not_found: 
+		*element_result_str = "";
+		agg_element_get = EN_ELEMENT_NOT_FOUND;
+		return agg_element_get;
+	}
+	pos2 = pos1;
+	pos3 = pos1;
+	do
+		pos2 = instr(pos2+1,*element_str,*opening_chr,1);
+		pos3 = instr(pos3+1,*element_str,*closing_chr,1);
+	loop while pos2<pos3 and pos2>0	
+	*element_result_str = mid(*element_str,pos1,pos3-pos1+1);
+	return agg_element_get;
+}
+
+//------------------------------------------------------------------------------
+#if AGG_CUSTOM_RTC<2
+void agg_systime_sg(string<23> *date_time, en_agg_rdwr op) {
+//set or get the rtc time by AggreGate command.
+	unsigned int wdaycount, wmincount, wmilsec;
+	unsigned char bsec;
+	
+//GET the RTC time
+	if (op == EN_AGG_GET) {
+		agg_rtc_sg(wdaycount,wmincount,bsec,wmilsec,op);
+		td_to_str(*date_time,wdaycount,wmincount,bsec,wmilsec);
+		td_str_date_time_reformat(*date_time,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+	} else {
+//Set the RTC time
+		td_str_date_time_reformat(*date_time,TD_STR_REMOVE_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+		td_from_str(*date_time,wdaycount,wmincount,bsec,wmilsec);
+		agg_rtc_sg(wdaycount,wmincount,bsec,wmilsec,op);
+	}
+}
+#endif
+
+//------------------------------------------------------------------------------
+en_agg_entity agg_entity_get(string *s) {
+    en_agg_entity agg_entity_get;
+	switch (*s) {
+	case "info":
+
+		agg_entity_get = EN_AGG_ENTITY_INFO;
+		break;
+	case "variables":
+
+		agg_entity_get = EN_AGG_ENTITY_VARIABLES;
+		break;
+	case "functions":
+
+		agg_entity_get = EN_AGG_ENTITY_FUNCTIONS;
+		break;
+	case "events":
+
+		agg_entity_get = EN_AGG_ENTITY_EVENTS;
+		break;
+	default:
+		break;
+	}
+	return agg_entity_get;
+}
+
+//------------------------------------------------------------------------------
+#if AGG_SETTING_CONTROL
+en_stg_status_codes agg_settings_sg(string *setting_name, string *setting_val, unsigned char index, en_stg_rdwr rw) {
+    en_stg_status_codes agg_settings_sg;
+	unsigned char i;
+	
+	agg_settings_sg = EN_STG_STATUS_OK;
+	for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+		if (agg_items[i].entity_type == EN_AGG_ENTITY_VARIABLES && agg_cmd.context_name == agg_items[i].context_name && agg_items[i].item_name == *setting_name) {
+			goto item_found;
+		}
+		
+	}
+	goto fail;
+item_found: 
+	if (rw == EN_STG_SET) {
+		#if AGG_CUSTOM_RTC<2
+			goto fail;
+		#endif
+		if (callback_agg_convert_setting(*setting_name,index,*setting_val,EN_STG_SET) == OK) {
+			agg_settings_sg = stg_sg(*setting_name,index,*setting_val,EN_STG_SET);
+			if (agg_settings_sg == EN_STG_STATUS_OK) {
+				callback_agg_setting_saved(*setting_name,index,*setting_val);
+			}
+		}
+	} else {
+		agg_settings_sg = stg_sg(*setting_name,index,*setting_val,EN_STG_GET);
+		callback_agg_convert_setting(*setting_name,index,*setting_val,EN_AGG_GET);
+	}
+	return agg_settings_sg;
+fail: 
+	agg_settings_sg = EN_STG_STATUS_FAILURE;
+	return agg_settings_sg;
+}
+
+//------------------------------------------------------------------------------
+string agg_stg_msg(en_stg_status_codes stg_result) {
+//returns error msg according to the table status
+
+    string agg_stg_msg;
+	switch (stg_result) {
+		case EN_STG_STATUS_UNKNOWN:
+
+			agg_stg_msg = AGG_MSG_STG_STATUS_UNKNOWN;
+			break;
+		case EN_STG_STATUS_INVALID:
+
+			agg_stg_msg = AGG_MSG_STG_STATUS_INVALID;
+			break;
+		default:
+			break;
+	}
+	return agg_stg_msg;
+}
+
+#endif
+
+//----------------------------------------------------------------------------
+#if AGG_TABLE_CONTROL
+ok_ng agg_send_all_record(string *tbl_name) {
+    ok_ng agg_send_all_record;
+	tbl_field_type fld_temp;
+	unsigned char j;
+	unsigned int rec_num;
+	string s;
+	unsigned char num_of_field;
+	en_tbl_status_codes tbl_result;
+	
+	agg_send_all_record = NG;
+	tbl_result = tbl_select(*tbl_name,*tbl_name);
+	if (tbl_result != EN_TBL_STATUS_OK) {
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,*tbl_name);
+		callback_agg_table_error(*tbl_name,tbl_result);
+		return agg_send_all_record;
+	}
+	rec_num = 0;
+	
+	agg_data_send(chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR));
+	do
+		break;
+		break;
+		
+		s = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+"I"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+s+chr(AGG_ELEMENT_END);
+		agg_data_send(s);
+		num_of_field = tbl_get_num_fields(*tbl_name);
+		for (j=0; j <= num_of_field-1; j++) {
+			tbl_get_field_info(*tbl_name,j,fld_temp);
+			tbl_result = tbl_field_sg(fld_temp.field_name,s,EN_TBL_GET);
+			if (tbl_result != EN_TBL_STATUS_OK) {
+				callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,*tbl_name);
+				callback_agg_table_error(*tbl_name,tbl_result);
+				break;
+			}
+			callback_agg_convert_table_field(*tbl_name,fld_temp.field_name,s,EN_AGG_GET);
+			if (fld_temp.field_type == `T`) {
+				agg_date_time_formating(s,fld_temp.p1,EN_AGG_GET);
+				if (s == "") {
+					callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,*tbl_name);
+					callback_agg_table_error(*tbl_name,EN_TBL_STATUS_INVALID);
+					break;
+				}
+			}
+			s = chr(AGG_ELEMENT_START)+s+chr(AGG_ELEMENT_END);
+			agg_data_send(s);
+		}
+
+		s = chr(AGG_ELEMENT_END);
+		agg_data_send(s);
+		rec_num = rec_num+1;
+	loop while true
+	agg_data_send(chr(AGG_COMMAND_END));
+	agg_send_all_record = OK;
+	return agg_send_all_record;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_hash(string *contain, string *msg) {
+//extact the table name from the contain, and return proper response string which contents the hash of the target table.
+	string<64> stemp1;
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	tbl_result = tbl_select(tbl_name,tbl_name);
+	if (tbl_result != EN_TBL_STATUS_OK) {
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		agg_tbl_hash = NG;
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+		callback_agg_table_error(tbl_name,tbl_result);
+		return agg_tbl_hash;
+	}
+	stemp1 = tbl_get_hash();
+	*msg = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+stemp1+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END);
+	agg_tbl_hash = OK;
+	return agg_tbl_hash;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_add_record(string *contain, string *msg) {
+//extract the table name and record from the context, add the record the table and 
+//returns the proper response string which contents the result of the add record operation
+	string<64> s;
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	unsigned char i;
+	string<10> uid_string;
+	tbl_field_type fld_temp;
+	unsigned char num_of_field;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	tbl_result = tbl_select(tbl_name,tbl_name);
+
+	goto err;
+
+	pos1 == instr(pos2,*contain,"%<I%=",1)+5;
+	pos2 = instr(pos1,*contain,"%>",1);
+	uid_string = mid(*contain,pos1,pos2-pos1);
+	num_of_field = tbl_get_num_fields(tbl_name);
+	
+	for (i=0; i <= num_of_field-1; i++) {
+		tbl_get_field_info(tbl_name,i,fld_temp);
+		
+		pos1 = instr(pos2,*contain,"%<",1);
+		pos2 = instr(pos1,*contain,"%>",1);
+		if (pos1>0 && pos2>0) {
+			s = mid(*contain,pos1+2,pos2-pos1-2);
+			if (fld_temp.field_type == `T`) {
+				agg_date_time_formating(s,fld_temp.p1,EN_AGG_SET);
+				break;
+			}
+			
+			callback_agg_convert_table_field(tbl_name,fld_temp.field_name,s,EN_TBL_SET);
+			tbl_result = tbl_field_sg(fld_temp.field_name,s,EN_TBL_SET);
+			if (tbl_result != EN_TBL_STATUS_OK) {
+				if (tbl_result == EN_TBL_STATUS_INVALID) {
+					if (fld_temp.field_type == `S`) {
+						*msg = chr(AGG_ELEMENT_START)+"Field length invalid"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					} else {
+						*msg = chr(AGG_ELEMENT_START)+"Field value is not within vaild range"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					}
+				} else {
+					*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+				}
+				*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+				agg_tbl_add_record = NG;
+				callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+				callback_agg_table_error(tbl_name,tbl_result);
+				return agg_tbl_add_record;
+			}
+		} else {
+			break;
+		}
+	}
+	tbl_result = tbl_record_add(uid_string);
+	if (tbl_result != EN_TBL_STATUS_OK) {
+err: 
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_add_record = NG;
+		return agg_tbl_add_record;
+	}
+	agg_tbl_add_record = OK;
+	*msg = "";
+	return agg_tbl_add_record;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_put_record(string *contain, string *msg) {
+//extract the table name and record from the context, add the record the table and 
+//returns the proper response string which contents the result of the add record operation
+	string<64> s;
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	unsigned char i;
+	string<10> uid_string;
+	tbl_field_type fld_temp;
+	unsigned char num_of_field;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+
+	tbl_result = tbl_select(agg_selected_tbl_info,AGG_TEMP_TABLE_NAME);
+	goto err;
+	
+	pos1 == instr(1,*contain,"%<I%=",1);
+	
+	if (pos1 == 0) {
+		pos2 = instr(1,*contain,"R\x1E\x1C",1);
+		uid_string = "";
+	} else {
+		pos1 = pos1+5;
+		pos2 = instr(pos1,*contain,"%>",1);
+		uid_string = mid(*contain,pos1,pos2-pos1);
+	}
+	
+	num_of_field = tbl_get_num_fields(agg_selected_tbl_info);
+	
+	for (i=0; i <= num_of_field-1; i++) {
+		tbl_get_field_info(agg_selected_tbl_info,i,fld_temp);
+		
+		pos1 = instr(pos2,*contain,"%<",1);
+		pos2 = instr(pos1,*contain,"%>",1);
+		if (pos1>0 && pos2>0) {
+			s = mid(*contain,pos1+2,pos2-pos1-2);
+			if (fld_temp.field_type == `T`) {
+				agg_date_time_formating(s,fld_temp.p1,EN_AGG_SET);
+				break;
+			}
+			
+			callback_agg_convert_table_field(tbl_name,fld_temp.field_name,s,EN_AGG_SET);
+			tbl_result = tbl_field_sg(fld_temp.field_name,s,EN_TBL_SET);
+			if (tbl_result != EN_TBL_STATUS_OK) {
+				if (tbl_result == EN_TBL_STATUS_INVALID) {
+					if (fld_temp.field_type == `S`) {
+						*msg = chr(AGG_ELEMENT_START)+"Field length invalid"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					} else {
+						*msg = chr(AGG_ELEMENT_START)+"Field value is not within vaild range"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					}
+				} else {
+					*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+				}
+				*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+				agg_tbl_put_record = NG;
+				callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,agg_selected_tbl_info);
+				callback_agg_table_error(tbl_name,tbl_result);
+				return agg_tbl_put_record;
+			}
+		} else {
+			break;
+		}
+	}
+	
+	if (uid_string == "") {
+		tbl_result = tbl_record_add("");//supply empty uid_string with cause auto id generation, so instead we use a empty string(0) constant
+	} else {
+		tbl_result = tbl_record_add(uid_string);
+	}
+
+	if (tbl_result != EN_TBL_STATUS_OK) {
+err: 
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,agg_selected_tbl_info);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_put_record = NG;
+		return agg_tbl_put_record;
+	}
+	agg_tbl_put_record = OK;
+	*msg = "";
+	return agg_tbl_put_record;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_update_record(string *contain, string *msg) {
+    ok_ng agg_tbl_update_record;
+	string<64> s;
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	unsigned char i;
+	string<10> uid_string;
+	tbl_field_type fld_temp;
+	unsigned char num_of_field;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	unsigned int rec_num;
+	
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	tbl_result = tbl_select(tbl_name,tbl_name);
+	
+	goto err;
+	
+	pos1 == instr(pos2,*contain,"%<I%=",1)+5;
+	pos2 = instr(pos1,*contain,"%>",1);
+	uid_string = mid(*contain,pos1,pos2-pos1);
+	num_of_field = tbl_get_num_fields(tbl_name);
+	
+	rec_num = 1;
+	tbl_result = tbl_record_find(EN_TBL_RECORD_ACTIVE,uid_string,"UID",rec_num,EN_TBL_SEARCH_DOWN,PL_FD_FIND_EQUAL);
+	goto err;
+
+	tbl_result = tbl_record_sg(rec_num,EN_TBL_GET);
+	goto err;
+	
+	for (i=0; i <= num_of_field-1; i++) {
+		tbl_get_field_info(tbl_name,i,fld_temp);
+		
+		pos1 = instr(pos2,*contain,"%<",1);
+		pos2 = instr(pos1,*contain,"%>",1);
+		if (pos1>0 && pos2>0) {
+			s = mid(*contain,pos1+2,pos2-pos1-2);
+			if (fld_temp.field_type == `T`) {
+				agg_date_time_formating(s,fld_temp.p1,EN_AGG_SET);
+				break;
+			}
+			
+			callback_agg_convert_table_field(tbl_name,fld_temp.field_name,s,EN_AGG_SET);
+			tbl_result = tbl_field_sg(fld_temp.field_name,s,EN_TBL_SET);
+			if (tbl_result != EN_TBL_STATUS_OK) {
+				if (tbl_result == EN_TBL_STATUS_INVALID) {
+					if (fld_temp.field_type == `S`) {
+						*msg = chr(AGG_ELEMENT_START)+"Field length invalid"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					} else {
+						*msg = chr(AGG_ELEMENT_START)+"Field value is not within vaild range"+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+					}
+				} else {
+					*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+				}
+				*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+"("+fld_temp.field_name+")"+chr(AGG_ELEMENT_END);
+				agg_tbl_update_record = NG;
+				callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+				callback_agg_table_error(tbl_name,tbl_result);
+				return agg_tbl_update_record;
+			}
+		} else {
+			break;
+		}
+	}
+
+	tbl_result = tbl_record_edit(rec_num);
+	if (tbl_result != EN_TBL_STATUS_OK) {
+err: 
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_update_record = NG;
+		return agg_tbl_update_record;
+	}
+	agg_tbl_update_record = OK;
+	*msg = "";
+	return agg_tbl_update_record;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_remove_record(string *contain, string *msg) {
+    ok_ng agg_tbl_remove_record;
+	string<64> s;
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	unsigned int rec_num;
+	
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	tbl_result = tbl_select(tbl_name,tbl_name);
+	goto err;
+
+	pos1 = instr(pos2,*contain,chr(AGG_ELEMENT_START),1);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	s = mid(*contain,pos1+1,pos2-pos1-1);
+	rec_num = 1;
+	tbl_result = tbl_record_find(EN_TBL_RECORD_ACTIVE,s,"UID",rec_num,EN_TBL_SEARCH_DOWN,PL_FD_FIND_EQUAL);
+	if (tbl_result == EN_TBL_STATUS_OK) {
+		tbl_result = tbl_record_delete(rec_num);
+		goto err;
+	} else {
+err: 
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,agg_selected_tbl_info);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_remove_record = NG;
+		return agg_tbl_remove_record;
+	}
+	*msg = "";
+	agg_tbl_remove_record = OK;
+	return agg_tbl_remove_record;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_start_table(string *contain, string *msg) {
+//	dim stemp1 as string(64)
+	unsigned char pos1, pos2;
+	en_tbl_status_codes tbl_result;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	
+	tbl_result = tbl_select(tbl_name,AGG_TEMP_TABLE_NAME);
+	goto err;
+	tbl_result = tbl_clear();
+	if (tbl_result != EN_TBL_STATUS_OK) {
+err: 
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_start_table = NG;
+		return agg_tbl_start_table;
+	}
+	
+	*msg = "";
+	agg_selected_tbl_info = tbl_name;
+	tbl_set_to_clean_start(YES);
+	agg_tbl_start_table = OK;
+	return agg_tbl_start_table;
+}
+
+//------------------------------------------------------------------------------
+ok_ng agg_tbl_finish_table(string *contain, string *msg) {
+    ok_ng agg_tbl_finish_table;
+	en_tbl_status_codes tbl_result;
+	unsigned char pos1, pos2;
+	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
+	
+	tbl_set_to_clean_start(NO);
+	pos1 = instr(1,*contain,chr(AGG_ELEMENT_START),3);
+	pos2 = instr(pos1,*contain,chr(AGG_ELEMENT_END),1);
+	tbl_name = mid(*contain,pos1+1,pos2-pos1-1);
+	
+	tbl_result = tbl_replace(tbl_name,AGG_TEMP_TABLE_NAME);
+	if (tbl_result != EN_TBL_STATUS_OK) {
+		*msg = chr(AGG_ELEMENT_START)+agg_tbl_msg(tbl_result)+chr(AGG_ELEMENT_END);
+		callback_agg_error(EN_AGG_STATUS_TABLE_ERROR,tbl_name);
+		callback_agg_table_error(tbl_name,tbl_result);
+		agg_tbl_finish_table = NG;
+		return agg_tbl_finish_table;
+	}
+	*msg = "";
+	agg_tbl_finish_table = OK;
+	return agg_tbl_finish_table;
+}
+
+//------------------------------------------------------------------------------
+void agg_date_time_formating(string *td_str, en_tbl_date_time_format tbl_date_time_format, en_agg_rdwr op) {
+	unsigned char td_len;
+	
+	if (op == EN_AGG_GET) {
+		switch (tbl_date_time_format) {
+		case EN_TBL_DT_DATE:
+//YYYYMMDD (year,month,date)
+			td_len = 8;
+			goto date_time_add_formating;
+			break;
+		case EN_TBL_DT_TIME1:
+//hhmm (hour,minutes)
+			td_len = 4;
+			goto time_add_formating;
+			break;
+		case EN_TBL_DT_TIME2:
+//hhmmss (hour,minutes,second)
+			td_len = 6;
+			goto time_add_formating;
+			break;
+		case EN_TBL_DT_TIME3:
+//hhmmssmls (hour,minutes,second,milsecond)
+			td_len = 9;
+time_add_formating: 
+			if (len(*td_str)>td_len) {
+//				td_str=left(td_str,td_len)
+			} else {
+				*td_str = *td_str+strgen(td_len-len(*td_str),"0");
+			}
+			td_str_time_reformat(*td_str,TD_STR_ADD_FORMATTING);
+			break;
+		case EN_TBL_DT_DATE_TIME1:
+//YYYYMMDDhhmm (year,month,date,hour,minutes)
+			td_len = 12;
+			goto date_time_add_formating;
+			break;
+		case EN_TBL_DT_DATE_TIME2:
+//YYYYMMDDhhmmss (year,month,date,hour,minutes,second)
+			td_len = 14;
+			goto date_time_add_formating;
+			break;
+		case EN_TBL_DT_ALL:
+//YYYYMMDDhhmmssmls (year,month,date,hour,minutes,second,milsecond)
+			td_len = 17;
+date_time_add_formating: 
+			if (len(*td_str)>td_len) {
+//				td_str=left(td_str,td_len)
+			} else {
+				*td_str = *td_str+strgen(td_len-len(*td_str),"0");
+			}
+			td_str_date_time_reformat(*td_str,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+			break;
+		default:
+			break;
+		}
+	} else {
+		switch (tbl_date_time_format) {
+		case EN_TBL_DT_DATE:
+//YYYYMMDD (year,month,date)
+			td_len = 10;
+			goto date_time_remove_formating;
+			break;
+		case EN_TBL_DT_TIME1:
+//hhmm (hour,minutes)
+			td_len = 5;
+			goto time_remove_formating;
+			break;
+		case EN_TBL_DT_TIME2:
+//hhmmss (hour,minutes,second)
+			td_len = 8;
+			goto time_remove_formating;
+			break;
+		case EN_TBL_DT_TIME3:
+//hhmmssmls (hour,minutes,second,milsecond)
+			td_len = 12;
+time_remove_formating: 
+			if (len(*td_str)>td_len) {
+//				td_str=left(td_str,td_len)
+			} else {
+				*td_str = *td_str+strgen(td_len-len(*td_str),"0");
+			}
+			td_str_time_reformat(*td_str,TD_STR_REMOVE_FORMATTING);
+			break;
+		case EN_TBL_DT_DATE_TIME1:
+//YYYYMMDDhhmm (year,month,date,hour,minutes)
+			td_len = 16;
+			goto date_time_remove_formating;
+			break;
+		case EN_TBL_DT_DATE_TIME2:
+//YYYYMMDDhhmmss (year,month,date,hour,minutes,second)
+			td_len = 19;
+			goto date_time_remove_formating;
+			break;
+		case EN_TBL_DT_ALL:
+//YYYYMMDDhhmmssmls (year,month,date,hour,minutes,second,milsecond)
+			td_len = 23;
+date_time_remove_formating: 
+			if (len(*td_str)>td_len) {
+//				td_str=left(td_str,td_len)
+			} else {
+				*td_str = *td_str+strgen(td_len-len(*td_str),"0");
+			}
+			td_str_date_time_reformat(*td_str,TD_STR_REMOVE_FORMATTING,TD_DATE_FORMAT_YYYYMMDD);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+//------------------------------------------------------------------------------
+string agg_tbl_msg(en_tbl_status_codes tbl_result) {
+//returns error msg according to the table status
+
+    string agg_tbl_msg;
+	switch (tbl_result) {
+		case EN_TBL_STATUS_OK:
+
+			agg_tbl_msg = "";
+			break;
+		case EN_TBL_STATUS_FAILURE:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_FAILURE;
+			break;
+		case EN_TBL_STATUS_UNKNOWN_TABLE:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_UNKNOWN_TABLE;
+			break;
+		case EN_TBL_STATUS_UNKNOWN_FIELD:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_UNKNOWN_FIELD;
+			break;
+		case EN_TBL_STATUS_INVALID:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_INVALID;
+			break;
+		case EN_TBL_STATUS_FULL:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_FULL;
+			break;
+		case EN_TBL_STATUS_KEY_VIOLATION:
+
+			agg_tbl_msg = AGG_MSG_TBL_STATUS_KEY_VIOLATION;
+			break;
+	}
+	return agg_tbl_msg;
+}
+#endif
+
+//----------------------------------------------------------------------------
+ok_ng agg_call_function(string *op, string *context_name, string *func_input) {
+    ok_ng agg_call_function;
+	string msg;
+	
+	if (*context_name == "") {//root operations
+		switch (*op) {
+		case "synchronized":
+
+			agg_sychronized = YES;
+			agg_call_function = OK;
+			#if AGG_DEBUG_PRINT
+				agg_debugprint("AggreGate server synchronized");
+			#endif
+			agg_link_state = EN_AGG_LINK_STATE_ESTABLISHED;
+			callback_agg_synchronized();
+			break;
+		case "login":
+
+			msg = agg_root_login(*func_input);
+			agg_call_function = ok;
+			break;
+		case "register":
+
+			if (agg_auto_register == YES) {
+				msg = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+agg_password+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END);
+				agg_call_function = OK;
+			} else {
+				msg = chr(AGG_ELEMENT_START)+"Auto register disabled."+chr(AGG_ELEMENT_END);
+				agg_call_function = NG;
+			}
+			break;
+			
+		case "disk":
+
+			agg_call_function = agg_disk_download();
+			goto finish;
+			break;
+			
+		#if AGG_REMOTE_FIRMWARE_UPLOAD
+			case "upload":
+
+				agg_call_function = agg_firmware_upload();
+				
+				#if AGG_DEBUG_PRINT
+					if (agg_call_function == OK) {
+						agg_debugprint("Firmware uploaded successful");
+					} else {
+						agg_debugprint("Firmware uploaded failed");
+					}
+					break;
+				#endif
+		#endif
+		
+		#if AGG_TABLE_CONTROL
+			case "hash":
+
+				//returns hash value of the table
+				agg_call_function = agg_tbl_hash(*func_input,msg);
+				callback_agg_device_function(*op,*context_name,*func_input,msg);
+				break;
+			case "startTable":
+
+				//start table synchronization, this function call info device to start replace the whole table
+				agg_call_function = agg_tbl_start_table(*func_input,msg);
+				break;
+			case "finishTable":
+
+				//this function call notify the device that the table synchronization is done.
+				agg_call_function = agg_tbl_finish_table(*func_input,msg);
+				return agg_call_function;
+				agg_call_function = agg_tbl_hash(*func_input,msg);
+				callback_agg_device_function(*op,*context_name,*func_input,msg);
+				break;
+			case "addRecord":
+
+				//adding single record to the target table
+				agg_call_function = agg_tbl_add_record(*func_input,msg);
+				break;
+			case "removeRecord":
+
+				//remove single record from the target table
+				agg_call_function = agg_tbl_remove_record(*func_input,msg);
+				break;
+			case "updateRecord":
+
+				//modify a single record which is pointed by the table record pointer.
+				agg_call_function = agg_tbl_update_record(*func_input,msg);
+				break;
+			case "putRecords":
+
+				//this is the function call used to add records to device during total table synchronization.
+				agg_call_function = agg_tbl_put_record(*func_input,msg);
+				break;
+		#endif
+		
+		default://device specific operations
+			break;
+		}
+	} else {//device specific operations
+		agg_call_function = callback_agg_device_function(*op,*context_name,*func_input,msg);
+	}
+
+	if (agg_call_function == OK) {
+		msg = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+msg+chr(AGG_COMMAND_END);
+	} else {
+		msg = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+msg+chr(AGG_COMMAND_END);
+	}
+	
+	agg_data_send(msg);
+	
+finish: 
+	agg_data_send(chr(AGG_COMMAND_END));
+
+return agg_call_function;
+}
+
+//------------------------------------------------------------------------------
+string agg_root_login(string *function_input) {
+    string agg_root_login;
+	string<128> stemp1, stemp2, stemp3;
+
+	agg_element_get("1/1/",*function_input,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+	stemp2 = chr(AGG_ELEMENT_START)+agg_owner_name+chr(AGG_ELEMENT_END);
+	stemp2 = stemp2+chr(AGG_ELEMENT_START)+agg_device_name+chr(AGG_ELEMENT_END);
+	stemp3 = mid(stemp1,2,len(stemp1)-2);
+	stemp3 = stemp3+agg_password;
+	stemp1 = md5(stemp3,"",MD5_FINISH,len(stemp3));
+	stemp3 = agg_hex_to_hexstr(stemp1);
+	stemp2 = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+stemp2+chr(AGG_ELEMENT_START)+stemp3+chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END);
+	agg_root_login = stemp2;
+	#if AGG_LOGIN_CONTROL
+		login(CMD_MODE_AGGREGATE,"",agg_sock);
+	#endif
+	return agg_root_login;
+}
+
+//------------------------------------------------------------------------------
+void agg_data_send(string s) {
+	unsigned int w;
+
+	w = sys.timercount;
+	sock.num = agg_sock;
+	while (sock.txfree<len(s) && sock.statesimple == PL_SSTS_EST) {
+		if (sys.timercount<w) { w = 0; };
+		break;
+	}
+	sock.setdata(s);
+	sock.send();
+}
+
+//----------------------------------------------------------------------------
+void agg_rx_clr(unsigned char l) {
+
+	if (l>0) {
+		sock.num = agg_sock;
+		agg_rx = right(agg_rx,len(agg_rx)+1-l);
+		agg_rx = agg_rx+sock.getdata(255-len(agg_rx));
+	}
+}
+
+//------------------------------------------------------------------------------
+void agg_invisible_separators(string *s) {
+
+	agg_replace_chr(*s,"<",chr(AGG_ELEMENT_START));
+	agg_replace_chr(*s,">",chr(AGG_ELEMENT_END));
+	agg_replace_chr(*s,"=",chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR));
+	agg_replace_chr(*s,"^",chr(AGG_NULL));
+	agg_replace_chr(*s,"%3E%",">");
+	agg_replace_chr(*s,"%3D%","=");
+}
+
+//------------------------------------------------------------------------------
+void agg_replace_chr(string *s, string *a, string *b) {
+//replace sub-string a with sub-string b in the target string s
+	unsigned char pos;
+	unsigned char len_a, len_b;
+	string stemp;
+	
+	len_a = len(*a);
+	len_b = len(*b);
+	pos = 0;
+	
+	do 
+		pos = instr(pos+1,*s,*a,1);
+		if (pos>0) {
+			if (len_a == len_b) {
+				insert(*s,pos,*b);
+			} else {
+				stemp = left(*s,pos-1);
+				
+				if (right(stemp,1) == "%") {
+						stemp = left(stemp,len(stemp)-1);
+					*s = right(*s,len(*s)-(pos-1));
+					*s = stemp+*s;
+					pos = pos+1;
+				} else {
+					*s = right(*s,len(*s)-(pos-1)-len_a);
+					*s = stemp+*b+*s;
+				}
+								
+			}
+		}
+	loop while pos>0
+}
+
+//------------------------------------------------------------------------------
+string agg_hex_to_hexstr(string *is) {
+    string agg_hex_to_hexstr;
+	string<4> ss;
+	unsigned char f;
+
+	agg_hex_to_hexstr = "";
+	for (f=1; f <= len(is); f++) {
+		ss = hex(asc(mid(*is,f,1)));
+		ss = right(ss,len(ss)-2);
+		if (len(ss)<2) {
+			ss = "0"+ss;
+		}
+		agg_hex_to_hexstr = agg_hex_to_hexstr+ss;
+	}
+	return agg_hex_to_hexstr;
+}
+
+//----------------------------------------------------------------------------
+#if AGG_REMOTE_FIRMWARE_UPLOAD
+void agg_convert_data_block(string *data_string, string *left_over_str) {
+	unsigned char b, length;
+	string s;
+	string<1> checking_byte;
+	string<10> binary_str1, binary_str2;
+	unsigned int i;
+	
+	s = "";
+	*data_string = *left_over_str+*data_string;
+	*left_over_str = "";
+	
+	length = len(*data_string);
+	for (i=1; i <= length; i++) {
+		checking_byte = mid(*data_string,i,1);
+		b = asc(checking_byte);
+		
+		if (b>127) {
+			if (i == length) {
+				*left_over_str = checking_byte;
+				goto proc_esc_chr;
+			} else {
+				binary_str1 = bin(b);
+				b = asc(mid(*data_string,i+1,1));
+				binary_str2 = bin(b);
+				binary_str1 = right(binary_str1,2)+right(binary_str2,6);
+				checking_byte = chr(val("&b"+binary_str1));
+				i = i+1;
+			}
+		}
+
+		s = s+checking_byte;
+	}
+		
+proc_esc_chr: 
+	*data_string = s;
+	b = 0;
+	
+	do
+		b = instr(b+1,*data_string,"%",1);
+		length = len(*data_string);
+		
+		if (b>0) {
+			if (*left_over_str == "") {
+				if (b == length) {
+					*left_over_str = right(*data_string,1);
+					*data_string = left(*data_string,length-1);
+					break;
+				}
+				if (b == length-1) {
+					if (right(*data_string,1) == "%") {
+						*left_over_str = right(*data_string,2);
+						*data_string = left(*data_string,length-2);
+						break;
+					}
+				}
+			}
+			
+			checking_byte = mid(*data_string,b+1,1);
+			s = left(*data_string,b-1);
+			switch (checking_byte) {
+			case "^":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x02"+*data_string;
+				break;
+			case "$":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x0d"+*data_string;
+				break;
+			case "/":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x17"+*data_string;
+				break;
+			case "<":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x1c"+*data_string;
+				break;
+			case ">":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x1d"+*data_string;
+				break;
+			case "=":
+
+				*data_string = right(*data_string,length-b-1);
+				*data_string = s+"\x1e"+*data_string;
+				break;
+			case "%":
+
+				if (mid(*data_string,b+2,1) == "%") {
+					*data_string = right(*data_string,length-b);
+					*data_string = s+*data_string;
+				} else {
+					*data_string = right(*data_string,length-b-1);
+					*data_string = s+"%"+*data_string;
+					
+				}
+				break;
+			default:break;
+
+			}
+			
+		}
+	loop while b>0
+	
+}
+
+//----------------------------------------------------------------------------
+ok_ng agg_firmware_upload() {
+    ok_ng agg_firmware_upload;
+	unsigned long remain_file_size, total_file_size;
+	string data;
+	unsigned char pos1, pos2, data_size;
+	unsigned char fail_counter;
+	string<2> left_over_byte;
+	unsigned int x;
+	
+	agg_firmware_upload = NG;
+	
+	x = fd.availableflashspace-2066;
+	return agg_firmware_upload;
+	return agg_firmware_upload;
+	return agg_firmware_upload;
+	return agg_firmware_upload;
+	
+	agg_firmware_upload = OK;
+	left_over_byte = "";
+	pos1 = instr(1,agg_rx,"/",4);
+	pos2 = instr(1,agg_rx,"/",5);
+	if (pos1>0 && pos2>pos1) {
+		data = mid(agg_rx,pos1+1,pos2-pos1-1);
+		
+		remain_file_size = lval(data);
+		total_file_size = remain_file_size;
+		agg_convert_data_block(agg_rx,left_over_byte);
+
+		if (remain_file_size<len(agg_rx)) {
+			data_size = remain_file_size;
+		} else {
+			data_size = 253;
+		}
+		
+		data = mid(agg_rx,pos2+1,data_size);
+		fd.setdata(data);
+		remain_file_size = remain_file_size-len(data);
+				
+		while (remain_file_size>0) {
+			if (remain_file_size>253) {
+				data = sock.getdata(253);
+			} else {
+				data_size = remain_file_size;
+				data = sock.getdata(data_size);
+			}
+			
+			agg_convert_data_block(data,left_over_byte);
+					
+			fd.setdata(data);
+			data_size = len(data);
+			if (data_size == 0) {
+				fail_counter = fail_counter+1;
+				if (fail_counter>AGG_FIRMWARE_GET_FAIL_COUNT) {
+					goto upload_fail;
+				}
+			} else {
+				fail_counter = 0;
+			}
+			if (remain_file_size>=data_size) {
+				callback_agg_firmware_upload_progress(total_file_size,remain_file_size);
+				remain_file_size = remain_file_size-data_size;
+			}
+		}
+		
+		fd.setpointer(65537);
+		data = fd.getdata(4);
+		if (data != "TBIN") {
+			goto upload_fail;
+		}
+		
+		fd.setpointer(fd.filesize-3);
+		data = fd.getdata(4);
+		if (data != "TBIN") {
+upload_fail: 
+			agg_firmware_upload = NG;
+			fd.close();
+			fd.delete(AGG_FIRMWARE_FILENAME);
+			return agg_firmware_upload;
+		}
+		callback_agg_firmware_upload_progress(total_file_size,remain_file_size);
+		agg_firmware_recieved = YES;
+		fd.close();
+	} else {
+		agg_firmware_upload = NG;
+	}
+	
+	return agg_firmware_upload;
+}
+#endif
+
+//----------------------------------------------------------------------------
+#if AGG_CUSTOM_RTC<2
+void agg_rtc_sg(unsigned int *wdaycount, unsigned int *wmincount, unsigned char *bsec, unsigned int *wmilsec, en_agg_rdwr op) {
+
+#if AGG_CUSTOM_RTC == 0
+	switch (op) {
+	case EN_AGG_GET:
+
+		rtc.getdata(*wdaycount,*wmincount,*bsec);
+		*wmilsec = 0;
+		break;
+	case EN_AGG_SET:
+
+		rtc.setdata(*wdaycount,*wmincount,*bsec);
+		break;
+	}
+#endif
+
+#if AGG_CUSTOM_RTC == 1
+	callback_agg_rtc_sg(*wdaycount,*wmincount,*bsec,*wmilsec,op);
+#endif
+
+}
+#endif
+
+//----------------------------------------------------------------------------
+#if AGG_DEBUG_PRINT
+void agg_debug_print_status(en_agg_status_codes status) {
+	string<64> s;
+
+	switch (status) {
+	case EN_AGG_STATUS_OK:
+
+		return;
+		break;
+	case EN_AGG_STATUS_NOT_STARTED:
+
+		s = "agg_start() wasn't used or failed.";
+		break;
+	case EN_AGG_STATUS_OUT_OF_SOCKETS:
+
+		s = "out of sockets.";
+		break;
+	case EN_AGG_STATUS_INVALID_INTERFACE:
+
+		s = "Invalid interface.";
+		break;
+	case EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE:
+
+		s = "insufficient buffer space.";
+		break;
+	case EN_AGG_STATUS_CONNECTION_LOST:
+
+		s = "device has been disconnected from the server.";
+		break;
+	case EN_AGG_STATUS_SETTING_ERROR:
+
+		s = "setting error.";
+		break;
+	case EN_AGG_STATUS_TABLE_ERROR:
+
+		s = "table error.";
+		break;
+	case EN_AGG_STATUS_FUNCTION_ERROR:
+
+		s = "function error.";
+		break;
+	case EN_AGG_STATUS_ITEM_NOT_FOUND:
+
+		s = "item not found.";
+		break;
+	}
+	agg_debugprint("ERROR: "+s);
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if AGG_DEBUG_PRINT
+void agg_debugprint(string *print_data) {
+	string<16> s;
+	
+agg_debugprint_1: 
+	sys.debugprint(AGG_STAMP1+s+AGG_STAMP2+*print_data+AGG_CR_LF);
+}
+#endif
+
+//----------------------------------------------------------------------------
+ok_ng agg_disk_download() {
+    ok_ng agg_disk_download;
+	unsigned int sector_num;
+	string s;
+	unsigned long size;
+	unsigned char i;
+	
+	s = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR)+chr(AGG_ELEMENT_START)+"0/\x1a/fd_content.txt/-1/1/";
+	agg_data_send(s);
+	
+	size = fd.availableflashspace*264;
+	s = lstr(size);
+
+	for (sector_num=0; sector_num <= fd.availableflashspace-1; sector_num++) {
+		for (i=0; i <= 2; i++) {
+			fd.getsector(sector_num);
+			s = fd.getbuffer(i*88,88);
+			agg_convert_disk_data(s);
+			agg_data_send(s);
+		}
+	}
+	
+	agg_data_send(chr(AGG_ELEMENT_END)+chr(AGG_ELEMENT_END));
+	agg_disk_download = OK;
+	
+	return agg_disk_download;
+}
+
+//----------------------------------------------------------------------------
+ok_ng agg_set_variable() {
+    ok_ng agg_set_variable;
+	string stemp1, stemp2;
+	unsigned char pos1, pos2, i, stg_num;
+	string<AGG_ITEM_BUFF_LEN> item_name_temp;
+	unsigned char endless_loop_count;
+	unsigned int t;
+	
+	agg_set_variable = OK;
+rx_read: 
+		agg_element_get("1/",agg_rx,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp2);
+		stemp1 = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR);
+		pos1 = instr(1,agg_rx,stemp1,1);
+		agg_rx_clr(pos1+len(stemp2));
+		
+		if (pos1>0) {
+			switch (agg_cmd.item_name) {
+			case "date":
+case "datex":
+//set date
+				#if AGG_CUSTOM_RTC<2
+					agg_element_get("1/1/",stemp2,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp2);
+					stemp2 = mid(stemp2,2,len(stemp2)-2);
+					agg_systime_sg(stemp2,EN_AGG_SET);
+					break;
+				#endif
+			case "modtime":
+//set modification time
+				do
+proc_modtime: 
+					#if AGG_CUSTOM_RTC<2
+						agg_element_get("1/1/",stemp2,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+						item_name_temp = mid(stemp1,2,len(stemp1)-2);
+						agg_element_get("1/2/",stemp2,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+						stemp1 = mid(stemp1,2,len(stemp1)-2);
+
+						for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+							if (agg_items[i].entity_type == EN_AGG_ENTITY_VARIABLES && agg_cmd.context_name == agg_items[i].context_name && agg_items[i].item_name == item_name_temp) {
+								agg_modtime_sg(agg_items[i],stemp1,EN_AGG_SET);
+							}
+						}
+					#endif
+					
+					agg_element_get("1/",agg_rx,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp2);
+					stemp1 = chr(AGG_ELEMENT_START)+"R"+chr(AGG_ELEMENT_NAME_VALUE_SEPARATOR);
+					endless_loop_count = 0;
+find_command_close: 
+					pos1 = instr(1,agg_rx,stemp1,1);
+					pos2 = instr(1,agg_rx,chr(AGG_COMMAND_END),1);
+					agg_rx_clr(pos1+len(stemp2));
+					
+					//check for command end character, if it's not present, meaning more data to come
+					if (pos2 == 0) {
+						//if item start string <R= is not present, wait and try to get more data from rx buffer
+						if (pos1 == 0) {
+							//delay for 1 clock cycle
+							t = sys.timercount;
+							while (t == sys.timercount) {
+							}
+							endless_loop_count = endless_loop_count+1;
+							if (endless_loop_count>10) {
+								agg_set_variable = NG;
+								return agg_set_variable;
+							}
+						}
+						
+						//if the rx string is full then proc the string, if it's not try get fill it up
+						if (len(agg_rx) == 255) {
+							goto proc_modtime;
+						} else {
+							goto find_command_close;
+						}
+						
+					}
+				loop while pos1>0
+				break;
+				
+			case "children":
+case "events":
+
+				agg_element_get("1/1/",stemp2,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+				stemp1 = mid(stemp1,2,len(stemp1)-2);
+				break;
+				
+			default:
+			
+				for (i=0; i <= AGG_MAX_NUM_SCRIPT_LINES-1; i++) {
+					if (agg_cmd.item_name == agg_items[i].item_name) {
+						break;
+					}
+				}
+
+				if (agg_items[i].p1 == "S") {
+					#if AGG_SETTING_CONTROL
+						//cases setting modifications
+						en_stg_status_codes stg_result;
+						
+						if (stg_get_num_members(agg_cmd.item_name,stg_num) == EN_STG_STATUS_OK) {//get number of settings
+							for (i=0; i <= stg_num-1; i++) {
+								agg_element_get("1/"+str(i+1)+"/",stemp2,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
+								stemp1 = mid(stemp1,2,len(stemp1)-2);
+								stg_result = agg_settings_sg(agg_cmd.item_name,stemp1,i,EN_AGG_SET);
+								break;
+							}
+							if (stg_result != EN_STG_STATUS_OK) {
+								stemp2 = agg_stg_msg(stg_result);
+								stemp2 = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+stemp2+chr(AGG_COMMAND_END);
+								callback_agg_error(EN_AGG_STATUS_SETTING_ERROR,agg_cmd.item_name);
+								callback_agg_setting_error(agg_cmd.item_name,stg_result);
+								agg_data_send(stemp2);
+								
+								#if AGG_DEBUG_PRINT
+									stemp1 = "setting name: "+agg_cmd.item_name+" index: "+str(i);
+									agg_debugprint(stemp1);
+									agg_debug_print_status(EN_AGG_STATUS_SETTING_ERROR);
+								#endif					
+								return agg_set_variable;
+							}
+						}
+					#endif
+				} else if (agg_items[i].p1 == "X") {
+					if (callback_agg_external_data_source(agg_items[i].p1,agg_cmd.item_name,stemp2,stemp1,EN_AGG_SET) != OK) {
+						if (stemp1 == "") {
+							stemp1 = chr(AGG_ELEMENT_START)+"data source unavailable."+chr(AGG_ELEMENT_END);
+						}
+						stemp2 = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"E"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+stemp1+chr(AGG_COMMAND_END);
+						agg_data_send(stemp2);
+						return agg_set_variable;
+					}
+				break;
+			}
+		} else {
+			goto rx_read;
+			return agg_set_variable;
+		}
+		stemp2 = chr(AGG_COMMAND_START)+"R"+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+agg_cmd.id+chr(AGG_COMMAND_PARAMETERS_SEPARATOR)+"A"+chr(AGG_COMMAND_END);
+		agg_data_send(stemp2);
+
+return agg_set_variable;
+}
+
+//----------------------------------------------------------------------------
+void agg_convert_disk_data(string *data_string) {
+	string s;
+	unsigned char i;
+	string<1> checking_byte;
+	string<10> bin_string1, bin_string2;
+	unsigned char b1;
+	
+	s = "";
+	for (i=1; i <= len(data_string); i++) {
+		checking_byte = mid(*data_string,i,1);
+		switch (checking_byte) {
+		case "\x02":
+
+			s = s+"%^";
+			break;
+		case "\x0d":
+
+			s = s+"%$";
+			break;
+		case "\x17":
+
+			s = s+"%/";
+			break;
+		case "\x1c":
+
+			s = s+"%<";
+			break;
+		case "\x1d":
+
+			s = s+"%>";
+			break;
+		case "\x1e":
+
+			s == s+"%=";
+			break;
+		case "%":
+
+			s = s+"%%";
+			break;
+		default:
+			b1 = asc(checking_byte);
+			if (b1>127) {
+				bin_string2 = bin(b1);
+				bin_string1 = "&b110000"+mid(bin_string2,3,2);
+				bin_string2 = "&b10"+right(bin_string2,6);
+				b1 = val(bin_string1);
+				s = s+chr(b1);
+				b1 = val(bin_string2);
+				s = s+chr(b1);
+			} else {
+				s = s+checking_byte;
+			break;
+		}
+	}
+	*data_string = s;
+}

@@ -1,0 +1,20 @@
+#include "global.th"
+
+
+
+no_yes interface_ready[MAX_NUM_INTERFACES];
+
+
+void on_sys_init() {
+    boot();
+}
+
+void on_sys_timer() {
+    dhcp_proc_timer();
+
+}
+
+void on_sock_data_arrival() {
+    dhcp_proc_data();
+
+}

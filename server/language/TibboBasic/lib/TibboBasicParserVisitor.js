@@ -1,4 +1,4 @@
-// Generated from /Users/jimmyhu/Projects/TIDEDesktopService/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
+// Generated from /Users/jimmyhu/Projects/tibbo-basic/server/language/TibboBasic/TibboBasicParser.g4 by ANTLR 4.8
 // jshint ignore: start
 var antlr4 = require('antlr4/index');
 
@@ -216,6 +216,12 @@ TibboBasicParserVisitor.prototype.visitSC_Case = function(ctx) {
 };
 
 
+// Visit a parse tree produced by TibboBasicParser#sC_Default.
+TibboBasicParserVisitor.prototype.visitSC_Default = function(ctx) {
+  return this.visitChildren(ctx);
+};
+
+
 // Visit a parse tree produced by TibboBasicParser#sC_Cond.
 TibboBasicParserVisitor.prototype.visitSC_Cond = function(ctx) {
   return this.visitChildren(ctx);
@@ -236,12 +242,6 @@ TibboBasicParserVisitor.prototype.visitTypeStmt = function(ctx) {
 
 // Visit a parse tree produced by TibboBasicParser#typeStmtElement.
 TibboBasicParserVisitor.prototype.visitTypeStmtElement = function(ctx) {
-  return this.visitChildren(ctx);
-};
-
-
-// Visit a parse tree produced by TibboBasicParser#assignment.
-TibboBasicParserVisitor.prototype.visitAssignment = function(ctx) {
   return this.visitChildren(ctx);
 };
 
