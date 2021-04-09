@@ -583,7 +583,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterEnumerationStmt(ctx: any) {
-        this.transpiler.addCode(`enum ${ctx.children[1].getText()} {`);
+        this.transpiler.addCode(`enum ${ctx.children[1].getText().toLowerCase()} {`);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -631,7 +631,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterTypeStmt(ctx: any) {
-        this.transpiler.addCode(`struct ${ctx.name.text} {`);
+        this.transpiler.addCode(`struct ${ctx.name.text.toLowerCase()} {`);
         this.transpiler.writeLine(ctx.start.line);
     }
 

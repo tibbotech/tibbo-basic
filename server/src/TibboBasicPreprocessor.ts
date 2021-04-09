@@ -318,7 +318,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
             if (item.ruleIndex == TibboBasicPreprocessorParser.RULE_preprocessor_expression && item.op != undefined) {
                 switch (item.op.type) {
                     case TibboBasicPreprocessorParser.AND:
-                        result = this.evaluate(item.children[0].children) && this.evaluate(item.children[2].children);
+                        result = this.evaluate([item.children[0]]) && this.evaluate([item.children[2]]);
                         break;
                     case TibboBasicPreprocessorParser.OR:
                         result = this.evaluate([items[i].children[0]]) || this.evaluate([items[i].children[2]]);

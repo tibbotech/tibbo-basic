@@ -43,7 +43,7 @@ enum en_dhcp_status_codes {
 	DHCP_STATUS_FAILURE//Interaction with the DHCP server failed (because there was no reply, the reply was unrecognized, invalid, etc.).
 };
 
-enum DHCP_info_elements {
+enum dhcp_info_elements {
 	DHCP_INFO_ELEMENT_REQUIRED_BUFFERS
 };
 
