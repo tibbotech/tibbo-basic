@@ -9,9 +9,12 @@
         "noImplicitThis": true,
         "inlineSourceMap": false,
         "sourceMap": true,
-        "outDir": "./out",
+        "outDir": "out",
+		"rootDir": "src",
         "preserveConstEnums": true,
         "strictNullChecks": true,
         "noUnusedParameters": false
-    }
+    },
+    "include": ["src/**/*"],
+	"exclude": ["node_modules"]
 }

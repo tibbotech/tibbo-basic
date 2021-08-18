@@ -8,7 +8,7 @@ var grammarFileName = "TibboBasicParser.g4";
 
 
 var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
-    "\u0003\u0092\u030d\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004",
+    "\u0003\u0092\u030e\u0004\u0002\t\u0002\u0004\u0003\t\u0003\u0004\u0004",
     "\t\u0004\u0004\u0005\t\u0005\u0004\u0006\t\u0006\u0004\u0007\t\u0007",
     "\u0004\b\t\b\u0004\t\t\t\u0004\n\t\n\u0004\u000b\t\u000b\u0004\f\t\f",
     "\u0004\r\t\r\u0004\u000e\t\u000e\u0004\u000f\t\u000f\u0004\u0010\t\u0010",
@@ -101,23 +101,23 @@ var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
     "3\u028c\u000b3\u00053\u028e\n3\u00033\u00033\u00034\u00034\u00035\u0003",
     "5\u00035\u00035\u00075\u0298\n5\f5\u000e5\u029b\u000b5\u00055\u029d",
     "\n5\u00035\u00035\u00036\u00056\u02a2\n6\u00036\u00036\u00036\u0003",
-    "6\u00056\u02a8\n6\u00036\u00036\u00037\u00037\u00057\u02ae\n7\u0003",
-    "7\u00037\u00057\u02b2\n7\u00038\u00038\u00038\u00038\u00038\u00038\u0003",
-    "8\u00038\u00038\u00038\u00038\u00038\u00058\u02c0\n8\u00038\u00038\u0005",
-    "8\u02c4\n8\u00038\u00058\u02c7\n8\u00058\u02c9\n8\u00039\u00039\u0003",
-    "9\u00079\u02ce\n9\f9\u000e9\u02d1\u000b9\u0003:\u0003:\u0003:\u0003",
-    ";\u0003;\u0003;\u0003<\u0003<\u0003<\u0005<\u02dc\n<\u0003<\u0006<\u02df",
-    "\n<\r<\u000e<\u02e0\u0003<\u0005<\u02e4\n<\u0003<\u0003<\u0003<\u0003",
-    "<\u0003<\u0003<\u0005<\u02ec\n<\u0003=\u0003=\u0003=\u0005=\u02f1\n",
-    "=\u0003=\u0003=\u0003=\u0005=\u02f6\n=\u0007=\u02f8\n=\f=\u000e=\u02fb",
-    "\u000b=\u0003=\u0005=\u02fe\n=\u0003=\u0003=\u0003>\u0003>\u0005>\u0304",
-    "\n>\u0003>\u0003>\u0003>\u0005>\u0309\n>\u0003?\u0003?\u0003?\u0002",
-    "\u0004NT@\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0014\u0016\u0018",
-    "\u001a\u001c\u001e \"$&(*,.02468:<>@BDFHJLNPRTVXZ\\^`bdfhjlnprtvxz|",
-    "\u0002\u000e\u0004\u0002JJLL\u0003\u0002\"\'\u0004\u0002PPpp\u0004\u0002",
-    "\b\b\n\n\u0005\u000266UU]]\u0004\u0002\\\\__\u0004\u0002WY[[\u0004\u0002",
-    "VV^^\u0007\u0002\u0004\u000489>>@@NN\u0004\u000288\\\\\u0003\u0002k",
-    "l\u0004\u0002TTpp\u0002\u035c\u0002\u0081\u0003\u0002\u0002\u0002\u0004",
+    "6\u00056\u02a8\n6\u00036\u00056\u02ab\n6\u00037\u00037\u00057\u02af",
+    "\n7\u00037\u00037\u00057\u02b3\n7\u00038\u00038\u00038\u00038\u0003",
+    "8\u00038\u00038\u00038\u00038\u00038\u00038\u00038\u00058\u02c1\n8\u0003",
+    "8\u00038\u00058\u02c5\n8\u00038\u00058\u02c8\n8\u00058\u02ca\n8\u0003",
+    "9\u00039\u00039\u00079\u02cf\n9\f9\u000e9\u02d2\u000b9\u0003:\u0003",
+    ":\u0003:\u0003;\u0003;\u0003;\u0003<\u0003<\u0003<\u0005<\u02dd\n<\u0003",
+    "<\u0006<\u02e0\n<\r<\u000e<\u02e1\u0003<\u0005<\u02e5\n<\u0003<\u0003",
+    "<\u0003<\u0003<\u0003<\u0003<\u0005<\u02ed\n<\u0003=\u0003=\u0003=\u0005",
+    "=\u02f2\n=\u0003=\u0003=\u0003=\u0005=\u02f7\n=\u0007=\u02f9\n=\f=\u000e",
+    "=\u02fc\u000b=\u0003=\u0005=\u02ff\n=\u0003=\u0003=\u0003>\u0003>\u0005",
+    ">\u0305\n>\u0003>\u0003>\u0003>\u0005>\u030a\n>\u0003?\u0003?\u0003",
+    "?\u0002\u0004NT@\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0014\u0016",
+    "\u0018\u001a\u001c\u001e \"$&(*,.02468:<>@BDFHJLNPRTVXZ\\^`bdfhjlnp",
+    "rtvxz|\u0002\u000e\u0004\u0002JJLL\u0003\u0002\"\'\u0004\u0002PPpp\u0004",
+    "\u0002\b\b\n\n\u0005\u000266UU]]\u0004\u0002\\\\__\u0004\u0002WY[[\u0004",
+    "\u0002VV^^\u0007\u0002\u0004\u000489>>@@NN\u0004\u000288\\\\\u0003\u0002",
+    "kl\u0004\u0002TTpp\u0002\u035e\u0002\u0081\u0003\u0002\u0002\u0002\u0004",
     "\u0095\u0003\u0002\u0002\u0002\u0006\u0097\u0003\u0002\u0002\u0002\b",
     "\u009a\u0003\u0002\u0002\u0002\n\u00a3\u0003\u0002\u0002\u0002\f\u00b0",
     "\u0003\u0002\u0002\u0002\u000e\u00b2\u0003\u0002\u0002\u0002\u0010\u00bb",
@@ -142,10 +142,10 @@ var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
     "^\u0275\u0003\u0002\u0002\u0002`\u027c\u0003\u0002\u0002\u0002b\u0281",
     "\u0003\u0002\u0002\u0002d\u0284\u0003\u0002\u0002\u0002f\u0291\u0003",
     "\u0002\u0002\u0002h\u0293\u0003\u0002\u0002\u0002j\u02a1\u0003\u0002",
-    "\u0002\u0002l\u02ab\u0003\u0002\u0002\u0002n\u02c8\u0003\u0002\u0002",
-    "\u0002p\u02ca\u0003\u0002\u0002\u0002r\u02d2\u0003\u0002\u0002\u0002",
-    "t\u02d5\u0003\u0002\u0002\u0002v\u02eb\u0003\u0002\u0002\u0002x\u02ed",
-    "\u0003\u0002\u0002\u0002z\u0303\u0003\u0002\u0002\u0002|\u030a\u0003",
+    "\u0002\u0002l\u02ac\u0003\u0002\u0002\u0002n\u02c9\u0003\u0002\u0002",
+    "\u0002p\u02cb\u0003\u0002\u0002\u0002r\u02d3\u0003\u0002\u0002\u0002",
+    "t\u02d6\u0003\u0002\u0002\u0002v\u02ec\u0003\u0002\u0002\u0002x\u02ee",
+    "\u0003\u0002\u0002\u0002z\u0304\u0003\u0002\u0002\u0002|\u030b\u0003",
     "\u0002\u0002\u0002~\u0080\u0005\u0004\u0003\u0002\u007f~\u0003\u0002",
     "\u0002\u0002\u0080\u0083\u0003\u0002\u0002\u0002\u0081\u007f\u0003\u0002",
     "\u0002\u0002\u0081\u0082\u0003\u0002\u0002\u0002\u0082\u0084\u0003\u0002",
@@ -461,78 +461,79 @@ var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
     "\u0002\u0002\u0002\u02a3\u02a7\u0007p\u0002\u0002\u02a4\u02a5\u0007",
     "Z\u0002\u0002\u02a5\u02a6\u0007T\u0002\u0002\u02a6\u02a8\u0007`\u0002",
     "\u0002\u02a7\u02a4\u0003\u0002\u0002\u0002\u02a7\u02a8\u0003\u0002\u0002",
-    "\u0002\u02a8\u02a9\u0003\u0002\u0002\u0002\u02a9\u02aa\u0005l7\u0002",
-    "\u02aak\u0003\u0002\u0002\u0002\u02ab\u02ad\u0007\u0005\u0002\u0002",
-    "\u02ac\u02ae\u0007\u0018\u0002\u0002\u02ad\u02ac\u0003\u0002\u0002\u0002",
-    "\u02ad\u02ae\u0003\u0002\u0002\u0002\u02ae\u02af\u0003\u0002\u0002\u0002",
-    "\u02af\u02b1\u0005z>\u0002\u02b0\u02b2\u0005r:\u0002\u02b1\u02b0\u0003",
-    "\u0002\u0002\u0002\u02b1\u02b2\u0003\u0002\u0002\u0002\u02b2m\u0003",
-    "\u0002\u0002\u0002\u02b3\u02c9\u0007\r\u0002\u0002\u02b4\u02c9\u0007",
-    "?\u0002\u0002\u02b5\u02c9\u0007M\u0002\u0002\u02b6\u02c9\u0007\u0013",
-    "\u0002\u0002\u02b7\u02c9\u0007)\u0002\u0002\u02b8\u02c9\u0007\u0007",
-    "\u0002\u0002\u02b9\u02c9\u0007\u0006\u0002\u0002\u02ba\u02c9\u0007\t",
-    "\u0002\u0002\u02bb\u02c9\u00073\u0002\u0002\u02bc\u02c9\u00074\u0002",
-    "\u0002\u02bd\u02c6\u0007C\u0002\u0002\u02be\u02c0\u0007o\u0002\u0002",
-    "\u02bf\u02be\u0003\u0002\u0002\u0002\u02bf\u02c0\u0003\u0002\u0002\u0002",
-    "\u02c0\u02c1\u0003\u0002\u0002\u0002\u02c1\u02c3\u0007]\u0002\u0002",
-    "\u02c2\u02c4\u0007o\u0002\u0002\u02c3\u02c2\u0003\u0002\u0002\u0002",
-    "\u02c3\u02c4\u0003\u0002\u0002\u0002\u02c4\u02c5\u0003\u0002\u0002\u0002",
-    "\u02c5\u02c7\u0005N(\u0002\u02c6\u02bf\u0003\u0002\u0002\u0002\u02c6",
-    "\u02c7\u0003\u0002\u0002\u0002\u02c7\u02c9\u0003\u0002\u0002\u0002\u02c8",
-    "\u02b3\u0003\u0002\u0002\u0002\u02c8\u02b4\u0003\u0002\u0002\u0002\u02c8",
-    "\u02b5\u0003\u0002\u0002\u0002\u02c8\u02b6\u0003\u0002\u0002\u0002\u02c8",
-    "\u02b7\u0003\u0002\u0002\u0002\u02c8\u02b8\u0003\u0002\u0002\u0002\u02c8",
-    "\u02b9\u0003\u0002\u0002\u0002\u02c8\u02ba\u0003\u0002\u0002\u0002\u02c8",
-    "\u02bb\u0003\u0002\u0002\u0002\u02c8\u02bc\u0003\u0002\u0002\u0002\u02c8",
-    "\u02bd\u0003\u0002\u0002\u0002\u02c9o\u0003\u0002\u0002\u0002\u02ca",
-    "\u02cf\u0007p\u0002\u0002\u02cb\u02cc\t\f\u0002\u0002\u02cc\u02ce\u0007",
-    "p\u0002\u0002\u02cd\u02cb\u0003\u0002\u0002\u0002\u02ce\u02d1\u0003",
-    "\u0002\u0002\u0002\u02cf\u02cd\u0003\u0002\u0002\u0002\u02cf\u02d0\u0003",
-    "\u0002\u0002\u0002\u02d0q\u0003\u0002\u0002\u0002\u02d1\u02cf\u0003",
-    "\u0002\u0002\u0002\u02d2\u02d3\u0007]\u0002\u0002\u02d3\u02d4\t\r\u0002",
-    "\u0002\u02d4s\u0003\u0002\u0002\u0002\u02d5\u02d6\u0007p\u0002\u0002",
-    "\u02d6\u02d7\u0007h\u0002\u0002\u02d7u\u0003\u0002\u0002\u0002\u02d8",
-    "\u02ec\u0007R\u0002\u0002\u02d9\u02ec\u0007S\u0002\u0002\u02da\u02dc",
-    "\t\u0007\u0002\u0002\u02db\u02da\u0003\u0002\u0002\u0002\u02db\u02dc",
-    "\u0003\u0002\u0002\u0002\u02dc\u02e3\u0003\u0002\u0002\u0002\u02dd\u02df",
-    "\u0007T\u0002\u0002\u02de\u02dd\u0003\u0002\u0002\u0002\u02df\u02e0",
-    "\u0003\u0002\u0002\u0002\u02e0\u02de\u0003\u0002\u0002\u0002\u02e0\u02e1",
-    "\u0003\u0002\u0002\u0002\u02e1\u02e2\u0003\u0002\u0002\u0002\u02e2\u02e4",
-    "\u0007k\u0002\u0002\u02e3\u02de\u0003\u0002\u0002\u0002\u02e3\u02e4",
-    "\u0003\u0002\u0002\u0002\u02e4\u02e5\u0003\u0002\u0002\u0002\u02e5\u02ec",
-    "\u0007T\u0002\u0002\u02e6\u02ec\u0007P\u0002\u0002\u02e7\u02ec\u0007",
-    "Q\u0002\u0002\u02e8\u02ec\u0007G\u0002\u0002\u02e9\u02ec\u0007(\u0002",
-    "\u0002\u02ea\u02ec\u0007p\u0002\u0002\u02eb\u02d8\u0003\u0002\u0002",
-    "\u0002\u02eb\u02d9\u0003\u0002\u0002\u0002\u02eb\u02db\u0003\u0002\u0002",
-    "\u0002\u02eb\u02e6\u0003\u0002\u0002\u0002\u02eb\u02e7\u0003\u0002\u0002",
-    "\u0002\u02eb\u02e8\u0003\u0002\u0002\u0002\u02eb\u02e9\u0003\u0002\u0002",
-    "\u0002\u02eb\u02ea\u0003\u0002\u0002\u0002\u02ecw\u0003\u0002\u0002",
-    "\u0002\u02ed\u02f0\u0007c\u0002\u0002\u02ee\u02f1\u0005v<\u0002\u02ef",
-    "\u02f1\u0005x=\u0002\u02f0\u02ee\u0003\u0002\u0002\u0002\u02f0\u02ef",
-    "\u0003\u0002\u0002\u0002\u02f1\u02f9\u0003\u0002\u0002\u0002\u02f2\u02f5",
-    "\u0007j\u0002\u0002\u02f3\u02f6\u0005v<\u0002\u02f4\u02f6\u0005x=\u0002",
-    "\u02f5\u02f3\u0003\u0002\u0002\u0002\u02f5\u02f4\u0003\u0002\u0002\u0002",
-    "\u02f6\u02f8\u0003\u0002\u0002\u0002\u02f7\u02f2\u0003\u0002\u0002\u0002",
-    "\u02f8\u02fb\u0003\u0002\u0002\u0002\u02f9\u02f7\u0003\u0002\u0002\u0002",
-    "\u02f9\u02fa\u0003\u0002\u0002\u0002\u02fa\u02fd\u0003\u0002\u0002\u0002",
-    "\u02fb\u02f9\u0003\u0002\u0002\u0002\u02fc\u02fe\u0007j\u0002\u0002",
-    "\u02fd\u02fc\u0003\u0002\u0002\u0002\u02fd\u02fe\u0003\u0002\u0002\u0002",
-    "\u02fe\u02ff\u0003\u0002\u0002\u0002\u02ff\u0300\u0007d\u0002\u0002",
-    "\u0300y\u0003\u0002\u0002\u0002\u0301\u0304\u0005n8\u0002\u0302\u0304",
-    "\u0005p9\u0002\u0303\u0301\u0003\u0002\u0002\u0002\u0303\u0302\u0003",
-    "\u0002\u0002\u0002\u0304\u0308\u0003\u0002\u0002\u0002\u0305\u0306\u0007",
-    "Z\u0002\u0002\u0306\u0307\t\r\u0002\u0002\u0307\u0309\u0007`\u0002\u0002",
-    "\u0308\u0305\u0003\u0002\u0002\u0002\u0308\u0309\u0003\u0002\u0002\u0002",
-    "\u0309{\u0003\u0002\u0002\u0002\u030a\u030b\u0007;\u0002\u0002\u030b",
-    "}\u0003\u0002\u0002\u0002h\u0081\u0095\u009e\u00a3\u00b0\u00b8\u00bd",
+    "\u0002\u02a8\u02aa\u0003\u0002\u0002\u0002\u02a9\u02ab\u0005l7\u0002",
+    "\u02aa\u02a9\u0003\u0002\u0002\u0002\u02aa\u02ab\u0003\u0002\u0002\u0002",
+    "\u02abk\u0003\u0002\u0002\u0002\u02ac\u02ae\u0007\u0005\u0002\u0002",
+    "\u02ad\u02af\u0007\u0018\u0002\u0002\u02ae\u02ad\u0003\u0002\u0002\u0002",
+    "\u02ae\u02af\u0003\u0002\u0002\u0002\u02af\u02b0\u0003\u0002\u0002\u0002",
+    "\u02b0\u02b2\u0005z>\u0002\u02b1\u02b3\u0005r:\u0002\u02b2\u02b1\u0003",
+    "\u0002\u0002\u0002\u02b2\u02b3\u0003\u0002\u0002\u0002\u02b3m\u0003",
+    "\u0002\u0002\u0002\u02b4\u02ca\u0007\r\u0002\u0002\u02b5\u02ca\u0007",
+    "?\u0002\u0002\u02b6\u02ca\u0007M\u0002\u0002\u02b7\u02ca\u0007\u0013",
+    "\u0002\u0002\u02b8\u02ca\u0007)\u0002\u0002\u02b9\u02ca\u0007\u0007",
+    "\u0002\u0002\u02ba\u02ca\u0007\u0006\u0002\u0002\u02bb\u02ca\u0007\t",
+    "\u0002\u0002\u02bc\u02ca\u00073\u0002\u0002\u02bd\u02ca\u00074\u0002",
+    "\u0002\u02be\u02c7\u0007C\u0002\u0002\u02bf\u02c1\u0007o\u0002\u0002",
+    "\u02c0\u02bf\u0003\u0002\u0002\u0002\u02c0\u02c1\u0003\u0002\u0002\u0002",
+    "\u02c1\u02c2\u0003\u0002\u0002\u0002\u02c2\u02c4\u0007]\u0002\u0002",
+    "\u02c3\u02c5\u0007o\u0002\u0002\u02c4\u02c3\u0003\u0002\u0002\u0002",
+    "\u02c4\u02c5\u0003\u0002\u0002\u0002\u02c5\u02c6\u0003\u0002\u0002\u0002",
+    "\u02c6\u02c8\u0005N(\u0002\u02c7\u02c0\u0003\u0002\u0002\u0002\u02c7",
+    "\u02c8\u0003\u0002\u0002\u0002\u02c8\u02ca\u0003\u0002\u0002\u0002\u02c9",
+    "\u02b4\u0003\u0002\u0002\u0002\u02c9\u02b5\u0003\u0002\u0002\u0002\u02c9",
+    "\u02b6\u0003\u0002\u0002\u0002\u02c9\u02b7\u0003\u0002\u0002\u0002\u02c9",
+    "\u02b8\u0003\u0002\u0002\u0002\u02c9\u02b9\u0003\u0002\u0002\u0002\u02c9",
+    "\u02ba\u0003\u0002\u0002\u0002\u02c9\u02bb\u0003\u0002\u0002\u0002\u02c9",
+    "\u02bc\u0003\u0002\u0002\u0002\u02c9\u02bd\u0003\u0002\u0002\u0002\u02c9",
+    "\u02be\u0003\u0002\u0002\u0002\u02cao\u0003\u0002\u0002\u0002\u02cb",
+    "\u02d0\u0007p\u0002\u0002\u02cc\u02cd\t\f\u0002\u0002\u02cd\u02cf\u0007",
+    "p\u0002\u0002\u02ce\u02cc\u0003\u0002\u0002\u0002\u02cf\u02d2\u0003",
+    "\u0002\u0002\u0002\u02d0\u02ce\u0003\u0002\u0002\u0002\u02d0\u02d1\u0003",
+    "\u0002\u0002\u0002\u02d1q\u0003\u0002\u0002\u0002\u02d2\u02d0\u0003",
+    "\u0002\u0002\u0002\u02d3\u02d4\u0007]\u0002\u0002\u02d4\u02d5\t\r\u0002",
+    "\u0002\u02d5s\u0003\u0002\u0002\u0002\u02d6\u02d7\u0007p\u0002\u0002",
+    "\u02d7\u02d8\u0007h\u0002\u0002\u02d8u\u0003\u0002\u0002\u0002\u02d9",
+    "\u02ed\u0007R\u0002\u0002\u02da\u02ed\u0007S\u0002\u0002\u02db\u02dd",
+    "\t\u0007\u0002\u0002\u02dc\u02db\u0003\u0002\u0002\u0002\u02dc\u02dd",
+    "\u0003\u0002\u0002\u0002\u02dd\u02e4\u0003\u0002\u0002\u0002\u02de\u02e0",
+    "\u0007T\u0002\u0002\u02df\u02de\u0003\u0002\u0002\u0002\u02e0\u02e1",
+    "\u0003\u0002\u0002\u0002\u02e1\u02df\u0003\u0002\u0002\u0002\u02e1\u02e2",
+    "\u0003\u0002\u0002\u0002\u02e2\u02e3\u0003\u0002\u0002\u0002\u02e3\u02e5",
+    "\u0007k\u0002\u0002\u02e4\u02df\u0003\u0002\u0002\u0002\u02e4\u02e5",
+    "\u0003\u0002\u0002\u0002\u02e5\u02e6\u0003\u0002\u0002\u0002\u02e6\u02ed",
+    "\u0007T\u0002\u0002\u02e7\u02ed\u0007P\u0002\u0002\u02e8\u02ed\u0007",
+    "Q\u0002\u0002\u02e9\u02ed\u0007G\u0002\u0002\u02ea\u02ed\u0007(\u0002",
+    "\u0002\u02eb\u02ed\u0007p\u0002\u0002\u02ec\u02d9\u0003\u0002\u0002",
+    "\u0002\u02ec\u02da\u0003\u0002\u0002\u0002\u02ec\u02dc\u0003\u0002\u0002",
+    "\u0002\u02ec\u02e7\u0003\u0002\u0002\u0002\u02ec\u02e8\u0003\u0002\u0002",
+    "\u0002\u02ec\u02e9\u0003\u0002\u0002\u0002\u02ec\u02ea\u0003\u0002\u0002",
+    "\u0002\u02ec\u02eb\u0003\u0002\u0002\u0002\u02edw\u0003\u0002\u0002",
+    "\u0002\u02ee\u02f1\u0007c\u0002\u0002\u02ef\u02f2\u0005v<\u0002\u02f0",
+    "\u02f2\u0005x=\u0002\u02f1\u02ef\u0003\u0002\u0002\u0002\u02f1\u02f0",
+    "\u0003\u0002\u0002\u0002\u02f2\u02fa\u0003\u0002\u0002\u0002\u02f3\u02f6",
+    "\u0007j\u0002\u0002\u02f4\u02f7\u0005v<\u0002\u02f5\u02f7\u0005x=\u0002",
+    "\u02f6\u02f4\u0003\u0002\u0002\u0002\u02f6\u02f5\u0003\u0002\u0002\u0002",
+    "\u02f7\u02f9\u0003\u0002\u0002\u0002\u02f8\u02f3\u0003\u0002\u0002\u0002",
+    "\u02f9\u02fc\u0003\u0002\u0002\u0002\u02fa\u02f8\u0003\u0002\u0002\u0002",
+    "\u02fa\u02fb\u0003\u0002\u0002\u0002\u02fb\u02fe\u0003\u0002\u0002\u0002",
+    "\u02fc\u02fa\u0003\u0002\u0002\u0002\u02fd\u02ff\u0007j\u0002\u0002",
+    "\u02fe\u02fd\u0003\u0002\u0002\u0002\u02fe\u02ff\u0003\u0002\u0002\u0002",
+    "\u02ff\u0300\u0003\u0002\u0002\u0002\u0300\u0301\u0007d\u0002\u0002",
+    "\u0301y\u0003\u0002\u0002\u0002\u0302\u0305\u0005n8\u0002\u0303\u0305",
+    "\u0005p9\u0002\u0304\u0302\u0003\u0002\u0002\u0002\u0304\u0303\u0003",
+    "\u0002\u0002\u0002\u0305\u0309\u0003\u0002\u0002\u0002\u0306\u0307\u0007",
+    "Z\u0002\u0002\u0307\u0308\t\r\u0002\u0002\u0308\u030a\u0007`\u0002\u0002",
+    "\u0309\u0306\u0003\u0002\u0002\u0002\u0309\u030a\u0003\u0002\u0002\u0002",
+    "\u030a{\u0003\u0002\u0002\u0002\u030b\u030c\u0007;\u0002\u0002\u030c",
+    "}\u0003\u0002\u0002\u0002i\u0081\u0095\u009e\u00a3\u00b0\u00b8\u00bd",
     "\u00c3\u00cc\u00d0\u00d6\u00da\u00ee\u00f5\u00fd\u0100\u010a\u010f\u0112",
     "\u0117\u011b\u0123\u012d\u0132\u0134\u013e\u0148\u014d\u0151\u0157\u015f",
     "\u0166\u0170\u0172\u0174\u0181\u0183\u0185\u0190\u0198\u019a\u019c\u01a1",
     "\u01a5\u01a9\u01ac\u01b1\u01b5\u01b8\u01c0\u01c3\u01c8\u01cc\u01d2\u01d7",
     "\u01db\u01e5\u01e9\u01ef\u01f6\u01fb\u01ff\u0205\u020c\u0216\u0220\u0231",
     "\u0233\u023a\u0243\u024c\u0251\u025b\u025e\u0266\u026a\u0271\u0273\u027a",
-    "\u028a\u028d\u0299\u029c\u02a1\u02a7\u02ad\u02b1\u02bf\u02c3\u02c6\u02c8",
-    "\u02cf\u02db\u02e0\u02e3\u02eb\u02f0\u02f5\u02f9\u02fd\u0303\u0308"].join("");
+    "\u028a\u028d\u0299\u029c\u02a1\u02a7\u02aa\u02ae\u02b2\u02c0\u02c4\u02c7",
+    "\u02c9\u02d0\u02dc\u02e1\u02e4\u02ec\u02f1\u02f6\u02fa\u02fe\u0304\u0309"].join("");
 
 
 var atn = new antlr4.atn.ATNDeserializer().deserialize(serializedATN);
@@ -7010,10 +7011,6 @@ ParamContext.prototype.IDENTIFIER = function() {
     return this.getToken(TibboBasicParser.IDENTIFIER, 0);
 };
 
-ParamContext.prototype.asTypeClause = function() {
-    return this.getTypedRuleContext(AsTypeClauseContext,0);
-};
-
 ParamContext.prototype.LPAREN = function() {
     return this.getToken(TibboBasicParser.LPAREN, 0);
 };
@@ -7032,6 +7029,10 @@ ParamContext.prototype.BYVAL = function() {
 
 ParamContext.prototype.BYREF = function() {
     return this.getToken(TibboBasicParser.BYREF, 0);
+};
+
+ParamContext.prototype.asTypeClause = function() {
+    return this.getTypedRuleContext(AsTypeClauseContext,0);
 };
 
 ParamContext.prototype.enterRule = function(listener) {
@@ -7095,8 +7096,14 @@ TibboBasicParser.prototype.param = function() {
             this.match(TibboBasicParser.RPAREN);
         }
 
-        this.state = 679;
-        localctx.valueType = this.asTypeClause();
+        this.state = 680;
+        this._errHandler.sync(this);
+        _la = this._input.LA(1);
+        if(_la===TibboBasicParser.AS) {
+            this.state = 679;
+            localctx.valueType = this.asTypeClause();
+        }
+
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
 	        localctx.exception = re;
@@ -7177,23 +7184,23 @@ TibboBasicParser.prototype.asTypeClause = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 681;
+        this.state = 682;
         this.match(TibboBasicParser.AS);
-        this.state = 683;
+        this.state = 684;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===TibboBasicParser.ENUM) {
-            this.state = 682;
+            this.state = 683;
             this.match(TibboBasicParser.ENUM);
         }
 
-        this.state = 685;
+        this.state = 686;
         localctx.valueType = this.type();
-        this.state = 687;
+        this.state = 688;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===TibboBasicParser.MULT) {
-            this.state = 686;
+            this.state = 687;
             this.fieldLength();
         }
 
@@ -7323,86 +7330,86 @@ TibboBasicParser.prototype.baseType = function() {
     this.enterRule(localctx, 108, TibboBasicParser.RULE_baseType);
     var _la = 0; // Token type
     try {
-        this.state = 710;
+        this.state = 711;
         this._errHandler.sync(this);
         switch(this._input.LA(1)) {
         case TibboBasicParser.CHAR:
             this.enterOuterAlt(localctx, 1);
-            this.state = 689;
+            this.state = 690;
             this.match(TibboBasicParser.CHAR);
             break;
         case TibboBasicParser.SHORT:
             this.enterOuterAlt(localctx, 2);
-            this.state = 690;
+            this.state = 691;
             this.match(TibboBasicParser.SHORT);
             break;
         case TibboBasicParser.WORD:
             this.enterOuterAlt(localctx, 3);
-            this.state = 691;
+            this.state = 692;
             this.match(TibboBasicParser.WORD);
             break;
         case TibboBasicParser.DWORD:
             this.enterOuterAlt(localctx, 4);
-            this.state = 692;
+            this.state = 693;
             this.match(TibboBasicParser.DWORD);
             break;
         case TibboBasicParser.FLOAT:
             this.enterOuterAlt(localctx, 5);
-            this.state = 693;
+            this.state = 694;
             this.match(TibboBasicParser.FLOAT);
             break;
         case TibboBasicParser.REAL:
             this.enterOuterAlt(localctx, 6);
-            this.state = 694;
+            this.state = 695;
             this.match(TibboBasicParser.REAL);
             break;
         case TibboBasicParser.BOOLEAN:
             this.enterOuterAlt(localctx, 7);
-            this.state = 695;
+            this.state = 696;
             this.match(TibboBasicParser.BOOLEAN);
             break;
         case TibboBasicParser.BYTE:
             this.enterOuterAlt(localctx, 8);
-            this.state = 696;
+            this.state = 697;
             this.match(TibboBasicParser.BYTE);
             break;
         case TibboBasicParser.INTEGER:
             this.enterOuterAlt(localctx, 9);
-            this.state = 697;
+            this.state = 698;
             this.match(TibboBasicParser.INTEGER);
             break;
         case TibboBasicParser.LONG:
             this.enterOuterAlt(localctx, 10);
-            this.state = 698;
+            this.state = 699;
             this.match(TibboBasicParser.LONG);
             break;
         case TibboBasicParser.STRING:
             this.enterOuterAlt(localctx, 11);
-            this.state = 699;
+            this.state = 700;
             this.match(TibboBasicParser.STRING);
-            this.state = 708;
+            this.state = 709;
             this._errHandler.sync(this);
-            var la_ = this._interp.adaptivePredict(this._input,89,this._ctx);
+            var la_ = this._interp.adaptivePredict(this._input,90,this._ctx);
             if(la_===1) {
-                this.state = 701;
+                this.state = 702;
                 this._errHandler.sync(this);
                 _la = this._input.LA(1);
                 if(_la===TibboBasicParser.WS) {
-                    this.state = 700;
+                    this.state = 701;
                     this.match(TibboBasicParser.WS);
                 }
 
-                this.state = 703;
+                this.state = 704;
                 this.match(TibboBasicParser.MULT);
-                this.state = 705;
+                this.state = 706;
                 this._errHandler.sync(this);
                 _la = this._input.LA(1);
                 if(_la===TibboBasicParser.WS) {
-                    this.state = 704;
+                    this.state = 705;
                     this.match(TibboBasicParser.WS);
                 }
 
-                this.state = 707;
+                this.state = 708;
                 this.expression(0);
 
             }
@@ -7509,13 +7516,13 @@ TibboBasicParser.prototype.complexType = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 712;
+        this.state = 713;
         this.match(TibboBasicParser.IDENTIFIER);
-        this.state = 717;
+        this.state = 718;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         while(_la===TibboBasicParser.DOT || _la===TibboBasicParser.BANG) {
-            this.state = 713;
+            this.state = 714;
             _la = this._input.LA(1);
             if(!(_la===TibboBasicParser.DOT || _la===TibboBasicParser.BANG)) {
             this._errHandler.recoverInline(this);
@@ -7524,9 +7531,9 @@ TibboBasicParser.prototype.complexType = function() {
             	this._errHandler.reportMatch(this);
                 this.consume();
             }
-            this.state = 714;
+            this.state = 715;
             this.match(TibboBasicParser.IDENTIFIER);
-            this.state = 719;
+            this.state = 720;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
         }
@@ -7605,9 +7612,9 @@ TibboBasicParser.prototype.fieldLength = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 720;
-        this.match(TibboBasicParser.MULT);
         this.state = 721;
+        this.match(TibboBasicParser.MULT);
+        this.state = 722;
         _la = this._input.LA(1);
         if(!(_la===TibboBasicParser.INTEGERLITERAL || _la===TibboBasicParser.IDENTIFIER)) {
         this._errHandler.recoverInline(this);
@@ -7686,9 +7693,9 @@ TibboBasicParser.prototype.lineLabel = function() {
     this.enterRule(localctx, 114, TibboBasicParser.RULE_lineLabel);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 723;
-        this.match(TibboBasicParser.IDENTIFIER);
         this.state = 724;
+        this.match(TibboBasicParser.IDENTIFIER);
+        this.state = 725;
         this.match(TibboBasicParser.COLON);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -7804,28 +7811,28 @@ TibboBasicParser.prototype.literal = function() {
     this.enterRule(localctx, 116, TibboBasicParser.RULE_literal);
     var _la = 0; // Token type
     try {
-        this.state = 745;
+        this.state = 746;
         this._errHandler.sync(this);
         switch(this._input.LA(1)) {
         case TibboBasicParser.HEXLITERAL:
             this.enterOuterAlt(localctx, 1);
-            this.state = 726;
+            this.state = 727;
             this.match(TibboBasicParser.HEXLITERAL);
             break;
         case TibboBasicParser.BINLITERAL:
             this.enterOuterAlt(localctx, 2);
-            this.state = 727;
+            this.state = 728;
             this.match(TibboBasicParser.BINLITERAL);
             break;
         case TibboBasicParser.INTEGERLITERAL:
         case TibboBasicParser.MINUS:
         case TibboBasicParser.PLUS:
             this.enterOuterAlt(localctx, 3);
-            this.state = 729;
+            this.state = 730;
             this._errHandler.sync(this);
             _la = this._input.LA(1);
             if(_la===TibboBasicParser.MINUS || _la===TibboBasicParser.PLUS) {
-                this.state = 728;
+                this.state = 729;
                 _la = this._input.LA(1);
                 if(!(_la===TibboBasicParser.MINUS || _la===TibboBasicParser.PLUS)) {
                 this._errHandler.recoverInline(this);
@@ -7836,50 +7843,50 @@ TibboBasicParser.prototype.literal = function() {
                 }
             }
 
-            this.state = 737;
+            this.state = 738;
             this._errHandler.sync(this);
-            var la_ = this._interp.adaptivePredict(this._input,94,this._ctx);
+            var la_ = this._interp.adaptivePredict(this._input,95,this._ctx);
             if(la_===1) {
-                this.state = 732; 
+                this.state = 733; 
                 this._errHandler.sync(this);
                 _la = this._input.LA(1);
                 do {
-                    this.state = 731;
+                    this.state = 732;
                     this.match(TibboBasicParser.INTEGERLITERAL);
-                    this.state = 734; 
+                    this.state = 735; 
                     this._errHandler.sync(this);
                     _la = this._input.LA(1);
                 } while(_la===TibboBasicParser.INTEGERLITERAL);
-                this.state = 736;
+                this.state = 737;
                 this.match(TibboBasicParser.DOT);
 
             }
-            this.state = 739;
+            this.state = 740;
             this.match(TibboBasicParser.INTEGERLITERAL);
             break;
         case TibboBasicParser.STRINGLITERAL:
             this.enterOuterAlt(localctx, 4);
-            this.state = 740;
+            this.state = 741;
             this.match(TibboBasicParser.STRINGLITERAL);
             break;
         case TibboBasicParser.TemplateStringLiteral:
             this.enterOuterAlt(localctx, 5);
-            this.state = 741;
+            this.state = 742;
             this.match(TibboBasicParser.TemplateStringLiteral);
             break;
         case TibboBasicParser.TRUE:
             this.enterOuterAlt(localctx, 6);
-            this.state = 742;
+            this.state = 743;
             this.match(TibboBasicParser.TRUE);
             break;
         case TibboBasicParser.FALSE:
             this.enterOuterAlt(localctx, 7);
-            this.state = 743;
+            this.state = 744;
             this.match(TibboBasicParser.FALSE);
             break;
         case TibboBasicParser.IDENTIFIER:
             this.enterOuterAlt(localctx, 8);
-            this.state = 744;
+            this.state = 745;
             this.match(TibboBasicParser.IDENTIFIER);
             break;
         default:
@@ -7990,9 +7997,9 @@ TibboBasicParser.prototype.arrayLiteral = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 747;
+        this.state = 748;
         this.match(TibboBasicParser.L_CURLY_BRACKET);
-        this.state = 750;
+        this.state = 751;
         this._errHandler.sync(this);
         switch(this._input.LA(1)) {
         case TibboBasicParser.FALSE:
@@ -8005,24 +8012,24 @@ TibboBasicParser.prototype.arrayLiteral = function() {
         case TibboBasicParser.MINUS:
         case TibboBasicParser.PLUS:
         case TibboBasicParser.IDENTIFIER:
-            this.state = 748;
+            this.state = 749;
             this.literal();
             break;
         case TibboBasicParser.L_CURLY_BRACKET:
-            this.state = 749;
+            this.state = 750;
             this.arrayLiteral();
             break;
         default:
             throw new antlr4.error.NoViableAltException(this);
         }
-        this.state = 759;
+        this.state = 760;
         this._errHandler.sync(this);
-        var _alt = this._interp.adaptivePredict(this._input,98,this._ctx)
+        var _alt = this._interp.adaptivePredict(this._input,99,this._ctx)
         while(_alt!=2 && _alt!=antlr4.atn.ATN.INVALID_ALT_NUMBER) {
             if(_alt===1) {
-                this.state = 752;
+                this.state = 753;
                 this.match(TibboBasicParser.COMMA);
-                this.state = 755;
+                this.state = 756;
                 this._errHandler.sync(this);
                 switch(this._input.LA(1)) {
                 case TibboBasicParser.FALSE:
@@ -8035,31 +8042,31 @@ TibboBasicParser.prototype.arrayLiteral = function() {
                 case TibboBasicParser.MINUS:
                 case TibboBasicParser.PLUS:
                 case TibboBasicParser.IDENTIFIER:
-                    this.state = 753;
+                    this.state = 754;
                     this.literal();
                     break;
                 case TibboBasicParser.L_CURLY_BRACKET:
-                    this.state = 754;
+                    this.state = 755;
                     this.arrayLiteral();
                     break;
                 default:
                     throw new antlr4.error.NoViableAltException(this);
                 } 
             }
-            this.state = 761;
+            this.state = 762;
             this._errHandler.sync(this);
-            _alt = this._interp.adaptivePredict(this._input,98,this._ctx);
+            _alt = this._interp.adaptivePredict(this._input,99,this._ctx);
         }
 
-        this.state = 763;
+        this.state = 764;
         this._errHandler.sync(this);
         _la = this._input.LA(1);
         if(_la===TibboBasicParser.COMMA) {
-            this.state = 762;
+            this.state = 763;
             this.match(TibboBasicParser.COMMA);
         }
 
-        this.state = 765;
+        this.state = 766;
         this.match(TibboBasicParser.R_CURLY_BRACKET);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {
@@ -8148,7 +8155,7 @@ TibboBasicParser.prototype.type = function() {
     var _la = 0; // Token type
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 769;
+        this.state = 770;
         this._errHandler.sync(this);
         switch(this._input.LA(1)) {
         case TibboBasicParser.BOOLEAN:
@@ -8162,23 +8169,23 @@ TibboBasicParser.prototype.type = function() {
         case TibboBasicParser.SHORT:
         case TibboBasicParser.STRING:
         case TibboBasicParser.WORD:
-            this.state = 767;
+            this.state = 768;
             this.baseType();
             break;
         case TibboBasicParser.IDENTIFIER:
-            this.state = 768;
+            this.state = 769;
             this.complexType();
             break;
         default:
             throw new antlr4.error.NoViableAltException(this);
         }
-        this.state = 774;
+        this.state = 775;
         this._errHandler.sync(this);
-        var la_ = this._interp.adaptivePredict(this._input,101,this._ctx);
+        var la_ = this._interp.adaptivePredict(this._input,102,this._ctx);
         if(la_===1) {
-            this.state = 771;
-            this.match(TibboBasicParser.LPAREN);
             this.state = 772;
+            this.match(TibboBasicParser.LPAREN);
+            this.state = 773;
             _la = this._input.LA(1);
             if(!(_la===TibboBasicParser.INTEGERLITERAL || _la===TibboBasicParser.IDENTIFIER)) {
             this._errHandler.recoverInline(this);
@@ -8187,7 +8194,7 @@ TibboBasicParser.prototype.type = function() {
             	this._errHandler.reportMatch(this);
                 this.consume();
             }
-            this.state = 773;
+            this.state = 774;
             this.match(TibboBasicParser.RPAREN);
 
         }
@@ -8257,7 +8264,7 @@ TibboBasicParser.prototype.visibility = function() {
     this.enterRule(localctx, 122, TibboBasicParser.RULE_visibility);
     try {
         this.enterOuterAlt(localctx, 1);
-        this.state = 776;
+        this.state = 777;
         this.match(TibboBasicParser.PUBLIC);
     } catch (re) {
     	if(re instanceof antlr4.error.RecognitionException) {

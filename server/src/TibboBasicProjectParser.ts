@@ -599,66 +599,62 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterParam(ctx) {
-        if (ctx.valueType) {
-            if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_declareSubStmt ||
-                ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_declareFuncStmt) {
-                return;
-            }
-            let valueType = '';
-            let length = '';
-            ctx.children.forEach(element => {
-                if (element.ruleIndex == TibboBasicParser.RULE_asTypeClause) {
-                    valueType = element.valueType.getText();
-                    if (element.children.length >= 4) {
-                        length = element.children[2].getText();
-                    }
-                }
-            });
-            const variable = {
-                name: ctx.name.text,
-                value: '',
-                length: length,
-                dataType: valueType,
-                location: {
-                    startToken: ctx.name,
-                    stopToken: ctx.name
-                },
-                references: [],
-                comments: []
-            };
-            const param = {
-                name: ctx.name.text,
-                dataType: valueType,
-                byref: ctx.byref != null
-            };
-            this.parser.addVariable(variable);
-            if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_subStmt) {
-                this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
-            }
-            if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_functionStmt) {
-                this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
-            }
-            if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_syscallDeclarationInner) {
-                if (ctx.parentCtx.parentCtx.children.length == 3) {
-                    //syscall
-                    this.parser.syscalls[ctx.parentCtx.parentCtx.children[0].symbol.text].parameters.push(param);
-                }
-                else {
-                    //object call
-                    const obj = this.parser.objects[ctx.parentCtx.parentCtx.children[0].symbol.text];
-                    const prop = ctx.parentCtx.parentCtx.children[2].symbol.text;
-                    if (obj != undefined) {
-                        for (let i = 0; i < obj.functions.length; i++) {
-                            if (obj.functions[i].name == prop) {
-                                obj.functions[i].parameters.push(param);
-                                break;
-                            }
-                        }
-                    }
-                }
 
+        if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_declareSubStmt ||
+            ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_declareFuncStmt) {
+            return;
+        }
+        let valueType = 'void';
+        let length = '';
+        ctx.children.forEach(element => {
+            if (element.ruleIndex == TibboBasicParser.RULE_asTypeClause) {
+                valueType = element.valueType.getText();
+                if (element.children.length >= 4) {
+                    length = element.children[2].getText();
+                }
+            }
+        });
+        const variable = {
+            name: ctx.name.text,
+            value: '',
+            length: length,
+            dataType: valueType,
+            location: {
+                startToken: ctx.name,
+                stopToken: ctx.name
+            },
+            references: [],
+            comments: []
+        };
+        const param = {
+            name: ctx.name.text,
+            dataType: valueType,
+            byref: ctx.byref != null
+        };
+        this.parser.addVariable(variable);
+        if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_subStmt) {
+            this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
+        }
+        if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_functionStmt) {
+            this.parser.functions[ctx.parentCtx.parentCtx.name.text].parameters.push(param);
+        }
+        if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_syscallDeclarationInner) {
+            const objName = ctx.parentCtx.parentCtx.object;
+            if (objName) {
+                const obj = this.parser.objects[ctx.parentCtx.parentCtx.children[0].symbol.text];
+                const prop = ctx.parentCtx.parentCtx.children[2].symbol.text;
+                for (let i = 0; i < obj.functions.length; i++) {
+                    if (obj.functions[i].name == prop) {
+                        obj.functions[i].parameters.push(param);
+                        break;
+                    }
+                }
+            }
+            else {
+                this.parser.syscalls[ctx.parentCtx.parentCtx.children[0].symbol.text].parameters.push(param);
             }
         }
+
     }
 
     enterBlockIfThenElse(ctx) {
@@ -790,9 +786,9 @@ class ParserListener extends TibboBasicParserListener {
                 };
                 let symbolName = item.start.text;
 
-                this.addSymbolReference(symbolName, location);
-                this.addFunction(symbolName, {});
-                this.parser.functions[symbolName].references.push(location);
+                // this.addSymbolReference(symbolName, location);
+                // this.addFunction(symbolName, {});
+                // this.parser.functions[symbolName].references.push(location);
             }
         }
     }
