@@ -636,6 +636,20 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                         }
                     }
                 }
+                if (result.value == '') {
+                    //TODO get correct variable at scope
+                    const varD: TBVariable | undefined = getVariable(text, filePath, offset);
+                    if (varD != undefined) {
+                        let lengthField = '';
+                        if (varD.length != undefined && varD.length != '') {
+                            lengthField += '(' + varD.length + ')';
+                        }
+                        result.value = '```tibbo-basic\n';
+                        result.value += `dim ${varD.name}${lengthField} as ${varD.dataType}`;
+                        result.value += '\n```\n';
+                        result.value += getComments(varD.comments);
+                    }
+                }
                 if (result.value != '') {
                     //is object or complex type variable
                 }
@@ -729,20 +743,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     }
                 }
 
-                if (result.value == '') {
-                    //TODO get correct variable at scope
-                    const varD: TBVariable | undefined = getVariable(text, filePath, offset);
-                    if (varD != undefined) {
-                        let lengthField = '';
-                        if (varD.length != undefined && varD.length != '') {
-                            lengthField += '(' + varD.length + ')';
-                        }
-                        result.value = '```tibbo-basic\n';
-                        result.value += `dim ${varD.name}${lengthField} as ${varD.dataType}`;
-                        result.value += '\n```\n';
-                        result.value += getComments(varD.comments);
-                    }
-                }
+                
                 break;
         }
     }
@@ -1432,7 +1433,7 @@ function notifyDiagnostics() {
                             message: `${funcName} is not called anywhere`,
                         }
                     ];
-                    diagnostics.push(diagnostic);
+                    // diagnostics.push(diagnostic);
                 }
 
             }

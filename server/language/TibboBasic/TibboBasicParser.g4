@@ -272,7 +272,7 @@ paramList
     : LPAREN (param (COMMA param)*)? RPAREN
     ;
 
-param : (BYVAL | BYREF)? name=IDENTIFIER (LPAREN INTEGERLITERAL RPAREN)? valueType=asTypeClause ;
+param : (BYVAL | BYREF)? name=IDENTIFIER (LPAREN INTEGERLITERAL RPAREN)? valueType=asTypeClause? ;
 
 // atomic rules ----------------------------------
 asTypeClause : AS ENUM? valueType=type (fieldLength)?;
