@@ -369,7 +369,7 @@ class ParserListener extends TibboBasicParserListener {
                 comparisonOperator = '>=';
             }
             else {
-                stepExp = `${variable} += ${ctx.step[0].substr(1)}`;
+                stepExp = `${variable} += ${ctx.step.start.text}`;
             }
         }
         let endCondition = `${variable} ${comparisonOperator} ${ctx.children[3].getText()}`;

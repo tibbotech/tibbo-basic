@@ -13,6 +13,7 @@ let files = [
     path.join(__dirname, '..', 'tests', 'main.tbs'),
     path.join(__dirname, '..', 'tests', 'device.tbs'),
     path.join(__dirname, '..', 'tests', 'boot.tbs'),
+    path.join(__dirname, '..', 'tests', 'super_spi.tbs'),
     // path.join(__dirname, '..', 'tests', 'Platforms/src/2_01_03/dhcp/trunk/dhcp.tbh'),
     // path.join(__dirname, '..', 'tests', 'Platforms/src/2_01_03/dhcp/trunk/dhcp.tbs'),
     // path.join(__dirname, '..', 'tests', 'Platforms/src/2_01_03/settings/trunk/settings.tbs'),
