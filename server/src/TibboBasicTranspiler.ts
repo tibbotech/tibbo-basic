@@ -255,28 +255,31 @@ class ParserListener extends TibboBasicParserListener {
     exitParamList(ctx: any) {
         if (!this.isDeclaration) {
             this.transpiler.addCode(`(${this.currentParams.join(', ')}) {`);
+            if (this.currentFunction && this.currentFunction.returnType !== '') {
+                this.transpiler.addCode(`\n${this.currentFunction.returnType} ${this.currentFunction.name};`);
+            }
         }
         else {
             this.transpiler.addCode(`(${this.currentParams.join(', ')});`);
         }
         this.transpiler.writeLine(ctx.start.line);
-        if (this.currentFunction && this.currentFunction.returnType !== '') {
-            let index = ctx.start.line;
-            if (this.transpiler.lines[index].trim().indexOf('\'') != 0) {
-                this.transpiler.appendLine(`    ${this.currentFunction.returnType} ${this.currentFunction.name};`, index);
-            }
-            else {
-                while (index != -1) {
-                    if (this.transpiler.lines[index].trim().indexOf('\'') != 0) {
-                        this.transpiler.appendLine(`    ${this.currentFunction.returnType} ${this.currentFunction.name};`, index + 1);
-                        index = -1;
-                    }
-                    else {
-                        index++;
-                    }
-                }
-            }
-        }
+        // if (this.currentFunction && this.currentFunction.returnType !== '') {
+        //     let index = ctx.start.line;
+        //     if (this.transpiler.lines[index].trim().indexOf('\'') != 0) {
+        //         this.transpiler.appendLine(`    ${this.currentFunction.returnType} ${this.currentFunction.name};`, index);
+        //     }
+        //     else {
+        //         while (index != -1) {
+        //             if (this.transpiler.lines[index].trim().indexOf('\'') != 0) {
+        //                 this.transpiler.appendLine(`    ${this.currentFunction.returnType} ${this.currentFunction.name};`, index + 1);
+        //                 index = -1;
+        //             }
+        //             else {
+        //                 index++;
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     exitSubStmt(ctx: any) {
@@ -369,7 +372,7 @@ class ParserListener extends TibboBasicParserListener {
                 comparisonOperator = '>=';
             }
             else {
-                stepExp = `${variable} += ${ctx.step[0].substr(1)}`;
+                stepExp = `${variable} += ${ctx.step.start.text}`;
             }
         }
         let endCondition = `${variable} ${comparisonOperator} ${ctx.children[3].getText()}`;

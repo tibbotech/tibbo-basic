@@ -18,3 +18,10 @@ void on_sock_data_arrival() {
     dhcp_proc_data();
 
 }
+
+unsigned char test() {
+unsigned char test;
+//testing comments in function
+    test = 3;
+    return test;
+}

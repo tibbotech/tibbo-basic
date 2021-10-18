@@ -70,9 +70,9 @@ no_yes dhcp_ingnore_link_disconnects[NUM_INTERFACES];
 
 //==============================================================================
 string dhcp_get_info(dhcp_info_elements info_element, string *extra_data) {
+string dhcp_get_info;
 //Returns library-specific information for the requested info element
 
-    string dhcp_get_info;
 	dhcp_get_info = "";
 	switch (info_element) {
 	case DHCP_INFO_ELEMENT_REQUIRED_BUFFERS:
@@ -86,9 +86,9 @@ string dhcp_get_info(dhcp_info_elements info_element, string *extra_data) {
 
 //--------------------------------------------------------------------
 en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string *requested_ip, string *host_name) {
+en_dhcp_status_codes dhcp_start;
 //API procedure, starts DHCP client on the specified network interface.
 
-    en_dhcp_status_codes dhcp_start;
 	if (dhcp_init_flag != DHCP_INIT_SIGNATURE) {
 		dhcp_init();
 		dhcp_init_flag = DHCP_INIT_SIGNATURE;
@@ -162,9 +162,9 @@ dhcp_start_continue:
 
 //------------------------------------------------------------------------------
 en_dhcp_status_codes dhcp_stop(pl_sock_interfaces interface) {
+en_dhcp_status_codes dhcp_stop;
 //API procedure, stops DHCP client on the specified network interface.
 
-    en_dhcp_status_codes dhcp_stop;
 	if (dhcp_init_flag != DHCP_INIT_SIGNATURE) {
 		dhcp_init();
 		dhcp_init_flag = DHCP_INIT_SIGNATURE;
@@ -691,7 +691,7 @@ void dhcp_error(pl_sock_interfaces interface) {
 
 //------------------------------------------------------------------------------
 ok_ng dhcp_sock_open(pl_sock_interfaces interface, en_dhcp_phases phase) {
-    ok_ng dhcp_sock_open;
+ok_ng dhcp_sock_open;
 	unsigned char x;
 	unsigned int i;
 	

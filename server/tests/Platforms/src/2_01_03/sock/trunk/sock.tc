@@ -23,9 +23,9 @@ unsigned int sock_init_flag;
 
 //==============================================================================
 unsigned char sock_get(string *signature) {
+unsigned char sock_get;
 //Returns a free socket number or 255 if no free sockets left.
 
-    unsigned char sock_get;
 	unsigned char f;
 
 	if (sock_init_flag != SOCK_INIT_SIGNATURE) {
@@ -55,9 +55,9 @@ unsigned char sock_get(string *signature) {
 
 //--------------------------------------------------------------------
 string sock_who_uses(unsigned char sock_num) {
+string sock_who_uses;
 //Returns the signature of the specified socket's user.
 
-    string sock_who_uses;
 	if (sock_init_flag != SOCK_INIT_SIGNATURE) {
 		sock_init();
 		sock_init_flag = SOCK_INIT_SIGNATURE;

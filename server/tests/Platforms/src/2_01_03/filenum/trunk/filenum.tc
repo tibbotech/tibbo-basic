@@ -27,7 +27,7 @@ unsigned int filenum_init_flag;
 
 //====================================================================
 unsigned char filenum_open(string *signature, string *filename, pl_fd_status_codes *status) {
-    unsigned char filenum_open;
+unsigned char filenum_open;
 	unsigned char f;
 	
 	*status = PL_FD_STATUS_OK;
@@ -109,6 +109,7 @@ return filenum_open;
 
 //--------------------------------------------------------------------
 unsigned char filenum_get(string *signature) {
+unsigned char filenum_get;
 //find free file number or return 255 if no free file numbers available
 	unsigned char f;
 
@@ -139,7 +140,7 @@ unsigned char filenum_get(string *signature) {
 
 //--------------------------------------------------------------------
 string filenum_who_uses(unsigned char file_num) {
-    string filenum_who_uses;
+string filenum_who_uses;
 
 	if (filenum_init_flag != FILENUM_INIT_SIGNATURE) {
 		filenum_init();

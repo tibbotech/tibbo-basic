@@ -33,7 +33,7 @@ void dns_debugprint(string *print_data);
 //====================================================================
 
 en_dns_status_codes dns_start(unsigned char dns_sock_num) {
-    en_dns_status_codes dns_start;
+en_dns_status_codes dns_start;
 	unsigned char x;
 
 	#if DNS_DEBUG_PRINT
@@ -82,7 +82,7 @@ en_dns_status_codes dns_start(unsigned char dns_sock_num) {
 }
 
 en_dns_status_codes dns_connect(pl_sock_interfaces interface, string *dns_server_ip, unsigned int dns_port) {
-    en_dns_status_codes dns_connect;
+en_dns_status_codes dns_connect;
 	
 	if (dns_init_flag != DNS_INIT_SIGNATURE) {
 		#if DNS_DEBUG_PRINT

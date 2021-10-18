@@ -15,6 +15,7 @@ void scap_debugprint(string data);
 
 //================================================================================
 en_scap_status_codes scap_start() {
+en_scap_status_codes scap_start;
 //API procedure, starts the SCAP library.
 	unsigned char sock_num;
 
@@ -127,6 +128,7 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 }
 
 string<4> scap_size_convertion(unsigned long v) {
+string<4> scap_size_convertion;
 // convert parameter from dword to 4 bytes string
 	string<10> d;
 	unsigned char p[8];//P() is &H 1xxxxxx8

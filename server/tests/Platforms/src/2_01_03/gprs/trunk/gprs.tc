@@ -150,9 +150,9 @@ string<16> gprs_password;
 
 //====================================================================
 string gprs_get_info(gprs_info_elements info_element, string *extra_data) {
+string gprs_get_info;
 //API procedure, returns library-specific information according to the requested information element.
 
-    string gprs_get_info;
 	gprs_get_info = "";
 	switch (info_element) {
 	case GPRS_INFO_ELEMENT_REQUIRED_BUFFERS:
@@ -166,6 +166,7 @@ string gprs_get_info(gprs_info_elements info_element, string *extra_data) {
 
 //--------------------------------------------------------------------
 en_gprs_status_codes gprs_start(string *at_dt_command_param, string *apn, string *username, string *password) {
+en_gprs_status_codes gprs_start;
 //API procedure, starts the PPP login/configuration process.
 	unsigned char x;
 
@@ -912,7 +913,7 @@ void gprs_proc_timer_2() {
 
 //--------------------------------------------------------------------
 ok_ng gprs_parse_ping_reply() {
-    ok_ng gprs_parse_ping_reply;
+ok_ng gprs_parse_ping_reply;
 	unsigned long cs;
 	unsigned int w;
 	unsigned char f;
@@ -944,7 +945,7 @@ ok_ng gprs_parse_ping_reply() {
 
 //--------------------------------------------------------------------
 string gprs_parse_ppp_message() {
-    string gprs_parse_ppp_message;
+string gprs_parse_ppp_message;
 	unsigned int rxlen;
 	unsigned char f, x;
 	
@@ -1004,7 +1005,7 @@ string gprs_parse_ppp_message() {
 
 //--------------------------------------------------------------------
 gprs_lcp_parse_results gprs_parse_lcp_message(string *lcp_message, unsigned int ppp_protocol, gprs_ppp_codes code, string *rej_str) {
-    gprs_lcp_parse_results gprs_parse_lcp_message;
+gprs_lcp_parse_results gprs_parse_lcp_message;
 	unsigned char option_length;
 	string<128> lcp_message_copy;
 	
@@ -1212,7 +1213,7 @@ void gprs_ppp_send(unsigned int ppp_protocol, gprs_ppp_codes ppp_code, string *d
 
 //--------------------------------------------------------------------
 unsigned int gprs_update_fcs(string *dt) {
-    unsigned int gprs_update_fcs;
+unsigned int gprs_update_fcs;
 	unsigned char f;
 
 	gprs_update_fcs = &hFFFF;
@@ -1224,7 +1225,7 @@ unsigned int gprs_update_fcs(string *dt) {
 
 //--------------------------------------------------------------------
 unsigned int gprs_fcs_value(unsigned char x) {
-    unsigned int gprs_fcs_value;
+unsigned int gprs_fcs_value;
 	unsigned char f;
 
 	gprs_fcs_value = x;
@@ -1842,7 +1843,7 @@ case 3:
 //------------------------------------------------------------------------------
 #if GPRS_DEBUG_PRINT
 string gprs_print_hex(string *ss) {
-    string gprs_print_hex;
+string gprs_print_hex;
 	string s;
 	unsigned char f;
 	

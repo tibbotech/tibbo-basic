@@ -184,7 +184,7 @@ void agg_record_encode(string *encode_string, string *field_value);
 
 //------------------------------------------------------------------------------
 string agg_record_decode(string *encode_string, unsigned char field_index) {
-    string agg_record_decode;
+string agg_record_decode;
 	string s;
 	unsigned char l;
 	
@@ -197,6 +197,7 @@ string agg_record_decode(string *encode_string, unsigned char field_index) {
 
 //------------------------------------------------------------------------------
 en_agg_status_codes agg_start(pl_sock_interfaces interface, string *owner_name, string *device_name, string *password, string *agg_server_ip, unsigned int agg_server_port, unsigned int agg_server_tout, no_yes auto_reg) {
+en_agg_status_codes agg_start;
 //API procedure, allocate the sock, and opens the connection to AggreGate server
 	en_agg_status_codes agg_result;
 	unsigned int i;
@@ -286,9 +287,9 @@ l1:
 
 //-------------------------------------------------------------
 en_agg_status_codes agg_init() {
+en_agg_status_codes agg_init;
 //API procedure, initialize the AggreGate agent library, parses the descriptor file, checks compilation options, and exams the memory usage.
 
-    en_agg_status_codes agg_init;
 	unsigned int i, j, line_end, field_start_pos;
 	unsigned char agg_entity_index, agg_item_index, b, context_name_len, item_name_len, stored_event_index;
 	string s;
@@ -1058,7 +1059,7 @@ void agg_get_connection_state(en_agg_link_states *link_state, pl_sock_state_simp
 
 //------------------------------------------------------------------------------
 en_agg_status_codes agg_connect() {
-    en_agg_status_codes agg_connect;
+en_agg_status_codes agg_connect;
 	unsigned char x;
 	
 	if (agg_init_flag != AGG_INIT_SIGNATURE) {
@@ -1115,7 +1116,7 @@ void agg_sock_close() {
 
 //------------------------------------------------------------------------------
 string agg_rx_getdata(string *substr) {
-    string agg_rx_getdata;
+string agg_rx_getdata;
 	unsigned char x;
 	string s;
 	
@@ -1135,6 +1136,7 @@ string agg_rx_getdata(string *substr) {
 
 //-------------------------------------------------------------
 string agg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos) {
+string agg_get_descriptor_field;
 //line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
 	unsigned int i, w;
 	
@@ -1253,7 +1255,7 @@ send_script2:
 //------------------------------------------------------------------------------
 #if AGG_CUSTOM_RTC<2
 ok_ng agg_modtime_sg(agg_item selected_item, string *date_time, en_agg_rdwr op) {
-    ok_ng agg_modtime_sg;
+ok_ng agg_modtime_sg;
 	agg_modtime_sg = OK;
 	
 	#if AGG_SETTING_CONTROL
@@ -1457,7 +1459,7 @@ not_found:
 
 //------------------------------------------------------------------------------
 en_agg_element_get_status agg_element_get(string *element_level, string *element_str, string *opening_chr, string *closing_chr, string *element_result_str) {
-    en_agg_element_get_status agg_element_get;
+en_agg_element_get_status agg_element_get;
 	unsigned char temp, i;
 	unsigned char pos1, pos2, pos3, pos4, pos5;
 	
@@ -1539,7 +1541,7 @@ void agg_systime_sg(string<23> *date_time, en_agg_rdwr op) {
 
 //------------------------------------------------------------------------------
 en_agg_entity agg_entity_get(string *s) {
-    en_agg_entity agg_entity_get;
+en_agg_entity agg_entity_get;
 	switch (*s) {
 	case "info":
 
@@ -1566,7 +1568,7 @@ en_agg_entity agg_entity_get(string *s) {
 //------------------------------------------------------------------------------
 #if AGG_SETTING_CONTROL
 en_stg_status_codes agg_settings_sg(string *setting_name, string *setting_val, unsigned char index, en_stg_rdwr rw) {
-    en_stg_status_codes agg_settings_sg;
+en_stg_status_codes agg_settings_sg;
 	unsigned char i;
 	
 	agg_settings_sg = EN_STG_STATUS_OK;
@@ -1600,9 +1602,9 @@ fail:
 
 //------------------------------------------------------------------------------
 string agg_stg_msg(en_stg_status_codes stg_result) {
+string agg_stg_msg;
 //returns error msg according to the table status
 
-    string agg_stg_msg;
 	switch (stg_result) {
 		case EN_STG_STATUS_UNKNOWN:
 
@@ -1623,7 +1625,7 @@ string agg_stg_msg(en_stg_status_codes stg_result) {
 //----------------------------------------------------------------------------
 #if AGG_TABLE_CONTROL
 ok_ng agg_send_all_record(string *tbl_name) {
-    ok_ng agg_send_all_record;
+ok_ng agg_send_all_record;
 	tbl_field_type fld_temp;
 	unsigned char j;
 	unsigned int rec_num;
@@ -1680,6 +1682,7 @@ ok_ng agg_send_all_record(string *tbl_name) {
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_hash(string *contain, string *msg) {
+ok_ng agg_tbl_hash;
 //extact the table name from the contain, and return proper response string which contents the hash of the target table.
 	string<64> stemp1;
 	unsigned char pos1, pos2;
@@ -1705,6 +1708,7 @@ ok_ng agg_tbl_hash(string *contain, string *msg) {
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_add_record(string *contain, string *msg) {
+ok_ng agg_tbl_add_record;
 //extract the table name and record from the context, add the record the table and 
 //returns the proper response string which contents the result of the add record operation
 	string<64> s;
@@ -1778,6 +1782,7 @@ err:
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_put_record(string *contain, string *msg) {
+ok_ng agg_tbl_put_record;
 //extract the table name and record from the context, add the record the table and 
 //returns the proper response string which contents the result of the add record operation
 	string<64> s;
@@ -1861,7 +1866,7 @@ err:
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_update_record(string *contain, string *msg) {
-    ok_ng agg_tbl_update_record;
+ok_ng agg_tbl_update_record;
 	string<64> s;
 	unsigned char pos1, pos2;
 	en_tbl_status_codes tbl_result;
@@ -1942,7 +1947,7 @@ err:
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_remove_record(string *contain, string *msg) {
-    ok_ng agg_tbl_remove_record;
+ok_ng agg_tbl_remove_record;
 	string<64> s;
 	unsigned char pos1, pos2;
 	en_tbl_status_codes tbl_result;
@@ -1978,6 +1983,7 @@ err:
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_start_table(string *contain, string *msg) {
+ok_ng agg_tbl_start_table;
 //	dim stemp1 as string(64)
 	unsigned char pos1, pos2;
 	en_tbl_status_codes tbl_result;
@@ -2008,7 +2014,7 @@ err:
 
 //------------------------------------------------------------------------------
 ok_ng agg_tbl_finish_table(string *contain, string *msg) {
-    ok_ng agg_tbl_finish_table;
+ok_ng agg_tbl_finish_table;
 	en_tbl_status_codes tbl_result;
 	unsigned char pos1, pos2;
 	string<AGG_MAX_SCRIPT_LINE_NAME_LEN> tbl_name;
@@ -2144,9 +2150,9 @@ date_time_remove_formating:
 
 //------------------------------------------------------------------------------
 string agg_tbl_msg(en_tbl_status_codes tbl_result) {
+string agg_tbl_msg;
 //returns error msg according to the table status
 
-    string agg_tbl_msg;
 	switch (tbl_result) {
 		case EN_TBL_STATUS_OK:
 
@@ -2183,7 +2189,7 @@ string agg_tbl_msg(en_tbl_status_codes tbl_result) {
 
 //----------------------------------------------------------------------------
 ok_ng agg_call_function(string *op, string *context_name, string *func_input) {
-    ok_ng agg_call_function;
+ok_ng agg_call_function;
 	string msg;
 	
 	if (*context_name == "") {//root operations
@@ -2300,7 +2306,7 @@ return agg_call_function;
 
 //------------------------------------------------------------------------------
 string agg_root_login(string *function_input) {
-    string agg_root_login;
+string agg_root_login;
 	string<128> stemp1, stemp2, stemp3;
 
 	agg_element_get("1/1/",*function_input,chr(AGG_ELEMENT_START),chr(AGG_ELEMENT_END),stemp1);
@@ -2389,7 +2395,7 @@ void agg_replace_chr(string *s, string *a, string *b) {
 
 //------------------------------------------------------------------------------
 string agg_hex_to_hexstr(string *is) {
-    string agg_hex_to_hexstr;
+string agg_hex_to_hexstr;
 	string<4> ss;
 	unsigned char f;
 
@@ -2519,7 +2525,7 @@ proc_esc_chr:
 
 //----------------------------------------------------------------------------
 ok_ng agg_firmware_upload() {
-    ok_ng agg_firmware_upload;
+ok_ng agg_firmware_upload;
 	unsigned long remain_file_size, total_file_size;
 	string data;
 	unsigned char pos1, pos2, data_size;
@@ -2696,7 +2702,7 @@ agg_debugprint_1:
 
 //----------------------------------------------------------------------------
 ok_ng agg_disk_download() {
-    ok_ng agg_disk_download;
+ok_ng agg_disk_download;
 	unsigned int sector_num;
 	string s;
 	unsigned long size;
@@ -2725,7 +2731,7 @@ ok_ng agg_disk_download() {
 
 //----------------------------------------------------------------------------
 ok_ng agg_set_variable() {
-    ok_ng agg_set_variable;
+ok_ng agg_set_variable;
 	string stemp1, stemp2;
 	unsigned char pos1, pos2, i, stg_num;
 	string<AGG_ITEM_BUFF_LEN> item_name_temp;
