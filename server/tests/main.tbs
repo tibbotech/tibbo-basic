@@ -18,3 +18,8 @@ sub on_sock_data_arrival()
     dhcp_proc_data()
 
 end sub
+
+function test() as byte
+'testing comments in function
+    test = 3
+end function

@@ -23,6 +23,7 @@ pl_io_num sspi_mosi[SSPI_MAX_SLOTS], sspi_miso[SSPI_MAX_SLOTS], sspi_scl[SSPI_MA
 
 //==============================================================================
 unsigned char sspi_register(string *signature, pl_io_num mosi, pl_io_num miso, pl_io_num scl, spi_modes mode, no_yes use_ssi) {
+unsigned char sspi_register;
 //Returns a free spi number or 255 if no free spi slots left.
 	unsigned char f;
 	if (sspi_init_flag != SSPI_INIT_SIGNATURE) {
@@ -116,6 +117,7 @@ register_normal_slot:
 }
 
 string sspi_who_uses(unsigned char num) {
+string sspi_who_uses;
 //Returns the signature of the specified socket's user.
 	if (sspi_init_flag != SSPI_INIT_SIGNATURE) {
 		sspi_init();
@@ -205,7 +207,7 @@ void sspi_write(unsigned char data) {
 }
 
 unsigned char sspi_read() {
-    unsigned char sspi_read;
+unsigned char sspi_read;
 	unsigned char bitCnt;//Bit counter
 	unsigned char compval;//Value to compare - MASK
 

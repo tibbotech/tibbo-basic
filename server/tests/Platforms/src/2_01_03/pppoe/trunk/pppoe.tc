@@ -73,9 +73,9 @@ string<4> pppoe_dev_ip;
 
 //====================================================================
 string pppoe_get_info(pppoe_info_elements info_element, string *extra_data) {
+string pppoe_get_info;
 //Returns library-specific information for the requested info element
 
-    string pppoe_get_info;
 	pppoe_get_info = "";
 	switch (info_element) {
 	case PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS:
@@ -89,7 +89,7 @@ string pppoe_get_info(pppoe_info_elements info_element, string *extra_data) {
 
 //--------------------------------------------------------------------
 en_pppoe_status_codes pppoe_start(string *login, string *password) {
-    en_pppoe_status_codes pppoe_start;
+en_pppoe_status_codes pppoe_start;
 	unsigned char x;
 	
 	if (pppoe_init_flag != PPPOE_INIT_SIGNATURE) {
@@ -566,7 +566,7 @@ void pppoe_add_tag(string *packet_str, unsigned int tag_code, string *tag_data) 
 
 //--------------------------------------------------------------------
 ok_ng pppoe_get_verify_tag(string *packet_str, unsigned int tag_code, string *tag_data) {
-    ok_ng pppoe_get_verify_tag;
+ok_ng pppoe_get_verify_tag;
 	string<32> s;
 	unsigned char ptr, payload_len;
 	unsigned int tag_type, tag_len;
@@ -722,7 +722,7 @@ void pppoe_lcp_add_tag(string *packet_str, unsigned char tag_code, string *tag_d
 
 //--------------------------------------------------------------------
 ok_ng pppoe_lcp_get_verify_tag(string *packet_str, unsigned char tag_code, string *tag_data) {
-    ok_ng pppoe_lcp_get_verify_tag;
+ok_ng pppoe_lcp_get_verify_tag;
 	string<32> s;
 	unsigned char ptr, payload_len;
 	unsigned char tag_type, tag_len;

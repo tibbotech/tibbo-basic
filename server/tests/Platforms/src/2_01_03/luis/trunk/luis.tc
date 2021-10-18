@@ -40,7 +40,7 @@ en_luis_html_send_states luis_html_send_state;
 
 //================================================================================
 en_luis_status_codes luis_start(string *bt_name) {
-    en_luis_status_codes luis_start;
+en_luis_status_codes luis_start;
 	luis_start = EN_LUIS_STATUS_OK;
 	if (luis_init_flag == LUIS_INIT_SIGNATURE) {
 		return luis_start;
@@ -364,7 +364,7 @@ reply_null:
 }
 
 en_luis_status_codes luis_on_bt_data_arrival() {
-    en_luis_status_codes luis_on_bt_data_arrival;
+en_luis_status_codes luis_on_bt_data_arrival;
 	unsigned char x, y;
 	string<LUIS_MAX_BT_CMD_LEN> bt_cmd_str;
 	luis_on_bt_data_arrival = EN_LUIS_STATUS_OK;

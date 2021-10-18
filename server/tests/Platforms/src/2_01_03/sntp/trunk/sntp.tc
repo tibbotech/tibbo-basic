@@ -96,9 +96,9 @@ void sntp_init();
 
 //------------------------------------------------------------------------------
 en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string *server_ip, unsigned int server_port, unsigned char socket) {
+en_sntp_status_codes sntp_start;
 //Connect to SNTP Time Server specified by sntp_server_ip, at sntp_server_port.
 
-    en_sntp_status_codes sntp_start;
 	sntp_sock = socket;
 	sntp_start = SNTP_STATUS_OK;
 		
@@ -472,6 +472,7 @@ void sntp_debugprint(string *print_data) {
 
 //------------------------------------------------------------------------------
 unsigned long sntp_ts_to_dword(string<4> ts) {
+unsigned long sntp_ts_to_dword;
 //convert 4 bytes of string to dword value
 	unsigned char f;
 	unsigned long ts_val;
@@ -488,6 +489,7 @@ unsigned long sntp_ts_to_dword(string<4> ts) {
 
 //------------------------------------------------------------------------------
 string<4> sntp_dword_to_ts(unsigned long ts_val) {
+string<4> sntp_dword_to_ts;
 //convert 4 bytes of string to dword value
 	unsigned char f;
 	unsigned char b;
@@ -505,7 +507,7 @@ string<4> sntp_dword_to_ts(unsigned long ts_val) {
 //------------------------------------------------------------------------------
 #if SNTP_OFFSET_CALCULATION
 unsigned long sntp_get_clock_ts() {
-    unsigned long sntp_get_clock_ts;
+unsigned long sntp_get_clock_ts;
 	unsigned int w_days, w_mins;
 	unsigned char b_seconds;
 	unsigned long d;

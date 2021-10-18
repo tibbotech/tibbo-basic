@@ -67,10 +67,10 @@ unsigned int tbl_init_flag;
 
 //==============================================================================
 en_tbl_status_codes tbl_start() {
+en_tbl_status_codes tbl_start;
 //API procedure, starts the table library, parses the descriptor file, checks compilation options, and exams the memory usage.
 //Also mounts flash disk
 
-    en_tbl_status_codes tbl_start;
 	string s;
 	unsigned int i, j, k, line_end, field_start_pos, num_fields;
 	unsigned long dw;
@@ -841,12 +841,12 @@ return tbl_start;
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_select(string *table_name_or_num, string *file_name) {
+en_tbl_status_codes tbl_select;
 //API procedure, selecting the data file that is used in following table operations, if such data file does not exist, a new file will be created, 
 //based on the table info provided(table_name_or_num)
 //if file is created then attributes set to NULL
 //fills tbl_record_string with default values
 
-    en_tbl_status_codes tbl_select;
 	pl_fd_status_codes fd_status;
 	unsigned char f;
 	unsigned int i, j;
@@ -995,12 +995,12 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_select_for_read(string *table_name_or_num, string *file_name) {
+en_tbl_status_codes tbl_select_for_read;
 //API procedure, selecting the data file that is used in following table operations, if such data file does not exist, a new file will be created, 
 //based on the table info provided(table_name_or_num)
 //if file is created then attributes set to NULL
 //fills tbl_record_string with default values
 
-    en_tbl_status_codes tbl_select_for_read;
 	pl_fd_status_codes fd_status;
 	unsigned char f;
 	unsigned int i, j;
@@ -1139,7 +1139,7 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_close(string *file_name) {
-    en_tbl_status_codes tbl_close;
+en_tbl_status_codes tbl_close;
 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<< UNFINISHED
 
@@ -1165,10 +1165,10 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_clear() {
+en_tbl_status_codes tbl_clear;
 //tbl_select() must be used
 //API procedure, a selected data file is required, sets the selected data file size to 0, all file attribute will be set to NULL
 
-    en_tbl_status_codes tbl_clear;
 	if (tbl_init_flag != TBL_INIT_SIGNATURE) {
 		tbl_clear = EN_TBL_STATUS_NOT_STARTED;
 		#if TBL_DEBUG_PRINT
@@ -1216,9 +1216,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_replace(string *old_file_name, string *new_file_name) {
+en_tbl_status_codes tbl_replace;
 //API procedure, delete the old data file (old_file_name), and rename the new data file (new_file_name) to old data file name (old_file_name).
 
-    en_tbl_status_codes tbl_replace;
 	unsigned char i;
 	pl_fd_status_codes fd_status;
 	
@@ -1306,10 +1306,10 @@ finish:
 //------------------------------------------------------------------------------
 #if TBL_AGGREGATE_HASH
 string tbl_get_hash() {
+string tbl_get_hash;
 //tbl_select() must be used
 //API procedure, a selected data file is required, returns the current hash value of the selected data file.
 
-    string tbl_get_hash;
 	string<4> hash;
 	unsigned int msw, lsw;
 	unsigned long hash_val;
@@ -1336,11 +1336,11 @@ string tbl_get_hash() {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_sg(unsigned int *rec_num, en_tbl_rdwr op) {
+en_tbl_status_codes tbl_record_sg;
 //tbl_select() must be used
 //depends on record ptr
 //API procedure, a selected data file is required, loads the record pointed at by tbl_record_ptr to record buffer (tbl_record_string).
 
-    en_tbl_status_codes tbl_record_sg;
 	if (tbl_init_flag != TBL_INIT_SIGNATURE) {
 		tbl_record_sg = EN_TBL_STATUS_NOT_STARTED;
 		#if TBL_DEBUG_PRINT
@@ -1418,9 +1418,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_add(string<32> uid) {
+en_tbl_status_codes tbl_record_add;
 //tbl_select() must be used
 
-    en_tbl_status_codes tbl_record_add;
 //API procedure, a selected data file is required, stores the data in the record buffer (tbl_record_string) to the selectd data file.
 //If the table type is "T"(table) the record will overwrite the first deleted record, if there is no deleted record, the
 //record will be appended to the end of the selected data file.
@@ -1579,10 +1579,10 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_edit(unsigned int *rec_num) {
+en_tbl_status_codes tbl_record_edit;
 //tbl_select() must be used
 //depends on record ptr
 
-    en_tbl_status_codes tbl_record_edit;
 //API procedure, a selected data file is required, overwrites the current record (pointed by tbl_record_ptr) with the data from the record buffer(tbl_record_string).
 //The data file hash is updated accordingly
 
@@ -1652,10 +1652,10 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_read_active(unsigned int *rec_num) {
+en_tbl_status_codes tbl_record_read_active;
 //tbl_select() must be used
 //depends on record ptr
 
-    en_tbl_status_codes tbl_record_read_active;
 //API procedure, a selected data file is required, load the record buffer(tbl_record_string) with the record that pointed by record pointer(tbl_record_ptr)
 
 	unsigned long daddr;
@@ -1704,10 +1704,10 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_delete(unsigned int *rec_num) {
+en_tbl_status_codes tbl_record_delete;
 //tbl_select() must be used
 //depends on record ptr
 
-    en_tbl_status_codes tbl_record_delete;
 //API procedure, a selected data file is required, deletes a record.
 //If the table type is "T"(table) the record that is pointed by the record pointer will be mark as deleted.
 //If the table type is "L"(list) the first active record in the top of the selected data file will be mark as deleted.
@@ -1809,10 +1809,10 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_undelete(unsigned int *rec_num) {
+en_tbl_status_codes tbl_record_undelete;
 //tbl_select() must be used
 //depends on record ptr
 
-    en_tbl_status_codes tbl_record_undelete;
 //API procedure, a selected data file is required, undelete a deleted record.
 //If the table type is "T"(table) the record that is pointed by the record pointer will be mark as active.
 //If the table type is "L"(list) the last deleted record in the top of the selected data file will be mark as active.
@@ -1900,9 +1900,9 @@ finish:
 
 //------------------------------------------------------------------------------
 no_yes tbl_is_record_deleted(unsigned int rec_num) {
+no_yes tbl_is_record_deleted;
 //API procedure, a selected data file is required, return the status of the record that is currently pointed by the record pointer.
 	
-	    no_yes tbl_is_record_deleted;
 	string<1> s;
 	
 	tbl_is_record_deleted = YES;
@@ -1918,9 +1918,9 @@ no_yes tbl_is_record_deleted(unsigned int rec_num) {
 
 //------------------------------------------------------------------------------
 no_yes tbl_is_current_record_deleted() {
+no_yes tbl_is_current_record_deleted;
 //API procedure, check if the current record loaded in the tbl_record_string is an active record.
 
-    no_yes tbl_is_current_record_deleted;
 	if (left(tbl_record_string,1) == TBL_ACTIVE_FLAG) {
 		tbl_is_current_record_deleted = NO;
 	} else {
@@ -1931,7 +1931,7 @@ no_yes tbl_is_current_record_deleted() {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_find(en_tbl_record_states record_type, string *search_data, string *field_name, unsigned int *rec_num, en_tbl_search_direction direction, pl_fd_find_modes find_method) {
-    en_tbl_status_codes tbl_record_find;
+en_tbl_status_codes tbl_record_find;
 		//If the search includes the records that are marked as deleted.
 		//Searching criteria data.
 		//Searching criteria name.
@@ -2137,7 +2137,7 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_multi_field_record_find(en_tbl_record_states record_type, string *search_data, string *starting_field, unsigned int *rec_num, en_tbl_search_direction direction, pl_fd_find_modes find_method) {
-    en_tbl_status_codes tbl_multi_field_record_find;
+en_tbl_status_codes tbl_multi_field_record_find;
 		//If the search includes the records that are marked as deleted.
 		//Searching criteria data.
 		//Searching criteria name.
@@ -2254,9 +2254,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_field_sg(string *field_name, string *field_value, en_tbl_rdwr op) {
+en_tbl_status_codes tbl_field_sg;
 //API procedure, a selected table is required, extract the field from recorder buffer(tbl_record_string) or puts the field into the recorder buffer.
 
-    en_tbl_status_codes tbl_field_sg;
 	unsigned char fld_pos, fld_sz, b1, lsb, msb;
 	string<TBL_MAX_RECORD_SIZE> s, temp1, temp2;
 	unsigned int w1, w2, w3;
@@ -2471,9 +2471,9 @@ void tbl_field_set(string *field_name, string *field_value) {
 
 //------------------------------------------------------------------------------
 string tbl_field_get(string *field_name) {
+string tbl_field_get;
 //API procedure, reads (gets) the value of the specified field of currently selected file, reports errors thru callback_tbl_field_error(). 
 
-    string tbl_field_get;
 	string field_value;
 	en_tbl_status_codes tbl_result;
 	
@@ -2489,9 +2489,9 @@ string tbl_field_get(string *field_name) {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_get_field_def(string *table_name_or_num, string *field_name, string *def_value) {
+en_tbl_status_codes tbl_get_field_def;
 //API procedure, a selected table is required, returns the default value of selected field.
 	
-	    en_tbl_status_codes tbl_get_field_def;
 	unsigned int i, f;
 	unsigned char j;
 	unsigned int pos1, pos2;
@@ -2544,9 +2544,9 @@ finish:
 
 //------------------------------------------------------------------------------
 unsigned char tbl_get_field_size(unsigned int field_index) {
+unsigned char tbl_get_field_size;
 //API procedure, a selected table is required, returns the size of the field (number of bytes)
 
-    unsigned char tbl_get_field_size;
 	unsigned char sz;
 
 	switch (tbl_field_info[field_index].field_type) {
@@ -2587,9 +2587,9 @@ unsigned char tbl_get_field_size(unsigned int field_index) {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_get_num_records(unsigned int *num_of_records, no_yes include_deleted) {
+en_tbl_status_codes tbl_get_num_records;
 //tbl_select() must be used
 
-    en_tbl_status_codes tbl_get_num_records;
 //API procedure, a selected data file is required, gets total number of active records or all records(both active and inactive).
 
 	unsigned long fz;
@@ -2635,9 +2635,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_timestamp_sg(struct_tbl_timestamp *timestamp, en_tbl_rdwr op) {
+en_tbl_status_codes tbl_timestamp_sg;
 //tbl_select() must be used
 
-    en_tbl_status_codes tbl_timestamp_sg;
 //API procedure, a selected data file is required, sets and gets the timestamp for the selected data file.
 
 	string<7> ts;
@@ -2718,9 +2718,9 @@ finish:
 
 //------------------------------------------------------------------------------
 unsigned char tbl_get_max_field_size(string *table_name_or_num) {
+unsigned char tbl_get_max_field_size;
 //API procedure, a selected table sturcture is required, returns the size of the largest field for that table.
 
-    unsigned char tbl_get_max_field_size;
 	unsigned char tbl_index, i, temp, sz, upper_bound;
 	
 	tbl_get_max_field_size = 0;
@@ -2742,6 +2742,7 @@ unsigned char tbl_get_max_field_size(string *table_name_or_num) {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_get_table_info(string *table_name_or_num, tbl_type *table_metadata) {
+en_tbl_status_codes tbl_get_table_info;
 //API procedure, a selected table sturcture is required, returns infomation for the selected table.
 	unsigned char i;
 	
@@ -2765,18 +2766,18 @@ en_tbl_status_codes tbl_get_table_info(string *table_name_or_num, tbl_type *tabl
 
 //------------------------------------------------------------------------------
 string tbl_get_file_name() {
+string tbl_get_file_name;
 //API procedure, a selected data file is required, returns the name of the selected data file.
 
-    string tbl_get_file_name;
 	tbl_get_file_name = tbl_selected_file_name;
 	return tbl_get_file_name;
 }
 
 //------------------------------------------------------------------------------
 string tbl_get_table_name() {
+string tbl_get_table_name;
 //API procedure, a selected data file is required, returns the name of the selected table name.
 
-    string tbl_get_table_name;
 	if (tbl_selected_file_name == "") {
 		tbl_get_table_name = "";
 	} else {
@@ -2787,6 +2788,7 @@ string tbl_get_table_name() {
 
 //------------------------------------------------------------------------------
 unsigned char tbl_get_num_fields(string *table_name_or_num) {
+unsigned char tbl_get_num_fields;
 //API procedure, retures the number of the fields for the table specify by the table_name_or_num.
 	unsigned char i;
 	
@@ -2805,9 +2807,9 @@ unsigned char tbl_get_num_fields(string *table_name_or_num) {
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_get_field_info(string *table_name_or_num, unsigned char field_index, tbl_field_type *field_metadata) {
+en_tbl_status_codes tbl_get_field_info;
 //API procedure, retures the information of the field for the table specify by the table_name_or_num.
 	
-	    en_tbl_status_codes tbl_get_field_info;
 	unsigned char i;
 	unsigned int w;
 	
@@ -2842,9 +2844,9 @@ en_tbl_status_codes tbl_get_field_info(string *table_name_or_num, unsigned char 
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_adjust_size() {
+en_tbl_status_codes tbl_adjust_size;
 //look through the data file for the deleted records, if all records in 1 sector are deleted, then free the sector.
 
-    en_tbl_status_codes tbl_adjust_size;
 	unsigned int free_sector, deleted_record, record_per_sector, removing_sector;
 
 	goto tbl_fail;
@@ -2894,9 +2896,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_info_find(string *table_name_or_num, unsigned char *index) {
+en_tbl_status_codes tbl_info_find;
 //Looking for the table in the table_info array, the table name can also be the index
 
-    en_tbl_status_codes tbl_info_find;
 	unsigned char i;
 
 	i = asc(*table_name_or_num);
@@ -2932,9 +2934,9 @@ finish:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_record_ptr_sg(unsigned int *rec_num, en_tbl_rdwr op) {
+en_tbl_status_codes tbl_record_ptr_sg;
 //tbl_select() must be used
 
-    en_tbl_status_codes tbl_record_ptr_sg;
 //API procedure, a selected data file is required, sets the file pointer to the record that is at the position specify by rec_num. rec_num starts from 1.
 
 	unsigned long dptr, drec;
@@ -2979,9 +2981,9 @@ finish:
 //------------------------------------------------------------------------------
 #if TBL_AGGREGATE_HASH
 unsigned long tbl_set_md5() {
+unsigned long tbl_set_md5;
 //Calculate the MD5 of tbl_record_string, store it in the table, and also modify the table hash.
 	
-	    unsigned long tbl_set_md5;
 	unsigned int f, i;
 	string temp;
 	string<TBL_MAX_FIELD_VALUE_LEN> sfldval;
@@ -3034,7 +3036,7 @@ case EN_TBL_DT_ALL:
 
 //------------------------------------------------------------------------------
 en_tbl_status_codes tbl_field_find(string field_name, unsigned int *field_index) {
-    en_tbl_status_codes tbl_field_find;
+en_tbl_status_codes tbl_field_find;
 	unsigned int f, i;
 	
 	i = asc(field_name);
@@ -3073,7 +3075,7 @@ void tbl_check_for_missing_fields(unsigned int curr_pos, unsigned int line_end_p
 
 //------------------------------------------------------------------------------
 no_yes tbl_check_key_violation(unsigned int *key_ptr) {
-    no_yes tbl_check_key_violation;
+no_yes tbl_check_key_violation;
 	unsigned int i;
 	string<TBL_MAX_RECORD_SIZE> temp;
 	string<TBL_MAX_FIELD_VALUE_LEN> skeyfield, sfldval;
@@ -3128,7 +3130,7 @@ tbl_key_violate:
 
 //------------------------------------------------------------------------------
 pl_fd_status_codes tbl_attributes_sg(string *tbl_file_name, string<4> attri_name, string *attri_val, en_tbl_rdwr op) {
-    pl_fd_status_codes tbl_attributes_sg;
+pl_fd_status_codes tbl_attributes_sg;
 	string<13> s;
 	string<4> hash;
 	string<7> ts;
@@ -3190,7 +3192,7 @@ pl_fd_status_codes tbl_attributes_sg(string *tbl_file_name, string<4> attri_name
 
 //------------------------------------------------------------------------------
 pl_fd_status_codes tbl_active_rc_sg(unsigned int *rec_count, en_tbl_rdwr op) {
-    pl_fd_status_codes tbl_active_rc_sg;
+pl_fd_status_codes tbl_active_rc_sg;
 	string<2> s;
 	unsigned char msb, lsb;
 	if (op == EN_TBL_GET) {
@@ -3236,7 +3238,7 @@ void tbl_mod_hash(unsigned long *d) {
 //------------------------------------------------------------------------------
 #if TBL_AGGREGATE_HASH
 en_tbl_status_codes tbl_generate_uid(string *id_string) {
-    en_tbl_status_codes tbl_generate_uid;
+en_tbl_status_codes tbl_generate_uid;
 
 	en_tbl_status_codes result;
 	unsigned int msw, lsw;
@@ -3268,9 +3270,9 @@ en_tbl_status_codes tbl_generate_uid(string *id_string) {
 
 //-------------------------------------------------------------
 string tbl_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos) {
+string tbl_get_descriptor_field;
 //line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
 
-    string tbl_get_descriptor_field;
 	unsigned int i;
 	
 	do

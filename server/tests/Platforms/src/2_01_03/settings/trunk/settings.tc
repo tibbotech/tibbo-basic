@@ -59,11 +59,11 @@ unsigned int stg_init_flag;
 
 //================================================================================
 en_stg_status_codes stg_start() {
+en_stg_status_codes stg_start;
 //API procedure, starts the STG library, parses the descriptor file, restores all volatile (RAM) settings
 //to default values by calling stg_restore_multiple(EN_STG_INIT_MODE_RAM_ONLY).
 //MUST be called first, before any other procedure in this library is used.
 
-    en_stg_status_codes stg_start;
 	unsigned char stg_sdr_member;
 	unsigned char max_stg_name_len;
 	unsigned int len_of_str_rep, max_len_of_str_rep;
@@ -829,9 +829,9 @@ return stg_start;
 
 //-------------------------------------------------------------
 en_stg_status_codes stg_check_all(string *problem_stg) {
+en_stg_status_codes stg_check_all;
 //API procedure, verifies each setting by reading its value thru stg_sg().
 
-    en_stg_status_codes stg_check_all;
 	unsigned char f;
 	string<STG_MAX_SETTING_VALUE_LEN> stg_value;
 
@@ -862,9 +862,9 @@ en_stg_status_codes stg_check_all(string *problem_stg) {
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_get_def(string *stg_name_or_num, unsigned char index, string *def_value) {
+en_stg_status_codes stg_get_def;
 //API procedure, returns the default value for the specified setting's member.
 
-    en_stg_status_codes stg_get_def;
 	unsigned char num;
 	int pos, pos2;
 	string s;
@@ -934,9 +934,9 @@ en_stg_status_codes stg_get_def(string *stg_name_or_num, unsigned char index, st
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_restore_multiple(en_stg_init_modes init_mode) {
+en_stg_status_codes stg_restore_multiple;
 //API procedure, sets the default values for all or multiple settings.
 
-    en_stg_status_codes stg_restore_multiple;
 	unsigned char x, f, f2;
 	unsigned int pos, pos2;
 	string s, s2;
@@ -1109,9 +1109,9 @@ skip_this:
 
 //-------------------------------------------------------------
 en_stg_status_codes stg_restore_member(string *stg_name_or_num, unsigned char index) {
+en_stg_status_codes stg_restore_member;
 //API procedure, sets the default value for the specified setting's member.
 
-    en_stg_status_codes stg_restore_member;
 	string<STG_MAX_SETTING_VALUE_LEN> s;
 
 	#if STG_DEBUG_PRINT
@@ -1137,18 +1137,18 @@ en_stg_status_codes stg_restore_member(string *stg_name_or_num, unsigned char in
 
 //--------------------------------------------------------------------------------
 unsigned char stg_get_num_settings() {
+unsigned char stg_get_num_settings;
 //API procedure, returns the number of settings defined in your project.
 
-    unsigned char stg_get_num_settings;
 	stg_get_num_settings = stg_num_settings;
 	return stg_get_num_settings;
 }
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_get_num_members(string *stg_name_or_num, unsigned char *num_members) {
+en_stg_status_codes stg_get_num_members;
 //API procedure, returns the number of members for the specified setting.
 
-    en_stg_status_codes stg_get_num_members;
 	unsigned char num;
 
 	*num_members = 0;
@@ -1185,9 +1185,9 @@ en_stg_status_codes stg_get_num_members(string *stg_name_or_num, unsigned char *
 
 //--------------------------------------------------------------------------------
 string stg_get(string *stg_name_or_num, unsigned char index) {
+string stg_get;
 //API procedure, reads (gets) the value of the specified setting's member; reports errors thru callback_stg_error(). 
 
-    string stg_get;
 	string s;
 	en_stg_status_codes status;
 
@@ -1251,9 +1251,9 @@ void stg_set(string *stg_name_or_num, unsigned char index, string *stg_value) {
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_sg(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op) {
+en_stg_status_codes stg_sg;
 //API procedure, writes (sets) or reads (gets) the specified setting's member; directly returns the execution result.
 
-    en_stg_status_codes stg_sg;
 	string<STG_MAX_SETTING_VALUE_LEN> original_stg_value;
 	string<STG_MAX_SETTING_NAME_LEN> stg_name_or_num_copy;
 
@@ -1308,7 +1308,7 @@ return stg_sg;
 //--------------------------------------------------------------------------------
 #if STG_TIMESTAMP != 0
 en_stg_status_codes stg_set_ts(string *stg_name_or_num) {
-    en_stg_status_codes stg_set_ts;
+en_stg_status_codes stg_set_ts;
 
 	#if STG_DEBUG_PRINT
 		stg_debugprint("STG_SET_TS()");
@@ -1335,7 +1335,7 @@ en_stg_status_codes stg_set_ts(string *stg_name_or_num) {
 
 //--------------------------------------------------------------------------------
 unsigned char stg_stype_get(string *stg_name_or_num) {
-    unsigned char stg_stype_get;
+unsigned char stg_stype_get;
 	unsigned char f;
 	
 	f = stg_find(*stg_name_or_num);
@@ -1349,11 +1349,11 @@ unsigned char stg_stype_get(string *stg_name_or_num) {
 
 //--------------------------------------------------------------------------------
 unsigned char stg_find(string *stg_name_or_num) {
+unsigned char stg_find;
 //if stg_name_or_num starts with an alpha, then assumes that the setting name was supplied and
 //looks for the setting with this name. If the name starts with digit then assumes it is a setting
 //number. In both cases returns member number+1 if found, or 0 if not found.
 
-    unsigned char stg_find;
 	unsigned char f;
 	
 	f = asc(*stg_name_or_num);
@@ -1377,6 +1377,7 @@ unsigned char stg_find(string *stg_name_or_num) {
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_sg_internal(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op, no_yes read_backup) {
+en_stg_status_codes stg_sg_internal;
 //Reads/writes setting stg_name_or_num, value is exchanged through stg_value. Read or write operation is
 //determined by op. Returns various en_stg_status status codes.
 //The following applies only when STG_TIMESTAMP<>0 (see settings.tbh):
@@ -1387,7 +1388,6 @@ en_stg_status_codes stg_sg_internal(string *stg_name_or_num, unsigned char index
 //and the setting is of the BYTE type we need one byte for the checksum, so we can only have 254 members!
 //For GET operation, and when STG_REDUNDANCY>0 and when read_backup=YES we will read the backup (second) copy of the setting
 
-    en_stg_status_codes stg_sg_internal;
 	unsigned char x, cs, f;
 	unsigned int i;
 	string stg_str;
@@ -1653,11 +1653,11 @@ lb2: if (i<stg_sdr[num].p1 || i>stg_sdr[num].p2) {
 //--------------------------------------------------------------------------------
 #if STG_TIMESTAMP != 0
 en_stg_status_codes stg_set_ts_internal(string *stg_name_or_num, no_yes read_backup) {
+en_stg_status_codes stg_set_ts_internal;
 //Writes the timestamp of the setting without changing its value. The timestamp is passed in a
 //global stg_timestamp structure (the reason we don't use a function argument is because all other
 //procedures in this library use the stg_timestamp, so we do this for uniformity).
 
-    en_stg_status_codes stg_set_ts_internal;
 	unsigned char cs;
 	unsigned char num;
 	string stg_str;
@@ -1807,10 +1807,10 @@ return stg_set_ts_internal;
 
 //--------------------------------------------------------------------------------
 en_stg_status_codes stg_load_setting_data(string *stg_name_or_num, unsigned char *num, string *stg_str, no_yes read_backup) {
+en_stg_status_codes stg_load_setting_data;
 //Converts setting name (stg_name_or_num) into setting number (num), also loads the entire setting (all members, timestamp,
 //checksum) into the stg_str
 
-    en_stg_status_codes stg_load_setting_data;
 	#if STG_STORAGE_MEMORY != 0
 		pl_fd_status_codes fd_status;
 	#endif
@@ -1869,7 +1869,7 @@ en_stg_status_codes stg_load_setting_data(string *stg_name_or_num, unsigned char
 
 //--------------------------------------------------------------------------------
 string stg_ramarr_getdata(unsigned int startaddr, unsigned char len) {
-    string stg_ramarr_getdata;
+string stg_ramarr_getdata;
 	unsigned char f;
 	
 	stg_ramarr_getdata = "";
@@ -1885,7 +1885,7 @@ string stg_ramarr_getdata(unsigned int startaddr, unsigned char len) {
 
 //--------------------------------------------------------------------------------
 unsigned char stg_ramarr_setdata(string *datatoset, unsigned int startaddr) {
-    unsigned char stg_ramarr_setdata;
+unsigned char stg_ramarr_setdata;
 	unsigned char f;
 	
 	for (f=0; f <= len(datatoset)-1; f++) {
@@ -1901,9 +1901,9 @@ unsigned char stg_ramarr_setdata(string *datatoset, unsigned int startaddr) {
 
 //-------------------------------------------------------------
 string stg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos) {
+string stg_get_descriptor_field;
 //line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
 
-    string stg_get_descriptor_field;
 	unsigned int i;
 	
 	do

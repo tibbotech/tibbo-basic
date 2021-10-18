@@ -13,7 +13,7 @@ void td_get_tzone_offset(en_td_timezones timezone, unsigned int *minutes_offset)
 
 //==============================================================================
 ok_ng td_from_binstr(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds) {
-    ok_ng td_from_binstr;
+ok_ng td_from_binstr;
 	string<7> time_str;
 	
 	switch (len(*td_str)) {
@@ -46,7 +46,7 @@ return td_from_binstr;
 
 //------------------------------------------------------------------------------
 ok_ng td_to_binstr(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds) {
-    ok_ng td_to_binstr;
+ok_ng td_to_binstr;
 
 	if (day_count>36524 || min_count>1439 || seconds>59 || mseconds>999) {
 		*td_str = "";
@@ -68,7 +68,7 @@ ok_ng td_to_binstr(string *td_str, unsigned int day_count, unsigned int min_coun
 
 //------------------------------------------------------------------------------
 ok_ng td_from_str(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds) {
-    ok_ng td_from_str;
+ok_ng td_from_str;
 	unsigned char year_byte, month_byte, date_byte, hour_byte, minute_byte;
 	string<2> month_str, date_str, hour_str, minute_str, second_str;
 	string<3> msecond_str;
@@ -121,7 +121,7 @@ case 17:
 
 //------------------------------------------------------------------------------
 ok_ng td_to_str(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds) {
-    ok_ng td_to_str;
+ok_ng td_to_str;
 	string<2> month_str, date_str, hour_str, minute_str, second_str;
 	string<3> msecond_str;
 	string<4> year_str;
@@ -164,7 +164,7 @@ ok_ng td_to_str(string *td_str, unsigned int day_count, unsigned int min_count, 
 
 //------------------------------------------------------------------------------
 ok_ng td_str_to_binstr(string *td_str) {
-    ok_ng td_str_to_binstr;
+ok_ng td_str_to_binstr;
 	unsigned int day_count, min_count, mseconds;
 	unsigned char seconds, length;
 	
@@ -209,7 +209,7 @@ case 17:
 
 //------------------------------------------------------------------------------
 ok_ng td_binstr_to_str(string *td_str) {
-    ok_ng td_binstr_to_str;
+ok_ng td_binstr_to_str;
 	unsigned int day_count, min_count, mseconds;
 	unsigned char seconds, length;
 	
@@ -250,7 +250,7 @@ case 7:
 
 //------------------------------------------------------------------------------ 
 ok_ng td_str_date_time_reformat(string *td_str, en_td_string_ops op, en_td_date_formats date_format) {
-    ok_ng td_str_date_time_reformat;
+ok_ng td_str_date_time_reformat;
 	unsigned char length;
 	string<4> year_str;
 	string<3> ms_str;
@@ -381,7 +381,7 @@ case 23:
 
 //------------------------------------------------------------------------------ 
 ok_ng td_str_time_reformat(string *t_str, en_td_string_ops op) {
-    ok_ng td_str_time_reformat;
+ok_ng td_str_time_reformat;
 	unsigned char length;
 	string<3> ms_str;
 	string<2> hour_str, minute_str, second_str;
@@ -470,7 +470,7 @@ case 12:
 
 //------------------------------------------------------------------------------ 
 ok_ng td_local_to_gmt(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst) {
-    ok_ng td_local_to_gmt;
+ok_ng td_local_to_gmt;
 	unsigned int minute_offset, wtemp1;
 	
 	//calculate daylight saving time
@@ -513,7 +513,7 @@ ok_ng td_local_to_gmt(unsigned int *day_count, unsigned int *min_count, en_td_ti
 
 //------------------------------------------------------------------------------ 
 ok_ng td_gmt_to_local(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst) {
-    ok_ng td_gmt_to_local;
+ok_ng td_gmt_to_local;
 	unsigned int minute_offset, wtemp1;
 	
 	//calculate daylight saving time

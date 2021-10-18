@@ -117,6 +117,7 @@ pl_wln_module_types wln_module_type;
 unsigned char wln_rescan_tmr;
 //==============================================================================
 string wln_get_info(wln_info_elements info_element, string *extra_data) {
+string wln_get_info;
 //Returns library-specific information for the requested info element
 	pl_wln_security_modes security_mode;
 	unsigned char x;
@@ -146,7 +147,7 @@ string wln_get_info(wln_info_elements info_element, string *extra_data) {
 
 //--------------------------------------------------------------------
 en_wln_status_codes wln_start(string *ap_name, pl_wln_security_modes security_mode, string *key, pl_wln_domains domain, no_yes active_scan, pl_wln_scan_filter scanfilter) {
-    en_wln_status_codes wln_start;
+en_wln_status_codes wln_start;
 	unsigned char x;
 	#if GA1000
 		zero_replay_count_data[0] = 0;
@@ -295,7 +296,7 @@ wln_start_error:
 
 //----------------------------------------------------------------------------
 en_wln_status_codes wln_change(string *ap_name, pl_wln_security_modes security_mode, string *key) {
-    en_wln_status_codes wln_change;
+en_wln_status_codes wln_change;
 
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
@@ -426,7 +427,7 @@ wait_close_kal_socket:
 
 //----------------------------------------------------------------------------
 en_wln_status_codes wln_rescan() {
-    en_wln_status_codes wln_rescan;
+en_wln_status_codes wln_rescan;
 	
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
@@ -509,7 +510,7 @@ void wln_update_rssi() {
 
 //----------------------------------------------------------------------------
 pl_wln_check_association_retval wln_check_association() {
-    pl_wln_check_association_retval wln_check_association;
+pl_wln_check_association_retval wln_check_association;
 	wln_check_association = wln_associated;
 	return wln_check_association;
 }
@@ -595,7 +596,7 @@ void wln_proc_timer() {
 #if GA1000
 	#if WLN_WPA
 		int compare_replay_counters(string *replay_counter1, string *replay_counter2) {
-		    int compare_replay_counters;
+int compare_replay_counters;
 		
 		int i;
 		int result;
@@ -1069,7 +1070,7 @@ finish:
 
 //----------------------------------------------------------------------------
 ok_ng wln_start_scan() {
-    ok_ng wln_start_scan;
+ok_ng wln_start_scan;
 	accepted_rejected res;
 	
 	wln_start_scan = NG;
@@ -1107,7 +1108,7 @@ ok_ng wln_start_scan() {
 
 //----------------------------------------------------------------------------
 en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string *key) {
-    en_wln_status_codes wln_prepare_security;
+en_wln_status_codes wln_prepare_security;
 	int algorithm;
 	
 
@@ -1183,7 +1184,7 @@ case WLN_SECURITY_MODE_WPA2:
 
 #if WLN_WPA
 string wln_wpa_mkey_get(string *password, string *ssid) {
-    string wln_wpa_mkey_get;
+string wln_wpa_mkey_get;
 	#if GA1000
 	unsigned long count;
 	unsigned char pos, plen, left1;
@@ -1319,7 +1320,7 @@ string wln_wpa_mkey_get(string *password, string *ssid) {
 
 		//--------------------------------------------------------------------------------------------- 
 		string wln_sha1_vector(string *key, string *data) {
-		    string wln_sha1_vector;
+string wln_sha1_vector;
 
 			string s;
 			string hash;
@@ -1448,7 +1449,7 @@ string wln_wpa_mkey_get(string *password, string *ssid) {
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
 		string wln_md5_vector(string *key, string *data) {
-		    string wln_md5_vector;
+string wln_md5_vector;
 			string<16> hash;
 			unsigned char l;
 			
@@ -1466,7 +1467,7 @@ string wln_wpa_mkey_get(string *password, string *ssid) {
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
 		bool wln_wpa_supplicant_process_3_of_4(unsigned int key_info, unsigned int ver, string *replay_counter, string *mic_key, string *ptk) {
-		    bool wln_wpa_supplicant_process_3_of_4;
+bool wln_wpa_supplicant_process_3_of_4;
 			string<32> s;
 			bool key_was_set;
 			key_was_set = false;
@@ -1661,7 +1662,7 @@ string wln_wpa_mkey_get(string *password, string *ssid) {
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
 		bool wln_aes_unwrap(string *aes_kek, string *aes_cipher, string *aes_plain, unsigned char n) {
-		    bool wln_aes_unwrap;
+bool wln_aes_unwrap;
 			string<8> a;
 			string<16> b;
 			unsigned char r, k, l, i, j;
@@ -1703,7 +1704,7 @@ string wln_wpa_mkey_get(string *password, string *ssid) {
 		//--------------------------------------------------------------------------------------------- 
 		#if WLN_WPA
 		string wln_wpa_supplicant_parse_ies(string *key_data) {
-		    string wln_wpa_supplicant_parse_ies;
+string wln_wpa_supplicant_parse_ies;
 			unsigned char pos, data_len;
 			string<1> header;
 			string<4> rsn_group_key_data;
@@ -1873,7 +1874,7 @@ void wln_init() {
 
 //----------------------------------------------------------------------------
 pl_wln_module_types getmoduletype() {
-    pl_wln_module_types getmoduletype;
+pl_wln_module_types getmoduletype;
     wln.getmoduletype();
     return getmoduletype;
 }

@@ -22,9 +22,9 @@ unsigned int ssi_init_flag;
 
 //==============================================================================
 unsigned char ssi_get(string *signature) {
+unsigned char ssi_get;
 //Returns a free SSI channel number or 255 if no free channels left.
 
-    unsigned char ssi_get;
 	unsigned char f;
 
 	if (ssi_init_flag != SSI_INIT_SIGNATURE) {
@@ -54,9 +54,9 @@ unsigned char ssi_get(string *signature) {
 
 //--------------------------------------------------------------------
 string ssi_who_uses(unsigned char ssi_num) {
+string ssi_who_uses;
 //Returns the signature of the specified SSI channel's user.
 
-    string ssi_who_uses;
 	if (ssi_init_flag != SSI_INIT_SIGNATURE) {
 		ssi_init();
 		ssi_init_flag = SSI_INIT_SIGNATURE;
