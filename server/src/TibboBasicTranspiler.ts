@@ -214,6 +214,7 @@ class ParserListener extends TibboBasicParserListener {
         let parts = fileName.split('.');
         parts[1] = 'th"';
         fileName = parts.join('.');
+        fileName = fileName.replace(/\\/g, path.sep);
         this.transpiler.addCode(`#include ${fileName}`);
         this.transpiler.writeLine(ctx.start.line);
     }
