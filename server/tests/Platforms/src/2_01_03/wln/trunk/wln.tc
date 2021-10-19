@@ -30,8 +30,8 @@
 	#define NULL_2 chr(0)+chr(0)
 	#define CH36_64 chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)
 	#define CH5C_64 chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)
-	#define CYPHER_TKIP chr(0x00)+chr(&h0F)+chr(&hAC)+chr(&h02)
-	#define CYPHER_AES chr(0x00)+chr(&h0F)+chr(&hAC)+chr(&h04)
+	#define CYPHER_TKIP chr(0x00)+chr(0x0F)+chr(0xAC)+chr(0x02)
+	#define CYPHER_AES chr(0x00)+chr(0x0F)+chr(0xAC)+chr(0x04)
 
 //------------------------------------------------------------------------------
 	enum en_wln_wpa_key_types {
@@ -677,7 +677,7 @@ void wln_proc_data() {
 		}
 
 		//bit 7 or 13 must be set
-		if ((key_info && &h80) == 0 && (key_info && &h2000) == 0) {
+		if ((key_info && 0x80) == 0 && (key_info && 0x2000) == 0) {
 			return;
 		}
 		
@@ -695,7 +695,7 @@ void wln_proc_data() {
 		//Need to ensure the replay counter is increasing
 		if (compare_replay_counters(replay_counter,last_replay_counter)>0) {
 
-			if (wln_security_mode == WLN_SECURITY_MODE_WPA2 && (key_info && &h1000) != 0) {
+			if (wln_security_mode == WLN_SECURITY_MODE_WPA2 && (key_info && 0x1000) != 0) {
 				stemp1 = mid(rx_data,98,1);
 				stemp2 = mid(rx_data,99,1);
 				keydatalen = asc(stemp1)*256+asc(stemp2);
@@ -716,8 +716,8 @@ void wln_proc_data() {
 		}
 
 		//for bit 3, 1=Pairwise, 0=Group key
-		if ((key_info && &h8) != 0) {
-			if ((key_info && &h100) != 0) {
+		if ((key_info && 0x8) != 0) {
+			if ((key_info && 0x100) != 0) {
 				kde_gtk = wln_wpa_supplicant_parse_ies(plain);
 				#if WLN_DEBUG_PRINT
 					wln_debugprint("Pairwise step 3/4");
@@ -763,7 +763,7 @@ void wln_proc_data() {
 				wln_wpa_supplicant_send_2_of_4(ver,key_len,replay_counter,snonce,wln_mic_key);
 			}
 		} else {
-			if ((key_info && &h100) != 0) {
+			if ((key_info && 0x100) != 0) {
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 					wln_g_key_iv = mid(rx_data,50,16);
 					gtk = mid(rx_data,100,32);
@@ -1363,14 +1363,14 @@ string wln_sha1_vector;
 			
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
-				reply = reply+chr(&hFE);
+				reply = reply+chr(0xFE);
 
 			} else {
-				reply = reply+chr(&h2);
+				reply = reply+chr(0x2);
 			}
 			
 			//key_info(2)
-			key_info = ver+&h8+&h100;
+			key_info = ver+0x8+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
@@ -1477,7 +1477,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 				wln_debugprint("Pairwise step 4/4");
 			#endif	
 			wln_wpa_supplicant_send_4_of_4(key_info,ver,*replay_counter,*mic_key);
-			if ((key_info && &h40) != 0) {
+			if ((key_info && 0x40) != 0) {
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 					s = right(*ptk,32);
 					wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,s,PL_WLN_WPA_CAST_UNICAST);
@@ -1517,14 +1517,14 @@ bool wln_wpa_supplicant_process_3_of_4;
 			
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
-				reply = reply+chr(&hFE);
+				reply = reply+chr(0xFE);
 			} else {
-				reply = reply+chr(&h02);
+				reply = reply+chr(0x02);
 			}
 				
 			//key_info(2)
-			key_info == key_info && &h200;
-			key_info = key_info+ver+&h8+&h100;
+			key_info = key_info && 0x200;
+			key_info = key_info+ver+0x8+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
@@ -1574,8 +1574,8 @@ bool wln_wpa_supplicant_process_3_of_4;
 			string<32> ek;
 			string<8> stemp1, stemp2;
 			
-			gd_keyidx == key_info && &h30;
-			gd_keyidx = gd_keyidx/&h10;
+			gd_keyidx = key_info && 0x30;
+			gd_keyidx = gd_keyidx/0x10;
 			
 			ek = left(*key_iv,16)+right(*ptk,16);
 			
@@ -1604,19 +1604,19 @@ bool wln_wpa_supplicant_process_3_of_4;
 			length = 95;
 			msb = length/256;
 			lsb = length % 256;
-			reply = chr(&h1)+chr(IEEE802_1X_TYPE_EAPOL_KEY)+chr(msb)+chr(lsb);
+			reply = chr(0x1)+chr(IEEE802_1X_TYPE_EAPOL_KEY)+chr(msb)+chr(lsb);
 			
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
-				reply = reply+chr(&hFE);
+				reply = reply+chr(0xFE);
 			} else {
-				reply = reply+chr(&h02);
+				reply = reply+chr(0x02);
 			}
 			
 			
 			//key_info(2)
-			key_info == key_info && &h30;
-			key_info = key_info+ver+&h200+&h100;
+			key_info = key_info && 0x30;
+			key_info = key_info+ver+0x200+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
@@ -1680,7 +1680,7 @@ bool wln_aes_unwrap;
 					b = a;
 					k = n*j+i;
 					l = asc(mid(b,8,1));
-					k == k ^ l;
+					k = k ^ l;
 					insert(b,8,chr(k));
 					insert(b,9,mid(*aes_plain,r+1,8));
 					b = aes128dec(*aes_kek,b);
@@ -1691,7 +1691,7 @@ bool wln_aes_unwrap;
 			}
 
 			for (i=0; i <= 7; i++) {
-				if (mid(a,i,1) != chr(&ha6)) {
+				if (mid(a,i,1) != chr(0xa6)) {
 					wln_aes_unwrap = false;
 					return wln_aes_unwrap;
 				}
@@ -1716,9 +1716,9 @@ string wln_wpa_supplicant_parse_ies;
 				header = mid(*key_data,pos+1,1);
 				
 				break;
-				if (header == chr(&hdd)) {
+				if (header == chr(0xdd)) {
 					rsn_group_key_data = mid(*key_data,pos+3,4);
-					if (data_len>4 && rsn_group_key_data == chr(&h00)+chr(&h0F)+chr(&hAC)+chr(&h01)) {
+					if (data_len>4 && rsn_group_key_data == chr(0x00)+chr(0x0F)+chr(0xAC)+chr(0x01)) {
 						wln_wpa_supplicant_parse_ies = mid(*key_data,pos+7,data_len-4);
 						return wln_wpa_supplicant_parse_ies;
 					}
@@ -1743,7 +1743,7 @@ string wln_wpa_supplicant_parse_ies;
 			
 			progress_ctr = pass*4096;
 
-			count_buf = chr(&h0)+chr(&h0)+chr(&h0)+chr(count);
+			count_buf = chr(0x0)+chr(0x0)+chr(0x0)+chr(count);
 			addr_element = *ssid+count_buf;
 			wln_hmac_sha1_vector(*passphrase,addr_element,tmp,0);
 			

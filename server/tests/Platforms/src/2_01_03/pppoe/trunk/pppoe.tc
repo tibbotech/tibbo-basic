@@ -239,17 +239,17 @@ void pppoe_proc_data() {
 		case 1:
 //----- CONFIGURE-REQUEST -----
 			switch (proto) {
-			case &hC021:
+			case 0xC021:
 
 				//we specifically look for confirmation that PAP protocol can be used
-				if (pppoe_lcp_get_verify_tag(rx_data,&h03,s) == NG) {
+				if (pppoe_lcp_get_verify_tag(rx_data,0x03,s) == NG) {
 					#if PPPOE_DEBUG_PRINT
 						pppoe_debugprint("ERROR: AC did not provide 'Authentication-Protocol' tag");
 					#endif
 					goto failure;
 				}
 				
-				if (asc(mid(s,1,1))*256+asc(mid(s,2,1)) != &hC023) {
+				if (asc(mid(s,1,1))*256+asc(mid(s,2,1)) != 0xC023) {
 					#if PPPOE_DEBUG_PRINT
 						pppoe_debugprint("ERROR: AC provided some other authentication protocol (not PAP)");
 					#endif
@@ -262,7 +262,7 @@ void pppoe_proc_data() {
 				goto can_start_auth;
 				break;
 			
-			case &h8021:
+			case 0x8021:
 
 				insert(rx_data,9,chr(2));//replace "conf-req" with "conf-ack" and send it back
 				pppoe_send_reply(rx_data);
@@ -276,7 +276,7 @@ void pppoe_proc_data() {
 		case 2:
 //----- CONFIGURE-ACK -----
 			switch (proto) {
-			case &hC021:
+			case 0xC021:
 
 				pppoe_dev_lcp_ok = YES;
 can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
@@ -288,7 +288,7 @@ can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
 				}
 				break;
 
-			case &hC023:
+			case 0xC023:
 
 				#if PPPOE_DEBUG_PRINT
 					pppoe_debugprint("Authentication complete, can proceed to IP configuration");
@@ -311,7 +311,7 @@ can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
 		case 3:
 //----- CONFIGURE-NAK -----
 			switch (proto) {
-			case &hC021:
+			case 0xC021:
 
 				#if PPPOE_DEBUG_PRINT
 					pppoe_debugprint("ERROR: LCP configuration failed (NAK from AC)");
@@ -319,7 +319,7 @@ can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
 				goto failure;
 				break;
 
-			case &hC023:
+			case 0xC023:
 
 				#if PPPOE_DEBUG_PRINT
 					pppoe_debugprint("ERROR: Authentication failed (NAK from AC)");
@@ -327,7 +327,7 @@ can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
 				goto failure;
 				break;
 			
-			case &h8021:
+			case 0x8021:
 
 				//we requested IP 0.0.0.0 and expect that it will be rejected
 				pppoe_dev_ip = mid(rx_data,15,4);
@@ -483,15 +483,15 @@ void pppoe_send_padi() {
 
 	//we start from the payload
 	s = "";
-	pppoe_add_tag(s,&h0101,pppoe_serv_name);
-	pppoe_add_tag(s,&h0103,pppoe_host_uniq);
+	pppoe_add_tag(s,0x0101,pppoe_serv_name);
+	pppoe_add_tag(s,0x0103,pppoe_host_uniq);
 
 	//put header fields in front:
 	//&h11 -- fixed ver/type fields (4 bits each)
 	//&h09 -- code: active discovery initiation (1 byte)
 	//0 and 0 -- session ID (2 bytes)
 	//0 and chr(len(s)) -- payload length (2 bytes)
-	s = chr(&h11)+chr(&h09)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
+	s = chr(0x11)+chr(0x09)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(0,s,YES);
@@ -510,16 +510,16 @@ void pppoe_send_padr() {
 
 	//we start from the payload
 	s = "";
-	pppoe_add_tag(s,&h0101,pppoe_serv_name);
-	pppoe_add_tag(s,&h0103,pppoe_host_uniq);
-	pppoe_add_tag(s,&h0104,pppoe_ac_cookie);
+	pppoe_add_tag(s,0x0101,pppoe_serv_name);
+	pppoe_add_tag(s,0x0103,pppoe_host_uniq);
+	pppoe_add_tag(s,0x0104,pppoe_ac_cookie);
 
 	//put header fields in front:
 	//&h11 -- fixed ver/type fields (4 bits each)
 	//&h19 -- code: active discovery request (1 byte)
 	//0 and 0 -- session ID (2 bytes)
 	//0 and chr(len(s)) -- payload length (2 bytes)
-	s = chr(&h11)+chr(&h19)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
+	s = chr(0x11)+chr(0x19)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(0,s,YES);
@@ -544,7 +544,7 @@ void pppoe_send_padt() {
 	//&hA7 -- code: active discovery termination (1 byte)
 	//session ID (2 bytes)
 	//0 and chr(len(s)) -- payload length (2 bytes)
-	s = chr(&h11)+chr(&hA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id && &hFF)+chr(0)+chr(len(s))+s;
+	s = chr(0x11)+chr(0xA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(len(s))+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(0,s,YES);
@@ -558,7 +558,7 @@ void pppoe_send_padt() {
 //--------------------------------------------------------------------
 void pppoe_add_tag(string *packet_str, unsigned int tag_code, string *tag_data) {
 	*packet_str = *packet_str+chr(tag_code/256);
-	*packet_str = *packet_str+chr(tag_code && &hFF);
+	*packet_str = *packet_str+chr(tag_code && 0xFF);
 	*packet_str = *packet_str+chr(0);
 	*packet_str = *packet_str+chr(len(*tag_data));
 	*packet_str = *packet_str+*tag_data;
@@ -604,15 +604,15 @@ void pppoe_send_lcp() {
 
 	//we start from the payload
 	s = "";
-	pppoe_lcp_add_tag(s,&h05,right(pppoe_magic,4));
+	pppoe_lcp_add_tag(s,0x05,right(pppoe_magic,4));
 
 	//put header fields in front:
 	//&h01 -- configure-request
 	//LCP ID (1 byte)
 	//LCP length (2 bytes)
-	s = chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 		
-	s = chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -647,9 +647,9 @@ void pppoe_send_auth() {
 	//&h01 -- configure-request
 	//LCP ID (1 byte)
 	//LCP length (2 bytes)
-	s = chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 	
-	s = chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h23)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x23)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -673,9 +673,9 @@ void pppoe_send_ip(string *ip) {
 	//&h01 -- configure-request
 	//LCP ID (1 byte)
 	//LCP length (2 bytes)
-	s = chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 	
-	s = chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && &hFF)+chr(0)+chr(6+len(s))+chr(&h80)+chr(&h21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0x80)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -698,9 +698,9 @@ void pppoe_send_echo() {
 	//&h01 -- configure-request
 	//LCP ID (1 byte)
 	//LCP length (2 bytes)
-	s = chr(&h09)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+	s = chr(0x09)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 	
-	s = chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -992,7 +992,7 @@ void pppoe_debugprint_packet(unsigned char mode, string *packet_str, no_yes it_i
 		}
 		ptr = 0;
 		switch (proto) {
-		case &hC023:
+		case 0xC023:
 
 			if (code == 1) {
 				tag_len = asc(mid(*packet_str,13+ptr,1));
@@ -1004,7 +1004,7 @@ void pppoe_debugprint_packet(unsigned char mode, string *packet_str, no_yes it_i
 				pppoe_debugprint("...Password: "+str(tag_len)+": "+s);
 			}
 			break;
-		case &h8021:
+		case 0x8021:
 
 			tag_len = asc(mid(*packet_str,13+ptr+1,1));
 			s = mid(*packet_str,13+ptr+2,tag_len-2);

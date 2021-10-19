@@ -23,5 +23,6 @@ unsigned char test() {
 unsigned char test;
 //testing comments in function
     test = 3;
+    test = test && 0xF0;
     return test;
 }

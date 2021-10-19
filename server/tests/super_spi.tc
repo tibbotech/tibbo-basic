@@ -176,7 +176,7 @@ void sspi_write(unsigned char data) {
 	bool BitData;//Comparison result (1 or 0)
 
 	if (sspi_num>3) {
-		compval = &h80;//Initialize the MASK
+		compval = 0x80;//Initialize the MASK
 
 		io.num = sspi_scl[sspi_num];//Select SSI_CLK line
 
@@ -187,7 +187,7 @@ void sspi_write(unsigned char data) {
 		}
 		
 		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
-			BitData == data && compval;//Define the state of the bit(MSB-->LSB)
+			BitData = data && compval;//Define the state of the bit(MSB-->LSB)
 			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
 
 			if ((BitData)) {
@@ -214,7 +214,7 @@ unsigned char sspi_read;
 	io.lineset(sspi_mosi[sspi_num],LOW);
 	if (sspi_num>3) {
 		sspi_read = 0;
-		compval = &h80;//Initialize the MASK
+		compval = 0x80;//Initialize the MASK
 
 		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
 			if (sspi_mode[sspi_num] == SPI_MODE_0 || sspi_mode[sspi_num] == SPI_MODE_2) {
@@ -224,7 +224,7 @@ unsigned char sspi_read;
 			}
 
 			if ((io.lineget(sspi_miso[sspi_num]))) {//Devine the state of the bit
-				sspi_read == sspi_read || compval;//Store the value of the bit
+				sspi_read = sspi_read || compval;//Store the value of the bit
 			}
 
 			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
@@ -242,8 +242,8 @@ unsigned char sspi_read;
 	} else {
 		unsigned int tmp;
 		ssi.channel = sspi_num;
-		tmp = ssi.value(&hFFFF,8);
-		sspi_read == tmp && &h00FF;
+		tmp = ssi.value(0xFFFF,8);
+		sspi_read = tmp && 0x00FF;
 	}
 	return sspi_read;
 }

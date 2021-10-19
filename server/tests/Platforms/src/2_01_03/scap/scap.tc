@@ -72,8 +72,8 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 	data_size = data_size+(lcd.width*3*lcd.height)+spare;
 	bmp_data_size = scap_size_convertion(data_size);
 	
-	file_size = chr(&h36)+chr(&h84)+chr(&h03)+chr(&h00);
-	file_header = "BM"+file_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(&h36)+chr(0)+chr(0)+chr(0)+chr(&h28)+chr(0)+chr(0)+chr(0)+chr(&h40)+chr(01)+chr(0)+chr(0)+chr(&hF0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(pix_bit)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+bmp_data_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0);//2 bytes 	
+	file_size = chr(0x36)+chr(0x84)+chr(0x03)+chr(0x00);
+	file_header = "BM"+file_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(0x36)+chr(0)+chr(0)+chr(0)+chr(0x28)+chr(0)+chr(0)+chr(0)+chr(0x40)+chr(01)+chr(0)+chr(0)+chr(0xF0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(pix_bit)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+bmp_data_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0);//2 bytes 	
 			//4 bytes file size 		
 			//4 bytes reserved
 			//4 bytes	
@@ -100,11 +100,11 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 			pixel = lcd.getpixel(lx,ly);
 
 			red_value = (pixel && red_mask);
-			green_value == (pixel && green_mask) >> 5;
-			blue_value == (pixel && blue_mask) >> 11;
-			blue == blue_value << 3;
-			green == green_value << 2;
-			red == red_value << 3;
+			green_value = (pixel && green_mask) >> 5;
+			blue_value = (pixel && blue_mask) >> 11;
+			blue = blue_value << 3;
+			green = green_value << 2;
+			red = red_value << 3;
 			tmp[0] = blue;
 			tmp[1] = green;
 			tmp[2] = red;

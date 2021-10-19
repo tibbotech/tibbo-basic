@@ -279,7 +279,7 @@ void sntp_proc_sock_event(pl_sock_state_simple state) {
 void sntp_send_request() {
 	string<48> s;
 	
-	s = chr(&h0b)+strgen(47,chr(&h0));
+	s = chr(0x0b)+strgen(47,chr(0x0));
 	#if SNTP_OFFSET_CALCULATION	
 		string<4> s1;
 		s1 = sntp_dword_to_ts(sntp_get_clock_ts());

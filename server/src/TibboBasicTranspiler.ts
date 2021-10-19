@@ -436,12 +436,17 @@ class ParserListener extends TibboBasicParserListener {
                                 }
                             }
                         }
+                        expression = expression.replace(/\&h/g, '0x');
                         result += `${expression}`;
                         break;
                 }
             }
+            // else if (item.children && item.children.length > 1) {
+            //     result += this.parseExpression(item, isAssignment);
+            // }
             else {
                 let expression = item.getText();
+                expression = expression.replace(/\&h/g, '0x');
                 let tmp = item;
                 while (tmp.children.length == 1) {
                     if (tmp.children[0].children != undefined) {
@@ -466,13 +471,13 @@ class ParserListener extends TibboBasicParserListener {
                         if (args.length > 2) {
                             const referencedVariable = this.findVariable(primarySymbol);
                             if (referencedVariable !== undefined) {
-                                result += `${primarySymbol}[${this.parseExpression(args[1])}]`;
+                                result += `${primarySymbol}[${this.parseExpression(args[1], isAssignment)}]`;
                                 continue;
                             }
                         }
                     }
                 }
-                result += this.parseExpression(tmp);
+                result += this.parseExpression(tmp, isAssignment);
             }
 
 

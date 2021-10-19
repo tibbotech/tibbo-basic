@@ -22,4 +22,5 @@ end sub
 function test() as byte
 'testing comments in function
     test = 3
+    test=test and &hF0
 end function

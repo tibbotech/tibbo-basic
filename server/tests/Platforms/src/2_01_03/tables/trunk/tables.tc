@@ -2669,12 +2669,12 @@ en_tbl_status_codes tbl_timestamp_sg;
 		*timestamp.ts_milsec = 256*asc(mid(ts,6,1))+asc(mid(ts,7,1));
 	} else {
 		ts = chr(*timestamp.ts_daycount/256);
-		ts = ts+chr(*timestamp.ts_daycount && &hFF);
+		ts = ts+chr(*timestamp.ts_daycount && 0xFF);
 		ts = ts+chr(*timestamp.ts_mincount/256);
-		ts = ts+chr(*timestamp.ts_mincount && &hFF);
+		ts = ts+chr(*timestamp.ts_mincount && 0xFF);
 		ts = ts+chr(*timestamp.ts_seconds);
 		ts = ts+chr(*timestamp.ts_milsec/256);
-		ts = ts+chr(*timestamp.ts_milsec && &hFF);
+		ts = ts+chr(*timestamp.ts_milsec && 0xFF);
 		goto fd_error;
 		goto fd_error;
 		goto fd_error;
@@ -2902,7 +2902,7 @@ en_tbl_status_codes tbl_info_find;
 	unsigned char i;
 
 	i = asc(*table_name_or_num);
-	if (i>=&h30 && i<=&h39) {
+	if (i>=0x30 && i<=0x39) {
 		i = val(*table_name_or_num);
 		goto check_index;
 	} else {
@@ -3040,7 +3040,7 @@ en_tbl_status_codes tbl_field_find;
 	unsigned int f, i;
 	
 	i = asc(field_name);
-	if (i>=&h30 && i<=&h39) {
+	if (i>=0x30 && i<=0x39) {
 		i = val(field_name);
 		if (i>tbl_info[tbl_info_index].num_of_fields-1) {
 			*field_index = tbl_info[tbl_info_index].field_num_offset+i;
@@ -3225,7 +3225,7 @@ void tbl_mod_hash(unsigned long *d) {
 	msw = asc(left(hash,1))*256+asc(mid(hash,2,1));
 	lsw = asc(mid(hash,3,1))*256+asc(mid(hash,4,1));
 	hash_val = msw*65536+lsw;
-	hash_val == hash_val ^ *d;
+	hash_val = hash_val ^ *d;
 	msw = hash_val/65536;
 	lsw = hash_val % 65536;
 	hash = chr(msw/256)+chr(msw % 256)+chr(lsw/256)+chr(lsw % 256);

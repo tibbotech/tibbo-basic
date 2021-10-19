@@ -21,7 +21,7 @@
 #define AGG_ELEMENT_NAME_VALUE_SEPARATOR 0x1e
 #define AGG_NULL 0x1a
 #define AGG_SCRIPT_FIELD_SEPARATOR 0x9
-#define AGG_CR_LF chr(0x0d)+chr(&h0a)
+#define AGG_CR_LF chr(0x0d)+chr(0x0a)
 #define AGG_INIT_SIGNATURE 0xEF4E
 #define AGG_TX_BUF_SIZE 2//AGG_TX_BUFF_PAGES
 #define AGG_RX_BUF_SIZE 2//AGG_RX_BUFF_PAGES

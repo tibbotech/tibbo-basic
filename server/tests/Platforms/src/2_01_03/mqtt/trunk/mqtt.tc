@@ -93,7 +93,7 @@ string<2> mqtt_build_remaining_length;
 	do
 		unsigned char encodedByte;
 		size = size/128;
-		if ((size>0)) { encodedByte == encodedByte || 128; };
+		if ((size>0)) { encodedByte = encodedByte || 128; };
 		mqtt_build_remaining_length = mqtt_build_remaining_length+chr(encodedByte);
 	loop while (size > 0)
 	return mqtt_build_remaining_length;
@@ -131,9 +131,9 @@ void mqtt_send_login() {
 	string buf;
 	
 	if (((mqtt_user == "") || (mqtt_pw == ""))) {
-		buf = chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&h02)+chr(0)+chr(&h3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID;
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0x02)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID;
 	} else {
-		buf = chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&hc2)+chr(0)+chr(&h3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID+chr(0)+chr(len(mqtt_user))+mqtt_user+chr(0)+chr(len(mqtt_pw))+mqtt_pw;
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0xc2)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID+chr(0)+chr(len(mqtt_user))+mqtt_user+chr(0)+chr(len(mqtt_pw))+mqtt_pw;
 	}
 	buf = chr(CONNECT)+mqtt_build_remaining_length(len(buf))+buf;
 
@@ -369,7 +369,7 @@ void mqtt_proc_data() {
 
 	unsigned char head;
 	en_qos_choices qos;
-	head = (head && &hF0);
+	head = (head && 0xF0);
 	
 	buf = right(buf,length);
 

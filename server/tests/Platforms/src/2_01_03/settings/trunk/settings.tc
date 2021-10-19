@@ -1357,7 +1357,7 @@ unsigned char stg_find;
 	unsigned char f;
 	
 	f = asc(*stg_name_or_num);
-	if (f>=&h30 && f<=&h39) {
+	if (f>=0x30 && f<=0x39) {
 		f = val(*stg_name_or_num);
 		if (f<stg_num_settings) {
 			stg_find = f+1;
@@ -1580,12 +1580,12 @@ lb2: if (i<stg_sdr[num].p1 || i>stg_sdr[num].p2) {
 
 		#if STG_TIMESTAMP != 0
 			ts_str = chr(stg_timestamp.ts_daycount/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_daycount && &hFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_daycount && 0xFF);
 			ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_mincount && &hFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_mincount && 0xFF);
 			ts_str = ts_str+chr(stg_timestamp.ts_seconds);
 			ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_milsec && &hFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_milsec && 0xFF);
 			insert(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH+1-1,ts_str);//-1 because of checksum field in the end 
 		#endif
 
@@ -1708,12 +1708,12 @@ en_stg_status_codes stg_set_ts_internal;
 
 	//set new timestamp
 	ts_str = chr(stg_timestamp.ts_daycount/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_daycount && &hFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_daycount && 0xFF);
 	ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_mincount && &hFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_mincount && 0xFF);
 	ts_str = ts_str+chr(stg_timestamp.ts_seconds);
 	ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_milsec && &hFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_milsec && 0xFF);
 	stg_str = stg_str+ts_str;
 
 	//calculate checksum and add this checksum to the data
@@ -1936,7 +1936,7 @@ void stg_process_esc_seq(string *s) {
 	//process escape sequences
 	pos = instr(1,*s,"\x5Cx",1);//we are searching for "\x"
 	while (pos>0) {
-		x = val("&h"+mid(*s,pos+2,2));
+		x = val("0x"+mid(*s,pos+2,2));
 		*s = mid(*s,1,pos-1)+chr(x)+mid(*s,pos+4,255);
 		pos = instr(1,*s,"\x5C",1);
 	}
