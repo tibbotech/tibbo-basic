@@ -51,7 +51,7 @@ tbt42_errcheck tbt42_init;
 //go for direct I/O manipulation a.k.a. bit-banging (NO).
 //Note that there is a limited number of SSI channels so if you set use_ssi=YES this function may return NG, meaning that
 //there are no free SSI channels left. This doesn't mean failure. Rather, it means that comms will proceed in bit banging mood.
-	
+
 	tbt42_init = TBT42_OK;
 	#if RTC_DEBUG_PRINT == 1
 		rtc_debug_print("++++++++++");
@@ -74,7 +74,7 @@ tbt42_errcheck tbt42_init;
 		io.num = pin_clk;
 		io.state = HIGH;
 		io.enabled = YES;//Enable as output
-		
+
 		//SPI DO (MOSI)
 		io.num = pin_mosi;
 		io.state = HIGH;
@@ -111,7 +111,7 @@ tbt42_errcheck tbt42_init;
 
 	value = tbt42_reg_read_bin(TBT42_STATUS,pin_cs,*channel);
 	value = value && 0xF0;
-	
+
 	if (value && 0x80) {
 		tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,*channel);
 	} else {
@@ -123,7 +123,7 @@ tbt42_errcheck tbt42_init;
 void tbt42_rtc_get(unsigned int *wdaycount, unsigned int *wmincount, unsigned char *bsec, unsigned char pin_cs, unsigned char channel) {
 //Reads the current daycount, mincount, and seconds from the RTC. Use year(), month(), date(), hours(), minutes(), and weekday() syscalls
 //to convert these values into the actual date and time.
-	
+
 	unsigned char byear, bmonth, bday, bhour, bmin;
 
 	if (rtc_init_flag != TBT42_INIT_SIGNATURE) {
@@ -147,11 +147,11 @@ ok_ng tbt42_rtc_set;
 //Writes the specified daycount, mincount, and seconds into the RTC. Use daycount() and mincount() syscalls
 //to convert your date and time into the daycount and mincount values.
 //Returns NG if values you supplied are invalid.
-	
+
 	unsigned char byear, bmonth, bday, bhour, bmin;
 
 	tbt42_rtc_set = OK;
-	
+
 	if (rtc_init_flag != TBT42_INIT_SIGNATURE) {
 		#if RTC_DEBUG_PRINT == 1
 			rtc_debug_print("The lib is not initialized, call tbt42_init() first");
@@ -159,7 +159,7 @@ ok_ng tbt42_rtc_set;
 		tbt42_rtc_set = NG;
 		return tbt42_rtc_set;
 	}
-	
+
 	if (bsec>59) {
 		#if RTC_DEBUG_PRINT == 1
 			rtc_debug_print("Maximum bsec number is 59");
@@ -195,11 +195,11 @@ ok_ng tbt42_alarm_set;
 //- When wdaycount=0 AND wmincount=0 AND bsec=0 alarm occurs every second.<br>
 //- When wdaycount=0 AND wmincount=0 AND bsec>0 alarm occurs every minute and on the second specified by bsec.<br>
 //- When wdaycount>0 alarm occurs on the date/time specified by the combination of wdaycount, wmincount, and bsec.
-	
+
 	unsigned char byear, bmonth, bday, bhour, bmin;
-	
+
 	tbt42_alarm_set = NG;
-	
+
 	if (rtc_init_flag != TBT42_INIT_SIGNATURE) {
 		#if RTC_DEBUG_PRINT == 1
 			rtc_debug_print("The lib is not initialized, call tbt42_init() first");
@@ -273,7 +273,7 @@ ok_ng tbt42_alarm_set;
 	}
 
 	tbt42_reg_write_bin(TBT42_CONTROL,value,pin_cs,channel);
-	
+
 	tbt42_alarm_set = OK;
 	return tbt42_alarm_set;
 }
@@ -282,7 +282,7 @@ ok_ng tbt42_alarm_waiting(unsigned char pin_miso, unsigned char pin_cs, unsigned
 ok_ng tbt42_alarm_waiting;
 	tbt42_alarm_waiting = NG;
 wait_alarm: 
-	goto wait_alarm;
+	if (io.lineget(pin_miso) == HIGH) { goto wait_alarm;}
 	//alarm has occurred
 	tbt42_rtc_int_clear(pin_cs,channel);//this clears the interupt
 	tbt42_alarm_waiting = OK;
@@ -293,7 +293,7 @@ no_yes tbt42_alarm_setting_get(unsigned int *wdaycount, unsigned int *wmincount,
 no_yes tbt42_alarm_setting_get;
 //Returns NO if alarm is disabled or YES if enabled, in which case wdaycout, wmincount, and bsec will contain
 //current alarm settings.
-	
+
 	unsigned char byear, bmonth, bday, bhour, bmin;
 
 	if (rtc_init_flag != TBT42_INIT_SIGNATURE) {
@@ -368,7 +368,7 @@ no_yes tbt42_alarm_setting_get;
 	} else {
 		max_day = 30;
 	}
-	
+
 	if (bday>max_day) {
 		bday = 1;
 		bmonth = bmonth+1;
@@ -392,7 +392,7 @@ no_yes tbt42_alarm_setting_get;
 
 void tbt42_rtc_int_clear(unsigned char pin_cs, unsigned char channel) {
 //Clears the alarm interrupt thus causing the INT line to go HIGH (deactivate). 	
-	
+
 	unsigned char value;
 
 	value = tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel);
@@ -405,9 +405,9 @@ float tbt42_temp_get;
 //Reads the current temperature. The temperature is measured in steps of 0.25 degrees C.
 //Reading the temperature does not cause the actual temperature measurement to occur.
 //Measurements happen once in every 64 seconds and are independent of temperature reads.
-	
+
 	int tmp;
-	
+
 	tmp = tbt42_reg_read_bin(TBT42_TEMP_H,pin_cs,channel)*256+tbt42_reg_read_bin(TBT42_TEMP_L,pin_cs,channel);
 	tmp = tmp/64;//to get rid of 6 empty bits
 	tbt42_temp_get = tmp;
@@ -419,7 +419,7 @@ float tbt42_temp_get;
 unsigned char tbt42_nvram_read(unsigned char address, unsigned char pin_cs, unsigned char channel) {
 unsigned char tbt42_nvram_read;
 //Reads a byte of data from the non-volatile memory at address 0~255.	
-	
+
 	tbt42_reg_write_bin(TBT42_NVRAM_AD,address,pin_cs,channel);
 	tbt42_nvram_read = tbt42_reg_read_bin(TBT42_NVRAM_DT,pin_cs,channel);
 	return tbt42_nvram_read;
@@ -428,7 +428,7 @@ unsigned char tbt42_nvram_read;
 //----------------------------------------------------------------------------
 void tbt42_nvram_write(unsigned char data_to_write, unsigned char address, unsigned char pin_cs, unsigned char channel) {
 //Writes a byte of data into the non-volatile memory at address 0~255.	
-	
+
 	tbt42_reg_write_bin(TBT42_NVRAM_AD,address,pin_cs,channel);
 	tbt42_reg_write_bin(TBT42_NVRAM_DT,data_to_write,pin_cs,channel);
 }
@@ -436,7 +436,7 @@ void tbt42_nvram_write(unsigned char data_to_write, unsigned char address, unsig
 unsigned char tbt42_reg_read_bcd(unsigned char add, unsigned char pin_cs, unsigned char channel) {
 unsigned char tbt42_reg_read_bcd;
 	unsigned char digit1, digit0;
-	
+
 	sspi_get(channel);
 
 	io.lineset(pin_cs,LOW);
@@ -452,7 +452,7 @@ unsigned char tbt42_reg_read_bcd;
 
 void tbt42_reg_write_bcd(unsigned char add, unsigned char data, unsigned char pin_cs, unsigned char channel) {
 	unsigned char digit1, digit0;
-	
+
 	digit1 = data/10;
 	digit0 = data-digit1*10;
 	data = digit1*16+digit0;

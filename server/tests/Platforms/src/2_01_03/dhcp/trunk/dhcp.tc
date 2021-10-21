@@ -79,7 +79,7 @@ string dhcp_get_info;
 
 		dhcp_get_info = str(DHCP_SOCK_BUFF_PAGES*2);
 		break;
-	
+
 	}
 	return dhcp_get_info;
 }
@@ -104,7 +104,7 @@ en_dhcp_status_codes dhcp_start;
 	if (dhcp_sock>=sock.numofsock) {
 		dhcp_sock = sock_get(DHCP_SOCK_GET_SIGNATURE);
 	}
-	
+
 	if (dhcp_sock>=sock.numofsock) {
 		#if DHCP_DEBUG_PRINT
 			dhcp_debug_print_status(interface,DHCP_STATUS_OUT_OF_SOCKETS);
@@ -113,7 +113,7 @@ en_dhcp_status_codes dhcp_start;
 		dhcp_start = DHCP_STATUS_OUT_OF_SOCKETS;
 		return dhcp_start;
 	}
-	
+
 	#if NET_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
 			goto dhcp_start_continue;
@@ -145,7 +145,7 @@ dhcp_start_continue:
 	} else {
 		dhcp_obtained_ip[dhcp_i] = "";
 	}
-	
+
 	dhcp_host_name[dhcp_i] = *host_name;
 
 	if (dhcp_phase[dhcp_i] == DHCP_PHASE_OFF) {
@@ -214,7 +214,7 @@ void dhcp_set_link_disconnect_behavior(pl_sock_interfaces interface, no_yes beha
 //reestablished the DHCP will be repeated for this interface. YES means that reestablishing the link
 //will not lead to the DHCP restart.
 	unsigned char dhcp_i;
-	
+
 	if (NUM_INTERFACES == 1) {
 		dhcp_i = 0;
 	} else {
@@ -237,14 +237,14 @@ void dhcp_proc_timer() {
 	if (dhcp_current_interface>=2) {
 		dhcp_current_interface = 0;
 	}
-	
+
 	#if NET_AVAILABLE
 		if (dhcp_current_interface == 0) {
 			dhcp_proc_one_interface(PL_SOCK_INTERFACE_NET);
 			return;
 		}
 	#endif
-	
+
 	#if WLN_AVAILABLE
 		if (dhcp_current_interface == 1) {
 			dhcp_proc_one_interface(PL_SOCK_INTERFACE_WLN);
@@ -267,8 +267,8 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 		if (interface == PL_SOCK_INTERFACE_NET) {
 			if (dhcp_phase[dhcp_i] != DHCP_PHASE_OFF) {
 				if (net.linkstate == PL_NET_LINKSTAT_NOLINK) {
-					return;
-					
+					if (dhcp_ingnore_link_disconnects[dhcp_i] != NO) { return;}
+
 					dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
 					dhcp_renew[dhcp_i] = NO;
 					dhcp_timer[dhcp_i] = 1;
@@ -293,8 +293,8 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 		if (interface == PL_SOCK_INTERFACE_WLN) {
 			if (dhcp_phase[dhcp_i] != DHCP_PHASE_OFF) {
 				if (wln_check_association() == PL_WLN_NOT_ASSOCIATED) {
-					return;
-					
+					if (dhcp_ingnore_link_disconnects[dhcp_i] != NO) { return;}
+
 					dhcp_wln_exchange_delay = DHCP_WLN_EXCHANGE_DELAY_CONST;
 					dhcp_phase[dhcp_i] = DHCP_PHASE_IDLE;
 					dhcp_renew[dhcp_i] = NO;
@@ -309,7 +309,7 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 						dhcp_wln_exchange_delay = dhcp_wln_exchange_delay-1;
 						return;
 					}
-					
+
 					#if DHCP_DEBUG_PRINT
 						if (dhcp_media_linked[dhcp_i] == NO) {
 							dhcp_debugprint(interface,"Wi-Fi interface associated with the AP -- DHCP (re)started");
@@ -329,7 +329,7 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 			return;
 		}
 	}
-	
+
 	#if NET_AVAILABLE && WLN_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
 			if (dhcp_interface_token == PL_SOCK_INTERFACE_WLN && dhcp_phase[PL_SOCK_INTERFACE_NET-1] != DHCP_PHASE_OFF) {
@@ -349,7 +349,7 @@ void dhcp_proc_one_interface(pl_sock_interfaces interface) {
 	#endif
 
 	switch (dhcp_phase[dhcp_i]) {
-		
+
 	case DHCP_PHASE_IDLE:
 
 		if (dhcp_renew[dhcp_i] == NO) {
@@ -378,7 +378,7 @@ label1: if (dhcp_sock_open(interface,DHCP_PHASE_DISCOVER) != OK) {
 		dhcp_timer[dhcp_i] = DHCP_WAIT_TIME;
 		return;
 		break;
-	
+
 	case DHCP_PHASE_DISCOVER_REPLY:
 
 		#if DHCP_DEBUG_PRINT
@@ -387,7 +387,7 @@ label1: if (dhcp_sock_open(interface,DHCP_PHASE_DISCOVER) != OK) {
 		dhcp_error(interface);
 		return;
 		break;
-		
+
 	case DHCP_PHASE_REQUEST:
 
 label2: if (dhcp_sock_open(interface,DHCP_PHASE_REQUEST) != OK) {
@@ -402,7 +402,7 @@ label2: if (dhcp_sock_open(interface,DHCP_PHASE_REQUEST) != OK) {
 		dhcp_timer[dhcp_i] = DHCP_WAIT_TIME;
 		return;
 		break;
-		
+
 	case DHCP_PHASE_REQUEST_REPLY:
 
 		#if DHCP_DEBUG_PRINT
@@ -411,7 +411,7 @@ label2: if (dhcp_sock_open(interface,DHCP_PHASE_REQUEST) != OK) {
 		dhcp_error(interface);
 		return;
 		break;
-		
+
 	}
 }
 
@@ -438,7 +438,7 @@ dhcp_is_active:
 	}
 
 	s = sock.getdata(236);//read all the data up to a magic cookie
-	
+
 	//verify opcode: must be "reply" (2)
 	//verify hardware type: must be "ethernet" (1)
 	//verify hardware address length: must be (6)
@@ -481,17 +481,17 @@ decode_packet:
 		if (asc(mid(s,17,1))>223) {
 			goto dhcp_proc_data_error;
 		}
-		
+
 		//last number cannot be 0 or 255
 		x = asc(mid(s,20,1));
 		if (x == 0 || x == 255) {
 			goto dhcp_proc_data_error;
 		}
-		
+
 		//IP-address being offered is correct- extract it!
 		dhcp_obtained_ip[dhcp_i] = ddstr(mid(s,17,4));
 		break;
-	
+
 	case DHCP_PHASE_REQUEST_REPLY:
 
 		//Make sure that the IP-address the DHCP supplied now (ACK) is the same as in OFFER message
@@ -506,8 +506,8 @@ decode_packet:
 		#if DHCP_DEBUG_PRINT
 			dhcp_debugprint(interface,"INFO: RX unexpected message (wasn't expecting anything at the moment)");
 		#endif
-		break;
-		
+		goto dhcp_proc_data_error;break;
+
 	}
 
 	//This part is common for all types of replies received from the DHCP server.
@@ -515,10 +515,10 @@ decode_packet:
 	if (mid(s,29,6) != mac) {
 			goto dhcp_proc_data_error;
 	}
-		
+
 	//Read magic cookie and options
 	s = sock.getdata(255);
-	
+
 	//Check magic cookie
 	if (ddstr(mid(s,1,4)) != "99.130.83.99") {
 		goto dhcp_proc_data_error;
@@ -535,7 +535,7 @@ decode_packet:
 //reached the end of all options
 			goto exit_options;
 			break;
-		
+
 		case 0:
 //this is a "padding"- just skip it
 			goto next_option;
@@ -555,20 +555,20 @@ decode_packet:
 					goto dhcp_proc_data_error;
 				}
 				break;
-			
+
 			case DHCP_PHASE_REQUEST_REPLY:
 
 				if (message_type != 5) {
 					goto dhcp_proc_data_error;
 				}
 				break;
-			
+
 			default:break;
 
 			}
 			f = f+2;
 			break;
-				
+
 		case 1:
 //netmask option!- make sure its length is 5
 			if (asc(mid(s,f+1,1)) != 4) {
@@ -596,7 +596,7 @@ decode_packet:
 			}
 			f = f+5;
 			break;
-		
+
 		case 59:
 //T1- renewal time
 			t1_found = YES;
@@ -608,7 +608,7 @@ get_lease: if (asc(mid(s,f+1,1)) != 4) {
 			dhcp_obtained_lease_time[dhcp_i] = asc(mid(s,f+2,1))*16777216+asc(mid(s,f+3,1))*65536+asc(mid(s,f+4,1))*256+asc(mid(s,f+5,1));
 			f = f+5;
 			break;
-		
+
 		case 54:
 //server identifier option
 			if (asc(mid(s,f+1,1)) != 4) {
@@ -617,11 +617,11 @@ get_lease: if (asc(mid(s,f+1,1)) != 4) {
 			dhcp_server_ip[dhcp_i] = ddstr(mid(s,f+2,4));
 			f = f+5;
 			break;
-			
+
 		default://some other option: just skip it
 			x = asc(mid(s,f+1,1));
-			break;
-		
+			f = f+x+1;break;
+
 		}
 next_option: 
 	}
@@ -638,7 +638,7 @@ exit_options:
 		dhcp_timer[dhcp_i] = 1;
 		dhcp_sock_close();
 		break;
-		
+
 	case DHCP_PHASE_REQUEST_REPLY:
 
 		#if DHCP_DEBUG_PRINT
@@ -694,10 +694,10 @@ ok_ng dhcp_sock_open(pl_sock_interfaces interface, en_dhcp_phases phase) {
 ok_ng dhcp_sock_open;
 	unsigned char x;
 	unsigned int i;
-	
+
 	dhcp_interface_token = interface;
 	sock.num = dhcp_sock;
-	
+
 	//for DHCP DISCOVER, we need to have the IP address at 0.0.0.0
 	if (phase == DHCP_PHASE_DISCOVER) {
 		#if NET_AVAILABLE
@@ -726,7 +726,7 @@ ok_ng dhcp_sock_open;
 			}
 		#endif
 	}
-	
+
 	//arrange buffer space
 	if (sock.rxbuffsize<DHCP_MIN_BUFFER_SPACE || sock.txbuffsize<DHCP_MIN_BUFFER_SPACE) {
 		sock.rxbuffrq(0);
@@ -742,7 +742,7 @@ ok_ng dhcp_sock_open;
 			callback_dhcp_pre_buffrq(x);
 			sock.num = dhcp_sock;
 		}
-		
+
 		sock.rxbuffrq(DHCP_SOCK_BUFF_PAGES);
 		sock.txbuffrq(DHCP_SOCK_BUFF_PAGES);
 		sys.buffalloc();
@@ -765,19 +765,19 @@ ok_ng dhcp_sock_open;
 	sock.connectiontout = 600;
 	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT;
 	sock.reconmode = PL_SOCK_RECONMODE_3;
-	
+
 	#if NET_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
 			sock.targetinterface = PL_SOCK_INTERFACE_NET;
 		}
 	#endif
-	
+
 	#if WLN_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_WLN) {
 			sock.targetinterface = PL_SOCK_INTERFACE_WLN;
 		}
 	#endif
-	
+
 	if (sock.statesimple == PL_SSTS_CLOSED) {
 		i = sys.timercount;
 		sock.connect();
@@ -793,7 +793,7 @@ dhcp_1:
 //------------------------------------------------------------------------------
 void dhcp_sock_close() {
 	unsigned int i;
-	
+
 	i = sys.timercount;
 	sock.discard();
 	while (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
@@ -804,13 +804,13 @@ void dhcp_sock_close() {
 //------------------------------------------------------------------------------
 void dhcp_check_if_all_finished() {
 	unsigned char f;
-	
+
 	for (f=0; f <= NUM_INTERFACES-1; f++) {
 		if (dhcp_phase[f] != DHCP_PHASE_IDLE && dhcp_phase[f] != DHCP_PHASE_OFF) {
 			return;
 		}
 	}
-	
+
 	sock.num = dhcp_sock;
 	sock.rxbuffrq(0);
 	sock.txbuffrq(0);
@@ -840,7 +840,7 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 
 	//1.1.6.0- opcode=rq, hware type= Ethernet, hardware addr len= 6, hop count=0
 	s = ddval("1.1.6.0");
-	
+
 	//transaction ID- last 4 bytes of MAC address
 	s = s+right(mac,4);
 
@@ -855,30 +855,30 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 		//set client ip, your ip, server ip, gateway ip all to zeroes.
 		s = s+strgen(16,chr(0));
 		break;
-	
+
 	case DHCP_PHASE_REQUEST:
 
 		//our IP address and the field for server-suggested IP- fill with zeroes to avoid problems
 		s = s+strgen(8,chr(0));
-		
+
 		//supply IP-address of the server (we obtained from the OFFER message)- this is required
 		s = s+strgen(4,chr(0));
-	
+
 		//no need to set gateway IP
 		s = s+strgen(4,chr(0));
 		break;
-	
+
 	default:break;
 	}
-	
+
 	s = s+mac;//client MAC
 
 	sock.setdata(s);
-	
+
 	//now we just need 204 empty bytes
 	s = strgen(202,chr(0));
 	sock.setdata(s);
-	
+
 	//continue...
 	s = ddval("99.130.83.99");//magic cookie
 
@@ -887,13 +887,13 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 
 		//53.1.1- set message type to DISCOVER
 		s = s+ddval("53.1.1");
-		
+
 		//116.1.1 - DHCP Auto Configuration
 		s = s+ddval("116.1.1");
-		
+
 		//61.7 - Client Identifier
 		s = s+ddval("61.7.1.")+mac;
-	
+
 		//50.4- suggest our current IP only if IP was assigned already
 		if (*obtained_ip != "") {
 			s = s+ddval("50.4."+*obtained_ip);//suggest our current IP
@@ -903,19 +903,19 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 
 		//51.4.255.255.255.255- suggest maximum lease time
 		s = s+ddval("51.4.255.255.255.255");
-		
+
 		//55.2.1.3- provide a list of parameters we need
 		s = s+ddval("55.2.1.3");
 		break;
-	
+
 	case DHCP_PHASE_REQUEST:
 
 		//53.1.3- set message type to REQUEST
 		s = s+ddval("53.1.3");
-		
+
 		//Our identifier
 		s = s+ddval("61.7.1")+mac;
-		
+
 		//54.4- specify the DHCP server we are addressing
 		s = s+ddval("54.4")+ddval(dhcp_server_ip[dhcp_i]);
 
@@ -930,7 +930,7 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 		//55.2.1.3- provide a list of parameters we need
 		s = s+ddval("55.2.1.3");
 		break;
-	
+
 	default:break;
 
 	}
@@ -939,7 +939,7 @@ void send_dhcp(string<16> *obtained_ip, string<32> *device_name, pl_sock_interfa
 	if (*device_name != "") {
 		s = s+chr(12)+chr(len(*device_name))+*device_name;
 	}
-	
+
 	//end of all options and send!
 	//We pad the packet for compatibility to certain DHCP server that conforms to BOOTP packet size
 	sock.setdata(s+CHR(255)+strgen(319-len(s),CHR(0)));
@@ -968,7 +968,7 @@ wait_discard:
 			goto wait_discard;
 		}
 	}
-	
+
 	sock.num = sock_bup;
 }
 
@@ -987,7 +987,7 @@ void dhcp_init() {
 		dhcp_ingnore_link_disconnects[f] = NO;
 	}
 	dhcp_current_interface = 0;
-	
+
 	#if WLN_AVAILABLE
 		dhcp_wln_exchange_delay = DHCP_WLN_EXCHANGE_DELAY_CONST;
 	#endif
@@ -998,15 +998,20 @@ void dhcp_init() {
 void dhcp_debug_print_status(pl_sock_interfaces interface, en_dhcp_status_codes status) {
 	string<64> s;
 	switch (status) {
-	s = "OK";
+	case DHCP_STATUS_OK:
+s = "OK";
 	break;
-	s = "out of sockets";
+	case DHCP_STATUS_OUT_OF_SOCKETS:
+s = "out of sockets";
 	break;
-	s = "invalid interface";
+	case DHCP_STATUS_INVALID_INTERFACE:
+s = "invalid interface";
 	break;
-	s = "insufficient buffer space";
+	case DHCP_STATUS_INSUFFICIENT_BUFFER_SPACE:
+s = "insufficient buffer space";
 	break;
-	s = "DHCP process failed";
+	case DHCP_STATUS_FAILURE:
+s = "DHCP process failed";
 	break;
 	}
 	dhcp_debugprint(interface,"ERROR: "+s);
@@ -1017,7 +1022,7 @@ void dhcp_debug_print_status(pl_sock_interfaces interface, en_dhcp_status_codes 
 #if DHCP_DEBUG_PRINT
 void dhcp_debugprint(pl_sock_interfaces interface, string *print_data) {
 	string<16> s;
-	
+
 	#if NET_AVAILABLE
 		if (interface == PL_SOCK_INTERFACE_NET) {
 			s = "net";
@@ -1031,9 +1036,9 @@ void dhcp_debugprint(pl_sock_interfaces interface, string *print_data) {
 			goto dhcp_debugprint_1;
 		}
 	#endif
-	
+
 	s = str(interface)+"??";
-	
+
 dhcp_debugprint_1: 
 	sys.debugprint(DHCP_STAMP1+s+DHCP_STAMP2+*print_data+DHCP_CR_LF);
 }

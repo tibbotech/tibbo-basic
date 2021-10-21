@@ -32,7 +32,7 @@ unsigned char sock_get;
 		sock_init();
 		sock_init_flag = SOCK_INIT_SIGNATURE;
 	}
-	
+
 	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
 		if (sock_in_use[f] == NO) {
 			sock_in_use[f] = YES;
@@ -90,7 +90,7 @@ void sock_release(unsigned char sock_num) {
 	sock.discard();
 	while (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
 	}
-	
+
 	//release socket buffers
 	sock.rxbuffrq(0);
 	sock.txbuffrq(0);
@@ -99,7 +99,7 @@ void sock_release(unsigned char sock_num) {
 	sock.rplbuffrq(0);
 	sock.varbuffrq(0);
 	sys.buffalloc();
-	
+
 	//restore the socket to its default state
 	sock.acceptbcast = NO;
 	sock.allowedinterfaces = "NET";
@@ -132,7 +132,7 @@ void sock_release(unsigned char sock_num) {
 	#if SOCK_DEBUG_PRINT
 		sock_debugprint("'"+sock_user_signature[sock_num]+"' released socket #"+str(sock_num));
 	#endif
-	
+
 	sock_in_use[sock_num] = NO;
 	sock_user_signature[sock_num] = SOCK_UNUSED_SIGNATURE;
 	sock.num = sock_bup;
@@ -141,7 +141,7 @@ void sock_release(unsigned char sock_num) {
 //------------------------------------------------------------------------------
 void sock_init() {
 	unsigned char f;
-	
+
 	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
 		sock_in_use[f] = NO;
 		sock_user_signature[f] = SOCK_UNUSED_SIGNATURE;

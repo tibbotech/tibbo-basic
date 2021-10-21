@@ -42,11 +42,26 @@ export default class TibboBasicTranspiler {
     currentLine: string = '';
     functions: TibboFunction[] = [];
     variables: { [name: string]: TibboVariable } = {};
+    lineMappings: number[] = [];
 
     parseFile(contents: string): string {
         this.output = '';
         this.lines = [];
         this.lines = contents.split('\n');
+        const reg = /\S/;
+        this.lineMappings = [];
+        for (let i = 0; i < this.lines.length; i++) {
+            this.lineMappings.push(i);
+            const match = reg.exec(this.lines[i]);
+            let index = 0;
+            if (match) {
+                index = match.index;
+                if (match[0] === '#') {
+                    continue;
+                }
+            }
+            this.lines[i] = this.lines[i].substr(0, index);
+        }
 
         const chars = new antlr4.InputStream(contents);
         const lexer = new TibboBasicLexer(chars);
@@ -78,6 +93,7 @@ export default class TibboBasicTranspiler {
                     this.lines[line] += '//' + comment;
                 }
             }
+
         }
         for (let i = 0; i < this.lines.length; i++) {
             if (this.lines[i].trim().indexOf('#') == 0) {
@@ -123,20 +139,21 @@ export default class TibboBasicTranspiler {
         return content;
     }
 
-    addCode(code: string) {
+    addCode(code: string, line: number) {
         this.currentLine += code;
+        this.lines[this.lineMappings[line - 1]] += code;
     }
 
     writeLine(line: number) {
         let lineContent = this.lines[line - 1];
         let res = lineContent.search(/\S|$/);
         const exp = /^\s*[a-zA-Z][a-zA-Z0-9_]+:\s*$/;
-        if (lineContent.match(exp) !== null && this.currentLine.match(exp) == null) {
-            this.lines[line - 1] += this.currentLine;
-        }
-        else {
-            this.lines[line - 1] = lineContent.substr(0, res) + this.currentLine;
-        }
+        // if (lineContent.match(exp) !== null && this.currentLine.match(exp) == null) {
+        //     this.lines[line - 1] += this.currentLine;
+        // }
+        // else {
+        //     this.lines[line - 1] = lineContent.substr(0, res) + this.currentLine;
+        // }
 
         this.currentLine = '';
     }
@@ -209,18 +226,27 @@ class ParserListener extends TibboBasicParserListener {
         return undefined;
     }
 
+    enterDoLoopStmt(ctx: any) {
+        this.transpiler.addCode(`do {`, ctx.start.line);
+    }
+
+    exitDoLoopStmt(ctx: any) {
+        const condition = this.parseExpression(ctx.condition);
+        this.transpiler.addCode(`} while (${condition});`, ctx.stop.line);
+    }
+
     enterIncludeStmt(ctx: any) {
         let fileName = ctx.children[1].getText();
         let parts = fileName.split('.');
         parts[1] = 'th"';
         fileName = parts.join('.');
         fileName = fileName.replace(/\\/g, path.sep);
-        this.transpiler.addCode(`#include ${fileName}`);
+        this.transpiler.addCode(`#include ${fileName}`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     enterSubStmt(ctx: any) {
-        this.transpiler.addCode(`void ${ctx.name.text}`);
+        this.transpiler.addCode(`void ${ctx.name.text}`, ctx.start.line);
         this.currentFunction = {
             name: ctx.name.text,
             returnType: '',
@@ -255,13 +281,13 @@ class ParserListener extends TibboBasicParserListener {
 
     exitParamList(ctx: any) {
         if (!this.isDeclaration) {
-            this.transpiler.addCode(`(${this.currentParams.join(', ')}) {`);
+            this.transpiler.addCode(`(${this.currentParams.join(', ')}) {`, ctx.start.line);
             if (this.currentFunction && this.currentFunction.returnType !== '') {
-                this.transpiler.addCode(`\n${this.currentFunction.returnType} ${this.currentFunction.name};`);
+                this.transpiler.addCode(`\n${this.currentFunction.returnType} ${this.currentFunction.name};`, ctx.start.line);
             }
         }
         else {
-            this.transpiler.addCode(`(${this.currentParams.join(', ')});`);
+            this.transpiler.addCode(`(${this.currentParams.join(', ')});`, ctx.start.line);
         }
         this.transpiler.writeLine(ctx.start.line);
         // if (this.currentFunction && this.currentFunction.returnType !== '') {
@@ -284,7 +310,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     exitSubStmt(ctx: any) {
-        this.transpiler.addCode('}');
+        this.transpiler.addCode('}', ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
         this.isDeclaration = false;
         this.currentFunction = undefined;
@@ -294,7 +320,7 @@ class ParserListener extends TibboBasicParserListener {
         this.isDeclaration = false;
         const name = ctx.name.text;
         const returnType = this.convertVariableType(ctx.returnType.valueType.getText());
-        this.transpiler.addCode(`${returnType} ${ctx.name.text}`);
+        this.transpiler.addCode(`${returnType} ${ctx.name.text}`, ctx.start.line);
         this.currentFunction = {
             name: name,
             returnType: returnType,
@@ -304,7 +330,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     exitFunctionStmt(ctx: any) {
-        this.transpiler.addCode('}');
+        this.transpiler.addCode('}', ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
         this.transpiler.appendLine(`return ${this.currentFunction?.name};`, ctx.stop.line - 1);
         this.isDeclaration = false;
@@ -313,13 +339,13 @@ class ParserListener extends TibboBasicParserListener {
 
     enterDeclareSubStmt(ctx: any) {
         this.isDeclaration = true;
-        this.transpiler.addCode(`void ${ctx.name.text}`);
+        this.transpiler.addCode(`void ${ctx.name.text}`, ctx.start.line);
     }
 
     enterDeclareFuncStmt(ctx: any) {
         this.isDeclaration = true;
         const returnType = this.convertVariableType(ctx.returnType.valueType.getText());
-        this.transpiler.addCode(`${returnType} ${ctx.name.text}`);
+        this.transpiler.addCode(`${returnType} ${ctx.name.text}`, ctx.start.line);
     }
 
     enterDeclareVariableStmt(ctx: any) {
@@ -356,7 +382,7 @@ class ParserListener extends TibboBasicParserListener {
         }).join(', ');
         this.variables = this.variables.concat(variables);
 
-        this.transpiler.addCode(`${this.isGlobalVariable ? 'extern ' : ''}${dataType} ${variableList};`);
+        this.transpiler.addCode(`${this.isGlobalVariable ? 'extern ' : ''}${dataType} ${variableList};`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -378,12 +404,12 @@ class ParserListener extends TibboBasicParserListener {
         }
         let endCondition = `${variable} ${comparisonOperator} ${ctx.children[3].getText()}`;
 
-        this.transpiler.addCode(`for (${startCondition}; ${endCondition}; ${stepExp}) {`);
+        this.transpiler.addCode(`for (${startCondition}; ${endCondition}; ${stepExp}) {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     exitForNextStmt(ctx: any) {
-        this.transpiler.addCode('}');
+        this.transpiler.addCode('}', ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
@@ -485,22 +511,27 @@ class ParserListener extends TibboBasicParserListener {
         return result;
     }
 
+    exitInlineIfThenElse(ctx: any) {
+        this.transpiler.addCode(`}`, ctx.stop.line);
+        this.transpiler.writeLine(ctx.stop.line);
+    }
+
     enterInlineIfThenElse(ctx: any) {
         const code = ctx.children[1].getText();
         let condition = this.parseExpression(ctx.children[1]);
         let exp1 = this.parseExpression(ctx.children[3], true);
-        this.transpiler.addCode(`if (${condition}) { ${exp1}; }`);
+        this.transpiler.addCode(`if (${condition}) { `, ctx.start.line);
         if (ctx.children.length > 5) {
-            this.transpiler.addCode(`else { ${this.parseExpression(ctx.children[5])}; }`);
+            this.transpiler.addCode(`else { `, ctx.start.line);
         }
-        this.transpiler.addCode(`;`);
-        this.transpiler.writeLine(ctx.stop.line);
+        // this.transpiler.addCode(`;`);
+        // this.transpiler.writeLine(ctx.stop.line);
     }
 
     enterBlockIfThenElse(ctx: any) {
         const code = ctx.children[1].getText();
         let condition = this.parseExpression(ctx.children[1]);
-        this.transpiler.addCode(`if (${condition}) {`);
+        this.transpiler.addCode(`if (${condition}) {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -510,18 +541,18 @@ class ParserListener extends TibboBasicParserListener {
             if (child.symbol) {
                 switch (child.symbol.type) {
                     case TibboBasicLexer.ELSE:
-                        this.transpiler.addCode(`} else {`);
+                        this.transpiler.addCode(`} else {`, child.symbol.line);
                         this.transpiler.writeLine(child.symbol.line);
                         break;
                     case TibboBasicLexer.ELSEIF:
-                        this.transpiler.addCode(`} else if (${this.parseExpression(ctx.children[i + 1])}) {`);
+                        this.transpiler.addCode(`} else if (${this.parseExpression(ctx.children[i + 1])}) {`, child.symbol.line);
                         this.transpiler.writeLine(child.symbol.line);
                         break;
                 }
 
             }
         }
-        this.transpiler.addCode(`}`);
+        this.transpiler.addCode(`}`, ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
@@ -533,15 +564,15 @@ class ParserListener extends TibboBasicParserListener {
             if (equalsCount == 1) {
                 isAssignment = true;
             }
-            this.transpiler.addCode(this.parseExpression(ctx.children[0], isAssignment));
-            this.transpiler.addCode(';');
+            this.transpiler.addCode(this.parseExpression(ctx.children[0], isAssignment), ctx.start.line);
+            this.transpiler.addCode(';', ctx.start.line);
             this.transpiler.writeLine(ctx.start.line);
         }
     }
 
     enterLineLabel(ctx: any) {
         let label = ctx.getText();
-        this.transpiler.addCode(`${label} `);
+        this.transpiler.addCode(`${label} `, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -551,12 +582,12 @@ class ParserListener extends TibboBasicParserListener {
 
     enterWhileWendStmt(ctx: any) {
         let condition = this.parseExpression(ctx.children[1]);
-        this.transpiler.addCode(`while (${condition}) {`);
+        this.transpiler.addCode(`while (${condition}) {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     exitWhileWendStmt(ctx: any) {
-        this.transpiler.addCode(`}`)
+        this.transpiler.addCode(`}`, ctx.stop.line)
         this.transpiler.writeLine(ctx.stop.line);
     }
 
@@ -565,51 +596,52 @@ class ParserListener extends TibboBasicParserListener {
             case TibboBasicLexer.EXIT_DO:
             case TibboBasicLexer.EXIT_FOR:
             case TibboBasicLexer.EXIT_WHILE:
-                this.transpiler.addCode('break;');
+                this.transpiler.addCode('break;', ctx.start.line);
                 this.transpiler.writeLine(ctx.start.line);
                 break;
             case TibboBasicLexer.EXIT_SUB:
-                this.transpiler.addCode('return;');
+                this.transpiler.addCode('return;', ctx.start.line);
                 this.transpiler.writeLine(ctx.start.line);
                 break;
             case TibboBasicLexer.EXIT_FUNCTION:
-                this.transpiler.addCode(`return ${this.currentFunction?.name};`);
+                this.transpiler.addCode(`return ${this.currentFunction?.name};`, ctx.start.line);
                 this.transpiler.writeLine(ctx.start.line);
                 break;
         }
     }
 
-    // enterExpression(ctx: any) {
-    //     console.log(ctx.getText());
-    // }
-    // exitExpression(ctx) {
+    enterExpression(ctx: any) {
+        // const code = this.parseExpression(ctx);
+        // console.log(code);
+    }
+    exitExpression(ctx) {
 
-    // }
+    }
 
     enterGoToStmt(ctx: any) {
-        this.transpiler.addCode(`goto ${ctx.children[1].getText()};`);
-        this.transpiler.writeLine(ctx.start.line);
+        const code = `goto ${ctx.children[1].getText()};`;
+        this.transpiler.addCode(code, ctx.start.line);
     }
 
     enterEnumerationStmt(ctx: any) {
-        this.transpiler.addCode(`enum ${ctx.children[1].getText().toLowerCase()} {`);
+        this.transpiler.addCode(`enum ${ctx.children[1].getText().toLowerCase()} {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     exitEnumerationStmt(ctx: any) {
-        this.transpiler.addCode(`};`);
+        this.transpiler.addCode(`};`, ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
     enterSelectCaseStmt(ctx: any) {
-        this.transpiler.addCode(`switch (${this.parseExpression(ctx.children[2])}) {`);
+        this.transpiler.addCode(`switch (${this.parseExpression(ctx.children[2])}) {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     enterSC_Case(ctx: any) {
         for (let i = 0; i < ctx.children.length; i++) {
             if (ctx.children[i].ruleIndex == TibboBasicParser.RULE_sC_Cond) {
-                this.transpiler.addCode(`case ${this.parseExpression(ctx.children[i])}:\r\n`);
+                this.transpiler.addCode(`case ${this.parseExpression(ctx.children[i])}:\r\n`, ctx.start.line);
             }
         }
         this.transpiler.writeLine(ctx.start.line);
@@ -620,32 +652,32 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterSC_Default(ctx: any) {
-        this.transpiler.addCode('default:');
+        this.transpiler.addCode('default:', ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     exitSC_Default(ctx: any) {
-        this.transpiler.addCode('break;');
+        this.transpiler.addCode('break;', ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
     exitSelectCaseStmt(ctx: any) {
-        this.transpiler.addCode(`}`);
+        this.transpiler.addCode(`}`, ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
     enterConstSubStmt(ctx: any) {
-        this.transpiler.addCode(`#define ${ctx.children[0].getText()} ${this.parseExpression(ctx.children[2])}`);
+        this.transpiler.addCode(`#define ${ctx.children[0].getText()} ${this.parseExpression(ctx.children[2])}`, ctx.stop.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     enterTypeStmt(ctx: any) {
-        this.transpiler.addCode(`struct ${ctx.name.text.toLowerCase()} {`);
+        this.transpiler.addCode(`struct ${ctx.name.text.toLowerCase()} {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     exitTypeStmt(ctx: any) {
-        this.transpiler.addCode(`};`);
+        this.transpiler.addCode(`};`, ctx.stop.line);
         this.transpiler.writeLine(ctx.stop.line);
     }
 
@@ -655,12 +687,12 @@ class ParserListener extends TibboBasicParserListener {
         if (ctx.children.length > 2) {
             name += `[${ctx.children[2]}]`;
         }
-        this.transpiler.addCode(`${valueType} ${name};`);
+        this.transpiler.addCode(`${valueType} ${name};`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     enterEnumerationStmt_Constant(ctx: any) {
-        this.transpiler.addCode(`${ctx.getText()}`);
+        this.transpiler.addCode(`${ctx.getText()}`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 }

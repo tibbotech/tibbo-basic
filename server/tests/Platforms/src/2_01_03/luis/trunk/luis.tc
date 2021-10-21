@@ -45,12 +45,12 @@ en_luis_status_codes luis_start;
 	if (luis_init_flag == LUIS_INIT_SIGNATURE) {
 		return luis_start;
 	}
-	
-	
+
+
 	#if LUIS_DEBUG_PRINT
 		luis_debugprint("---START---");
 	#endif
-	
+
 	if (wln.enabled == NO) {
 		wln.csmap = LUIS_BT_CS;
 		io.num = LUIS_BT_CS;
@@ -65,21 +65,21 @@ en_luis_status_codes luis_start;
 		io.num = LUIS_BT_RST;
 		io.enabled = YES;
 		wln.disable();
-		
+
 		io.num = LUIS_BT_RST;
 		io.state = LOW;
 		luis_delay_ms(1);
 		io.state = HIGH;
-		
+
 		sys.buffalloc();
-		
+
 		wln.boot(0);
 	} else {
 		#if LUIS_DEBUG_PRINT
 			luis_debugprint("WA2000 module already enabled");
 		#endif
 	}
-	
+
 	if (wln.enabled == NO) {
 		#if LUIS_DEBUG_PRINT
 			luis_debugprint("WA2000 module failed to start");
@@ -94,7 +94,7 @@ en_luis_status_codes luis_start;
 		sys.buffalloc();
 		bt.enable();
 	}
-	
+
 	romfile.open(LUIS_HTML_FILE);
 	if (romfile.pointer32 != 1) {
 		luis_start = EN_LUIS_FILE_HTML_ERROR;
@@ -112,21 +112,21 @@ en_luis_status_codes luis_start;
 	}
 	int config_size;
 	LUIS_GOP_result = "{\x22type\x22:\x22spa\x22,\x22length\x22:"+lstr(html_size+config_size-len(LUIS_PLACEHOLDER_STR))+"}";
-	
+
 	if (luis_start == EN_LUIS_STATUS_OK) {
 		luis_init_flag = LUIS_INIT_SIGNATURE;
 	}
-	
-	return luis_start;
+
+return luis_start;
 }
 
 void luis_on_bt_event(pl_bt_events bt_event) {
 	if (luis_init_flag != LUIS_INIT_SIGNATURE || wln.enabled == NO) {
 		return;
 	}
-	
+
 	switch (bt_event) {
-	
+
 	case PL_BT_EVENT_CONNECTED:
 
 		#if LUIS_DEBUG_PRINT
@@ -171,12 +171,12 @@ void luis_on_bt_data_sent() {
 
 
 	unsigned long chunk_size;
-	
+
 	if (len(luis_current_send_chunk) != 0 && bt.txfree-bt.newtxlen>=len(luis_current_send_chunk)) {
 		bt.setdata(luis_current_send_chunk);
 		bt.send();
 	}
-	
+
 	switch (luis_html_send_state) {
 	case EN_LUIS_HTML_GOP_RESULT:
 
@@ -224,7 +224,7 @@ void luis_on_bt_data_sent() {
 	if (len(luis_current_send_chunk)>0) {
 		bt.notifysent(bt.txbuffsize-len(luis_current_send_chunk));
 	}
-	
+
 }
 
 void luis_proc_bt_cmd(string *cmd_str) {
@@ -245,7 +245,7 @@ void luis_proc_bt_cmd(string *cmd_str) {
 			explicit_index = YES;
 		}
 	}
-	
+
 
 	unsigned char cs, f, pos;
 	unsigned int mac_num;
@@ -262,7 +262,7 @@ void luis_proc_bt_cmd(string *cmd_str) {
 			bt.notifysent(bt.txbuffsize-len(luis_current_send_chunk));
 			return;
 		}
-		
+
 		switch (stg_sg(setting_name,0,reply_str,EN_STG_GET)) {
 		case EN_STG_STATUS_OK:
 
@@ -277,7 +277,7 @@ void luis_proc_bt_cmd(string *cmd_str) {
 			goto reply_err;
 			break;
 		default:
-			break;
+			goto reply_failed;break;
 		}
 		break;
 
@@ -305,10 +305,10 @@ void luis_proc_bt_cmd(string *cmd_str) {
 			goto reply_err;
 			break;
 		default:
-			break;
+			goto reply_failed;break;
 		}
 		break;
-	
+
 	case "B":
 //buzz the device ---------------------------------- 
 		callback_luis_buzz_command();
@@ -317,7 +317,7 @@ void luis_proc_bt_cmd(string *cmd_str) {
 
 	case "I":
 //initialize settings --------------------------
-		goto reply_failed;
+		if (stg_restore_multiple(EN_STG_INIT_MODE_NORMAL) != EN_STG_STATUS_OK) { goto reply_failed;}
 		goto reply_ok;
 		break;
 
@@ -328,10 +328,10 @@ void luis_proc_bt_cmd(string *cmd_str) {
 		io.state = LOW;
 		sys.reboot();
 		break;
-	
+
 	default:
-		break;
-	
+		goto reply_err;break;
+
 	}
 
 reply_rejected: 
@@ -356,10 +356,10 @@ reply_ok_have_data:
 
 send: 
 	reply_str = chr(2)+reply_str+chr(13);//add encapsulation
-	
+
 	bt.setdata(reply_str);
 	bt.send();
-	
+
 reply_null: 
 }
 
@@ -368,14 +368,14 @@ en_luis_status_codes luis_on_bt_data_arrival;
 	unsigned char x, y;
 	string<LUIS_MAX_BT_CMD_LEN> bt_cmd_str;
 	luis_on_bt_data_arrival = EN_LUIS_STATUS_OK;
-	
+
 	if (luis_init_flag != LUIS_INIT_SIGNATURE) {
 		luis_on_bt_data_arrival = EN_LUIS_STATUS_NOT_STARTED;
 		return luis_on_bt_data_arrival;
 	}
 
 	bt_cmd_str = bt_cmd_str+bt.getdata(255-len(bt_cmd_str));
-	
+
 	x = instr(1,bt_cmd_str,chr(LUIS_STX),1);
 	//this will prevent the string to overflow with garbage
 	if (len(bt_cmd_str) == LUIS_MAX_BT_CMD_LEN) {
@@ -385,12 +385,12 @@ en_luis_status_codes luis_on_bt_data_arrival;
 			return luis_on_bt_data_arrival;
 		}
 	}
-	
+
 	while (x != 0) {
 		//we've got STX
 		bt_cmd_str = right(bt_cmd_str,len(bt_cmd_str)+1-x);//cut out everything to the left of STX
 		x = instr(1,bt_cmd_str,chr(LUIS_CR),1);//look for command end
-		return luis_on_bt_data_arrival;
+		if (x == 0) { return luis_on_bt_data_arrival;}
 		luis_proc_bt_cmd(mid(bt_cmd_str,2,x-2));
 		bt_cmd_str = right(bt_cmd_str,len(bt_cmd_str)-x);
 		x = instr(1,bt_cmd_str,chr(LUIS_STX),1);

@@ -44,7 +44,7 @@ en_scap_status_codes scap_start;
 		sock.varbuffrq(SCAP_HTTP_VAR_BUFF_PAGES/SCAP_NUM_OF_SOCK);
 	}
 	sys.buffalloc();
-	
+
 	sock.urlsubstitutes = "scap_bmpfile.bmp";
 	return scap_start;
 }
@@ -63,15 +63,15 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 	unsigned char red_value, green_value, blue_value;
 	string file_header, file_size, bmp_data_size;
 	unsigned long data_size;
-	
+
 	data_size = 0;
 	spare = 0;
 	pix_bit = 24;
 	limit = offsetY-1;
-	if (((lcd.width*3) % 4) != 0) { spare = (4-((lcd.width*3) % 4))*lcd.height; };
+	if (((lcd.width*3) % 4) != 0) { spare = (4-((lcd.width*3) % 4))*lcd.height;}
 	data_size = data_size+(lcd.width*3*lcd.height)+spare;
 	bmp_data_size = scap_size_convertion(data_size);
-	
+
 	file_size = chr(0x36)+chr(0x84)+chr(0x03)+chr(0x00);
 	file_header = "BM"+file_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(0x36)+chr(0)+chr(0)+chr(0)+chr(0x28)+chr(0)+chr(0)+chr(0)+chr(0x40)+chr(01)+chr(0)+chr(0)+chr(0xF0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(pix_bit)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+bmp_data_size+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(1)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0);//2 bytes 	
 			//4 bytes file size 		
@@ -84,19 +84,19 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 			//2 bytes planes now is null
 			//2 bytes bit per pixel 
 			//4 bytes compression
-			bmp_data_size+
+			
 			//4 bytes Horizental Resolution
 			//4 bytes Vertical Resolution
 			//4 bytes Used Color
 			//4 bytes important Color
-			
+
 			sock.setdata(file_header);
 			sock.send();
 	ly = Ysize-1;
-	do
+	do {
 
 		for (lx=offsetX; lx <= Xsize-1; lx++) {
-			
+
 			pixel = lcd.getpixel(lx,ly);
 
 			red_value = (pixel && red_mask);
@@ -112,16 +112,16 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 			for (i=0; i <= 2; i++) {
 				pixels = pixels+chr(tmp[i]);
 			}
-								
+
 			while (sock.txfree<4) {
 				sock.send();
 			}
 			sock.setdata(pixels);
 			sock.send();
-			
+
 		}
 		ly = ly-1;
-	loop until ly=limit
+	} while (ly == limit);
 	while (sock.newtxlen != 0) {
 		sock.send();
 	}
@@ -134,33 +134,33 @@ string<4> scap_size_convertion;
 	unsigned char p[8];//P() is &H 1xxxxxx8
 	short k, j, w;
 	unsigned char q;
-	
+
 	d = lhex(v);//&H in front of data
 	d = mid(d,3,len(d)-2);//remove &H, rest part is value  
 	k = len(d);//length of d
 	j = k;
 	w = k-1;
-	
+
 	for (q=0; q <= w; q++) {
 		p[q] = asc(right(d,1))-48;// decimal of ASCII code "1" is 49-48= 1 
-		if (p[q]>16) { p[q] = p[q]-7; };// decimal of ASCII code "A" is 65-48-7 =10 
+		if (p[q]>16) { p[q] = p[q]-7;}// decimal of ASCII code "A" is 65-48-7 =10 
 		d = left(d,j-q-1);
 	}
-	 
-	goto next_size;
-	
+
+	if (k == 8) { goto next_size;}
+
 	for (q=k; q <= 7; q++) {
 		p[q] = 0;
 	}
 next_size: 
-	
+
 	p[0] = p[0]+p[1]*16;
 	p[2] = p[2]+p[3]*16;
 	p[4] = p[4]+p[5]*16;
 	p[6] = p[6]+p[7]*16;
 	scap_size_convertion = chr(p[0])+chr(p[2])+chr(p[4])+chr(p[6]);
-	
-	return scap_size_convertion;
+
+return scap_size_convertion;
 }
 
 #if SCAP_DEBUG_PRINT == 1

@@ -16,7 +16,7 @@
 #define WLN_CR_LF chr(13)+chr(10)
 
 #if GA1000 
-	
+
 	#define WLN_FIRMWARE_FILE "ga1000fw.bin"
 	#define WLN_SOCK_GET_SIGNATURE_KAL "WKAL"
 	#define SHA1_MAC_LEN 20
@@ -92,7 +92,7 @@ string<32> wln_key;
 	no_yes wln_scan_and_assoc_in_prog;
 	unsigned int wln_init_flag;
 	pl_wln_check_association_retval wln_associated;
-	
+
 #if GA1000
 	#if WLN_WPA
 		en_wln_wpa_key_types wln_wpa_key_type;
@@ -128,11 +128,11 @@ string wln_get_info;
 	case WLN_INFO_ELEMENT_REQUIRED_BUFFERS:
 
 		x = WLN_BUFFER_PAGES;
-		
+
 		#if WLN_KEEP_ALIVE
 			x = x+1;
 		#endif
-		
+
 		#if WLN_WPA
 			if (security_mode == WLN_SECURITY_MODE_WPA1 || security_mode == WLN_SECURITY_MODE_WPA2) {
 				x = x+2;
@@ -140,7 +140,7 @@ string wln_get_info;
 		#endif
 		wln_get_info = str(x);
 		break;
-	
+
 	}
 	return wln_get_info;
 }
@@ -159,7 +159,7 @@ en_wln_status_codes wln_start;
 		zero_replay_count_data[6] = 0;
 		zero_replay_count_data[7] = 1;
 	#endif
-	
+
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
 		wln_init_flag = WLN_INIT_SIGNATURE;
@@ -194,7 +194,7 @@ en_wln_status_codes wln_start;
 			goto wln_start_error;
 		}
 	#endif
-	
+
 	#if WLN_WPA && GA1000
 		if (security_mode == WLN_SECURITY_MODE_WPA1 || security_mode == WLN_SECURITY_MODE_WPA2) {
 			wln_wpa_socket = sock_get(WLN_SOCK_GET_SIGNATURE_WPA);
@@ -204,12 +204,12 @@ en_wln_status_codes wln_start;
 			}
 		}
 	#endif
-	
+
 	x = wln_get_info(WLN_INFO_ELEMENT_REQUIRED_BUFFERS,str(security_mode));
-		
+
 	if (x>sys.freebuffpages) {
 		callback_wln_pre_buffrq(x-sys.freebuffpages);
-		
+
 		if (x>sys.freebuffpages) {
 			wln_start = WLN_STATUS_INSUFFICIENT_BUFFER_SPACE;
 			goto wln_start_error;
@@ -269,9 +269,9 @@ en_wln_status_codes wln_start;
 	#if WLN_WPA
 		wln_mac_binary = ddval(wln.mac);
 	#endif
-	
+
 	wln_start = wln_prepare_security(security_mode,*key);
-	goto wln_start_error;
+	if (wln_start != WLN_STATUS_OK) { goto wln_start_error;}
 
 	wln_association_holdoff_timer = 1;//will start scanning and associating on the next timer event
 	return wln_start;
@@ -281,11 +281,11 @@ wln_start_error:
 		wln_debug_print_status(wln_start);
 		wln_debugprint("---FAILURE---");
 	#endif
-	
+
 	#if WLN_DEBUG_PRINT
 		wln_dont_print_stop = YES;
 	#endif
-	
+
 	wln_stop();
 
 	#if WLN_DEBUG_PRINT
@@ -330,7 +330,7 @@ en_wln_status_codes wln_change;
 		return wln_change;
 	}
 
-	goto wln_change_error;
+	if (wln_prepare_security(security_mode,*key) != WLN_STATUS_OK) { goto wln_change_error;}
 
 	wln.disassociate;
 	return wln_change;
@@ -340,11 +340,11 @@ wln_change_error:
 		wln_debug_print_status(wln_change);
 		wln_debugprint("---FAILURE---");
 	#endif
-	
+
 	#if WLN_DEBUG_PRINT
 		wln_dont_print_stop = YES;
 	#endif
-	
+
 	wln_stop();
 
 	#if WLN_DEBUG_PRINT
@@ -356,12 +356,12 @@ wln_change_error:
 //----------------------------------------------------------------------------
 void wln_stop() {
 	unsigned int i;
-	
+
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
 		wln_init_flag = WLN_INIT_SIGNATURE;
 	}
-	
+
 	#if WLN_DEBUG_PRINT
 		if (wln_dont_print_stop == NO) {
 			wln_debugprint("---STOP---");
@@ -378,7 +378,7 @@ void wln_stop() {
 	while (wln.enabled == YES) {
 	}
 	wln_reset();
- 
+
 	//deallocate buffers and release sockets
 	#if WLN_KEEP_ALIVE
 		if (wln_keep_alive_socket<sock.numofsock) {
@@ -393,7 +393,7 @@ wait_close_kal_socket:
 
 			sock_release(sock.num);
 			wln_keep_alive_socket = 255;
-			
+
 			sock.txbuffrq(0);
 		}
 	#endif
@@ -410,10 +410,10 @@ wait_close_kal_socket:
 					if (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
 					goto wait_close_wpa_socket;
 					}
-					
+
 					sock_release(sock.num);
 					wln_wpa_socket = 255;
-					
+
 					sock.rxbuffrq(0);
 					sock.txbuffrq(0);
 				}
@@ -428,7 +428,7 @@ wait_close_kal_socket:
 //----------------------------------------------------------------------------
 en_wln_status_codes wln_rescan() {
 en_wln_status_codes wln_rescan;
-	
+
 	if (wln_init_flag != WLN_INIT_SIGNATURE) {
 		wln_init();
 		wln_init_flag = WLN_INIT_SIGNATURE;
@@ -493,7 +493,7 @@ void wln_delay_ms(unsigned long ms) {
         while (sys.timercountms-delay<ms) {
 	    }
     }
-	
+
 }
 
 #endif 
@@ -518,7 +518,7 @@ pl_wln_check_association_retval wln_check_association;
 //----------------------------------------------------------------------------
 void wln_proc_timer() {
 	en_wln_status_codes wln_result;
-	
+
 	if (wln_init_flag != WLN_INIT_SIGNATURE || wln.enabled == NO) {
 		return;
 	}
@@ -597,12 +597,12 @@ void wln_proc_timer() {
 	#if WLN_WPA
 		int compare_replay_counters(string *replay_counter1, string *replay_counter2) {
 int compare_replay_counters;
-		
+
 		int i;
 		int result;
-		
+
 		result = 0;
-		
+
 		for (i=1; i <= 8; i++) {
 			string rc1;
 			string rc2;
@@ -616,8 +616,8 @@ int compare_replay_counters;
 				compare_replay_counters = 0;
 			}
 		}
-		
-		return compare_replay_counters;
+
+return compare_replay_counters;
 		}
 	#endif 
 
@@ -637,21 +637,21 @@ void wln_proc_data() {
 		string<34> kde_gtk;
 		string<32> wpakey;
 		string<8> stemp1, stemp2;
-		
+
 		if (mid(wln.scanresultwpainfo,7,4) == CYPHER_TKIP) {
 			wln_g_group_cipher = PL_WLN_WPA_ALGORITHM_TKIP;
 		}
-		
+
 		if (mid(wln.scanresultwpainfo,7,4) == CYPHER_AES) {
 			wln_g_group_cipher = PL_WLN_WPA_ALGORITHM_AES;
 		}
-		
+
 		if (wln_init_flag != WLN_INIT_SIGNATURE || sock.num != wln_wpa_socket) {
 			return;
 		}
 
 		rx_data = sock.getdata(255);
-		
+
 		//packet type should be "3" (EAPOL-Key)
 		stemp1 = mid(rx_data,2,1);
 		if (asc(stemp1) != 3) {
@@ -680,18 +680,18 @@ void wln_proc_data() {
 		if ((key_info && 0x80) == 0 && (key_info && 0x2000) == 0) {
 			return;
 		}
-		
+
 		//bit 0-2 of key_info is key descriptor version
-		
+
 		ver = (key_info && &b111);
-		
+
 		//byte 8,9 is key length
 		key_len = mid(rx_data,8,2);
-			
+
 		//byte 10 to 17 is replay_counter
 		replay_counter = mid(rx_data,10,8);
-			
-		
+
+
 		//Need to ensure the replay counter is increasing
 		if (compare_replay_counters(replay_counter,last_replay_counter)>0) {
 
@@ -736,7 +736,7 @@ void wln_proc_data() {
 						insert(wpakey,25,stemp1);
 						wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,wpakey,PL_WLN_WPA_CAST_MULTICAST);//'<<<<<<<<<<<@@@@@	
 					}
-					
+
 					wln_associated = WLN_ASSOCIATION_RETVAL_YES;
 					wln_rescan_tmr = WLN_RESCAN_TMR_CTR_CONNECT;
 					callback_wln_ok();
@@ -771,11 +771,11 @@ void wln_proc_data() {
 				} else {
 					kde_gtk = wln_wpa_supplicant_parse_ies(plain);
 				}
-				
+
 				#if WLN_DEBUG_PRINT
 					wln_debugprint("Group key step 1/2");
 				#endif			
-				
+
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 					wln_wpa_supplicant_process_1_of_2(key_info,wln_g_key_iv,ptk_kek,gtk);
 				} else {
@@ -793,7 +793,7 @@ void wln_proc_data() {
 						}
 					}
 				}
-				
+
 				wln_mic_key = left(wln_g_ptk,16);
 				#if WLN_DEBUG_PRINT
 					wln_debugprint("Group key step 2/2");
@@ -838,7 +838,7 @@ void wln_proc_task_complete(pl_wln_tasks completed_task) {
 	}
 
 	wln_result = WLN_STATUS_OK;
-	
+
 	switch (completed_task) {
 	case PL_WLN_TASK_SCAN:
 case PL_WLN_TASK_ACTIVESCAN:
@@ -850,31 +850,31 @@ case PL_WLN_TASK_ACTIVESCAN:
 			} else {
 				current_rssi = wln.rssi;
 			}
-			
+
 			if (wln.scanresultssid != wln_ap_name) {
 				scan_rssi = 0;
 			} else {
 				scan_rssi = wln.scanresultrssi;
 			}
-			
+
 			if (ddval(wln.scanresultbssid) == wln_bssid_binary) {
 				different_ap = NO;
 			} else {
 				different_ap = YES;
 			}
-			
+
 			callback_wln_rescan_result(current_rssi,scan_rssi,different_ap);
 			return;
 		}
-		
+
 		//was looking for AP
 		if (instr(1,wln.scanresultssid,wln_ap_name,1) == 0) {
 			wln_result = WLN_STATUS_SCANNING_FAILURE;
 			goto finish;
 		}
-		
+
 		wln_bssid_binary = ddval(wln.scanresultbssid);
-		
+
 		//For WEP mode, security key must be set EACH TIME before the association
 		switch (wln_security_mode) {
 		case WLN_SECURITY_MODE_WEP64:
@@ -884,7 +884,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 				goto finish;
 			}
 			break;
-			
+
 		case WLN_SECURITY_MODE_WEP128:
 
 			if (wln.setwep(wln_key,PL_WLN_WEP_MODE_128) != ACCEPTED) {
@@ -892,7 +892,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 				goto finish;
 			}
 			break;
-		
+
 		#if WLN_WPA			
 			//WA2000 Note: We need security not to be reset to make the module more responsive. 				
 			case WLN_SECURITY_MODE_WPA1:
@@ -914,12 +914,12 @@ case PL_WLN_TASK_ACTIVESCAN:
 				}
 				break;
 		#endif		
-		
+
 		default:
 			if (wln.setwep("",PL_WLN_WEP_MODE_DISABLED) != ACCEPTED) {
 				wln_result = WLN_STATUS_UNEXPECTED_ERROR;
 				goto finish;
-			break;
+			}break;
 		}
 
 		//start association
@@ -939,7 +939,7 @@ case PL_WLN_TASK_ACTIVESCAN:
 	case PL_WLN_TASK_ASSOCIATE:
 
 		if (wln.associationstate == PL_WLN_ASSOCIATED) {
-		
+
 			#if WLN_WPA	
 				if (wln_security_mode == WLN_SECURITY_MODE_WPA1 || wln_security_mode == WLN_SECURITY_MODE_WPA2) {
                     if (wln.getmoduletype()) {
@@ -961,11 +961,11 @@ case PL_WLN_TASK_ACTIVESCAN:
 					goto finish;
 				}
 			#endif
-			
+
 			#if WLN_KEEP_ALIVE == 1
 				wln_keep_alive_tmr = WLN_KEEP_ALIVE_TOUT;
 			#endif
-			
+
 			#if WLN_DEBUG_PRINT
 				wln_debugprint("---ASSOCIATED(WEP64, WEP128, or no security)---");
 			#endif
@@ -978,15 +978,15 @@ case PL_WLN_TASK_ACTIVESCAN:
 			goto finish;
 		}
 		break;
-	
+
 	case PL_WLN_TASK_DISASSOCIATE:
 
 		wln_result = WLN_STATUS_DISASSOCIATION;
 		goto finish;
 		break;
-	
+
 	default:
-		break;
+		return;break;
 	}
 
 finish: 
@@ -1019,7 +1019,7 @@ void wln_proc_event(pl_wln_events wln_event) {
 		} else {
 			callback_wln_failure(WLN_STATUS_ASSOCIATION_FAILURE);//means we've been kicked out during WPA handshake
 		}
-		
+
 		last_replay_counter = "\x00\x00\x00\x00\x00\x00\x00\x00";
 	}
 }
@@ -1030,7 +1030,7 @@ void wln_check_for_better_ap(unsigned char rssi_lvl) {
 	unsigned char i;
 	unsigned char sock_backup;
 	no_yes ongoing_connection;
-	
+
 	sock_backup = sock.num;
 	if (wln_check_association() != WLN_ASSOCIATION_RETVAL_YES) {
 		wln_rescan_tmr = WLN_RESCAN_TMR_CTR_CONNECT;
@@ -1072,19 +1072,19 @@ finish:
 ok_ng wln_start_scan() {
 ok_ng wln_start_scan;
 	accepted_rejected res;
-	
+
 	wln_start_scan = NG;
-	
-	return wln_start_scan;
-	return wln_start_scan;
-	return wln_start_scan;
-	
+
+	if (wln.enabled != YES) { return wln_start_scan;}
+	if (wln_scan_and_assoc_in_prog == YES) { return wln_start_scan;}
+	if (wln.task != PL_WLN_TASK_IDLE) { return wln_start_scan;}
+
 	if (wln_active_scan == NO) {
 		res = wln.scan(wln_ap_name);
 	} else {
 		res = wln.activescan(wln_ap_name);
 	}
-	
+
 	if (res == ACCEPTED) {
 		#if WLN_DEBUG_PRINT
 			if (wln_active_scan == NO) {
@@ -1110,7 +1110,7 @@ ok_ng wln_start_scan;
 en_wln_status_codes wln_prepare_security(pl_wln_security_modes security_mode, string *key) {
 en_wln_status_codes wln_prepare_security;
 	int algorithm;
-	
+
 
 	wln_prepare_security = WLN_STATUS_OK;
 
@@ -1128,12 +1128,12 @@ en_wln_status_codes wln_prepare_security;
 			algorithm = PL_WLN_WPA_ALGORITHM_AES;
 			break;
 		default:
-			break;
+			wpa_mode = PL_WLN_WPA_DISABLED;break;
 		}
 		#if WLN_AVAILABLE  ==  1
 				wln.setwpa(wpa_mode,0,"",0);
 		#endif 
-		
+
 	#else
 
 		wpa_mode = PL_WLN_WPA_DISABLED;
@@ -1141,13 +1141,13 @@ en_wln_status_codes wln_prepare_security;
 
 	last_replay_counter = "\x00\x00\x00\x00\x00\x00\x00\x00";
 	wpa_should_set_key = false;
-	
+
 	switch (security_mode) {
 	case WLN_SECURITY_MODE_DISABLED:
 
 	break;
 		//---
-		
+
 	#if WLN_WPA
 		case WLN_SECURITY_MODE_WPA1:
 case WLN_SECURITY_MODE_WPA2:
@@ -1155,7 +1155,7 @@ case WLN_SECURITY_MODE_WPA2:
 		break;
 			//---
 	#endif		
-		
+
 	case WLN_SECURITY_MODE_WEP64:
 
 		if (len(*key) != 10) {
@@ -1163,7 +1163,7 @@ case WLN_SECURITY_MODE_WPA2:
 			return wln_prepare_security;
 		}
 		break;
-		
+
 	case WLN_SECURITY_MODE_WEP128:
 
 		if (len(*key) != 26) {
@@ -1171,11 +1171,11 @@ case WLN_SECURITY_MODE_WPA2:
 			return wln_prepare_security;
 		}
 		break;
-	
+
 	default:
 		wln_prepare_security = WLN_STATUS_INVALID_SECURITY_MODE;
-		break;
-			
+		return wln_prepare_security;break;
+
 	}
 	return wln_prepare_security;
 }
@@ -1246,14 +1246,14 @@ string wln_wpa_mkey_get;
 			} else {
 				data1 = *addr2+*addr1;
 			}
-			
+
 			if (*nonce1<*nonce2) {
 				data1 = data1+*nonce1+*nonce2;
 			} else {
 				data1 = data1+*nonce2+*nonce1;
 			}
 			wln_sha1_prf(*pmk,*label,data1,*ptk,64);
-			
+
 		}
 		#endif
 
@@ -1265,14 +1265,14 @@ string wln_wpa_mkey_get;
 			unsigned char pos, plen;
 			string<20> s;
 			string s1;
-			
+
 			len1[0] = len(*label);
 			len1[1] = len(*data1);
 			len1[2] = 1;
-			
+
 			pos = 1;
 			counter = 0;
-				
+
 			while (pos<buf_len) {
 				s1 = *label+*data1+chr(counter);
 				plen = buf_len-pos+1;
@@ -1297,22 +1297,22 @@ string wln_wpa_mkey_get;
 			string<64> k_pad, stemp, null_str;
 			string<20> tk1, tk2;
 			unsigned char l;
-			
+
 			l = 64-len(*key);
 			null_str = left(NULL_64,l);
 			k_pad = *key+null_str;
-			
+
 			stemp = CH36_64;
 			k_pad = strxor(k_pad,stemp);
-			
+
 			tk1 = wln_sha1_vector(k_pad,*addr_element);
-			
+
 			k_pad = *key+null_str;
-			
-			
+
+
 			stemp = CH5C_64;
 			k_pad = strxor(k_pad,stemp);
-			
+
 			tk2 = wln_sha1_vector(k_pad,tk1);
 			insert(*mac,pos,tk2);
 		}
@@ -1325,7 +1325,7 @@ string wln_sha1_vector;
 			string s;
 			string hash;
 			unsigned char l;
-			
+
 			s = *key;
 			l = len(s);
 			hash = sha1(s,"",SHA1_UPDATE,0);
@@ -1350,17 +1350,17 @@ string wln_sha1_vector;
 			unsigned char mac_pos;
 			string<1> info_header, info_length;
 			string<96> scanresultwpainfo;
-			
-			
+
+
 			//header(4)
 			scanresultwpainfo = wln.scanresultwpainfo;
-			
+
 			length = len(scanresultwpainfo)-2+95;
 			msb = length/256;
 			lsb = length % 256;
 
 			reply = WPA_HEADER+chr(msb)+chr(lsb);
-			
+
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 				reply = reply+chr(0xFE);
@@ -1368,43 +1368,43 @@ string wln_sha1_vector;
 			} else {
 				reply = reply+chr(0x2);
 			}
-			
+
 			//key_info(2)
 			key_info = ver+0x8+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
-			
+
 			//key_length(2)
 			reply = reply+*key_len;
-			
+
 			//replay_counter(8)
 			reply = reply+*replay_counter;
-			
+
 			//key_nonce(32)
 			reply = reply+*snonce;
-			
+
 			//key_iv(16), key_rsc(8), key_id(8)
 			stemp = NULL_32;
 			reply = reply+stemp;
-			
+
 			//mac(16)
 			mac_pos = len(reply)+1;
 			mac = NULL_16;
 			reply = reply+mac;
-			
+
 			//key_data_length(2)
 			length = len(scanresultwpainfo)-2;
 			msb = length/256;
 			lsb = length % 256;
 			reply = reply+chr(msb)+chr(lsb);
-			
+
 			//WPA info
 			info_header = left(scanresultwpainfo,1);
 			info_length = mid(scanresultwpainfo,3,1);
 			reply = reply+info_header+info_length+mid(scanresultwpainfo,5,asc(info_length));
 
-			
+
 			//overwrite mac (82 to 98)
 			if (ver == 1) {
 				wln_hmac_md5_vector(*mic_key,1,reply,mac,0);
@@ -1415,7 +1415,7 @@ string wln_sha1_vector;
 			stemp = right(reply,length-mac_pos-16+1);
 			reply = left(reply,mac_pos-1);
 			reply = reply+left(mac,16)+stemp;
-			
+
 			sock.setdata(reply);
 			sock.send();
 		}
@@ -1427,11 +1427,11 @@ string wln_sha1_vector;
 			string<64> k_pad, stemp, null_str;
 			string<20> tk1, tk2;
 			unsigned char l;
-			
+
 			l = 64-len(*key);
 			null_str = left(NULL_64,l);
 			k_pad = *key+null_str;
-			
+
 			stemp = CH36_64;
 			k_pad = strxor(k_pad,stemp);
 
@@ -1440,7 +1440,7 @@ string wln_sha1_vector;
 
 			stemp = CH5C_64;
 			k_pad = strxor(k_pad,stemp);
-			
+
 			tk2 = wln_md5_vector(k_pad,tk1);
 			insert(*mac,pos,tk2);
 		}
@@ -1452,10 +1452,10 @@ string wln_sha1_vector;
 string wln_md5_vector;
 			string<16> hash;
 			unsigned char l;
-			
+
 			l = len(*key);
 			hash = md5(*key,"",MD5_UPDATE,0);
-			
+
 			l = l+len(*data);
 			hash = md5(*data,hash,MD5_FINISH,l);
 
@@ -1471,7 +1471,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 			string<32> s;
 			bool key_was_set;
 			key_was_set = false;
-			
+
 			*mic_key = left(*ptk,16);
 			#if WLN_DEBUG_PRINT
 				wln_debugprint("Pairwise step 4/4");
@@ -1508,46 +1508,46 @@ bool wln_wpa_supplicant_process_3_of_4;
 			string<16> mac;
 			string<32> stemp;
 			unsigned char mac_pos;
-			
+
 			//header(4)
 			length = 95;
 			msb = length/256;
 			lsb = length % 256;
 			reply = WPA_HEADER+chr(msb)+chr(lsb);
-			
+
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 				reply = reply+chr(0xFE);
 			} else {
 				reply = reply+chr(0x02);
 			}
-				
+
 			//key_info(2)
 			key_info = key_info && 0x200;
 			key_info = key_info+ver+0x8+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
-			
+
 			//key_length(2)
 			reply = reply+NULL_2;
-			
+
 			//replay_counter(8)
 			reply = reply+*replay_counter;
-			
+
 			//key_nonce(32)
 			stemp = NULL_32;
 			reply = reply+stemp;
-			
+
 			//key_iv(16), key_rsc(8), key_id(8)
 			stemp = NULL_32;
 			reply = reply+stemp;
-			
+
 			//mac(16)
 			mac_pos = len(reply)+1;
 			mac = NULL_16;
 			reply = reply+mac;
-			
+
 			//key_data_length(2)
 			reply = reply+NULL_2;
 
@@ -1561,7 +1561,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 			stemp = right(reply,length-mac_pos-16+1);
 			reply = left(reply,mac_pos-1);
 			reply = reply+left(mac,16)+stemp;
-			
+
 			sock.setdata(reply);
 			sock.send();
 		}
@@ -1573,19 +1573,19 @@ bool wln_wpa_supplicant_process_3_of_4;
 			unsigned char gd_keyidx;
 			string<32> ek;
 			string<8> stemp1, stemp2;
-			
+
 			gd_keyidx = key_info && 0x30;
 			gd_keyidx = gd_keyidx/0x10;
-			
+
 			ek = left(*key_iv,16)+right(*ptk,16);
-			
+
 			*gtk = rc4(ek,256,*gtk);
-			
+
 			stemp1 = mid(*gtk,17,8);
 			stemp2 = mid(*gtk,25,8);
 			insert(*gtk,17,stemp2);
 			insert(*gtk,25,stemp1);
-			
+
 			wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,*gtk,PL_WLN_WPA_CAST_MULTICAST);
 		}
 		#endif
@@ -1599,50 +1599,50 @@ bool wln_wpa_supplicant_process_3_of_4;
 			string<16> mac;
 			string<32> stemp;
 			unsigned char mac_pos;
-			
+
 			//header(4)
 			length = 95;
 			msb = length/256;
 			lsb = length % 256;
 			reply = chr(0x1)+chr(IEEE802_1X_TYPE_EAPOL_KEY)+chr(msb)+chr(lsb);
-			
+
 			//key_type(1)
 			if (wln_security_mode == WLN_SECURITY_MODE_WPA1) {
 				reply = reply+chr(0xFE);
 			} else {
 				reply = reply+chr(0x02);
 			}
-			
-			
+
+
 			//key_info(2)
 			key_info = key_info && 0x30;
 			key_info = key_info+ver+0x200+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
 			reply = reply+chr(msb)+chr(lsb);
-			
+
 			//key_length(2)
 			reply = reply+NULL_2;
-			
+
 			//replay_counter(8)
 			reply = reply+*replay_counter;
-			
+
 			//key_nonce(32)
 			stemp = NULL_32;
 			reply = reply+stemp;
-			
+
 			//key_iv(16), key_rsc(8), key_id(8)
 			stemp = NULL_32;
 			reply = reply+stemp;
-			
+
 			//mac(16)
 			mac_pos = len(reply)+1;
 			mac = NULL_16;
 			reply = reply+mac;
-			
+
 			//key_data_length(2)
 			reply = reply+NULL_2;
-				
+
 			//overwrite mac
 			if (ver == 1) {
 				wln_hmac_md5_vector(*mic_key,1,reply,mac,0);
@@ -1653,7 +1653,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 			stemp = right(reply,length-mac_pos-16+1);
 			reply = left(reply,mac_pos-1);
 			reply = reply+mac+stemp;
-			
+
 			sock.setdata(reply);
 			sock.send();
 		}
@@ -1666,7 +1666,7 @@ bool wln_aes_unwrap;
 			string<8> a;
 			string<16> b;
 			unsigned char r, k, l, i, j;
-			
+
 			a = left(*aes_cipher,8);
 			insert(*aes_plain,1,mid(*aes_cipher,9,8*n));
 
@@ -1708,14 +1708,14 @@ string wln_wpa_supplicant_parse_ies;
 			unsigned char pos, data_len;
 			string<1> header;
 			string<4> rsn_group_key_data;
-			
+
 			pos = 0;
 			data_len = 0;
-			do
+			do {
 				data_len = asc(mid(*key_data,pos+2,1));
 				header = mid(*key_data,pos+1,1);
-				
-				break;
+
+				if (data_len == 0 && header == chr(0xdd)) { break;}
 				if (header == chr(0xdd)) {
 					rsn_group_key_data = mid(*key_data,pos+3,4);
 					if (data_len>4 && rsn_group_key_data == chr(0x00)+chr(0x0F)+chr(0xAC)+chr(0x01)) {
@@ -1723,10 +1723,10 @@ string wln_wpa_supplicant_parse_ies;
 						return wln_wpa_supplicant_parse_ies;
 					}
 				}
-				
+
 				pos = pos+data_len+2;
-				break;
-			loop while true
+				if (pos>=len(*key_data)) { break;}
+			} while (true);
 			wln_wpa_supplicant_parse_ies = "";
 			return wln_wpa_supplicant_parse_ies;
 		}
@@ -1740,21 +1740,21 @@ string wln_wpa_supplicant_parse_ies;
 			unsigned int i;
 			string<4> count_buf;
 			unsigned int progress_ctr;
-			
+
 			progress_ctr = pass*4096;
 
 			count_buf = chr(0x0)+chr(0x0)+chr(0x0)+chr(count);
 			addr_element = *ssid+count_buf;
 			wln_hmac_sha1_vector(*passphrase,addr_element,tmp,0);
-			
+
 			*digest = tmp;
-			
+
 			for (i=1; i <= iterations-1; i++) {
 				wln_hmac_sha1_vector(*passphrase,tmp,tmp2,0);
 
 				tmp = tmp2;
 				*digest = strxor(*digest,tmp2);
-				
+
 				progress_ctr = progress_ctr+1;
 				if (progress_ctr % 82 == 0) {
 					callback_wln_mkey_progress_update(progress_ctr/82);
@@ -1771,22 +1771,22 @@ string wln_wpa_supplicant_parse_ies;
 void wln_init_gpio() {
 	//map interface lines (on platforms with fixed mapping this will have no effect and do no harm)
 	//WA2000 Will remap DI as output and DO as input and clock as input as required. 
-	
+
  	io.num = wln.clkmap;
 	io.enabled = YES;
 	io.state = 1;
-	
-	 
+
+
 	io.num = wln.csmap;
 	io.enabled = YES;
 	io.state = 0;
-	
-	 
+
+
 	io.num = wln.domap;
 	io.enabled = YES;
 	io.state = 0;
-	
-	
+
+
 }
 
 void wln_reset() {
@@ -1836,25 +1836,25 @@ void wln_reset() {
 //----------------------------------------------------------------------------
 void wln_init() {
 //upload the firmware for wifi module and setup WEP
-	
+
 	wln_scan_and_assoc_in_prog = NO;
 	wln_associated = WLN_ASSOCIATION_RETVAL_NO;
 	wln_rescan_in_prog = NO;
 	wln_rescan_requested = NO;
 	wln_updaterssi_requested = NO;
-	
+
 	#if WLN_DEBUG_PRINT
 		wln_dont_print_stop = NO;
 	#endif
-	
+
 	wln.disable();
 	while (wln.enabled == YES) {
 	}
-	
+
 	wln_init_gpio();
 	wln_reset();
 	wln_module_type = wln.getmoduletype();
- 
+
 	#if WLN_KEEP_ALIVE
 		wln_keep_alive_socket = 255;
 	#endif
@@ -1893,29 +1893,40 @@ void disable() {
 void wln_debug_print_status(en_wln_status_codes status) {
 	string<64> s;
 	switch (status) {
-	s = "OK";
+	case WLN_STATUS_OK:
+s = "OK";
 	break;
-	s = "ERROR: out of sockets";
+	case WLN_STATUS_OUT_OF_SOCKETS:
+s = "ERROR: out of sockets";
 	break;
-	s = "ERROR: insufficient buffer space";
+	case WLN_STATUS_INSUFFICIENT_BUFFER_SPACE:
+s = "ERROR: insufficient buffer space";
 	break;
 #if GA1000 
-	s = "ERROR: missing '"+WLN_FIRMWARE_FILE+"' firmware file";
+	case WLN_STATUS_MISSING_FIRMWARE_FILE:
+s = "ERROR: missing '"+WLN_FIRMWARE_FILE+"' firmware file";
 	break;
 #endif
+case WLN_STATUS_BOOT_FAILURE:
 s = "ERROR: boot failure";
 break;
-	s = "ERROR: incorrect security mode";
+	case WLN_STATUS_INVALID_SECURITY_MODE:
+s = "ERROR: incorrect security mode";
 	break;
-	s = "ERROR: incorrect WEP key length";
+	case WLN_STATUS_INVALID_WEP_KEY:
+s = "ERROR: incorrect WEP key length";
 	break;
-	s = "Access point not found";
+	case WLN_STATUS_SCANNING_FAILURE:
+s = "Access point not found";
 	break;
-	s = "Association failure";
+	case WLN_STATUS_ASSOCIATION_FAILURE:
+s = "Association failure";
 	break;
-	s = "Disassociation (or link loss)";
+	case WLN_STATUS_DISASSOCIATION:
+s = "Disassociation (or link loss)";
 	break;
-	s = "ERROR: unexpected error (Wi-Fi module is busy when it shoudn't be)";
+	case WLN_STATUS_UNEXPECTED_ERROR:
+s = "ERROR: unexpected error (Wi-Fi module is busy when it shoudn't be)";
 	break;
 	}
 

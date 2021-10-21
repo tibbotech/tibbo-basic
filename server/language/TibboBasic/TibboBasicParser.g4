@@ -72,8 +72,8 @@ declareFuncStmt : DECLARE FUNCTION (IDENTIFIER DOT)? name=IDENTIFIER paramList? 
 
 doLoopStmt
     : DO block LOOP
-	| DO (WHILE | UNTIL) expression block LOOP
-	| DO block LOOP (WHILE | UNTIL) expression
+	| DO (WHILE | UNTIL) condition=expression block LOOP
+	| DO block LOOP (WHILE | UNTIL) condition=expression
 ;
 
 enumerationStmt:
@@ -106,7 +106,7 @@ jumpStmt
 goToStmt : GOTO IDENTIFIER;
 
 ifThenElseStmt
-    : IF expression THEN (expression | jumpStmt) (ELSE (expression | jumpStmt))? NEWLINE # inlineIfThenElse
+    : IF expression THEN (statement | jumpStmt) (ELSE (statement | jumpStmt))? NEWLINE # inlineIfThenElse
     | IF expression THEN NEWLINE+ block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
     ;
 

@@ -185,7 +185,7 @@ void sspi_write(unsigned char data) {
 		} else {
 			io.state = LOW;
 		}
-		
+
 		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
 			BitData = data && compval;//Define the state of the bit(MSB-->LSB)
 			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)

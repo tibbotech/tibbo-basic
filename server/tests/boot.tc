@@ -7,7 +7,7 @@ struct foo_struct {//structure with two members, and both are arrays
 };
 
 void boot();
-    
+
     unsigned char f;
     for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
 		interface_ready[f] = NO;
@@ -18,7 +18,7 @@ void boot();
     //ethernet dhcp
     dhcp_start(PL_SOCK_INTERFACE_NET,"192.168.1.137","");
     //-----------------------------------------------------------------
-	
+
     unsigned char i;
 	unsigned char j;
 	sys.debugprint(str(i));
@@ -40,7 +40,7 @@ void boot();
 	foo_struct ll;
 	ll.x = 9;
 	ll.s = "bcd";
-	
+
 	for (i=0; i <= 3; i++) {
 		ll.s = str(i);
 	}
