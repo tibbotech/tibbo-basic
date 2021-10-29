@@ -1352,7 +1352,7 @@ void gprs_eliminate_double_cr(string *s) {
 		unsigned char f;
 		string<1> c;
 		string<GPRS_MAX_CMD_REPLY_LEN> so;
-		no_yes cr_encountered;
+		no_yes cr_encountered = NO;
 
 		so = "";
 		for (f=1; f <= len(s); f++) {

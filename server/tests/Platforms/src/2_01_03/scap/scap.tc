@@ -56,9 +56,9 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 	unsigned char tmp[3], pix_bit;
 	string pixels;
 	unsigned char i;
-	unsigned int blue_mask;
-	unsigned int red_mask;
-	unsigned int green_mask;
+	unsigned int blue_mask = 0xF800;
+	unsigned int red_mask = 0x1F;
+	unsigned int green_mask = 0x7E0;
 	unsigned char red, green, blue, spare;
 	unsigned char red_value, green_value, blue_value;
 	string file_header, file_size, bmp_data_size;

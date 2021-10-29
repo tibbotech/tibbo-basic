@@ -240,7 +240,7 @@ unsigned char sspi_read;
 			sspi_debugprint("spi read data:"+hex(sspi_read));
 		#endif
 	} else {
-		unsigned int tmp;
+		unsigned int tmp = 0;
 		ssi.channel = sspi_num;
 		tmp = ssi.value(0xFFFF,8);
 		sspi_read = tmp && 0x00FF;

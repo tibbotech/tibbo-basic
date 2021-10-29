@@ -186,22 +186,22 @@ class ParserListener extends TibboBasicParserListener {
         let valueType = variableType;
         switch (variableType) {
             case 'byte':
-                valueType = 'unsigned char';
+                valueType = 'unsigned char';//U8
                 break;
             case 'integer':
-                valueType = 'int';
+                valueType = 'int';//S16
                 break;
             case 'word':
-                valueType = 'unsigned int';
+                valueType = 'unsigned int';//U16
                 break;
             case 'dword':
-                valueType = 'unsigned long';
+                valueType = 'unsigned long';//U32
                 break;
             case 'real':
-                valueType = 'float';
+                valueType = 'float';//float
                 break;
             case 'boolean':
-                valueType = 'bool';
+                valueType = 'bool';//bool
                 break;
             default:
                 if (valueType.indexOf('string') == 0) {
@@ -358,6 +358,7 @@ class ParserListener extends TibboBasicParserListener {
 
     enterVariableListStmt(ctx: any) {
         const variables: TibboVariable[] = [];
+        let initCode = '';
         for (let i = 0; i < ctx.children.length; i++) {
             const item = ctx.children[i];
             if (item.ruleIndex == TibboBasicParser.RULE_variableListItem) {
@@ -374,6 +375,12 @@ class ParserListener extends TibboBasicParserListener {
                 }
                 variables.push(variable);
             }
+            else if (item.symbol && item.symbol.text == '=') {
+                initCode += ' = ';
+            }
+            if (item.ruleIndex == TibboBasicParser.RULE_expression) {
+                initCode += this.parseExpression(item);
+            }
         }
         const dataType = this.convertVariableType(ctx.variableType.valueType.getText());
         let variableList = variables.map((variable) => {
@@ -382,7 +389,7 @@ class ParserListener extends TibboBasicParserListener {
         }).join(', ');
         this.variables = this.variables.concat(variables);
 
-        this.transpiler.addCode(`${this.isGlobalVariable ? 'extern ' : ''}${dataType} ${variableList};`, ctx.start.line);
+        this.transpiler.addCode(`${this.isGlobalVariable ? 'extern ' : ''}${dataType} ${variableList}${initCode};`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -558,7 +565,11 @@ class ParserListener extends TibboBasicParserListener {
 
     enterStatement(ctx: any) {
         let code = ctx.getText();
-        if (ctx.children[0].ruleIndex == TibboBasicParser.RULE_expression) {
+        const item = ctx.children[0];
+        if (item.ruleIndex == TibboBasicParser.RULE_expression
+            // || item.ruleIndex == TibboBasicParser.RULE_variableListStmt
+            // || item.ruleIndex == TibboBasicParser.RULE_variableStmt
+        ) {
             let isAssignment = false;
             var equalsCount = (code.match(/\=/g) || []).length;
             if (equalsCount == 1) {

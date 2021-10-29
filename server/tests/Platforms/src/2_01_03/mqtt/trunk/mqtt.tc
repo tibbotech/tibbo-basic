@@ -91,7 +91,7 @@ string<2> mqtt_build_remaining_length(unsigned char size) {
 string<2> mqtt_build_remaining_length;
 	mqtt_build_remaining_length = "";
 	do {
-		unsigned char encodedByte;
+		unsigned char encodedByte = size % 128;
 		size = size/128;
 		if ((size>0)) { encodedByte = encodedByte || 128;}
 		mqtt_build_remaining_length = mqtt_build_remaining_length+chr(encodedByte);
@@ -110,9 +110,9 @@ pl_sock_state_simple mqtt_call_connect() {
 pl_sock_state_simple mqtt_call_connect;
 
 	#if PLATFORM_TYPE_32
-		unsigned int t_counter;//about 100ms
+		unsigned int t_counter = 18000;//about 100ms
 	#else
-		unsigned int t_counter;//about 100ms
+		unsigned int t_counter = 500;//about 100ms
 	#endif
 
 	sock.num = mqtt_sock_num;
@@ -211,9 +211,9 @@ void mqtt_disconnect() {
 		return;
 	}
 	if (mqtt_cur_state != ms_connected) { return;}
-	unsigned char current_sock;
+	unsigned char current_sock = sock.num;
 
-	string buf;
+	string buf = chr(DISCONNECT)+chr(0);
 
 	sock.num = mqtt_sock_num;
 	sock.setdata(buf);
@@ -235,7 +235,7 @@ void mqtt_publish(string *topic, string *data, en_qos_choices qos) {
 
 	string buf;
 	unsigned char remaining_length;
-	unsigned char current_sock;
+	unsigned char current_sock = sock.num;
 
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Publishing: topic="+*topic+", data="+*data);
@@ -270,7 +270,7 @@ void mqtt_sub(string *topic, en_qos_choices qos) {
 	if (mqtt_cur_state != ms_connected) { return;}
 
 	string buf;
-	unsigned char current_sock;
+	unsigned char current_sock = sock.num;
 
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Subscribing to: data="+*topic);
@@ -299,7 +299,7 @@ void mqtt_unsub(string *topic) {
 	if (mqtt_cur_state != ms_connected) { return;}
 
 	string buf;
-	unsigned char current_sock;
+	unsigned char current_sock = sock.num;
 
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Unsubscribing from: data="+*topic);
@@ -350,15 +350,15 @@ void mqtt_proc_data() {
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) { return;}
 	if (sock.num != mqtt_sock_num) { return;}
 
-	unsigned char pos;
-	string buf;
+	unsigned char pos = 2;
+	string buf = sock.peekdata(2);
 
 	if ((len(buf)<2)) {
 		return;
 	}
 
 	//total sequence length
-	unsigned int length;
+	unsigned int length = asc(right(buf,1));
 	if ((length>127)) { pos = pos+1;}
 
 	if ((length+pos<=sock.rxlen)) {
@@ -367,8 +367,8 @@ void mqtt_proc_data() {
 		return;
 	}
 
-	unsigned char head;
-	en_qos_choices qos;
+	unsigned char head = asc(left(buf,1));
+	en_qos_choices qos = (head && 0x06) >> 1;
 	head = (head && 0xF0);
 
 	buf = right(buf,length);

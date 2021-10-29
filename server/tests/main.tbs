@@ -12,6 +12,8 @@ sub on_sys_init()
     if sock.statesimple=PL_SSTS_EST then exit sub
     if io.lineget(pin_miso)=HIGH then goto wait_alarm
 
+    
+
     if f=255 then f=3
     
     if f=255 then

@@ -473,7 +473,7 @@ en_wln_status_codes wln_rescan;
 #if SYS_VER  ==  1000  || PLATFORM_ID == EM500W 
 //----------------------------------------------------------------------------
 void wln_delay_ms(unsigned long ms) {
-	unsigned long delay;
+	unsigned long delay = ms*3;
 	while (delay>0) {
 			delay = delay-1;
 	}
@@ -604,8 +604,8 @@ int compare_replay_counters;
 		result = 0;
 
 		for (i=1; i <= 8; i++) {
-			string rc1;
-			string rc2;
+			string rc1 = mid(*replay_counter1,i,1);
+			string rc2 = mid(*replay_counter2,i,1);
 			if (rc1>rc2) {
 				compare_replay_counters = 1;
 				break;
