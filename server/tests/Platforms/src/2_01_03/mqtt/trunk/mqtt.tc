@@ -93,7 +93,7 @@ string<2> mqtt_build_remaining_length;
 	do {
 		unsigned char encodedByte = size % 128;
 		size = size/128;
-		if ((size>0)) { encodedByte = encodedByte || 128;}
+		if ((size>0)) { encodedByte = encodedByte | 128;}
 		mqtt_build_remaining_length = mqtt_build_remaining_length+chr(encodedByte);
 	} while ((size>0));
 	return mqtt_build_remaining_length;
@@ -369,7 +369,7 @@ void mqtt_proc_data() {
 
 	unsigned char head = asc(left(buf,1));
 	en_qos_choices qos = (head && 0x06) >> 1;
-	head = (head && 0xF0);
+	head = (head & 0xF0);
 
 	buf = right(buf,length);
 

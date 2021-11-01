@@ -546,7 +546,7 @@ void pppoe_send_padt() {
 	//&hA7 -- code: active discovery termination (1 byte)
 	//session ID (2 bytes)
 	//0 and chr(len(s)) -- payload length (2 bytes)
-	s = chr(0x11)+chr(0xA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(len(s))+s;
+	s = chr(0x11)+chr(0xA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(len(s))+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(0,s,YES);
@@ -560,7 +560,7 @@ void pppoe_send_padt() {
 //--------------------------------------------------------------------
 void pppoe_add_tag(string *packet_str, unsigned int tag_code, string *tag_data) {
 	*packet_str = *packet_str+chr(tag_code/256);
-	*packet_str = *packet_str+chr(tag_code && 0xFF);
+	*packet_str = *packet_str+chr(tag_code & 0xFF);
 	*packet_str = *packet_str+chr(0);
 	*packet_str = *packet_str+chr(len(*tag_data));
 	*packet_str = *packet_str+*tag_data;
@@ -614,7 +614,7 @@ void pppoe_send_lcp() {
 	//LCP length (2 bytes)
 	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 
-	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -651,7 +651,7 @@ void pppoe_send_auth() {
 	//LCP length (2 bytes)
 	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 
-	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x23)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x23)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -677,7 +677,7 @@ void pppoe_send_ip(string *ip) {
 	//LCP length (2 bytes)
 	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 
-	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0x80)+chr(0x21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0x80)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);
@@ -702,7 +702,7 @@ void pppoe_send_echo() {
 	//LCP length (2 bytes)
 	s = chr(0x09)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
 
-	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id && 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
 
 	#if PPPOE_DEBUG_PRINT
 		pppoe_debugprint_packet(1,s,YES);

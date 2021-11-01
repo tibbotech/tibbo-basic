@@ -8,11 +8,13 @@ no_yes interface_ready[MAX_NUM_INTERFACES];
 void on_sys_init() {
     boot();
 
+    if (len(s) == 1 && f == 3) {
+        f = f & 0x01;
+    }
+
     if (len(s) == 1) { s = "0"+s;}
     if (sock.statesimple == PL_SSTS_EST) { return;}
     if (io.lineget(pin_miso) == HIGH) { goto wait_alarm;}
-
-
 
     if (f == 255) { f = 3;}
 
@@ -39,6 +41,6 @@ unsigned char test() {
 unsigned char test;
 //testing comments in function
     test = 3;
-    test = test && 0xF0;
+    test = test & 0xF0;
     return test;
 }

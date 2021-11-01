@@ -2717,12 +2717,12 @@ en_tbl_status_codes tbl_timestamp_sg;
 		*timestamp.ts_milsec = 256*asc(mid(ts,6,1))+asc(mid(ts,7,1));
 	} else {
 		ts = chr(*timestamp.ts_daycount/256);
-		ts = ts+chr(*timestamp.ts_daycount && 0xFF);
+		ts = ts+chr(*timestamp.ts_daycount & 0xFF);
 		ts = ts+chr(*timestamp.ts_mincount/256);
-		ts = ts+chr(*timestamp.ts_mincount && 0xFF);
+		ts = ts+chr(*timestamp.ts_mincount & 0xFF);
 		ts = ts+chr(*timestamp.ts_seconds);
 		ts = ts+chr(*timestamp.ts_milsec/256);
-		ts = ts+chr(*timestamp.ts_milsec && 0xFF);
+		ts = ts+chr(*timestamp.ts_milsec & 0xFF);
 		if (fd.transactionstart()) { goto fd_error;}
 		if (tbl_attributes_sg(tbl_selected_file_name,"TS",ts,EN_TBL_SET) != PL_FD_STATUS_OK) { goto fd_error;}
 		if (fd.transactioncommit()) { goto fd_error;}

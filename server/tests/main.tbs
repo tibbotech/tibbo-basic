@@ -7,12 +7,14 @@ dim interface_ready(MAX_NUM_INTERFACES) as no_yes
 
 sub on_sys_init()
     boot()
+
+    if len(s) = 1 and f = 3 then
+        f = f AND &h01
+    end if
     
     if len(s) = 1 then s = "0"+s 
     if sock.statesimple=PL_SSTS_EST then exit sub
     if io.lineget(pin_miso)=HIGH then goto wait_alarm
-
-    
 
     if f=255 then f=3
     

@@ -438,10 +438,20 @@ class ParserListener extends TibboBasicParserListener {
                         result += ' != ';
                         break;
                     case TibboBasicLexer.AND:
-                        result += ' && ';
+                        if (isAssignment) {
+                            result += ' & ';
+                        }
+                        else {
+                            result += ' && ';
+                        }
                         break;
                     case TibboBasicLexer.OR:
-                        result += ' || ';
+                        if (isAssignment) {
+                            result += ' | ';
+                        }
+                        else {
+                            result += ' || ';
+                        }
                         break;
                     case TibboBasicLexer.XOR:
                         result += ' ^ ';

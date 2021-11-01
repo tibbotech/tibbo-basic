@@ -1584,12 +1584,12 @@ lb2: if (i<stg_sdr[num].p1 || i>stg_sdr[num].p2) {
 
 		#if STG_TIMESTAMP != 0
 			ts_str = chr(stg_timestamp.ts_daycount/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_daycount && 0xFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_daycount & 0xFF);
 			ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_mincount && 0xFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_mincount & 0xFF);
 			ts_str = ts_str+chr(stg_timestamp.ts_seconds);
 			ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
-			ts_str = ts_str+chr(stg_timestamp.ts_milsec && 0xFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_milsec & 0xFF);
 			insert(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH+1-1,ts_str);//-1 because of checksum field in the end 
 		#endif
 
@@ -1712,12 +1712,12 @@ en_stg_status_codes stg_set_ts_internal;
 
 	//set new timestamp
 	ts_str = chr(stg_timestamp.ts_daycount/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_daycount && 0xFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_daycount & 0xFF);
 	ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_mincount && 0xFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_mincount & 0xFF);
 	ts_str = ts_str+chr(stg_timestamp.ts_seconds);
 	ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
-	ts_str = ts_str+chr(stg_timestamp.ts_milsec && 0xFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_milsec & 0xFF);
 	stg_str = stg_str+ts_str;
 
 	//calculate checksum and add this checksum to the data

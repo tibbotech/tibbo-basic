@@ -99,9 +99,9 @@ void scap_capture(unsigned int offsetX, unsigned int offsetY, unsigned int Xsize
 
 			pixel = lcd.getpixel(lx,ly);
 
-			red_value = (pixel && red_mask);
-			green_value = (pixel && green_mask) >> 5;
-			blue_value = (pixel && blue_mask) >> 11;
+			red_value = (pixel & red_mask);
+			green_value = (pixel & green_mask) >> 5;
+			blue_value = (pixel & blue_mask) >> 11;
 			blue = blue_value << 3;
 			green = green_value << 2;
 			red = red_value << 3;

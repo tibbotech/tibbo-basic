@@ -926,7 +926,7 @@ ok_ng gprs_parse_ping_reply;
 	}
 
 	if (cs>65535) {
-		cs = (cs && 0xFFFF)+cs/65536;
+		cs = (cs & 0xFFFF)+cs/65536;
 	}
 
 	if (cs != 0xFFFF) {
@@ -1127,7 +1127,7 @@ void gprs_ping_send() {
 		cs = cs+w;
 	}
 	if (cs>65535) {
-		cs = (cs && 0xFFFF)+cs/65536;
+		cs = (cs & 0xFFFF)+cs/65536;
 	}
 	cs = 0xFFFF-cs;
 
@@ -1218,7 +1218,7 @@ unsigned int gprs_update_fcs;
 
 	gprs_update_fcs = 0xFFFF;
 	for (f=1; f <= len(dt); f++) {
-		gprs_update_fcs = (gprs_update_fcs/256) ^ gprs_fcs_value((gprs_update_fcs ^ asc(mid(*dt,f,1))) && 0xFF);
+		gprs_update_fcs = (gprs_update_fcs/256) ^ gprs_fcs_value((gprs_update_fcs ^ asc(mid(*dt,f,1))) & 0xFF);
 	}
 	return gprs_update_fcs;
 }

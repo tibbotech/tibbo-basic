@@ -683,7 +683,7 @@ void wln_proc_data() {
 
 		//bit 0-2 of key_info is key descriptor version
 
-		ver = (key_info && &b111);
+		ver = (key_info & &b111);
 
 		//byte 8,9 is key length
 		key_len = mid(rx_data,8,2);
@@ -1523,7 +1523,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 			}
 
 			//key_info(2)
-			key_info = key_info && 0x200;
+			key_info = key_info & 0x200;
 			key_info = key_info+ver+0x8+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;
@@ -1574,7 +1574,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 			string<32> ek;
 			string<8> stemp1, stemp2;
 
-			gd_keyidx = key_info && 0x30;
+			gd_keyidx = key_info & 0x30;
 			gd_keyidx = gd_keyidx/0x10;
 
 			ek = left(*key_iv,16)+right(*ptk,16);
@@ -1615,7 +1615,7 @@ bool wln_wpa_supplicant_process_3_of_4;
 
 
 			//key_info(2)
-			key_info = key_info && 0x30;
+			key_info = key_info & 0x30;
 			key_info = key_info+ver+0x200+0x100;
 			msb = key_info/256;
 			lsb = key_info % 256;

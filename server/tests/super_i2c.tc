@@ -182,7 +182,7 @@ void si2c_write(unsigned char data) {
 		io.enabled = YES;//Set as output
 
 		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
-			BitData = data && compval;//Define the state of the bit(MSB-->LSB)
+			BitData = data & compval;//Define the state of the bit(MSB-->LSB)
 			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
 
 			if ((BitData)) {
@@ -231,7 +231,7 @@ unsigned char si2c_read;
 			io.state = HIGH;//Read one bit from I2C device
 			io.num = si2c_sda[si2c_num];
 			if ((io.state == HIGH)) {//Devine the state of the bit
-				si2c_read = si2c_read || compval;//Store the value of the bit
+				si2c_read = si2c_read | compval;//Store the value of the bit
 			}
 			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
 
@@ -264,7 +264,7 @@ unsigned char si2c_read;
 		} else {
 			tmp = ssi.value(0xFFFF,9)/2;
 		}
-		si2c_read = tmp && 0x00FF;
+		si2c_read = tmp & 0x00FF;
 	}
 	return si2c_read;
 }

@@ -55,12 +55,12 @@ ok_ng td_to_binstr;
 	}
 
 	*td_str = chr(day_count/256);
-	*td_str = *td_str+chr(day_count && 0xFF);
+	*td_str = *td_str+chr(day_count & 0xFF);
 	*td_str = *td_str+chr(min_count/256);
-	*td_str = *td_str+chr(min_count && 0xFF);
+	*td_str = *td_str+chr(min_count & 0xFF);
 	*td_str = *td_str+chr(seconds);
 	*td_str = *td_str+chr(mseconds/256);
-	*td_str = *td_str+chr(mseconds && 0xFF);
+	*td_str = *td_str+chr(mseconds & 0xFF);
 
 	td_to_binstr = OK;
 	return td_to_binstr;

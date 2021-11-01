@@ -110,7 +110,7 @@ tbt42_errcheck tbt42_init;
 	tbt42_reg_write_bin(TBT42_CONTROL,value && 0xFC,pin_cs,*channel);
 
 	value = tbt42_reg_read_bin(TBT42_STATUS,pin_cs,*channel);
-	value = value && 0xF0;
+	value = value & 0xF0;
 
 	if (value && 0x80) {
 		tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,*channel);
@@ -260,16 +260,16 @@ ok_ng tbt42_alarm_set;
 	unsigned char value;
 	if (enable_alarm == YES) {
 		value = tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel);
-		value = value && 0xF0;
+		value = value & 0xF0;
 		tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,channel);
 	}
 
 	value = tbt42_reg_read_bin(TBT42_CONTROL,pin_cs,channel);
-	value = value && 0xFC;
+	value = value & 0xFC;
 	if (enable_alarm == YES) {
-		value = value || 0x05;
+		value = value | 0x05;
 	} else {
-		value = value || 0x04;
+		value = value | 0x04;
 	}
 
 	tbt42_reg_write_bin(TBT42_CONTROL,value,pin_cs,channel);
@@ -322,25 +322,25 @@ no_yes tbt42_alarm_setting_get;
 			bday = tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel);
 			bhour = tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel);
 			bmin = tbt42_reg_read_bcd(TBT42_MINUTES,pin_cs,channel)+1;
-			*bsec = *bsec && 0x7F;
+			*bsec = *bsec & 0x7F;
 		} else {
 			if ((bday && 0x80) && (bhour && 0x80)) {
 				//alarm when minutes and secondes match
 				bday = tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel);
 				bhour = tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel)+1;
-				bmin = bmin && 0x7f;
-				*bsec = *bsec && 0x7f;
+				bmin = bmin & 0x7f;
+				*bsec = *bsec & 0x7f;
 			} else {
 				if (bday && 0x80) {
 					bday = tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)+1;
-					bhour = bhour && 0x7F;
-					bmin = bmin && 0x7F;
-					*bsec = *bsec && 0x7F;
+					bhour = bhour & 0x7F;
+					bmin = bmin & 0x7F;
+					*bsec = *bsec & 0x7F;
 				} else {
-					bday = bday && 0x7F;
-					bhour = bhour && 0x7F;
-					bmin = bmin && 0x7F;
-					*bsec = *bsec && 0x7F;
+					bday = bday & 0x7F;
+					bhour = bhour & 0x7F;
+					bmin = bmin & 0x7F;
+					*bsec = *bsec & 0x7F;
 				}
 			}
 		}
@@ -396,7 +396,7 @@ void tbt42_rtc_int_clear(unsigned char pin_cs, unsigned char channel) {
 	unsigned char value;
 
 	value = tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel);
-	value = value && 0xF0;
+	value = value & 0xF0;
 	tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,channel);
 }
 
@@ -445,7 +445,7 @@ unsigned char tbt42_reg_read_bcd;
 	io.lineset(pin_cs,HIGH);
 
 	digit1 = tbt42_reg_read_bcd/16;
-	digit0 = tbt42_reg_read_bcd && 0x0F;
+	digit0 = tbt42_reg_read_bcd & 0x0F;
 	tbt42_reg_read_bcd = digit1*10+digit0;
 	return tbt42_reg_read_bcd;
 }
