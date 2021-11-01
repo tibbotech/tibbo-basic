@@ -7,7 +7,7 @@ struct foo_struct {//structure with two members, and both are arrays
 };
 
 void boot();
-    
+
     unsigned char f;
     for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
 		interface_ready[f] = NO;
@@ -18,29 +18,29 @@ void boot();
     //ethernet dhcp
     dhcp_start(PL_SOCK_INTERFACE_NET,"192.168.1.137","");
     //-----------------------------------------------------------------
-	
-    unsigned char i;
-	unsigned char j;
+
+    unsigned char i = 42;
+	unsigned char j = 32;
 	sys.debugprint(str(i));
 	sys.debugprint(str(j));
     net.ip = DEVICE_NET_IP;
     net.netmask = DEVICE_NET_MASK;
     net.gatewayip = DEVICE_NET_GATEWAY;
-	bool aa;
-	unsigned char bb;
-	char cc;
-	unsigned int dd;
-	short ee;
-	unsigned long ff;
-	long gg;
-	float hh;
-	string ii;
-	pl_wln_association_states jj;
-	byte(3) kk;
+	bool aa = true;
+	unsigned char bb = 3;
+	char cc = 4;
+	unsigned int dd = 5;
+	short ee = 35767;
+	unsigned long ff = 65531;
+	long gg = 65577;
+	float hh = 0.123;
+	string ii = "aabbcc";
+	pl_wln_association_states jj = PL_WLN_OWN_NETWORK;
+	byte(3) kk = ;
 	foo_struct ll;
 	ll.x = 9;
 	ll.s = "bcd";
-	
+
 	for (i=0; i <= 3; i++) {
 		ll.s = str(i);
 	}
@@ -50,6 +50,6 @@ void boot();
 }
 
 void dosomething() {
-	unsigned char zz;
+	unsigned char zz = 3;
 	sys.debugprint("asdf\r\n");
 }

@@ -1,0 +1,472 @@
+'***********************************************************************************************************
+'			Tibbit #42 (RTC with NVRAM and temperature sensor)
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'----------------------------------------------------------------------------
+const TBT42_INIT_SIGNATURE=&h1010
+const TBT42_STAMP="TBT42> "
+const TBT42_CR_LF=chr(13)+chr(10)
+
+const TBT42_SECONDS	=&h0
+const TBT42_MINUTES	=&h1
+const TBT42_HOURS	=&h2
+const TBT42_DATE	=&h4
+const TBT42_MONTH	=&h5
+const TBT42_YEAR	=&h6
+const TBT42_A1M1	=&h7
+const TBT42_A1M2	=&h8
+const TBT42_A1M3	=&h9
+const TBT42_A1M4	=&hA
+const TBT42_CONTROL	=&hE
+const TBT42_STATUS	=&hF
+const TBT42_TEMP_H  =&h11
+const TBT42_TEMP_L  =&h12
+const TBT42_NVRAM_AD=&h18
+const TBT42_NVRAM_DT=&h19
+
+const MINS_IN_DAY=1440
+const SECS_IN_DAY=MINS_IN_DAY*60
+
+'--------------------------------------------------------------------
+declare sub tbt42_reg_write_bcd(add as byte,data as byte, pin_cs as byte, channel as byte)
+declare function tbt42_reg_read_bcd(add as byte, pin_cs as byte, channel as byte)as byte
+declare sub tbt42_reg_write_bin(add as byte,data as byte, pin_cs as byte, channel as byte)
+declare function tbt42_reg_read_bin(add as byte, pin_cs as byte, channel as byte)as byte
+
+#if RTC_DEBUG_PRINT=1
+	declare sub rtc_debug_print(data as string)
+#endif
+
+'--------------------------------------------------------------------
+dim spi_num_tbt42 as byte
+dim rtc_init_flag as word
+
+'==============================================================================
+function tbt42_init(use_ssi as no_yes,pin_cs as byte,pin_clk as byte,pin_mosi as byte,pin_miso as byte,byref channel as byte)as tbt42_errcheck
+'Call this function to initialize the Tibbit.
+'Use_ssi argument specifies whether you want to communicate with this Tibbit using the SSI channel running in the I2C mode (YES), or
+'go for direct I/O manipulation a.k.a. bit-banging (NO).
+'Note that there is a limited number of SSI channels so if you set use_ssi=YES this function may return NG, meaning that
+'there are no free SSI channels left. This doesn't mean failure. Rather, it means that comms will proceed in bit banging mood.
+	
+	tbt42_init=TBT42_OK
+	#if RTC_DEBUG_PRINT=1
+		rtc_debug_print("++++++++++")
+	#endif
+	rtc_init_flag=TBT42_INIT_SIGNATURE
+
+	channel=sspi_register("TBT42",pin_mosi,pin_miso,pin_clk,SPI_MODE_1,use_ssi)
+	#if RTC_DEBUG_PRINT=1
+		rtc_debug_print("spi num:"+str(channel))
+	#endif
+
+	'SPI CS
+	io.num=pin_cs
+	io.state=HIGH
+	io.enabled=YES
+	if channel <4 then
+		ssi.channel=channel
+
+		'SPI CLK
+		io.num=pin_clk
+		io.state=HIGH
+		io.enabled=YES							'Enable as output
+		
+		'SPI DO (MOSI)
+		io.num=pin_mosi
+		io.state=HIGH
+		io.enabled=YES
+
+
+		'SPI DI (MISO)
+		io.num=pin_mosi
+		io.enabled=NO
+
+		'setup SSI channel
+		ssi.channel=channel
+		ssi.mode=PL_SSI_MODE_1
+		ssi.clkmap=pin_clk
+		ssi.dimap=pin_miso
+		ssi.domap=pin_mosi
+		ssi.zmode=PL_SSI_ZMODE_ALWAYS_ENABLED
+		ssi.direction=PL_SSI_DIRECTION_LEFT
+		ssi.baudrate=1
+		ssi.enabled=YES
+	else
+		if use_ssi=YES then
+			tbt42_init=TBT42_NO_SSI_AVAILABLE
+		end if
+	end if
+
+	#if RTC_DEBUG_PRINT=1
+		rtc_debug_print("----------")
+	#endif
+	sspi_get(spi_num_tbt42)
+	dim value as byte
+	value=tbt42_reg_read_bin(TBT42_CONTROL,pin_cs,channel)
+	tbt42_reg_write_bin(TBT42_CONTROL,value and &hFC,pin_cs,channel)
+
+	value=tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel)
+	value=value and &hF0
+	
+	if value and &h80 then
+		tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,channel)
+	else
+		tbt42_init=TBT42_SELF_TEST_FAIL
+	end if
+end function
+
+sub tbt42_rtc_get(byref wdaycount as word, byref wmincount as word, byref bsec as byte, pin_cs as byte, channel as byte)
+'Reads the current daycount, mincount, and seconds from the RTC. Use year(), month(), date(), hours(), minutes(), and weekday() syscalls
+'to convert these values into the actual date and time.
+	
+	dim byear,bmonth,bday,bhour,bmin as byte
+
+	if rtc_init_flag<>TBT42_INIT_SIGNATURE then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("The lib is not initialized, call tbt42_init() first")
+		#endif
+		exit sub
+	end if
+	byear=tbt42_reg_read_bcd(TBT42_YEAR,pin_cs,channel)
+	bmonth=tbt42_reg_read_bcd(TBT42_MONTH,pin_cs,channel)
+	bday=tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)
+	bhour=tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel)
+	bmin=tbt42_reg_read_bcd(TBT42_MINUTES,pin_cs,channel)
+	bsec=tbt42_reg_read_bcd(TBT42_SECONDS,pin_cs,channel)
+	wdaycount=daycount(byear,bmonth,bday)
+	wmincount=mincount(bhour,bmin)
+end sub
+
+function tbt42_rtc_set(wdaycount as word, wmincount as word, bsec as byte, pin_cs as byte, channel as byte) as ok_ng
+'Writes the specified daycount, mincount, and seconds into the RTC. Use daycount() and mincount() syscalls
+'to convert your date and time into the daycount and mincount values.
+'Returns NG if values you supplied are invalid.
+	
+	dim byear,bmonth,bday,bhour,bmin as byte
+
+	tbt42_rtc_set=OK
+	
+	if rtc_init_flag<>TBT42_INIT_SIGNATURE then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("The lib is not initialized, call tbt42_init() first")
+		#endif
+		tbt42_rtc_set=NG
+		exit function
+	end if
+	
+	if bsec>59 then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("Maximum bsec number is 59")
+		#endif
+		tbt42_rtc_set=NG
+		exit function
+	end if
+	if wmincount>1439 then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("Maximum wmincount number is 1439.")
+		#endif
+		tbt42_rtc_set=NG
+		exit function
+	end if
+
+	byear=year(wdaycount)
+	bmonth=month(wdaycount)
+	bday=date(wdaycount)
+	bhour=hours(wmincount)
+	bmin=minutes(wmincount)
+	tbt42_reg_write_bcd(TBT42_SECONDS,bsec,pin_cs,channel) 'sec
+	tbt42_reg_write_bcd(TBT42_MINUTES,bmin,pin_cs,channel) 'min	
+	tbt42_reg_write_bcd(TBT42_HOURS,bhour,pin_cs,channel) 'hr
+	tbt42_reg_write_bcd(TBT42_DATE,bday,pin_cs,channel) 'date
+	tbt42_reg_write_bcd(TBT42_MONTH,bmonth,pin_cs,channel) 'mon
+	tbt42_reg_write_bcd(TBT42_YEAR,byear,pin_cs,channel) 'year
+end function
+
+function tbt42_alarm_set(wdaycount as word, wmincount as word, bsec as byte, enable_alarm as no_yes, pin_cs as byte, channel as byte) as ok_ng
+'Sets the alarm if enable_alarm=YES. Disables the alarm if enable_alarm=NO. With alarm enabled...<br>
+'- When wdaycount=0 AND wmincount=0 AND bsec=0 alarm occurs every second.<br>
+'- When wdaycount=0 AND wmincount=0 AND bsec>0 alarm occurs every minute and on the second specified by bsec.<br>
+'- When wdaycount>0 alarm occurs on the date/time specified by the combination of wdaycount, wmincount, and bsec.
+	
+	dim byear,bmonth,bday,bhour,bmin as byte
+	
+	tbt42_alarm_set=NG
+	
+	if rtc_init_flag<>TBT42_INIT_SIGNATURE then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("The lib is not initialized, call tbt42_init() first")
+		#endif
+		exit function
+	end if
+
+	if bsec>59 then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("Maximum bsec number is 59.")
+		#endif
+		exit function
+	end if
+	if wmincount>1439 then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("Maximum wmincount number is 1439.")
+		#endif
+		exit function
+	end if
+
+	byear=year(wdaycount)
+	bmonth=month(wdaycount)
+	bday=date(wdaycount)
+	bhour=hours(wmincount)
+	bmin=minutes(wmincount)
+
+	if bsec=0 and wdaycount=0 and wmincount=0 then
+		'per second
+		bday=&h80
+		bhour=&h80
+		bmin=&h80
+		bsec=&h80
+	else
+		if wdaycount=0 and wmincount=0 then
+			'seconds match (per minute)
+			bday=&h80
+			bhour=&h80
+			bmin=&h80
+		else
+			if bsec=0 and bmin=0 then
+				'minutes and seconds match
+				bday=&h80
+				bhour=&h80
+			else
+				if bday=0 then
+					'hours,minutes and seconds match
+					bday=&h80
+				end if
+			end if
+		end if
+	end if
+
+	tbt42_reg_write_bcd(TBT42_A1M4,bday,pin_cs,channel) 'date
+	tbt42_reg_write_bcd(TBT42_A1M3,bhour,pin_cs,channel)'hr
+	tbt42_reg_write_bcd(TBT42_A1M2,bmin,pin_cs,channel) 'min	
+	tbt42_reg_write_bcd(TBT42_A1M1,bsec,pin_cs,channel) 'sec
+
+	dim value as byte
+	if enable_alarm=YES then
+		value=tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel)
+		value=value and &hF0
+		tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,channel)
+	end if
+
+	value=tbt42_reg_read_bin(TBT42_CONTROL,pin_cs,channel)
+	value=value and &hFC
+	if enable_alarm=YES then
+		value=value or &h05
+	else
+		value=value or &h04
+	end if
+
+	tbt42_reg_write_bin(TBT42_CONTROL,value,pin_cs,channel)
+	
+	tbt42_alarm_set=OK
+end function
+
+function tbt42_alarm_waiting(pin_miso as byte,pin_cs as byte,channel as byte)as ok_ng
+	tbt42_alarm_waiting=NG
+wait_alarm:
+	if io.lineget(pin_miso)=HIGH then goto wait_alarm
+	'alarm has occurred
+	tbt42_rtc_int_clear(pin_cs, channel) 'this clears the interupt
+	tbt42_alarm_waiting=OK
+end function
+
+function tbt42_alarm_setting_get(byref wdaycount as word, byref wmincount as word, byref bsec as byte, pin_cs as byte, channel as byte) as no_yes
+'Returns NO if alarm is disabled or YES if enabled, in which case wdaycout, wmincount, and bsec will contain
+'current alarm settings.
+	
+	dim byear,bmonth,bday,bhour,bmin as byte
+
+	if rtc_init_flag<>TBT42_INIT_SIGNATURE then
+		#if RTC_DEBUG_PRINT=1
+			rtc_debug_print("The lib is not initialized, call tbt42_init() first")
+		#endif
+		exit function
+	end if
+
+	byear=tbt42_reg_read_bcd(TBT42_YEAR,pin_cs,channel)
+	bmonth=tbt42_reg_read_bcd(TBT42_MONTH,pin_cs,channel)
+	bday=tbt42_reg_read_bcd(TBT42_A1M4,pin_cs,channel)
+	bhour=tbt42_reg_read_bcd(TBT42_A1M3,pin_cs,channel)
+	bmin=tbt42_reg_read_bcd(TBT42_A1M2,pin_cs,channel)
+	bsec=tbt42_reg_read_bcd(TBT42_A1M1,pin_cs,channel)
+
+	if (bsec and &h80) and (bmin and &h80) and (bhour and &h80) and (bday and &h80) then
+		'alarm once per second
+		bday=tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)
+		bhour=tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel)
+		bmin=tbt42_reg_read_bcd(TBT42_MINUTES,pin_cs,channel)
+		bsec=tbt42_reg_read_bcd(TBT42_SECONDS,pin_cs,channel)+1
+	else
+		if (bday and &h80) and (bhour and &h80) and (bmin and &h80) then
+			'alarm when seconds match
+			bday=tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)
+			bhour=tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel)
+			bmin=tbt42_reg_read_bcd(TBT42_MINUTES,pin_cs,channel)+1
+			bsec=bsec and &h7F
+		else
+			if (bday and &h80) and (bhour and &h80) then
+				'alarm when minutes and secondes match
+				bday=tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)
+				bhour=tbt42_reg_read_bcd(TBT42_HOURS,pin_cs,channel)+1
+				bmin=bmin and &h7f
+				bsec=bsec and &h7f
+			else
+				if bday and &h80 then
+					bday=tbt42_reg_read_bcd(TBT42_DATE,pin_cs,channel)+1
+					bhour=bhour and &h7F
+					bmin=bmin and &h7F
+					bsec=bsec and &h7F
+				else
+					bday=bday and &h7F
+					bhour=bhour and &h7F
+					bmin=bmin and &h7F
+					bsec=bsec and &h7F
+				end if
+			end if
+		end if
+	end if
+
+	'check the format
+	if bsec >59 then
+		bsec=0
+		bmin=bmin+1
+	end if
+
+	if bmin>59 then
+		bmin=0
+		bhour=bhour+1
+	end if
+
+	if bhour>23 then
+		bhour=0
+		bday=bday+1
+	end if
+
+	dim max_day as byte
+	if bmonth=1 or bmonth=3 or bmonth=5 or bmonth=7 or bmonth=8 or bmonth=10 or bmonth=12 then
+		max_day=31
+	else
+		max_day=30
+	end if
+	
+	if bday>max_day then
+		bday=1
+		bmonth = bmonth +1
+	end if
+
+	if bmonth >12 then
+		bmonth=1
+		byear=byear+1
+	end if
+
+	wdaycount=daycount(byear,bmonth,bday)
+	wmincount=mincount(bhour,bmin)
+
+	if tbt42_reg_read_bin(TBT42_CONTROL,pin_cs,channel) and &h01 then
+		tbt42_alarm_setting_get=YES
+	else
+		tbt42_alarm_setting_get=NO
+	end if
+end function
+
+sub tbt42_rtc_int_clear(pin_cs as byte, channel as byte)
+'Clears the alarm interrupt thus causing the INT line to go HIGH (deactivate). 	
+	
+	dim value as byte
+
+	value=tbt42_reg_read_bin(TBT42_STATUS,pin_cs,channel)
+	value=value and &hF0
+	tbt42_reg_write_bin(TBT42_STATUS,value,pin_cs,channel)
+end sub
+
+function tbt42_temp_get(pin_cs as byte, channel as byte) as real
+'Reads the current temperature. The temperature is measured in steps of 0.25 degrees C.
+'Reading the temperature does not cause the actual temperature measurement to occur.
+'Measurements happen once in every 64 seconds and are independent of temperature reads.
+	
+	dim tmp as integer
+	
+	tmp=tbt42_reg_read_bin(TBT42_TEMP_H,pin_cs,channel)*256+tbt42_reg_read_bin(TBT42_TEMP_L,pin_cs,channel)
+	tmp=tmp/64 'to get rid of 6 empty bits
+	tbt42_temp_get=tmp
+	tbt42_temp_get=tbt42_temp_get/4
+end function
+
+'----------------------------------------------------------------------------
+function tbt42_nvram_read(address as byte,pin_cs as byte, channel as byte) as byte
+'Reads a byte of data from the non-volatile memory at address 0~255.	
+	
+	tbt42_reg_write_bin(TBT42_NVRAM_AD,address,pin_cs,channel)
+	tbt42_nvram_read=tbt42_reg_read_bin(TBT42_NVRAM_DT,pin_cs,channel)
+end function
+
+'----------------------------------------------------------------------------
+sub tbt42_nvram_write(data_to_write as byte, address as byte, pin_cs as byte, channel as byte)
+'Writes a byte of data into the non-volatile memory at address 0~255.	
+	
+	tbt42_reg_write_bin(TBT42_NVRAM_AD,address,pin_cs,channel)
+	tbt42_reg_write_bin(TBT42_NVRAM_DT,data_to_write,pin_cs,channel)
+end sub
+
+function tbt42_reg_read_bcd(add as byte, pin_cs as byte, channel as byte)as byte
+	dim digit1,digit0 as byte
+	
+	sspi_get(channel)
+
+	io.lineset(pin_cs,LOW)
+	sspi_write(add)
+	tbt42_reg_read_bcd=sspi_read()
+	io.lineset(pin_cs,HIGH)
+
+	digit1=tbt42_reg_read_bcd/16
+	digit0=tbt42_reg_read_bcd and &h0F
+	tbt42_reg_read_bcd=digit1*10+digit0
+end function
+
+sub tbt42_reg_write_bcd(add as byte, data as byte, pin_cs as byte, channel as byte)
+	dim digit1,digit0 as byte
+	
+	digit1=data/10
+	digit0=data-digit1*10
+	data=digit1*16+digit0
+
+	sspi_get(channel)
+	io.lineset(pin_cs,LOW)
+	sspi_write(add or &h80)
+	sspi_write(data)
+	io.lineset(pin_cs,HIGH)
+end sub
+
+function tbt42_reg_read_bin(add as byte, pin_cs as byte, channel as byte)as byte
+	sspi_get(channel)
+
+	io.lineset(pin_cs,LOW)
+	sspi_write(add)
+	tbt42_reg_read_bin=sspi_read()
+	io.lineset(pin_cs,HIGH)
+end function
+
+sub tbt42_reg_write_bin(add as byte, data as byte, pin_cs as byte, channel as byte)
+	sspi_get(channel)
+	io.lineset(pin_cs,LOW)
+	sspi_write(add or &h80)
+	sspi_write(data)
+	io.lineset(pin_cs,HIGH)
+end sub
+
+#if RTC_DEBUG_PRINT=1
+sub rtc_debug_print(data as string)
+	sys.debugprint(TBT42_STAMP+data+TBT42_CR_LF)
+end sub
+#endif

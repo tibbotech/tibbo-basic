@@ -250,64 +250,64 @@ var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
     "\u0002\u0125\u0126\u0007-\u0002\u0002\u0126\u0127\u0007p\u0002\u0002",
     "\u0127\'\u0003\u0002\u0002\u0002\u0128\u0129\u0007.\u0002\u0002\u0129",
     "\u012a\u0005N(\u0002\u012a\u012d\u0007E\u0002\u0002\u012b\u012e\u0005",
-    "N(\u0002\u012c\u012e\u0005$\u0013\u0002\u012d\u012b\u0003\u0002\u0002",
-    "\u0002\u012d\u012c\u0003\u0002\u0002\u0002\u012e\u0134\u0003\u0002\u0002",
-    "\u0002\u012f\u0132\u0007\u0014\u0002\u0002\u0130\u0133\u0005N(\u0002",
-    "\u0131\u0133\u0005$\u0013\u0002\u0132\u0130\u0003\u0002\u0002\u0002",
-    "\u0132\u0131\u0003\u0002\u0002\u0002\u0133\u0135\u0003\u0002\u0002\u0002",
-    "\u0134\u012f\u0003\u0002\u0002\u0002\u0134\u0135\u0003\u0002\u0002\u0002",
-    "\u0135\u0136\u0003\u0002\u0002\u0002\u0136\u0137\u0007e\u0002\u0002",
-    "\u0137\u0152\u0003\u0002\u0002\u0002\u0138\u0139\u0007.\u0002\u0002",
-    "\u0139\u013a\u0005N(\u0002\u013a\u013c\u0007E\u0002\u0002\u013b\u013d",
-    "\u0007e\u0002\u0002\u013c\u013b\u0003\u0002\u0002\u0002\u013d\u013e",
-    "\u0003\u0002\u0002\u0002\u013e\u013c\u0003\u0002\u0002\u0002\u013e\u013f",
-    "\u0003\u0002\u0002\u0002\u013f\u0140\u0003\u0002\u0002\u0002\u0140\u0148",
-    "\u0005\n\u0006\u0002\u0141\u0142\u0007\u0017\u0002\u0002\u0142\u0143",
-    "\u0005*\u0016\u0002\u0143\u0144\u0007E\u0002\u0002\u0144\u0145\u0005",
-    "\n\u0006\u0002\u0145\u0147\u0003\u0002\u0002\u0002\u0146\u0141\u0003",
-    "\u0002\u0002\u0002\u0147\u014a\u0003\u0002\u0002\u0002\u0148\u0146\u0003",
-    "\u0002\u0002\u0002\u0148\u0149\u0003\u0002\u0002\u0002\u0149\u014d\u0003",
-    "\u0002\u0002\u0002\u014a\u0148\u0003\u0002\u0002\u0002\u014b\u014c\u0007",
-    "\u0014\u0002\u0002\u014c\u014e\u0005\n\u0006\u0002\u014d\u014b\u0003",
-    "\u0002\u0002\u0002\u014d\u014e\u0003\u0002\u0002\u0002\u014e\u014f\u0003",
-    "\u0002\u0002\u0002\u014f\u0150\u0007\u001b\u0002\u0002\u0150\u0152\u0003",
-    "\u0002\u0002\u0002\u0151\u0128\u0003\u0002\u0002\u0002\u0151\u0138\u0003",
-    "\u0002\u0002\u0002\u0152)\u0003\u0002\u0002\u0002\u0153\u0154\u0005",
-    "N(\u0002\u0154+\u0003\u0002\u0002\u0002\u0155\u0157\u0007:\u0002\u0002",
-    "\u0156\u0158\u0007l\u0002\u0002\u0157\u0156\u0003\u0002\u0002\u0002",
-    "\u0157\u0158\u0003\u0002\u0002\u0002\u0158\u0159\u0003\u0002\u0002\u0002",
-    "\u0159\u015a\u0007p\u0002\u0002\u015a\u015b\u0007k\u0002\u0002\u015b",
-    "\u015f\u0007p\u0002\u0002\u015c\u015e\u0005.\u0018\u0002\u015d\u015c",
-    "\u0003\u0002\u0002\u0002\u015e\u0161\u0003\u0002\u0002\u0002\u015f\u015d",
-    "\u0003\u0002\u0002\u0002\u015f\u0160\u0003\u0002\u0002\u0002\u0160\u0162",
-    "\u0003\u0002\u0002\u0002\u0161\u015f\u0003\u0002\u0002\u0002\u0162\u0163",
-    "\u0007\u001c\u0002\u0002\u0163-\u0003\u0002\u0002\u0002\u0164\u0167",
-    "\u00050\u0019\u0002\u0165\u0167\u00052\u001a\u0002\u0166\u0164\u0003",
-    "\u0002\u0002\u0002\u0166\u0165\u0003\u0002\u0002\u0002\u0167/\u0003",
-    "\u0002\u0002\u0002\u0168\u0169\u0007,\u0002\u0002\u0169\u016a\u0007",
-    "V\u0002\u0002\u016a\u016b\u0007n\u0002\u0002\u016b\u0174\u0007Z\u0002",
-    "\u0002\u016c\u0172\u0007T\u0002\u0002\u016d\u016e\u0007j\u0002\u0002",
-    "\u016e\u0170\t\u0004\u0002\u0002\u016f\u0171\u0007_\u0002\u0002\u0170",
-    "\u016f\u0003\u0002\u0002\u0002\u0170\u0171\u0003\u0002\u0002\u0002\u0171",
-    "\u0173\u0003\u0002\u0002\u0002\u0172\u016d\u0003\u0002\u0002\u0002\u0172",
-    "\u0173\u0003\u0002\u0002\u0002\u0173\u0175\u0003\u0002\u0002\u0002\u0174",
-    "\u016c\u0003\u0002\u0002\u0002\u0174\u0175\u0003\u0002\u0002\u0002\u0175",
-    "\u0176\u0003\u0002\u0002\u0002\u0176\u0177\u0007`\u0002\u0002\u0177",
-    "\u0178\u0005l7\u0002\u01781\u0003\u0002\u0002\u0002\u0179\u017a\u0007",
-    "=\u0002\u0002\u017a\u017b\u0007V\u0002\u0002\u017b\u017c\u0007n\u0002",
-    "\u0002\u017c\u0185\u0007Z\u0002\u0002\u017d\u0183\u0007T\u0002\u0002",
-    "\u017e\u017f\u0007j\u0002\u0002\u017f\u0181\t\u0004\u0002\u0002\u0180",
-    "\u0182\u0007_\u0002\u0002\u0181\u0180\u0003\u0002\u0002\u0002\u0181",
-    "\u0182\u0003\u0002\u0002\u0002\u0182\u0184\u0003\u0002\u0002\u0002\u0183",
-    "\u017e\u0003\u0002\u0002\u0002\u0183\u0184\u0003\u0002\u0002\u0002\u0184",
-    "\u0186\u0003\u0002\u0002\u0002\u0185\u017d\u0003\u0002\u0002\u0002\u0185",
-    "\u0186\u0003\u0002\u0002\u0002\u0186\u0187\u0003\u0002\u0002\u0002\u0187",
-    "\u0188\u0007`\u0002\u0002\u0188\u0189\u0005h5\u0002\u01893\u0003\u0002",
-    "\u0002\u0002\u018a\u018b\u0007!\u0002\u0002\u018b\u018c\u0007Z\u0002",
-    "\u0002\u018c\u018d\u0007T\u0002\u0002\u018d\u018e\u0007`\u0002\u0002",
-    "\u018e\u0190\u0007p\u0002\u0002\u018f\u0191\u0005h5\u0002\u0190\u018f",
-    "\u0003\u0002\u0002\u0002\u0190\u0191\u0003\u0002\u0002\u0002\u01915",
-    "\u0003\u0002\u0002\u0002\u0192\u0193\u0007n\u0002\u0002\u0193\u019c",
+    "\f\u0007\u0002\u012c\u012e\u0005$\u0013\u0002\u012d\u012b\u0003\u0002",
+    "\u0002\u0002\u012d\u012c\u0003\u0002\u0002\u0002\u012e\u0134\u0003\u0002",
+    "\u0002\u0002\u012f\u0132\u0007\u0014\u0002\u0002\u0130\u0133\u0005\f",
+    "\u0007\u0002\u0131\u0133\u0005$\u0013\u0002\u0132\u0130\u0003\u0002",
+    "\u0002\u0002\u0132\u0131\u0003\u0002\u0002\u0002\u0133\u0135\u0003\u0002",
+    "\u0002\u0002\u0134\u012f\u0003\u0002\u0002\u0002\u0134\u0135\u0003\u0002",
+    "\u0002\u0002\u0135\u0136\u0003\u0002\u0002\u0002\u0136\u0137\u0007e",
+    "\u0002\u0002\u0137\u0152\u0003\u0002\u0002\u0002\u0138\u0139\u0007.",
+    "\u0002\u0002\u0139\u013a\u0005N(\u0002\u013a\u013c\u0007E\u0002\u0002",
+    "\u013b\u013d\u0007e\u0002\u0002\u013c\u013b\u0003\u0002\u0002\u0002",
+    "\u013d\u013e\u0003\u0002\u0002\u0002\u013e\u013c\u0003\u0002\u0002\u0002",
+    "\u013e\u013f\u0003\u0002\u0002\u0002\u013f\u0140\u0003\u0002\u0002\u0002",
+    "\u0140\u0148\u0005\n\u0006\u0002\u0141\u0142\u0007\u0017\u0002\u0002",
+    "\u0142\u0143\u0005*\u0016\u0002\u0143\u0144\u0007E\u0002\u0002\u0144",
+    "\u0145\u0005\n\u0006\u0002\u0145\u0147\u0003\u0002\u0002\u0002\u0146",
+    "\u0141\u0003\u0002\u0002\u0002\u0147\u014a\u0003\u0002\u0002\u0002\u0148",
+    "\u0146\u0003\u0002\u0002\u0002\u0148\u0149\u0003\u0002\u0002\u0002\u0149",
+    "\u014d\u0003\u0002\u0002\u0002\u014a\u0148\u0003\u0002\u0002\u0002\u014b",
+    "\u014c\u0007\u0014\u0002\u0002\u014c\u014e\u0005\n\u0006\u0002\u014d",
+    "\u014b\u0003\u0002\u0002\u0002\u014d\u014e\u0003\u0002\u0002\u0002\u014e",
+    "\u014f\u0003\u0002\u0002\u0002\u014f\u0150\u0007\u001b\u0002\u0002\u0150",
+    "\u0152\u0003\u0002\u0002\u0002\u0151\u0128\u0003\u0002\u0002\u0002\u0151",
+    "\u0138\u0003\u0002\u0002\u0002\u0152)\u0003\u0002\u0002\u0002\u0153",
+    "\u0154\u0005N(\u0002\u0154+\u0003\u0002\u0002\u0002\u0155\u0157\u0007",
+    ":\u0002\u0002\u0156\u0158\u0007l\u0002\u0002\u0157\u0156\u0003\u0002",
+    "\u0002\u0002\u0157\u0158\u0003\u0002\u0002\u0002\u0158\u0159\u0003\u0002",
+    "\u0002\u0002\u0159\u015a\u0007p\u0002\u0002\u015a\u015b\u0007k\u0002",
+    "\u0002\u015b\u015f\u0007p\u0002\u0002\u015c\u015e\u0005.\u0018\u0002",
+    "\u015d\u015c\u0003\u0002\u0002\u0002\u015e\u0161\u0003\u0002\u0002\u0002",
+    "\u015f\u015d\u0003\u0002\u0002\u0002\u015f\u0160\u0003\u0002\u0002\u0002",
+    "\u0160\u0162\u0003\u0002\u0002\u0002\u0161\u015f\u0003\u0002\u0002\u0002",
+    "\u0162\u0163\u0007\u001c\u0002\u0002\u0163-\u0003\u0002\u0002\u0002",
+    "\u0164\u0167\u00050\u0019\u0002\u0165\u0167\u00052\u001a\u0002\u0166",
+    "\u0164\u0003\u0002\u0002\u0002\u0166\u0165\u0003\u0002\u0002\u0002\u0167",
+    "/\u0003\u0002\u0002\u0002\u0168\u0169\u0007,\u0002\u0002\u0169\u016a",
+    "\u0007V\u0002\u0002\u016a\u016b\u0007n\u0002\u0002\u016b\u0174\u0007",
+    "Z\u0002\u0002\u016c\u0172\u0007T\u0002\u0002\u016d\u016e\u0007j\u0002",
+    "\u0002\u016e\u0170\t\u0004\u0002\u0002\u016f\u0171\u0007_\u0002\u0002",
+    "\u0170\u016f\u0003\u0002\u0002\u0002\u0170\u0171\u0003\u0002\u0002\u0002",
+    "\u0171\u0173\u0003\u0002\u0002\u0002\u0172\u016d\u0003\u0002\u0002\u0002",
+    "\u0172\u0173\u0003\u0002\u0002\u0002\u0173\u0175\u0003\u0002\u0002\u0002",
+    "\u0174\u016c\u0003\u0002\u0002\u0002\u0174\u0175\u0003\u0002\u0002\u0002",
+    "\u0175\u0176\u0003\u0002\u0002\u0002\u0176\u0177\u0007`\u0002\u0002",
+    "\u0177\u0178\u0005l7\u0002\u01781\u0003\u0002\u0002\u0002\u0179\u017a",
+    "\u0007=\u0002\u0002\u017a\u017b\u0007V\u0002\u0002\u017b\u017c\u0007",
+    "n\u0002\u0002\u017c\u0185\u0007Z\u0002\u0002\u017d\u0183\u0007T\u0002",
+    "\u0002\u017e\u017f\u0007j\u0002\u0002\u017f\u0181\t\u0004\u0002\u0002",
+    "\u0180\u0182\u0007_\u0002\u0002\u0181\u0180\u0003\u0002\u0002\u0002",
+    "\u0181\u0182\u0003\u0002\u0002\u0002\u0182\u0184\u0003\u0002\u0002\u0002",
+    "\u0183\u017e\u0003\u0002\u0002\u0002\u0183\u0184\u0003\u0002\u0002\u0002",
+    "\u0184\u0186\u0003\u0002\u0002\u0002\u0185\u017d\u0003\u0002\u0002\u0002",
+    "\u0185\u0186\u0003\u0002\u0002\u0002\u0186\u0187\u0003\u0002\u0002\u0002",
+    "\u0187\u0188\u0007`\u0002\u0002\u0188\u0189\u0005h5\u0002\u01893\u0003",
+    "\u0002\u0002\u0002\u018a\u018b\u0007!\u0002\u0002\u018b\u018c\u0007",
+    "Z\u0002\u0002\u018c\u018d\u0007T\u0002\u0002\u018d\u018e\u0007`\u0002",
+    "\u0002\u018e\u0190\u0007p\u0002\u0002\u018f\u0191\u0005h5\u0002\u0190",
+    "\u018f\u0003\u0002\u0002\u0002\u0190\u0191\u0003\u0002\u0002\u0002\u0191",
+    "5\u0003\u0002\u0002\u0002\u0192\u0193\u0007n\u0002\u0002\u0193\u019c",
     "\u0007Z\u0002\u0002\u0194\u019a\u0007T\u0002\u0002\u0195\u0196\u0007",
     "j\u0002\u0002\u0196\u0198\t\u0004\u0002\u0002\u0197\u0199\u0007_\u0002",
     "\u0002\u0198\u0197\u0003\u0002\u0002\u0002\u0198\u0199\u0003\u0002\u0002",
@@ -2096,6 +2096,7 @@ function DoLoopStmtContext(parser, parent, invokingState) {
 	antlr4.ParserRuleContext.call(this, parent, invokingState);
     this.parser = parser;
     this.ruleIndex = TibboBasicParser.RULE_doLoopStmt;
+    this.condition = null; // ExpressionContext
     return this;
 }
 
@@ -2114,16 +2115,16 @@ DoLoopStmtContext.prototype.LOOP = function() {
     return this.getToken(TibboBasicParser.LOOP, 0);
 };
 
-DoLoopStmtContext.prototype.expression = function() {
-    return this.getTypedRuleContext(ExpressionContext,0);
-};
-
 DoLoopStmtContext.prototype.WHILE = function() {
     return this.getToken(TibboBasicParser.WHILE, 0);
 };
 
 DoLoopStmtContext.prototype.UNTIL = function() {
     return this.getToken(TibboBasicParser.UNTIL, 0);
+};
+
+DoLoopStmtContext.prototype.expression = function() {
+    return this.getTypedRuleContext(ExpressionContext,0);
 };
 
 DoLoopStmtContext.prototype.enterRule = function(listener) {
@@ -2185,7 +2186,7 @@ TibboBasicParser.prototype.doLoopStmt = function() {
                 this.consume();
             }
             this.state = 226;
-            this.expression(0);
+            localctx.condition = this.expression(0);
             this.state = 227;
             this.block();
             this.state = 228;
@@ -2210,7 +2211,7 @@ TibboBasicParser.prototype.doLoopStmt = function() {
                 this.consume();
             }
             this.state = 234;
-            this.expression(0);
+            localctx.condition = this.expression(0);
             break;
 
         }
@@ -3099,15 +3100,8 @@ InlineIfThenElseContext.prototype.IF = function() {
     return this.getToken(TibboBasicParser.IF, 0);
 };
 
-InlineIfThenElseContext.prototype.expression = function(i) {
-    if(i===undefined) {
-        i = null;
-    }
-    if(i===null) {
-        return this.getTypedRuleContexts(ExpressionContext);
-    } else {
-        return this.getTypedRuleContext(ExpressionContext,i);
-    }
+InlineIfThenElseContext.prototype.expression = function() {
+    return this.getTypedRuleContext(ExpressionContext,0);
 };
 
 InlineIfThenElseContext.prototype.THEN = function() {
@@ -3116,6 +3110,17 @@ InlineIfThenElseContext.prototype.THEN = function() {
 
 InlineIfThenElseContext.prototype.NEWLINE = function() {
     return this.getToken(TibboBasicParser.NEWLINE, 0);
+};
+
+InlineIfThenElseContext.prototype.statement = function(i) {
+    if(i===undefined) {
+        i = null;
+    }
+    if(i===null) {
+        return this.getTypedRuleContexts(StatementContext);
+    } else {
+        return this.getTypedRuleContext(StatementContext,i);
+    }
 };
 
 InlineIfThenElseContext.prototype.jumpStmt = function(i) {
@@ -3177,34 +3182,18 @@ TibboBasicParser.prototype.ifThenElseStmt = function() {
             this.match(TibboBasicParser.THEN);
             this.state = 299;
             this._errHandler.sync(this);
-            switch(this._input.LA(1)) {
-            case TibboBasicParser.FALSE:
-            case TibboBasicParser.NOT:
-            case TibboBasicParser.TRUE:
-            case TibboBasicParser.STRINGLITERAL:
-            case TibboBasicParser.TemplateStringLiteral:
-            case TibboBasicParser.HEXLITERAL:
-            case TibboBasicParser.BINLITERAL:
-            case TibboBasicParser.INTEGERLITERAL:
-            case TibboBasicParser.LPAREN:
-            case TibboBasicParser.MINUS:
-            case TibboBasicParser.PLUS:
-            case TibboBasicParser.IDENTIFIER:
+            var la_ = this._interp.adaptivePredict(this._input,22,this._ctx);
+            switch(la_) {
+            case 1:
                 this.state = 297;
-                this.expression(0);
+                this.statement();
                 break;
-            case TibboBasicParser.EXIT_DO:
-            case TibboBasicParser.EXIT_FOR:
-            case TibboBasicParser.EXIT_FUNCTION:
-            case TibboBasicParser.EXIT_PROPERTY:
-            case TibboBasicParser.EXIT_SUB:
-            case TibboBasicParser.EXIT_WHILE:
-            case TibboBasicParser.GOTO:
+
+            case 2:
                 this.state = 298;
                 this.jumpStmt();
                 break;
-            default:
-                throw new antlr4.error.NoViableAltException(this);
+
             }
             this.state = 306;
             this._errHandler.sync(this);
@@ -3214,34 +3203,18 @@ TibboBasicParser.prototype.ifThenElseStmt = function() {
                 this.match(TibboBasicParser.ELSE);
                 this.state = 304;
                 this._errHandler.sync(this);
-                switch(this._input.LA(1)) {
-                case TibboBasicParser.FALSE:
-                case TibboBasicParser.NOT:
-                case TibboBasicParser.TRUE:
-                case TibboBasicParser.STRINGLITERAL:
-                case TibboBasicParser.TemplateStringLiteral:
-                case TibboBasicParser.HEXLITERAL:
-                case TibboBasicParser.BINLITERAL:
-                case TibboBasicParser.INTEGERLITERAL:
-                case TibboBasicParser.LPAREN:
-                case TibboBasicParser.MINUS:
-                case TibboBasicParser.PLUS:
-                case TibboBasicParser.IDENTIFIER:
+                var la_ = this._interp.adaptivePredict(this._input,23,this._ctx);
+                switch(la_) {
+                case 1:
                     this.state = 302;
-                    this.expression(0);
+                    this.statement();
                     break;
-                case TibboBasicParser.EXIT_DO:
-                case TibboBasicParser.EXIT_FOR:
-                case TibboBasicParser.EXIT_FUNCTION:
-                case TibboBasicParser.EXIT_PROPERTY:
-                case TibboBasicParser.EXIT_SUB:
-                case TibboBasicParser.EXIT_WHILE:
-                case TibboBasicParser.GOTO:
+
+                case 2:
                     this.state = 303;
                     this.jumpStmt();
                     break;
-                default:
-                    throw new antlr4.error.NoViableAltException(this);
+
                 }
             }
 

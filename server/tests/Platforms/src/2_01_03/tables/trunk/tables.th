@@ -166,13 +166,13 @@ en_tbl_status_codes tbl_select_for_read(string *table_name_or_num, string *file_
 	string tbl_get_table_name();
 	no_yes tbl_is_record_deleted(unsigned int rec_num);
 	en_tbl_status_codes tbl_close(string *file_name);//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	
+
 	en_tbl_status_codes tbl_field_sg(string *field_name, string *field_value, en_tbl_rdwr op);
 	string tbl_field_get(string *field_name);
 	void tbl_field_set(string *field_name, string *field_value);
 	no_yes tbl_is_current_record_deleted();
 	void tbl_set_to_clean_start(no_yes op);
-	
+
 void callback_tbl_error(en_tbl_status_codes status);
 no_yes callback_tbl_fail_to_open(string *filename, pl_fd_status_codes status, unsigned char filenum);
 void callback_tbl_field_error(string *file_name, string *field_name, en_tbl_status_codes tbl_result);

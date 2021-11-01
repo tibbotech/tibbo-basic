@@ -31,7 +31,7 @@ unsigned char ssi_get;
 		ssi_init();
 		ssi_init_flag = SSI_INIT_SIGNATURE;
 	}
-	
+
 	for (f=0; f <= SSI_MAX_CHANNELS-1; f++) {
 		if (ssi_in_use[f] == NO) {
 			ssi_in_use[f] = YES;
@@ -90,11 +90,11 @@ void ssi_release(unsigned char ssi_num) {
 	ssi.direction = PL_SSI_DIRECTION_RIGHT;
 	ssi.mode = PL_SSI_MODE_0;
 	ssi.zmode = PL_SSI_ZMODE_ALWAYS_ENABLED;
-	
+
 	#if SSI_DEBUG_PRINT
 		ssi_debugprint("'"+ssi_user_signature[ssi_num]+"' released SSI channel #"+str(ssi_num));
 	#endif
-	
+
 	ssi_in_use[ssi_num] = NO;
 	ssi_user_signature[ssi_num] = SSI_UNUSED_SIGNATURE;
 	ssi.channel = ssi_bup;
@@ -103,7 +103,7 @@ void ssi_release(unsigned char ssi_num) {
 //------------------------------------------------------------------------------
 void ssi_init() {
 	unsigned char f;
-	
+
 	for (f=0; f <= SSI_MAX_CHANNELS-1; f++) {
 		ssi_in_use[f] = NO;
 		ssi_user_signature[f] = SSI_UNUSED_SIGNATURE;

@@ -29,7 +29,7 @@ unsigned int filenum_init_flag;
 unsigned char filenum_open(string *signature, string *filename, pl_fd_status_codes *status) {
 unsigned char filenum_open;
 	unsigned char f;
-	
+
 	*status = PL_FD_STATUS_OK;
 
 	if (len(*filename)>FILENUM_MAX_FILENAME_LEN) {
@@ -40,7 +40,7 @@ unsigned char filenum_open;
 		#endif
 		return filenum_open;
 	}
-	
+
 	//file already opened?
 	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
 		if (filenum_in_use[f]) {
@@ -48,14 +48,14 @@ unsigned char filenum_open;
 				#if FILENUM_DEBUG_PRINT
 					filenum_debugprint("'"+*signature+"' tried to open file '"+*filename+"'. This file is already opened on file number "+str(filenum_open)+".");
 				#endif
-				
+
 				*status = PL_FD_STATUS_OK;
 				filenum_open = f;
 				return filenum_open;
 			}
 		}
 	}
-	
+
 	//got free file numbers left?
 	#if FILENUM_DEBUG_PRINT
 		filenum_do_not_debugprint = YES;
@@ -70,13 +70,13 @@ unsigned char filenum_open;
 		#endif
 		return filenum_open;
 	}
-	
+
 	//disk ready?
 	if (fd.ready == NO) {
 		fd.mount();
-		goto filenum_opened_failed;
+		if (fd.laststatus != PL_FD_STATUS_OK) { goto filenum_opened_failed;}
 	}
-	
+
 	//can we open that file?
 	fd.filenum = filenum_open;
 	fd.open(*filename);
@@ -117,7 +117,7 @@ unsigned char filenum_get;
 		filenum_init();
 		filenum_init_flag = FILENUM_INIT_SIGNATURE;
 	}
-	
+
 	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
 		if (filenum_in_use[f] == NO) {
 			filenum_in_use[f] = YES;
@@ -167,11 +167,11 @@ void filenum_release(unsigned char file_num) {
 	//close the file
 	fd.filenum = file_num;
 	fd.close();
-	
+
 	#if FILENUM_DEBUG_PRINT
 		filenum_debugprint("'"+filenum_user_signature[file_num]+"' released file number"+str(file_num));
 	#endif
-	
+
 	filenum_in_use[file_num] = NO;
 	filenum_user_signature[file_num] = FILENUM_UNUSED_SIGNATURE;
 }
@@ -179,7 +179,7 @@ void filenum_release(unsigned char file_num) {
 //------------------------------------------------------------------------------
 void filenum_init() {
 	unsigned char f;
-	
+
 	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
 		filenum_in_use[f] = NO;
 		filenum_user_signature[f] = FILENUM_UNUSED_SIGNATURE;

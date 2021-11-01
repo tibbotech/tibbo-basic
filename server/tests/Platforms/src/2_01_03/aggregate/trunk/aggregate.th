@@ -174,29 +174,29 @@ void callback_agg_synchronized();
 	en_stg_status_codes callback_agg_setting_saved(string *setting_name, unsigned char index, string *setting_val);
 	//Callback procedure, informs settings has been modified by AggreGate Server
 	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
-	
+
 	void callback_agg_setting_error(string *setting_name, en_stg_status_codes error_code);
 	//Callback procedure, informs of errors happened during accessing settings by AggreGate Server.
 	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
-	
+
 	ok_ng callback_agg_convert_setting(string *setting_name, unsigned char index, string *setting_value, en_agg_rdwr op);
 	//Callback procedure, allows settings to be converted, in the case that settings stored in device and on AggreGate Server are in different format.
 	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
-	
+
 #endif
 
 #if AGG_TABLE_CONTROL
 	void agg_proc_stored_events();
 	void agg_proc_data_sent();
 	void agg_stored_event_added(string *event_name);
-	
+
 	void callback_agg_table_error(string *table_name, en_tbl_status_codes error_code);
 	//Callback procedure, informs of errors happened during accessing tables by AggreGate Server.
 	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
 	void callback_agg_convert_table_field(string *table_name, string *field_name, string *field_value, en_agg_rdwr op);
 	//Callback procedure, allows table fields to be converted, in the case that table fields stored in device and on AggreGate Server are in different format.
 	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
-	
+
 #endif
 
 #if AGG_REMOTE_FIRMWARE_UPLOAD

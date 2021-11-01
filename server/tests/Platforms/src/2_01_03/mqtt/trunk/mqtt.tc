@@ -52,7 +52,7 @@ string<23> mqtt_pw;
 void mqtt_start();
 //API procedure, starts the MQTT library.
 //MUST be called first, before any other procedure in this library is used.
-	
+
 	if (mqtt_init_flag == MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
 			mqtt_debug_print("MQTT library already initialized.");
@@ -90,12 +90,12 @@ void mqtt_start();
 string<2> mqtt_build_remaining_length(unsigned char size) {
 string<2> mqtt_build_remaining_length;
 	mqtt_build_remaining_length = "";
-	do
-		unsigned char encodedByte;
+	do {
+		unsigned char encodedByte = size % 128;
 		size = size/128;
-		if ((size>0)) { encodedByte == encodedByte || 128; };
+		if ((size>0)) { encodedByte = encodedByte | 128;}
 		mqtt_build_remaining_length = mqtt_build_remaining_length+chr(encodedByte);
-	loop while (size > 0)
+	} while ((size>0));
 	return mqtt_build_remaining_length;
 }
 
@@ -108,32 +108,32 @@ string<2> mqtt_get_packet_identifier;
 
 pl_sock_state_simple mqtt_call_connect() {
 pl_sock_state_simple mqtt_call_connect;
-		
+
 	#if PLATFORM_TYPE_32
-		unsigned int t_counter;//about 100ms
+		unsigned int t_counter = 18000;//about 100ms
 	#else
-		unsigned int t_counter;//about 100ms
+		unsigned int t_counter = 500;//about 100ms
 	#endif
 
 	sock.num = mqtt_sock_num;
 	sock.targetip = mqtt_server_ip;
 	sock.targetport = mqtt_server_port;
 	sock.connect();
-	
-	do
+
+	do {
 		mqtt_call_connect = sock.statesimple;
 		t_counter = t_counter-1;
-	loop while (mqtt_call_connect <> sock.statesimple) and (t_counter > 0)
+	} while ((mqtt_call_connect != sock.statesimple) && (t_counter>0));
 	return mqtt_call_connect;
 }
 
 void mqtt_send_login() {
 	string buf;
-	
+
 	if (((mqtt_user == "") || (mqtt_pw == ""))) {
-		buf = chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&h02)+chr(0)+chr(&h3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID;
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0x02)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID;
 	} else {
-		buf = chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&hc2)+chr(0)+chr(&h3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID+chr(0)+chr(len(mqtt_user))+mqtt_user+chr(0)+chr(len(mqtt_pw))+mqtt_pw;
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0xc2)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID+chr(0)+chr(len(mqtt_user))+mqtt_user+chr(0)+chr(len(mqtt_pw))+mqtt_pw;
 	}
 	buf = chr(CONNECT)+mqtt_build_remaining_length(len(buf))+buf;
 
@@ -149,7 +149,7 @@ ok_ng mqtt_connect;
 //<b>user</b> and <b>password</b>- MQTT server login credentials,<br>
 //<b>keep_alive</b>- the interval, in seconds, at which the server will ping this device.<br><br>
 //Returns OK if executed successfully.
-	
+
 	mqtt_connect = NG;
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
@@ -169,15 +169,15 @@ ok_ng mqtt_connect;
 		mqtt_send_login();
 		mqtt_connect = OK;
 	}
-	
-	return mqtt_connect;
+
+return mqtt_connect;
 }
 
 ok_ng mqtt_reconnect() {
 ok_ng mqtt_reconnect;
 //API function, instructs the library to reconnect to the MQTT server (broker) using connection parameters previously supplied with mqtt_connect().<br>
 //Returns OK if executed successfully.
-	
+
 	mqtt_reconnect = NG;
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
@@ -187,55 +187,55 @@ ok_ng mqtt_reconnect;
 	}
 
 	sock.num = mqtt_sock_num;
-		
+
 	if ((sock.statesimple == PL_SSTS_CLOSED)) {
 		sock.close();
 		mqtt_call_connect();
 	}
-	
+
 	if ((sock.statesimple == PL_SSTS_EST)) {
 		mqtt_send_login();
 		mqtt_reconnect = OK;
 	}
-	
-	return mqtt_reconnect;
+
+return mqtt_reconnect;
 }
 
 void mqtt_disconnect() {
 //API procedure, disconnects the device from the MQTT server (broker).	
-	
+
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
 			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
 		#endif
 		return;
 	}
-	return;
-	unsigned char current_sock;
+	if (mqtt_cur_state != ms_connected) { return;}
+	unsigned char current_sock = sock.num;
 
-	string buf;
-	
+	string buf = chr(DISCONNECT)+chr(0);
+
 	sock.num = mqtt_sock_num;
 	sock.setdata(buf);
 	sock.send();
-	
+
 	sock.num = current_sock;
 }
 
 void mqtt_publish(string *topic, string *data, en_qos_choices qos) {
 //API procedure, publishes a <b>topic</b> and its <b>data</b> to the MQTT server (broker).
-	
+
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
 			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
 		#endif
 		return;
 	}
-	return;
+	if (mqtt_cur_state != ms_connected) { return;}
 
 	string buf;
 	unsigned char remaining_length;
-	unsigned char current_sock;
+	unsigned char current_sock = sock.num;
 
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Publishing: topic="+*topic+", data="+*data);
@@ -246,13 +246,13 @@ void mqtt_publish(string *topic, string *data, en_qos_choices qos) {
 	} else {
 		buf = chr(0)+chr(len(*topic))+*topic+mqtt_get_packet_identifier()+*data;
 	}
-	
+
 	buf = chr(PUBLISH+1+(qos*2))+mqtt_build_remaining_length(len(buf))+buf;
 
 	sock.num = mqtt_sock_num;
 	sock.setdata(buf);
 	sock.send();
-	
+
 	sock.num = current_sock;
 }
 
@@ -260,65 +260,65 @@ void mqtt_sub(string *topic, en_qos_choices qos) {
 //API procedure, subscribes the device to the specified topic on the MQTT server (broker).<br><br>
 //<b>topic</b>- the topic to subscribe to,<br>
 //<b>qos</b>- requested quality of service, according to the en_qos_choices enum.
-	
+
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
 			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
 		#endif
 		return;
 	}
-	return;
+	if (mqtt_cur_state != ms_connected) { return;}
 
 	string buf;
-	unsigned char current_sock;
-	
+	unsigned char current_sock = sock.num;
+
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Subscribing to: data="+*topic);
 	#endif
-	
+
 	buf = mqtt_get_packet_identifier()+chr(0)+chr(len(*topic))+*topic+chr(qos);
 	buf = chr(SUBSCRIBE+2)+mqtt_build_remaining_length(len(buf))+buf;
 
 	sock.num = mqtt_sock_num;
 	sock.setdata(buf);
 	sock.send();
-	
+
 	sock.num = current_sock;
 }
 
 void mqtt_unsub(string *topic) {
 //API procedure, unsubscribes the device from the specified topic.<br><br>
 //<b>topic</b>- message to unsubscribe from.
-	
+
 	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
 		#if MQTT_DEBUG_PRINT == 1
 			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
 		#endif
 		return;
 	}
-	return;
+	if (mqtt_cur_state != ms_connected) { return;}
 
 	string buf;
-	unsigned char current_sock;
-	
+	unsigned char current_sock = sock.num;
+
 	#if MQTT_DEBUG_PRINT == 1
 		mqtt_debug_print("Unsubscribing from: data="+*topic);
 	#endif
-	
+
 	buf = mqtt_get_packet_identifier()+chr(0)+chr(len(*topic))+*topic;
 	buf = chr(UNSUBSCRIBE+2)+mqtt_build_remaining_length(len(buf))+buf;
-	
+
 	sock.num = mqtt_sock_num;
 	sock.setdata(buf);
 	sock.send();
-	
+
 	sock.num = current_sock;
 }
 
 void mqtt_proc_timer() {
 //Event procedure, call it from the on_sys_timer() event handler.
-	
-	return;
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) { return;}
 	sock.num = mqtt_sock_num;
 	if (mqtt_cur_state == ms_connected) {
 		mqtt_timer_record = mqtt_timer_record+1;
@@ -346,35 +346,35 @@ void mqtt_proc_timer() {
 
 void mqtt_proc_data() {
 //Event procedure, call it from the on_sock_data_arrival event handler.
-	
-	return;
-	return;
 
-	unsigned char pos;
-	string buf;
-		
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) { return;}
+	if (sock.num != mqtt_sock_num) { return;}
+
+	unsigned char pos = 2;
+	string buf = sock.peekdata(2);
+
 	if ((len(buf)<2)) {
 		return;
 	}
 
 	//total sequence length
-	unsigned int length;
-	if ((length>127)) { pos = pos+1; };
-		
+	unsigned int length = asc(right(buf,1));
+	if ((length>127)) { pos = pos+1;}
+
 	if ((length+pos<=sock.rxlen)) {
 		buf = sock.getdata(length+pos);
 	} else {
 		return;
 	}
 
-	unsigned char head;
-	en_qos_choices qos;
-	head = (head && &hF0);
-	
+	unsigned char head = asc(left(buf,1));
+	en_qos_choices qos = (head && 0x06) >> 1;
+	head = (head & 0xF0);
+
 	buf = right(buf,length);
 
 	switch ((head)) {
-		
+
 		case CONNACK:
 
 							mqtt_debug_print("Connected to server.");
@@ -383,8 +383,9 @@ void mqtt_proc_data() {
 						mqtt_cur_state = ms_connected;
 						callback_mqtt_connect_ok();
 						break;
-		
-		length = asc(mid(buf,1,1))*256+asc(mid(buf,2,1));
+
+		case PUBLISH:
+length = asc(mid(buf,1,1))*256+asc(mid(buf,2,1));
 						#if MQTT_DEBUG_PRINT == 1
 							mqtt_debug_print("Notification: topic="+mid(buf,3,length)+", data="+right(buf,len(buf)-length-2-((qos != QOS_AT_MOST_ONCE)*2)));
 						#endif
@@ -399,13 +400,13 @@ void mqtt_proc_data() {
 							sock.send();
 						}
 						break;
-		
+
 		case PUBACK:
 
 							mqtt_debug_print("Publish ack.");
 							break;
 						#endif
-		
+
 		case PUBREC:
 
 							mqtt_debug_print("Publish rec.");
@@ -414,7 +415,7 @@ void mqtt_proc_data() {
 						sock.setdata(buf);
 						sock.send();
 						break;
-		
+
 		case PUBREL:
 
 							mqtt_debug_print("Publish rel.");
@@ -423,26 +424,26 @@ void mqtt_proc_data() {
 						sock.setdata(buf);
 						sock.send();
 						break;
-		
+
 		case PUBCOMP:
 
 							mqtt_debug_print("Publish comp.");
 							break;
 						#endif
-		
+
 		case SUBACK:
 
 							mqtt_debug_print("Subscribe ack.");
 						#endif
 						callback_mqtt_sub_ok();
 						break;
-		
+
 		case UNSUBACK:
 
 							mqtt_debug_print("Unsubscribe ack.");
 							break;
 						#endif
-		
+
 		case PINGRESP:
 
 							mqtt_debug_print("Ping response.");
