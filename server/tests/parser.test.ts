@@ -1,6 +1,6 @@
 
-import TibboBasicPreprocessor from '../src/tibbobasicPreprocessor';
-import TibboBasicProjectParser from '../src/tibbobasicProjectParser';
+import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
+import TibboBasicProjectParser from '../src/TibboBasicProjectParser';
 const fs = require('fs');
 const path = require('path');
 import ini = require('ini');
