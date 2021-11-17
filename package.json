@@ -33,7 +33,8 @@
         "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
         "webpack": "webpack --mode production --config ./client/webpack.config.js && webpack --mode production --config ./server/webpack.config.js",
         "vscode:prepublish": "npm run webpack",
-        "package": "vsce package"
+        "package": "vsce package",
+        "test": "cd server && npm run test"
     },
     "contributes": {
         "languages": [
