@@ -576,6 +576,9 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterVariableListItem(ctx) {
+        if (ctx.parentCtx.variableType === null) {
+            return;
+        }
         const variableType = ctx.parentCtx.variableType.valueType.getText()
         let length = '';
         if (ctx.children.length >= 4) {
@@ -794,6 +797,9 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterExpression(ctx) {
+        if (!ctx.children) {
+            return;
+        }
         for (let i = 0; i < ctx.children.length; i++) {
             let item = ctx.children[i];
             if (item.ruleIndex == TibboBasicParser.RULE_literal && item.start.type == TibboBasicParser.IDENTIFIER) {
