@@ -1,25 +1,20 @@
-import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
-import fs = require('fs');
-import TibboBasicJavascriptCompiler from './TibboBasicJavascriptCompiler';
-import ini = require('ini');
-import TibboBasicPreprocessor from './TibboBasicPreprocessor';
-import { Worker } from 'worker_threads';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const path = require("path");
+const fs = require("fs");
+const TibboBasicJavascriptCompiler_1 = require("./TibboBasicJavascriptCompiler");
+const ini = require("ini");
+const TibboBasicPreprocessor_1 = require("./TibboBasicPreprocessor");
+const worker_threads_1 = require("worker_threads");
 const { resolve } = require('path');
 const { readdir } = require('fs').promises;
-
 const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
-
-
-
-
 // let files = [
 //     path.join(__dirname, '..', 'tests', 'jstest', 'global.tbh'),
 //     path.join(__dirname, '..', 'tests', 'jstest', 'main.tbs'),
 //     path.join(__dirname, '..', 'tests', 'jstest', 'boot.tbs'),
 //     path.join(__dirname, '..', 'tests', 'jstest', 'device.tbs'),
 // ];
-
 // async function getFiles(dir) {
 //     const dirents = await readdir(dir, { withFileTypes: true });
 //     const files = await Promise.all(dirents.map((dirent) => {
@@ -28,8 +23,6 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
 //     }));
 //     return Array.prototype.concat(...files);
 // }
-
-
 (async function start() {
     try {
         const workspaceRoot = path.join(__dirname, '..', 'tests', 'jstest');
@@ -39,8 +32,8 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
         const dirName = path.dirname(tprPath);
         let PLATFORMS_PATH = path.join(__dirname, '..', 'tests', 'Platforms');
         let needsUpdate = true;
-        const preprocessor = new TibboBasicPreprocessor(workspaceRoot, PLATFORMS_PATH);
-        const files: string[] = [];
+        const preprocessor = new TibboBasicPreprocessor_1.default(workspaceRoot, PLATFORMS_PATH);
+        const files = [];
         // preprocessor.parsePlatforms();
         // for (let i = 0; i < preprocessor.filePriorities.length; i++) {
         //     const priority = preprocessor.filePriorities[i];
@@ -54,7 +47,6 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
             if (tpr[entryName] != undefined) {
                 const originalFilePath = tpr[entryName]['path'].split('\\').join(path.sep);
                 let filePath = originalFilePath;
-
                 const ext = path.extname(filePath);
                 if (!supportedFileTypes.includes(ext)) {
                     continue;
@@ -64,7 +56,6 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
                     directory = PLATFORMS_PATH;
                 }
                 filePath = preprocessor.parseFile(directory, originalFilePath, needsUpdate);
-
                 const fileContents = preprocessor.files[filePath];
                 files.push(fileContents);
             }
@@ -72,26 +63,20 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
                 break;
             }
         }
-
-        const compiler = new TibboBasicJavascriptCompiler();
+        const compiler = new TibboBasicJavascriptCompiler_1.default();
         const output = compiler.compile(files);
-
-        const worker = new Worker(output, { eval: true });
-        await new Promise<void>((resolve, reject) => {
+        const worker = new worker_threads_1.Worker(output, { eval: true });
+        await new Promise((resolve, reject) => {
             setTimeout(() => {
                 worker.terminate();
                 resolve();
             }, 3000);
         });
-
         // fs.writeFileSync(path.join(__dirname, '..', '..', 'main.js'), output);
     }
     catch (ex) {
         console.log(ex);
     }
-
     console.log('transpile test ended');
 })();
-
-
-
+//# sourceMappingURL=testJSCompiler.js.map

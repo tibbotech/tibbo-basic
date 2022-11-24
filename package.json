@@ -25,7 +25,7 @@
         "workspaceContains:*.tpr"
     ],
     "icon": "images/icon.png",
-    "main": "./client/out/extension",
+    "main": "./server/lib/index.js",
     "scripts": {
         "compile": "tsc -b",
         "build": "tsc -b",

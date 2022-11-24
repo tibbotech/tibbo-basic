@@ -1,50 +1,43 @@
+"use strict";
 let mainApp;
-
 const startSimulator = (app) => {
     mainApp = app;
     mainApp.timer = setInterval(() => {
         mainApp.on_sys_timer();
     }, sys.onsystimerperiod * 10);
     mainApp.on_sys_init();
-}
-
+};
 const stopSimulator = (app) => {
     clearInterval(app.timer);
-}
-
-const TiOS = function() {
+};
+const TiOS = function () {
     this.on_sys_init = function () {
-
-    }
+    };
     this.on_sys_timer = function () {
-
-    }
-
+    };
     this.on_button_pressed = function () {
-
-    }
-}
-
-const bt = {}
-const wln = {}
-const tpram = {}
-const fd = {}
-const ssi = {}
-const kp = {}
-const lcd = {}
-const rtc = {}
-const beep = {}
-const io = {}
-const pppoe = {}
-const net = {}
-const sys = {}
-const stor = {}
-const sock = {}
-const ser = {}
-const romfile = {}
-const ppp = {}
-const pat = {}
-const button = {}
+    };
+};
+const bt = {};
+const wln = {};
+const tpram = {};
+const fd = {};
+const ssi = {};
+const kp = {};
+const lcd = {};
+const rtc = {};
+const beep = {};
+const io = {};
+const pppoe = {};
+const net = {};
+const sys = {};
+const stor = {};
+const sock = {};
+const ser = {};
+const romfile = {};
+const ppp = {};
+const pat = {};
+const button = {};
 const PL_BT_FC_ENABLED = 1;
 const PL_BT_FC_DISABLED = 0;
 const PL_BT_EVENT_DISABLED = 3;
@@ -527,38 +520,37 @@ const PL_SOCK_INTERFACE_PPP = 3;
 const PL_SOCK_INTERFACE_WLN = 2;
 const PL_SOCK_INTERFACE_NET = 1;
 const PL_SOCK_INTERFACE_NULL = 0;
-
-function val( sourcestr) {}
-function lval( sourcestr) {}
-function str( num) {
+function val(sourcestr) { }
+function lval(sourcestr) { }
+function str(num) {
     return num.toString();
 }
-function lstr( num) {}
-function stri( num) {}
-function lstri( num) {}
-function hex( num) {}
-function lhex( num) {}
-function bin( num) {}
-function lbin( num) {}
-function left( sourcestr,  len) {}
-function right( sourcestr,  len) {}
-function mid( sourcestr,  frompos,  len) {}
-function len( sourcestr) {}
-function instr( frompos,  sourcestr,  substr,  num) {}
-function asc( sourcestr) {}
-function chr( asciicode) {}
-function ddstr( str) {}
-function ddval( str) {}
-function strgen( len,  substr) {}
-function strsum( sourcestr) {}
-function weekday( daycount) {}
-function year( daycount) {}
-function month( daycount) {}
-function date( daycount) {}
-function daycount( year,  month,  date) {}
-function hours( mincount) {}
-function minutes( mincount) {}
-function mincount( hours,  minutes) {}
+function lstr(num) { }
+function stri(num) { }
+function lstri(num) { }
+function hex(num) { }
+function lhex(num) { }
+function bin(num) { }
+function lbin(num) { }
+function left(sourcestr, len) { }
+function right(sourcestr, len) { }
+function mid(sourcestr, frompos, len) { }
+function len(sourcestr) { }
+function instr(frompos, sourcestr, substr, num) { }
+function asc(sourcestr) { }
+function chr(asciicode) { }
+function ddstr(str) { }
+function ddval(str) { }
+function strgen(len, substr) { }
+function strsum(sourcestr) { }
+function weekday(daycount) { }
+function year(daycount) { }
+function month(daycount) { }
+function date(daycount) { }
+function daycount(year, month, date) { }
+function hours(mincount) { }
+function minutes(mincount) { }
+function mincount(hours, minutes) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Returns the minutes number for a given hours and minutes. Minutes are counted from midnight (00:00 is minute #0).<br><br>
 //If any input parameter is illegal (hours exceeds 23, minutes exceeds 59, etc.) this syscall will return 65535.
@@ -567,9 +559,8 @@ function mincount( hours,  minutes) {}
 //<font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, 
 //<font color="teal"><b>hours</b></font>, <font color="teal"><b>minutes</b></font>, and 
 //<font color="teal"><b>daycount </b></font>syscalls.
-
 //--------------------------------------------------------------------
-function cfloat( num) {}
+function cfloat(num) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Floating-point calculations can lead to invalid result (#INF, -#INF errors, as per IEEE specification).<br><br>
 //When your application is in the debug mode you will get a FPERR exception if such an error is encountered. <br><br>
@@ -577,179 +568,99 @@ function cfloat( num) {}
 //variable contains correct value. This is where cfloat() function comes handy. <br><br>
 //The <font color="teal"><b>cfloat() </b></font>returns <font color="olive"><b>0- VALID </b></font>if the floating-point
 //variable num contains a valid value, and <font color="olive"><b>1- INVALID </b></font>if the num contains invalid value.
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
-    //Choose between plain and mantissa/exponent format automatically. Format that results in the
-                        //shortest string will be selected.
-    //Use mantissa/exponent format.
-    //Use regular plain format, not mantissa/exponent representation. 
-
-
-function ftostr( num,  mode,  rnd) {}
+//Choose between plain and mantissa/exponent format automatically. Format that results in the
+//shortest string will be selected.
+//Use mantissa/exponent format.
+//Use regular plain format, not mantissa/exponent representation. 
+function ftostr(num, mode, rnd) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Converts real value into its string representation. <font color="teal"><b>Ftostr() </b></font>function offers two formatting 
 //options: mode argument selects mantissa/exponent, plain, or "whichever is more compact" format for the output string.<br><br>
 //Rnd argument defines how many digits (both in the integer and fractional part) the number should be rounded to.
-
 //--------------------------------------------------------------------
-function strtof( str) {}
+function strtof(str) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Converts string representation of a real value into a real value. You must keep in mind that floating-point calculations
 //are inherently imprecise. Not every value can be converted into its exact floating-point representation.<br><br>
 //Also, <font color="teal"><b>strtof() </b></font>can be invoked implicitly (real_var=string_var).
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
-    //Set this mode for all data portions except the last one.
-    //Set this mode for the last data portion; also use this selection if you only have a single data portion.
-
-
-function md5( str,  input_hash,  md5_mode,  total_len) {}
+//Set this mode for all data portions except the last one.
+//Set this mode for the last data portion; also use this selection if you only have a single data portion.
+function md5(str, input_hash, md5_mode, total_len) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Generates MD5 hash on the <b>str </b>string. Returns 16-character hash string; an empty string when invalid str or input_hash argument was detected.
 //<br><br>
@@ -772,14 +683,10 @@ function md5( str,  input_hash,  md5_mode,  total_len) {}
 //<br><br>
 //See also:
 //<font color="teal"><b>sha1</b</font>.
-
 //--------------------------------------------------------------------
-
-    //Set this mode for all data portions except the last one.
-    //Set this mode for the last data portion; also use this selection if you only have a single data portion.
-
-
-function sha1( str,  input_hash,  sha1_mode,  totallen) {}
+//Set this mode for all data portions except the last one.
+//Set this mode for the last data portion; also use this selection if you only have a single data portion.
+function sha1(str, input_hash, sha1_mode, totallen) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Generates SHA1 hash on the <b>str </b>string. Returns 20-character hash string; an empty string when invalid str or input_hash argument was detected.
 //<br><br>
@@ -802,22 +709,16 @@ function sha1( str,  input_hash,  sha1_mode,  totallen) {}
 //<br><br>
 //See also:
 //<font color="teal"><b>md5</b</font>.
-
 //--------------------------------------------------------------------
-function random( len) {}
+function random(len) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Generates a string consisting of <b>len </b>random characters.
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-function insert( dest_str,  pos,  insert_str) {}
+function insert(dest_str, pos, insert_str) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Inserts insert_str string into the dest_str string at the insert position pos. Returns the new length of dest_str.
 //<br><br>
@@ -825,11 +726,8 @@ function insert( dest_str,  pos,  insert_str) {}
 //<br><br>
 //Dest_str length can increase as a result of this operation (but not beyond declared string capacity). This will happen if the insertion position does
 //not allow the source_str to fit within the current length of the dest_string.
-
 //--------------------------------------------------------------------
-
-
-function aes128enc( key,  plain) {}
+function aes128enc(key, plain) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Encrypts data in 16-byte blocks according to the AES128 algorithm. Returns encrypted data (which will consist of complete 16-character blocks).
 //<br><br>
@@ -839,13 +737,8 @@ function aes128enc( key,  plain) {}
 //<br><br>
 //Not supported on the EM500W platform.
 //<b>See also: </b>aes128dec, rc4.
-
-
-
 //--------------------------------------------------------------------
-
-
-function aes128dec( key,  cypher) {}
+function aes128dec(key, cypher) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Decrypts data in 16-byte blocks according to the AES128 algorithm. Returns decrypted data (which will consist of complete 16-character blocks).
 //<br><br>
@@ -856,11 +749,8 @@ function aes128dec( key,  cypher) {}
 //Not supported on the EM500W platform.
 //<br><br>
 //<b>See also: </b>aes128dec, rc4.
-
-
-
 //--------------------------------------------------------------------
-function rc4( key,  skip,  data) {}
+function rc4(key, skip, data) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Encrypts/decrypts the data stream according to the RC4 algorithm. Returns processed data.
 //<br><br>
@@ -874,9 +764,8 @@ function rc4( key,  skip,  data) {}
 //With RC4 algorithm, the same function is used both for encrypting and decrypting the data.
 //<br><br>
 //<b>See also: </b>aes128enc, aes128dec.
-
 //--------------------------------------------------------------------
-function strand( str1,  str2) {}
+function strand(str1, str2) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Returns a string containing the result of logical AND operation on data in str1 and str2 arguments.
 //<br><br>
@@ -885,9 +774,8 @@ function strand( str1,  str2) {}
 //If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical AND operation.
 //<br><br>
 //<b>See also: </b>stror, strxor.
-
 //--------------------------------------------------------------------
-function stror( str1,  str2) {}
+function stror(str1, str2) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Returns a string containing the result of logical OR operation on data in str1 and str2 arguments.
 //<br><br>
@@ -896,9 +784,8 @@ function stror( str1,  str2) {}
 //If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical OR operation.
 //<br><br>
 //<b>See also: </b>strand, strxor.
-
 //--------------------------------------------------------------------
-function strxor( str1,  str2) {}
+function strxor(str1, str2) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Returns a string containing the result of logical exclusive OR (XOR) operation on data in str1 and str2 arguments.
 //<br><br>
@@ -907,59 +794,39 @@ function strxor( str1,  str2) {}
 //If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical XOR operation.
 //<br><br>
 //<b>See also: </b>strand, stror.
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
 //<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
 //<b>METHOD.</b>
-
 //--------------------------------------------------------------------
-
 //<b>METHOD.</b>//**************************************************************************************************
 //       BUTTON object
 //**************************************************************************************************
-
-
 //All programmable boards, programmable serial controllers, and Tibbo Project System (TPS) devices offered by Tibbo feature a button referred to as the "setup" or "MD" button ("MD" stands for "mode").
 //<br><br>
 //All programmable Tibbo modules have a line for connecting this button externally.
 //<br><br>
 //When a programmable Tibbo device is executing a Tibbo BASIC/C application, the MD button can be used as a general-purpose input button.
-
 //--------------------------------------------------------------------
-Object.defineProperty(button, 'pressed', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(button, 'pressed', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the current button state.
 //<br><br>
 //This property reflects the immediate state of the hardware at the very moment the property is read -- no "debouncing" performed.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(button, 'time', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(button, 'time', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the time (in 0.5 second intervals) elapsed since the button was last pressed or released (whichever happened more recently).
 //<br><br>
@@ -968,20 +835,14 @@ Object.defineProperty(button, 'time', {
 //The value of this property maxes out at 255 (127.5 seconds).
 //<br><br>
 //The elapsed time is not counted while the execution of your application is paused (during debugging).
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the button object. </b><br><br> 
 //Generated when the MD button on your device is pressed (MD line goes LOW).
 //<br><br>
 //Multiple on_button_pressed events may be waiting in the event queue.
 //<br><br>
 //You can check the time elapsed since the preceding on_button_released event (or execution start) by reading the value of the button.time read-only property.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the button object. </b><br><br> 
 //Generated when the MD button on your device is released (MD line goes HIGH).
 //<br><br>
@@ -990,36 +851,6 @@ Object.defineProperty(button, 'time', {
 //You can check the time elapsed since the preceding on_button_pressed event by reading the value of the button.time read-only property.//**************************************************************************************************
 //       PAT (LED pattern) object
 //**************************************************************************************************
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //The pat. object allows you to "play" blink patters on up to five LED pairs or channels, each pair typically consisting of red and green LEDs.
 //<br><br>
 //Patterns only play when your application is executing and pause when you application is not running.
@@ -1031,16 +862,10 @@ Object.defineProperty(button, 'time', {
 //Mapping properties allow you to select control I/O lines for LEDs of channels 1-4.
 //<br><br>
 //<b>On this platform you need to configure LED control lines of channels 1-4 as outputs. This is done through the io.enabled property.</b>
-
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can only be loaded if no pattern is playing at the moment.
-    //<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can be loaded even if another pattern is currently playing.
-
-
-pat.play = function( pattern,  patint) {}
+//<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can only be loaded if no pattern is playing at the moment.
+//<b>PLATFORM CONSTANT. </b><br><br> Tells the pat.play method that the new pattern can be loaded even if another pattern is currently playing.
+pat.play = function (pattern, patint) { };
 //<b>METHOD. </b><br><br> 
 //For the currently selected pattern channel (selection is made through the pat.channel property), loads a new LED pattern to play.
 //<br><br>
@@ -1061,104 +886,38 @@ pat.play = function( pattern,  patint) {}
 //'*': Double the speed of playing this pattern. Can be inserted anywhere in the pattern string. Applies to the entire string. You can use up to two * characters, meaning that you can quadruple the normal speed of the output. 
 //<br><br>
 //The patint argument determines if this method's invocation is allowed to interrupt another pattern that is already playing. 
-
 //--------------------------------------------------------------------
-Object.defineProperty(pat, 'channel', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pat, 'channel', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (channel 0). </b><br><br>
 //Selects/returns the pattern channel to work with. This selection is related to the pat.play method, as well as io.redmap and io.greenmap properties.
 //<br><br>
 //Note that this property's value will be set automatically when the event handler for the on_pat event is entered.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Object.defineProperty(pat, 'greenmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pat, 'greenmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
 //For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's green LED.
 //<br><br>
 //Channel 0 does not require configuration. Writing to this property will only work on channels 1-4.
 //<br><br>
 //<b>On this platform you must also configure I/O lines of channels 1-4 as outputs. This is done through the io.enabled property of the io. object.</b>
-    
-    
-
-
-
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Object.defineProperty(pat, 'redmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pat, 'redmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE: channel 0: (-1), R/0; channels 1-4: PL_IO_NULL.</b><br><br>
 //For the currently selected pattern channel (selection is made through the pat.channel property), sets/returns the number of the I/O line that will act as the control line for this channel's red LED.
 //<br><br>
 //Channel 0 does not require configuration. Writing to this property will only work on channels 1-4.
 //<br><br>
 //<b>On this platform you must also configure I/O lines of channels 1-4 as outputs. This is done through the io.enabled property of the io. object.</b>
-    
-    
-
-
-
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the pat object. </b><br><br>
 //Generated when an LED pattern finishes "playing". This can only happened for "non-looped" patterns.
 //<br><br>
@@ -1169,45 +928,32 @@ Object.defineProperty(pat, 'redmap', {
 //The event won't be generated if the current pattern is superseded (overwritten) by a new call to pat.play.//**************************************************************************************************
 //       PPP object
 //**************************************************************************************************
-
-
-
-
 //The ppp object represents a ppp interface of your device (i.e. for accessing TCP/IP networks thru landline or GPRS modems).
 //This object only specifies various parameters related to the ppp interface (such as the IP address) and is not responsible for
 //sending/transmitting network data. The latter is the job of the sock object.
-
 //--------------------------------------------------------------------
-Object.defineProperty(ppp, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ppp, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (not enabled). </b><br><br>
 //Enables/disables PPP interface on the serial port specified by the ppp.portnum property. 
 //<br><br>
 //Once this property is set to 1- YES, the selected serial port seizes to be under the control of your application and works exclusively for the ppp. object.
 //PPP channel setup (ppp.buffrq, ppp.ip, ppp.portnum) can only be altered when the ppp. object is disabled.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ppp, 'portnum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ppp, 'portnum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (serial port #0 selected). </b><br><br>
 //Sets/returns the number of the serial port that will be used by the ppp. object.
 //<br><br>
 //Once the PPP interface is enabled (ppp.enabled= 1- YES), the selected serial port seizes to be under the control of your application and works exclusively for the ppp. object.
 //The value of this property won't exceed ser.numofports-1 (even if you attempt to set a higher value).
 //You can only change this property when the PPP channel is disabled (ppp.enabled= 0- NO).
-    
-    
-
-
 //--------------------------------------------------------------------
-ppp.buffrq = function( numpages) {}
+ppp.buffrq = function (numpages) { };
 //<b>METHOD.</b>
 //<br><br>
 //Pre-requests "numpages" number of buffer pages (1 page= 256 bytes) for the buffer of the ppp object.
@@ -1221,12 +967,11 @@ ppp.buffrq = function( numpages) {}
 //Executing sys.buffalloc while ppp.enabled= 1- YES will leave the buffer size unchanged.
 //<br><br>
 //The actual current buffer size can be verified through the ppp.buffsize read-only property.
-
 //--------------------------------------------------------------------
-Object.defineProperty(ppp, 'buffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ppp, 'buffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes).</b>
 //<br><br>
 //Returns the current capacity (in bytes) of the ppp. object's buffer.
@@ -1234,36 +979,27 @@ Object.defineProperty(ppp, 'buffsize', {
 //Buffer capacity can be changed through the ppp.buffrq method followed by the sys.buffalloc method invocation.
 //<br><br>
 //The PPP object will be unable to operate properly if its buffer has inadequate capacity. Recommended buffer size is 5 pages.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ppp, 'ip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ppp, 'ip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "1.0.0.1". </b><br><br>
 //Sets/returns the IP address of the PPP interface of your device. <br><br>
 //<br><br>
 //Typically, the IP address of the PPP interface is negotiated with the ISP. Available GPRS library implements all necessary steps of PPP link negotiation for GPRS modems.
 //<br><br>
 //This property can only be written to when the PPP interface is disabled (ppp.enabled= 0- NO).
-    
-    
-
 //**************************************************************************************************
 //       ROM (ROM file access) object
 //**************************************************************************************************
-
-
 //The romfile object allows you to access resource (fixed) files that you have added to your project.
 //Resource files appear under the "Resource Files" branch of your project tree.
 //Resource files are not processed by the compiler in any way, they are just added to the compiled project binary "as is".
 //<br><br>
 //Resource files are ideal for storing permanent data that never changes.
-
 //--------------------------------------------------------------------
-romfile.find = function( frompos,  substr,  num) {}
+romfile.find = function (frompos, substr, num) { };
 //<b>METHOD. [LEGACY]</b><br><br> 
 //Locates the Nth occurrence of a substring within the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
 //<br><br>
@@ -1279,9 +1015,8 @@ romfile.find = function( frompos,  substr,  num) {}
 //<b>Num </b>-- substring occurrence to search for.
 //<br><br>
 //This method was preserved for compatibility with previously developed applications. You are recommended to use romfile.find32 -- it has no file size limitations. 
-
 //--------------------------------------------------------------------
-romfile.find32 = function( frompos,  substr,  num) {}
+romfile.find32 = function (frompos, substr, num) { };
 //<b>METHOD. </b><br><br> 
 //Locates the Nth occurrence of a substring within the currently opened resource file.
 //<br><br>
@@ -1294,9 +1029,8 @@ romfile.find32 = function( frompos,  substr,  num) {}
 //<b>Substr </b>-- substring to search for.
 //<br><br>
 //<b>Num </b>-- substring occurrence to search for.
-
 //--------------------------------------------------------------------
-romfile.getdata = function( maxinplen) {}
+romfile.getdata = function (maxinplen) { };
 //<b>METHOD. </b><br><br> 
 //Reads the specified amount of bytes (characters) from the currently opened resource file, from the location pointed at by the file pointer (romfile.pointer32).
 //<br><br>
@@ -1308,22 +1042,18 @@ romfile.getdata = function( maxinplen) {}
 //<br><br>
 //<b>Maxinplen </b>-- maximum number of characters to read from the file.
 //The length of the returned string is also limited by two other factors: the receiving string capacity, and the amount of remaining data in the file (romfile.size+1-romfile.pointer).
-
 //--------------------------------------------------------------------
-Object.defineProperty(romfile, 'offset', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(romfile, 'offset', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (DWORD)</b>.
 //<br><br>
 //For the currently opened resource file returns the absolute file offset of this file in the compiled project binary.
 //<br><br>
 //For this property to return meaningful data, a resource file must first be successfully opened with romfile.open.
-    
-
-
 //--------------------------------------------------------------------
-romfile.open = function( filename) {}
+romfile.open = function (filename) { };
 //<b>METHOD. </b><br><br> 
 //Opens or re-opens a resource file.
 //<br><br>
@@ -1334,12 +1064,11 @@ romfile.open = function( filename) {}
 //<b>Filename </b>-- name of the resource file to open. Files that can be opened with this method are those appearing under the "Resource Files" branch of your project tree. 
 //<br><br>
 //There is no method (or need) to explicitly close resource files. Only one resource file can be opened at any given time.
-
 //--------------------------------------------------------------------
-Object.defineProperty(romfile, 'pointer', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(romfile, 'pointer', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD) [LEGACY]. </b><br><br>
 //Sets/returns the current pointer position in the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
 //<br><br>
@@ -1353,15 +1082,11 @@ Object.defineProperty(romfile, 'pointer', {
 //When you read from the file with romfile.getdata, the pointer is automatically moved forward by the number of bytes (characters) that have been read out.
 //<br><br>
 //This method was preserved for compatibility with previously developed applications. You are recommended to use romfile.pointer32 -- it has no file size limitations.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(romfile, 'pointer32', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(romfile, 'pointer32', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (DWORD). </b><br><br>
 //Sets/returns the current pointer position in the currently opened resource file.
 //<br><br>
@@ -1373,27 +1098,20 @@ Object.defineProperty(romfile, 'pointer32', {
 //When a non-empty file is (re)opened with the romfile.open method, the pointer is reset to the first character of the file (position 1).
 //<br><br>
 //When you read from the file with romfile.getdata, the pointer is automatically moved forward by the number of bytes (characters) that have been read out.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(romfile, 'size', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(romfile, 'size', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (DWORD). </b><br><br>
 //Returns the size of the currently opened resource file.
 //<br><br>
 //Zero size is returned if no file is opened of the file opening fails (because the file with the specified name does not exist). 
 //<br><br>
 //For this property to return meaningful data, a resource file must first be successfully opened with romfile.open.
-    
 //**************************************************************************************************
 //       SER (Serial port) object
 //**************************************************************************************************
-
-
 //This is a serial port object that encompasses ALL serial ports (UARTs) available on a particular system (total number
 //of available serial ports can be obtained through the <font color="maroon"><b>ser.numofports </b></font>read-only property).
 //<br><br>
@@ -1414,36 +1132,28 @@ Object.defineProperty(romfile, 'size', {
 //won't happen automatically as well. <br><br>For the UART mode, the TX/W1out/dout and RX/W1in/din are configured automatically when 
 //the port is opened (see <font color="maroon"><b>ser.enabled</b></font>). Your application still needs to set the direction of 
 //RTS/W0out/cout CTS/W0&1in/cin "manually".
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'numofports', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'numofports', {
+    get() { return 0; },
+    set() { }
+});
 //<b>READ-ONLY PROPERTY (BYTE). </b><br><br> 
 //Returns total number of serial ports found on the current platform.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'num', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'num', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (serial port #0 selected). </b><br><br>
 //Sets/returns the number of currently selected serial port (ports are enumerated from 0).
 //Most other properties and methods of this object relate to the serial port selected through this property.<br><br>
 //Note that serial-port related events such as <font color="teal"><b>on_ser_data_arrival </b></font> change currently selected port!
 //The value of this property won't exceed <font color="maroon"><b>ser.numofports</b></font>-1 (even if you attempt to set a higher value).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font> (not enabled). </b><br><br>
 //Enables/disables currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
 //<font color="olive"><b>0- NO </b></font>(not enabled), <font color="olive"><b>1- YES </b></font>(enabled).<br><br>
@@ -1453,36 +1163,29 @@ Object.defineProperty(ser, 'enabled', {
 //</font>, <font color="maroon"><b>ser.ctsmap</b></font>, <font color="maroon"><b>ser.mode</b></font>, <font color="maroon"><b>ser.redir</b>
 //</font>, <font color="maroon"><b>ser.txclear</b></font>). You also cannot allocate buffer memory for the port (do <font color="maroon"><b>
 //sys.buffalloc </b></font>) when the port is enabled.
-    
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of the operating mode of the serial port.
-        //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
-                            //UART mode, suitable for RS232, RS422, RS485, etc. communications in full-duplex or half-duplex mode 
-                            //(see <font color="maroon"><b>ser.interface</b></font>).<br><br>
-                            //Data is transmitted through the TX pin and received through the RX pin. Optionally, RTS (output) and CTS 
-                            //(input) lines are used for flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>) 
-                            //in the full-duplex mode. Additionally, RTS can be used for direction control in the half-duplex mode.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Wiegand mode, suitable for sending to or receiving data from any standard Wiegand device. Data transmission 
-                            //is through pins W0out and W1out, reception- through W0&1in and W1in. <br><br>
-                            //"W0&1in" means that a logical AND of W0 and W1 signals must be applied to this input. Therefore, external 
-                            //logical gate is needed in order to receive Wiegand data.               
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Clock/data mode, suitable for sending to or receiving data from any standard clock/data (or magstripe) device.
-                            //Data transmission is through pins cout and dout, reception- through cin and din. <br><br>
-                            //Third line of the magstripe interface- card present- is not required for data reception. For transmission, 
-                            //any I/O line can be used as card present output (under software control).
-
-
-Object.defineProperty(ser, 'mode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+//UART mode, suitable for RS232, RS422, RS485, etc. communications in full-duplex or half-duplex mode 
+//(see <font color="maroon"><b>ser.interface</b></font>).<br><br>
+//Data is transmitted through the TX pin and received through the RX pin. Optionally, RTS (output) and CTS 
+//(input) lines are used for flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>) 
+//in the full-duplex mode. Additionally, RTS can be used for direction control in the half-duplex mode.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Wiegand mode, suitable for sending to or receiving data from any standard Wiegand device. Data transmission 
+//is through pins W0out and W1out, reception- through W0&1in and W1in. <br><br>
+//"W0&1in" means that a logical AND of W0 and W1 signals must be applied to this input. Therefore, external 
+//logical gate is needed in order to receive Wiegand data.               
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Clock/data mode, suitable for sending to or receiving data from any standard clock/data (or magstripe) device.
+//Data transmission is through pins cout and dout, reception- through cin and din. <br><br>
+//Third line of the magstripe interface- card present- is not required for data reception. For transmission, 
+//any I/O line can be used as card present output (under software control).
+Object.defineProperty(ser, 'mode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- UART (UART). </b><br><br>
 //Sets operating mode for the currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
 //<font color="olive"><b>0- PL_SER_MODE_UART </b></font>(UART), <font color="olive"><b>1- PL_SER_MODE_WIEGAND </b></font>(Wiegand), 
@@ -1497,27 +1200,20 @@ Object.defineProperty(ser, 'mode', {
 //you will need to configure RTS line as output and CTS line as input through the <font color="maroon"><b>io.enabled </b></font>property. 
 //TX and RX configuration will happen automatically. <br><br>
 //For the Wiegand and clock/data mode, you will need to configure both RTS and TX as outputs, and CTS and RX as inputs.  
-    
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of full-duplex or half-duplex interface for the UART mode
 //of serial port (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
-                            //Full-duplex mode, suitable for RS232, RS422, or four-wire RS485 communications. RTS output (together with 
-                            //CTS input) can be used for optional hardware flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>).
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Half-duplex mode, suitable for two-wire RS485 communications. RTS line is used for direction control.
-                            //Direction control polarity can be set through <font color="maroon"><b>ser.dircontrol </b></font>property.
-
-
-Object.defineProperty(ser, 'interface', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+//Full-duplex mode, suitable for RS232, RS422, or four-wire RS485 communications. RTS output (together with 
+//CTS input) can be used for optional hardware flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>).
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Half-duplex mode, suitable for two-wire RS485 communications. RTS line is used for direction control.
+//Direction control polarity can be set through <font color="maroon"><b>ser.dircontrol </b></font>property.
+Object.defineProperty(ser, 'interface', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_SI_FULLDUPLEX (full-duplex). </b><br><br>
 //Chooses full-duplex or half-duplex operating mode for currently selected serial port (selection is made through <font color="maroon"><b>
 //ser.num</b></font>): <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX </b></font>(full-duplex mode), <font color="olive"><b>
@@ -1532,26 +1228,19 @@ Object.defineProperty(ser, 'interface', {
 //<br><br>
 //You have to configure RTS line as output and CTS line as input 
 //through the <font color="maroon"><b>io.enabled </b></font>property.
-    
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the flow control for the UART mode of serial port (ser.mode= 0- PL_SER_MODE_UART).
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
-                //No flow control.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                //RTS/CTS flow control.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                //XON/XOFF flow control.
-
-
-Object.defineProperty(ser, 'flowcontrol', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+//No flow control.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//RTS/CTS flow control.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//XON/XOFF flow control.
+Object.defineProperty(ser, 'flowcontrol', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- DISABLED. </b><br><br> 
 //Sets/returns flow control mode for currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>): 
 //<font color="olive"><b>0- DISABLED</b></font>, <font color="olive"><b>1- PL_SER_FC_RTSCTS</b></font>, or <font color="olive"><b>1- PL_SER_FC_XONXOFF</b></font>. Only relevant when the serial port is in UART 
@@ -1566,15 +1255,11 @@ Object.defineProperty(ser, 'flowcontrol', {
 //<br><br>
 //The RTS lines are not automatically configured as outputs and CTS- as inputs. You need to do this manually, through 
 //the <font color="maroon"><b>io.enabled </b></font>property of the io object. 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'rtsmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'rtsmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE- different for each serial port: UART0: 0- PL_IO_NUM_0, <br>
 //UART1: 1- PL_IO_NUM_1,<br> UART2: 2- PL_IO_NUM_2, <br> UART3: 3- PL_IO_NUM_3. </b><br><br>
 //Sets/returns the number of the I/O line that will act as RTS/W0out/cout output of currently selected serial port (selection is made through 
@@ -1596,15 +1281,11 @@ Object.defineProperty(ser, 'rtsmap', {
 //<br><br>
 //For the selected line to work, you have to configure it as an output through the <font color="maroon"><b>io.enabled </b></font>property of the 
 //io object.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'ctsmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'ctsmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE- different for each serial port: UART0: 0- PL_INT_NUM_0, <br>
 //UART1: 1- PL_INT_NUM_1, <br>UART2: 2- PL_INT_NUM_2, <br>UART3: 3- PL_INT_NUM_3. </b><br><br>
 //Sets/returns the number of I/O line that will act as CTS/W0&1in/cin input of currently selected serial port (selection is made through 
@@ -1622,55 +1303,39 @@ Object.defineProperty(ser, 'ctsmap', {
 //<br><br>
 //For the selected line to work, you have to configure it as an input through the <font color="maroon"><b>io.enabled </b></font>
 //property of the io object.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'xonchar', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'xonchar', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= &h11 (XON character) </b><br><br>
 //Sets/returns the ASCII code of the character that will be used to PAUSE transmission in the XON/XOFF flow control mode (ser.flowcontrol= 2- PL_SER_FC_XONOFF)
 //for the currently selected serial port (selection is made through ser.num).
-    
-    
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'xoffchar', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'xoffchar', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= &h13 (XOFF character) </b><br><br>
 //Sets/returns the ASCII code of the character that will be used to RESUME transmission in the XON/XOFF flow control mode (ser.flowcontrol= 2- PL_SER_FC_XONOFF)
 //for the currently selected serial port (selection is made through ser.num).
-    
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of polarity for the RTS line which controls direction in the UART/half-duplex mode of 
 //the serial port (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>and <font color="maroon">
 //<b>ser.interface </b></font>= <font color="olive"><b>0- PL_SER_SI_FULLDUPLEX</b></font>).
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
-                            //Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be LOW when the serial 
-                            //port is ready to RX data and HIGH when the serial port is TXing data. LOW/HIGH states provided are for 
-                            //the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be HIGH when the serial 
-                            //port is ready to RX data and LOW when the serial port is TXing data. LOW/HIGH states provided are for 
-                            //the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
-
-
-Object.defineProperty(ser, 'dircontrol', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+//Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be LOW when the serial 
+//port is ready to RX data and HIGH when the serial port is TXing data. LOW/HIGH states provided are for 
+//the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Specifies (for UART/half-duplex mode of the serial port) that the RTS output will be HIGH when the serial 
+//port is ready to RX data and LOW when the serial port is TXing data. LOW/HIGH states provided are for 
+//the TTL serial ports of MODULE-level products, for RS232 these states will be in reverse.
+Object.defineProperty(ser, 'dircontrol', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_DCP_LOWFORINPUT (LOW for input). </b><br><br>
 //Sets/returns the polarity of the direction control line (RTS) for selected serial port (selection is made through <font color="maroon">
 //<b>ser.num</b></font>): <br> <font color="olive"><b>0- PL_SER_DCP_LOWFORINPUT </b></font>(DIR LOW for input, HIGH for output),<br> 
@@ -1682,16 +1347,11 @@ Object.defineProperty(ser, 'dircontrol', {
 //Note, that HIGH/LOW states specified above are for the TTL-serial interface of the MODULE-level products. If you are dealing with the RS232 
 //port then the states will be in reverse (for example, <font color="olive"><b>1- PL_SER_DCP_HIGHFORINPUT </b></font>will mean "LOW for input, 
 //HIGH for output"). When the serial port is in the UART/half-duplex mode you can use the CTS line as a regular I/O line of your device.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-Object.defineProperty(ser, 'baudrate', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'baudrate', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= "platform-dependent, results in 9600 bps". </b><br><br>
 //Sets/returns the baudrate "divisor value" for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>).
 //Actual baudrade is calculated as follows: (9600*<font color="maroon"><b>ser.div9600</b></font>)/<font color="maroon"><b>ser.baudrate</b></font>.
@@ -1699,95 +1359,21 @@ Object.defineProperty(ser, 'baudrate', {
 //The <font color="maroon"><b>ser.div9600 </b></font>read-only property returns the value <font color="maroon"><b>ser.baudrate </b></font>must 
 //be set to in order to obtain 9600 bps on a particular device under present operating confitions. This property is only relevant when the 
 //serial port is in the UART mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
-    
-    
-
-
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of the parity mode of the serial port in the UART mode
 //(<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> No parity bit to be transmitted.
-    //<b>PLATFORM CONSTANT. </b><br><br> Even parity.
-    //<b>PLATFORM CONSTANT. </b><br><br> Odd parity.
-    //<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "1". Also can be used to emulate second stop bit
-                        //(there is no separate property to explicitely select the number of stop bits).
-    //<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "0".
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Object.defineProperty(ser, 'parity', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> No parity bit to be transmitted.
+//<b>PLATFORM CONSTANT. </b><br><br> Even parity.
+//<b>PLATFORM CONSTANT. </b><br><br> Odd parity.
+//<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "1". Also can be used to emulate second stop bit
+//(there is no separate property to explicitely select the number of stop bits).
+//<b>PLATFORM CONSTANT. </b><br><br> Parity bit always at "0".
+Object.defineProperty(ser, 'parity', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_PR_NONE (no parity). </b><br><br>
 //Sets/returns the parity mode for the selected serial port (selection is made through ser.num): 0- PL_SER_PR_NONE (no parity),
 //1- PL_SER_PR_EVEN (even parity), 2- PL_SER_PR_ODD (odd parity), 3- PL_SER_PR_MARK (mark), 4- PL_SER_PR_SPACE (space).
@@ -1797,39 +1383,16 @@ Object.defineProperty(ser, 'parity', {
 //This property is only relevant when the serial port is in the UART mode (ser.mode= 0- PL_SER_MODE_UART).
 //<br><br>
 //<b>On the platform, the combination of 7 bits/word (ser.bits=0- PL_SER_BB_7) and ser.parity= 0- PL_SER_PR_NONE will NOT work correctly.</b>
-    
-    
-
-
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of the number of bits in the word TXed/RXed by the serial
 //port in the UART mode (<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
-    //<b>PLATFORM CONSTANT. </b><br><br> Data word TXed/RXed by the serial port is to contain 7 data bits.
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> Data word TXed/RXed by the serial port is to contain 8 data bits.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Object.defineProperty(ser, 'bits', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> Data word TXed/RXed by the serial port is to contain 7 data bits.
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> Data word TXed/RXed by the serial port is to contain 8 data bits.
+Object.defineProperty(ser, 'bits', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- PL_SER_BB_8 (8 bits). </b><br><br>
 //Specifies the number of data bits in a word TXed/RXed by the currently selected serial port (selection is made through ser.num):
 //<br>0- PL_SER_BB_7 (7 bits/word), or 1- PL_SER_BB_8 (8 bits/word).
@@ -1837,17 +1400,11 @@ Object.defineProperty(ser, 'bits', {
 //This property is only relevant when the serial port is in the UART mode (ser.mode = 0- PL_SER_MODE_UART).
 //<br><br>
 //<b>On the platform, the combination of 7 bits/word (ser.bits=0- PL_SER_BB_7) and ser.parity= 0- PL_SER_PR_NONE will NOT work correctly.</b>
-    
-    
-
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'interchardelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'interchardelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (no delay). </b><br><br>
 //Sets/returns maximum intercharacter delay for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) 
 //in 10ms steps.<br><br>
@@ -1865,15 +1422,11 @@ Object.defineProperty(ser, 'interchardelay', {
 //and the RX buffer must be getting nearly full (less than 64 bytes of free space left). <br><br>
 //For Wiegand and clock/data modes, counting timeout  since the last bit is the only way to determine the end of the data output. Suggested 
 //timeout is app. 10 times the bit period of the data output by attached Wiegand or clock/data device.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'autoclose', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'autoclose', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font>. </b><br><br>
 //For currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) specifies whether the port will 
 //be disabled (<font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>) once the intercharacter gap expires 
@@ -1883,39 +1436,32 @@ Object.defineProperty(ser, 'autoclose', {
 //especially useful in Wiegand or clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>
 //1- PL_SER_MODE_WIEGAND </b></font>or <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>) where intercharacter gap is the only way 
 //to reliably identify the end of one data transmission.
-    
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the selection of the escape sequence type for the the serial port when the
 //port is in the UART mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>0- PL_SER_MODE_UART</b></font>).
-    //<b>PLATFORM CONSTANT. </b><br><br> Recognition of serial escape sequences disabled.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Escape sequences of type1 are to be recognized. Type1 escape sequence is "prev_char<--min 100ms-->EC<--min 
-                            //100ms-->EC<--min 100ms-->EC", where "EC" is escape character defined by the <font color="maroon"><b>
-                            //ser.escchar </b></font>property.<br><br>
-                            //There must be at least 100ms gap before the arrival of each escape character, otherwise the character will be 
-                            //counted as a regular data character. When escape sequence is detected in the incoming UART data stream the 
-                            //<font color="teal"><b>on_ser_esc </b></font>event is generated and the serial port is disabled, 
-                            //i.e. <font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>. 
-    //<b>PLATFORM CONSTANT</b></font>. </b><br><br> 
-                            //Escape sequences of type2 are to be recognized. Type2 escape sequence is "EC OC", where "EC" is escape 
-                            //character defined by the <font color="maroon"><b>ser.escchar </b></font>property and "OC" is any character other
-                            //than "EC".<br><br>
-                            //When escape sequence is detected in the incoming UART data stream the <font color="teal"><b>on_ser_esc
-                            //</b></font>event is generated and the serial port is disabled, i.e. <font color="maroon"><b>ser.enabled 
-                            //</b></font>= <font color="olive"><b>0- NO</b></font>.<br><br>
-                            //Data character with ASCII code matching that of selected EC should be transmitted as "EC EC"- this will result 
-                            //in a single character added to the RX buffer of the serial port.
-
-
-Object.defineProperty(ser, 'esctype', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> Recognition of serial escape sequences disabled.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Escape sequences of type1 are to be recognized. Type1 escape sequence is "prev_char<--min 100ms-->EC<--min 
+//100ms-->EC<--min 100ms-->EC", where "EC" is escape character defined by the <font color="maroon"><b>
+//ser.escchar </b></font>property.<br><br>
+//There must be at least 100ms gap before the arrival of each escape character, otherwise the character will be 
+//counted as a regular data character. When escape sequence is detected in the incoming UART data stream the 
+//<font color="teal"><b>on_ser_esc </b></font>event is generated and the serial port is disabled, 
+//i.e. <font color="maroon"><b>ser.enabled </b></font>= <font color="olive"><b>0- NO</b></font>. 
+//<b>PLATFORM CONSTANT</b></font>. </b><br><br> 
+//Escape sequences of type2 are to be recognized. Type2 escape sequence is "EC OC", where "EC" is escape 
+//character defined by the <font color="maroon"><b>ser.escchar </b></font>property and "OC" is any character other
+//than "EC".<br><br>
+//When escape sequence is detected in the incoming UART data stream the <font color="teal"><b>on_ser_esc
+//</b></font>event is generated and the serial port is disabled, i.e. <font color="maroon"><b>ser.enabled 
+//</b></font>= <font color="olive"><b>0- NO</b></font>.<br><br>
+//Data character with ASCII code matching that of selected EC should be transmitted as "EC EC"- this will result 
+//in a single character added to the RX buffer of the serial port.
+Object.defineProperty(ser, 'esctype', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SER_ET_DISABLED (escape sequences disabled).  </b><br><br>
 //Defines, for selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) whether serial escape sequence
 //recognition is enabled and, if yes, what type of escape sequence is to be recognised. <br><br>
@@ -1931,15 +1477,11 @@ Object.defineProperty(ser, 'esctype', {
 //character defined by the <font color="maroon"><b>ser.escchar </b></font>property and "OC" is any character other than "EC".<br><br>
 //This property is only relevant in the UART mode of the serial port (<font color="maroon"><b>ser.mode </b></font>= <font color="olive">
 //<b>0- PL_SER_MODE_UART</b></font>).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'escchar', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'escchar', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (SOH character).  </b><br><br>
 //For selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) sets/retrieves ASCII code of the escape
 //character used for type1 or type2 serial escape sequences. <br><br>
@@ -1948,15 +1490,11 @@ Object.defineProperty(ser, 'escchar', {
 //the serial port is in the Wiegand or clock/data mode (<font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>
 //1- PL_SER_MODE_WIEGAND </b></font> or <font color="maroon"><b>ser.mode </b></font>= <font color="olive"><b>2- PL_SER_MODE_CLOCKDATA</b></font>)
 //-- serial escape sequences are only recognized in the UART data.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'rxbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'rxbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>)returns current RX buffer capacity 
 //in bytes. Buffer capacity can be changed through the <font color="maroon"><b>ser.rxbuffrq </b></font>method followed by the 
@@ -1967,14 +1505,11 @@ Object.defineProperty(ser, 'rxbuffsize', {
 // "-X" is because a number of bytes is needed for internal buffer
 //variables. X=17 on 16-bit platforms and 33 on 32-bit platforms. <br><br>
 //The serial port cannot RX data when the RX buffer has zero capacity.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'txbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'txbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns current TX buffer capacity 
 //in bytes. Buffer capacity can be changed through the <font color="maroon"><b>ser.txbuffrq </b></font>method followed by the 
@@ -1985,14 +1520,11 @@ Object.defineProperty(ser, 'txbuffsize', {
 // "-X" is because a number of bytes is needed for internal buffer
 //variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
 //The serial port cannot TX data when the TX buffer has zero capacity.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'rxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'rxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns total number of committed bytes
 //currently waiting in the RX buffer to be extracted and processed by your application. <br><br>
@@ -2006,14 +1538,11 @@ Object.defineProperty(ser, 'rxlen', {
 //Notice that the RX buffer of the serial port employes "data committing" based on the amount of data in the buffer and intercharacter delay 
 //(<font color="maroon"><b>ser.interchardelay</b></font>). Data in the RX buffer may not be committed yet. Uncommitted data is not visible
 //to your application and is not included in the count returned by the  <font color="maroon"><b>ser.rxlen</b></font>).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'txlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'txlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns total number of committed bytes
 //currently found in the TX buffer. The data in the TX buffer does not become committed until you use the  <font color="maroon"><b>ser.send
@@ -2022,14 +1551,11 @@ Object.defineProperty(ser, 'txlen', {
 //on_ser_data_sent </b></font>event once the total number of committed bytes in the TX buffer drops below the level defined by the
 //<font color="maroon"><b>ser.notifysent </b></font> method. <br><br>
 //See also <font color="maroon"><b>ser.newtxlen</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'txfree', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'txfree', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>)returns the amount of free space in the TX
 //buffer in bytes, not taking into account uncommitted data. <br><br>
@@ -2037,37 +1563,29 @@ Object.defineProperty(ser, 'txfree', {
 //be able to store more data than this amount.<br><br>
 //To achieve asynchronous data processing, use the <font color="maroon"><b>ser.notifysent</b></font> method to get <font color="teal">
 //<b>on_ser_data_sent </b></font>event once the TX buffer gains required amount of free space.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'newtxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'newtxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) returns the amount of uncommitted TX data
 //in bytes.<br><br>
 //Uncommited data is the one that was added to the TX buffer with the <font color="maroon"><b>ser.setdata </b></font>method but not yet committed
 //using the <font color="maroon"><b>ser.send</b></font>) method.
-    
-
-
 //--------------------------------------------------------------------
-ser.rxclear = function() {}
+ser.rxclear = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) clears (deletes all data from) the RX
 //buffer.
-
 //--------------------------------------------------------------------
-ser.txclear = function() {}
+ser.txclear = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) clears (deletes all data from) the TX 
 //buffer. This method will only work when the serial port is closed (<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>
 //0- NO</b></font>).
-
 //--------------------------------------------------------------------
-ser.getdata = function( maxinplen) {}
+ser.getdata = function (maxinplen) { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) returns the string that contains the data
 //extracted from the RX buffer. Extracted data is permanently deleted from the buffer.<br><br>
@@ -2080,9 +1598,8 @@ ser.getdata = function( maxinplen) {}
 //represents one data bit and only two characters are possible: "0" or "1".
 //<br><br>
 //See also <font color="maroon"><b>ser.peekdata </b></font>method.
-
 //--------------------------------------------------------------------
-ser.peekdata = function( maxinplen) {}
+ser.peekdata = function (maxinplen) { };
 //METHOD.
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) returns the string that contains the "preview" of the data
 //from the RX buffer. The data is NOT deleted from the buffer. Length of returned data is limited by one of the three factors
@@ -2099,9 +1616,8 @@ ser.peekdata = function( maxinplen) {}
 //represents one data bit and only two characters are possible: "0" or "1".
 //<br><br>
 //See also <font color="maroon"><b>ser.getdata </b></font>method.
-
 //--------------------------------------------------------------------
-ser.setdata = function( txdata) {}
+ser.setdata = function (txdata) { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) adds the data passed in the txdata argument
 //to the contents of the TX buffer. <br><br>
@@ -2117,17 +1633,15 @@ ser.setdata = function( txdata) {}
 //setting. <br><br>
 //Also see <font color="maroon"><b>ser.txlen</b></font>, <font color="maroon"><b>ser.txfree</b></font>, <font color="maroon"><b>
 //ser.notifysent</b></font>, and <font color="teal"><b>on_ser_data_sent</b></font>. 
-
 //--------------------------------------------------------------------
-ser.send = function() {}
+ser.send = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) commits (allows sending) the data that was
 //previously saved into the TX buffer using the <font color="maroon"><b>ser.setdata</b></font> method.<br><br>
 //You can monitor the sending progress by checking the <font color="maroon"><b>ser.txlen </b></font>property or using the 
 //<font color="maroon"><b>ser.notifysent </b></font>method and the <font color="teal"><b>on_ser_data_sent </b></font>event. 
-
 //--------------------------------------------------------------------
-ser.notifysent = function( threshold) {}
+ser.notifysent = function (threshold) { };
 //<b>METHOD. </b><br><br>
 //Using this method for the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) will cause the 
 //<font color="teal"><b>on_ser_data_sent </b></font> event to be generated when the amount of committed data in the TX buffer is found 
@@ -2136,9 +1650,8 @@ ser.notifysent = function( threshold) {}
 //ser.notifysent </b></font> is invoked. This method, together with the <font color="teal"><b>on_ser_data_sent </b></font>event 
 //provides a way to handle data sending asynchronously. <br><br>
 //Just like with <font color="maroon"><b>ser.txfree</b></font>, the trigger you set won't take into account any uncommitted data in the TX buffer.
-
 //--------------------------------------------------------------------
-ser.rxbuffrq = function( numpages) {}
+ser.rxbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) pre-requests "numpages" number of 
 //buffer pages (1 page= 256 bytes) for the RX buffer of the serial port. Returns actual number of pages that can be allocated.
@@ -2155,9 +1668,8 @@ ser.rxbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>ser.txbuffrq </b></font>method.
-
 //--------------------------------------------------------------------
-ser.txbuffrq = function( numpages) {}
+ser.txbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num </b></font>) pre-requests "numpages" number of 
 //buffer pages (1 page= 256 bytes) for the TX buffer of the serial port. Returns actual number of pages that can be allocated.
@@ -2174,9 +1686,8 @@ ser.txbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>ser.rxbuffrq </b></font> method.
-
 //--------------------------------------------------------------------
-ser.redir = function( redir) {}
+ser.redir = function (redir) { };
 //<b>METHOD. </b><br><br>
 //For the selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>) redirects the data being RXed to the TX
 //buffer of the same serial port, different serial port, or another object that supports compatible buffers.<br><br>
@@ -2188,28 +1699,22 @@ ser.redir = function( redir) {}
 //ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>) then the port will be closed automatically. <br><br>
 //This method returns actual redirection result: <font color="olive"><b>0- PL_REDIR_NONE </b></font>if redirection failed or the same value
 //as the one that was passed in the redir argument if redirection was successful.
-
 //--------------------------------------------------------------------
-
-Object.defineProperty(ser, 'div9600', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'div9600', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= "platform dependent". </b><br><br>
 //Returns the value to which the <font color="maroon"><b>ser.baudrate </b></font>property must be set in order to achieve the baudrate of 
 //9600bps under present operating conditions. <br><br>
 //This property will return a different value depending on the PLL mode of the device (see<font color="maroon"><b>sys.currentpll</b></font>).<br><br>
 //"Smart" applications will use this property to set baudrates independently of present operating conditions.<br><br>
 //The value may also differ between the serial ports on the same device. An example of such device is the EM2000. On this module, the ser.div9600 value for UART3 is different from the value for UARTS0~2.
-    
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ser, 'sinkdata', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ser, 'sinkdata', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (normal data processing). </b><br><br>
 //For the currently selected serial port (selection is made through <font color="maroon"><b>ser.num</b></font>)
 //specifies whether the incoming data should be discarded.
@@ -2227,16 +1732,8 @@ Object.defineProperty(ser, 'sinkdata', {
 //Escape characters
 //(see <font color="maroon"><b>ser.esctype </b></font>and <font color="maroon"><b>ser.escchar</b></font>)
 //will still be detected in the incoming data stream.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the ser object. </b><br><br> 
 //Generated when currently enabled escape sequence is detected in the received UART data stream. Once the serial escape sequence is detected 
 //on a certain serial port this port is automatically disabled (<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>
@@ -2255,9 +1752,7 @@ Object.defineProperty(ser, 'sinkdata', {
 //Another <font color="teal"><b>on_ser_esc </b></font>
 //event for a particular port is never generated until the previous one is processed.
 //<br><br>
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the ser object. </b><br><br> Generated when at least one data byte is present in the RX buffer of the serial port (i.e. for this
 //port the  <font color="maroon"><b>ser.rxlen</b></font>)>0). When the event handler for this event is entered the <font color="maroon"><b>
 //ser.num </b></font>property is automatically switched to the port for which this event was generated. <br><br>
@@ -2268,9 +1763,7 @@ Object.defineProperty(ser, 'sinkdata', {
 //</b></font>event will be generated immediately. <br><br>
 //This event is not generated for a particular port when buffer redirection is set for this port through the <font color="maroon"><b>
 //ser.redir</b></font> method.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the ser object. </b><br><br> 
 //Generated after the total amount of committed data in the TX buffer of the serial port (<font color="maroon"><b>ser.txlen</b></font>) is 
 //found to be less than the threshold that was preset through the <font color="maroon"><b>ser.notifysent </b></font>method. <br><br>
@@ -2280,9 +1773,7 @@ Object.defineProperty(ser, 'sinkdata', {
 //When the event handler for this event is entered the <font color="maroon"><b>ser.num </b></font>is automatically switched to the port on
 //which this event was generated. Please, remember that uncommitted data in the TX buffer is not taken into account for the 
 //<font color="teal"><b>on_sock_data_sent </b></font>event generation.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the ser object. </b><br><br> 
 //Generated when data overrun has occurred in the RX buffer of the serial port.
 //<br><br>
@@ -2297,8 +1788,6 @@ Object.defineProperty(ser, 'sinkdata', {
 //can be prevented through the use of RTS/CTS flow control (see <font color="maroon"><b>ser.flowcontrol</b></font>).//**************************************************************************************************
 //       SOCK (Socket) object
 //**************************************************************************************************
-
-
 //This is the sockets object that encompasses ALL available sockets. Total number of sockets is typically 16 but can be
 //less due to memory limitations of a particular platform. The number of available sockets can be obtained through
 //the <font color="maroon"><b>sock.numofsock </b></font> read-only property. <br><br>
@@ -2306,110 +1795,99 @@ Object.defineProperty(ser, 'sinkdata', {
 //properties and methods refer to the currently selected socket. <br><br>
 //When the handler for one of the socket events is entered the <font color="maroon"><b>sock.num  </b></font>is automatically switched 
 //to the socket for which this event was generated.   
-
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> Contains the list of constants related to possible socket states. See also enum <font color="olive"><b>pl_sock_state_simple</b></font>.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (and haven't been opened yet, it is a
-                                //post-powerup state). <br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive close). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active close by the
-                                //application). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset during a
-                                //passive open).<br><br> Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset during an
-                                //active open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while in
-                                //"connection established" state). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while performing
-                                //a passive close). Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while performing
-                                //an active close). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset, no further
-                                //details available). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued by the
-                                //application). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
-                                //of excessive retransmission attempts during a passive open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
-                                //of excessive retransmission attempts during an active open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
-                                //of excessive retransmission attempts while in "connection established" state).
-                                //<br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
-                                //of excessive retransmission attempts during a passive close). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
-                                //of excessive retransmission attempts during a passive open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset caused by
-                                //connection timeout, i.e. no data was exchanged for sock.connectiontout number of
-                                //seconds). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset caused by
-                                //a data exchange error). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded by the application).
-                                //<br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because an error
-                                //in connection sequence was detected during a passive open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because an error
-                                //in connection sequence was detected during an active open). <br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because the device has
-                                //failed to resolve the IP address of the destination during an active open, i.e.
-                                //there was no reply to ARP requests). <br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because connection has 
-                                //timed out, i.e. no data was exchanged for sock.connectiontout number of seconds). <br><br>
-                                //Applies only to UDP.
-    //<b>PLATFORM CONSTANT. </b><br><br> ARP resolution is an progress (it is an active open).
-                                //<br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is a passive open).
-                                //<br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is an active open).
-                                //<br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is established (generic, includes both passive
-                                //and active open). <br><br>Applies both to UDP and TCP.  
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is established (it was a passive open).
-                                //<br><br>Applies both to UDP and TCP. 
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is established (it was an active open).
-                                //<br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is a passive close).
-                                //<br><br>Applies only to TCP. 
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is an active close).
-                                //<br><br>Applies only to TCP.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (and haven't been opened yet, it is a
+//post-powerup state). <br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive close). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active close by the
+//application). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset during a
+//passive open).<br><br> Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset during an
+//active open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while in
+//"connection established" state). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while performing
+//a passive close). Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset while performing
+//an active close). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was a passive reset, no further
+//details available). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued by the
+//application). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
+//of excessive retransmission attempts during a passive open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
+//of excessive retransmission attempts during an active open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
+//of excessive retransmission attempts while in "connection established" state).
+//<br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
+//of excessive retransmission attempts during a passive close). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset issued because
+//of excessive retransmission attempts during a passive open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset caused by
+//connection timeout, i.e. no data was exchanged for sock.connectiontout number of
+//seconds). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was an active reset caused by
+//a data exchange error). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded by the application).
+//<br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because an error
+//in connection sequence was detected during a passive open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because an error
+//in connection sequence was detected during an active open). <br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because the device has
+//failed to resolve the IP address of the destination during an active open, i.e.
+//there was no reply to ARP requests). <br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed (it was discarded because connection has 
+//timed out, i.e. no data was exchanged for sock.connectiontout number of seconds). <br><br>
+//Applies only to UDP.
+//<b>PLATFORM CONSTANT. </b><br><br> ARP resolution is an progress (it is an active open).
+//<br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is a passive open).
+//<br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is an active open).
+//<br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is established (generic, includes both passive
+//and active open). <br><br>Applies both to UDP and TCP.  
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is established (it was a passive open).
+//<br><br>Applies both to UDP and TCP. 
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is established (it was an active open).
+//<br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is a passive close).
+//<br><br>Applies only to TCP. 
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is an active close).
+//<br><br>Applies only to TCP.
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> Contains a simplified list of constants related to possible socket states. See also enum <font color="olive"><b>pl_sock_state</b></font>.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is closed. <br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> ARP resolution is an progress (it is an active open).
-                        //<br><br>Applies both to UDP and TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is a passive open).
-                        //<br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is an active open).
-                        //<br><br>Applies only to TCP.
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is established. <br><br>Applies both to UDP and TCP.  
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is a passive close).
-                        //<br><br>Applies only to TCP. 
-    //<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is an active close).
-                        //<br><br>Applies only to TCP.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is closed. <br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> ARP resolution is an progress (it is an active open).
+//<br><br>Applies both to UDP and TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is a passive open).
+//<br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is an active open).
+//<br><br>Applies only to TCP.
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is established. <br><br>Applies both to UDP and TCP.  
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is a passive close).
+//<br><br>Applies only to TCP. 
+//<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is an active close).
+//<br><br>Applies only to TCP.
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to whether the socket accepts any incoming connections and, if yes, from which sources.
-    //<b>PLATFORM CONSTANT. </b><br><br> The socket does not accept any incoming connections.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                        //The socket will only accept an incoming connection from specific IP (matching <font color="maroon">
-                                        //<b>sock.targetip</b></font>) and specific port (matching <font color="maroon"><b>
-                                        //sock.targetport</b></font>)
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                            //The socket will only accept an incoming connection from specific IP (matching <font color="maroon">
-                                            //<b>sock.targetip</b></font>), but any port.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                        //The socket will accept an incoming connection from any IP and any port.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> The socket does not accept any incoming connections.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//The socket will only accept an incoming connection from specific IP (matching <font color="maroon">
+//<b>sock.targetip</b></font>) and specific port (matching <font color="maroon"><b>
+//sock.targetport</b></font>)
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//The socket will only accept an incoming connection from specific IP (matching <font color="maroon">
+//<b>sock.targetip</b></font>), but any port.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//The socket will accept an incoming connection from any IP and any port.
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants that specify whether the socket accepts reconnects, and, if yes, from which sources. Reconnect situation is 
 //when a passive open and resulting connection replace, for the same socket, the connection that was already in progress. <br><br>
@@ -2417,99 +1895,77 @@ Object.defineProperty(ser, 'sinkdata', {
 //or a reconnect.<br><br>
 //Port switchover is when the socket starts sending its outgoing UDP datagrams to the port from which the most recent UDP datagram was received,
 //rather than the port specified by the <font color="maroon"><b>sock.targetport </b></font> property.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                //For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection 
-                                //with this socket, but any port; port switchover will not happen. <br><br>
-                                //TCP: reconnects are not accepted at all.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                //For UDP: Reconnects accepted from any IP, any port; port switchover will not happen. <br><br>
-                                //TCP: reconnects accepted only from the same IP and port as the ones already engaged in the current connection 
-                                //with this socket.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                //For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection with 
-                                //this socket, but any port; port switchover will happen. <br><br>
-                                //TCP: reconnects accepted only from the same IP as the one already engaged in the current connection with this
-                                //socket, but any port.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                                //For UDP: Reconnects accepted from any IP, any port; port switchover will happen. ,<br><br>
-                                //TCP: reconnects accepted from any IP, any port.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection 
+//with this socket, but any port; port switchover will not happen. <br><br>
+//TCP: reconnects are not accepted at all.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//For UDP: Reconnects accepted from any IP, any port; port switchover will not happen. <br><br>
+//TCP: reconnects accepted only from the same IP and port as the ones already engaged in the current connection 
+//with this socket.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection with 
+//this socket, but any port; port switchover will happen. <br><br>
+//TCP: reconnects accepted only from the same IP as the one already engaged in the current connection with this
+//socket, but any port.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//For UDP: Reconnects accepted from any IP, any port; port switchover will happen. ,<br><br>
+//TCP: reconnects accepted from any IP, any port.
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants that specify the transport protocol for the socket. HTTP is not listed here because it is not a transport
 //protocol (transport protocol used for HTTP is TCP).
-    //<b>PLATFORM CONSTANT. </b><br><br> Specifies UDP transport protocol for the socket.
-    //<b>PLATFORM CONSTANT. </b><br><br> Specifies TCP transport protocol for the socket.
-    //<b>PLATFORM CONSTANT. </b><br><br> Specifies RAW packet mode for the socket.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> Specifies UDP transport protocol for the socket.
+//<b>PLATFORM CONSTANT. </b><br><br> Specifies TCP transport protocol for the socket.
+//<b>PLATFORM CONSTANT. </b><br><br> Specifies RAW packet mode for the socket.
 //--------------------------------------------------------------------
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of HTTP request types supported by the internal web server.
-    //<b>PLATFORM CONSTANT. </b><br><br> HTTP GET request.
-    //<b>PLATFORM CONSTANT. </b><br><br> HTTP POST request.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> HTTP GET request.
+//<b>PLATFORM CONSTANT. </b><br><br> HTTP POST request.
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'numofsock', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'numofsock', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE). </b><br><br> Returns total number of sockets available on the current platform. See also <font color="maroon"><b>
 //sock.num </b></font>property.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'num', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'num', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (socket #0 selected). </b><br><br>
 //Sets/returns the number of the currently selected socket (sockets are enumerated from 0).<br><br>
 //Most other properties and methods of this object relate to the socket selected through this property. Note that socket-related events such 
 //as <font color="teal"><b>on_sock_data_arrival </b></font> change currently selected socket!<br><br>
 //The value of this property won't exceed <font color="maroon"><b>sock.numofsock</b></font>-1 (even if you attempt to set higher value).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'state', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'state', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0-PL_SST_CLOSED (connection is closed). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns "detailed" current socket state
 //(as opposed to <font color="teal"><b>on_sock_event </b></font>that retuns detailed state at the moment of a particular <font color="teal">
 //<b>on_sock_event </b></font>event generation).See <font color="olive"><b>pl_sock_state </b></font>constants for state descriptions.<br><br>
 //Another read-only property- <font color="maroon"><b>sock.statesimple</b></font>- returns "simplified" socket state.
-
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'statesimple', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'statesimple', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0-PL_SST_SIMPLE_CLOSED (connection is closed). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns "simplified" current socket state
 //(as opposed to <font color="teal"><b>on_sock_event </b></font> that retuns simplified state at the moment of a particular <font color="teal">
 //<b>on_sock_event </b></font> event generation). See <font color="olive"><b>pl_sock_state_simple </b></font>constants for state
 //descriptions.<br><br>
 //Another read-only property- <font color="maroon"><b>sock.state</b></font>- returns "detailed" socket state.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'inconmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'inconmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SOCK_INCONMODE_NONE (does not accept any incoming connections). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether incoming connections
 //(passive opens) will be accepted and, if yes, from which sources: <br><br>
@@ -2519,15 +1975,11 @@ Object.defineProperty(sock, 'inconmode', {
 //<font color="olive"><b>2- PL_SOCK_INCONMODE_SPECIFIC_IP_ANY_PORT </b></font>(incoming connections accepted only from specific IP (matching 
 //<font color="maroon"><b>sock.targetip</b></font>), but any port),<br><br>
 //<font color="olive"><b>3- PL_SOCK_INCONMODE_ANY_IP_ANY_PORT </b></font>(incoming connections accepted from any IP and any port). 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'reconmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'reconmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SOCK_RECONMODE_0. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) whether the socket accepts reconnects, 
 //and, if yes, from which sources. Reconnect situation is when a passive open and resulting connection replace, for the same socket, the 
@@ -2536,15 +1988,11 @@ Object.defineProperty(sock, 'reconmode', {
 //reconnect. Port switchover is when the socket starts sending its outgoing UDP datagrams to the port from which the most recent UDP datagram
 //was received, rather than the port specified by the <font color="maroon"><b>sock.targetport</b></font> property. <br><br>
 //See <font color="olive"><b>PL_SOCK_RECONMODE_ </b></font>constants for available choices.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'localportlist', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'localportlist', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "" (empty string). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) sets/returns the list of listening ports
 //on any of which this socket will accept an incoming UDP or TCP connection (as defined by the <font color="maroon"><b>sock.protocol </b></font>
@@ -2557,15 +2005,11 @@ Object.defineProperty(sock, 'localportlist', {
 //32 bytes. <br><br>
 //Notice, that there is also a <font color="maroon"><b>sock.httpportlist </b></font> property that defines a list of listening ports for HTTP 
 //TCP connections.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'httpportlist', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'httpportlist', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "" (empty string). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) sets/returns the list of listening ports
 //on any of which this socket will accept an incoming HTTP connection. (provided that the <font color="maroon"><b>sock.protocol</b></font>= 
@@ -2578,15 +2022,11 @@ Object.defineProperty(sock, 'httpportlist', {
 //sock.httpportlist</b></font>, the protocol for this socket is TCP then <font color="maroon"><b>sock.httpportlist</b></font> has precedence
 //(incoming TCP connection on the port in question will be interpreted as HTTP). <br><br>
 //See also <font color="maroon"><b>sock.localport </b></font> and <font color="maroon"><b>sock.httpmode </b></font> properties. 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'localport', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'localport', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current local port of the socket.
 //<br><br>Your application cannot set the local port directly. Instead, a list of ports on which the socket is allowed to accept an incoming 
@@ -2594,14 +2034,11 @@ Object.defineProperty(sock, 'localport', {
 //sock.httpportlist </b></font> properties.<br><br>
 //An incoming connection is accepted on any port from those two lists. The <font color="maroon"><b>sock.localport </b></font> property reflects 
 //current or the most recent local port on which connection was accepted.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'outport', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'outport', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0 (automatic). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) sets/returns the number of the port that
 //will be used by the socket to establish outgoing connections. <br><br>
@@ -2609,15 +2046,11 @@ Object.defineProperty(sock, 'outport', {
 //be selected randomly, for all subsequent outgoing connections the port number will increase by one. <br><br>
 //Actual local port of a connection can be queried through the <font color="maroon"><b>sock.localport </b></font> read-only property. If this 
 //property is not at zero then the port it specifies will be used for all outgoing connections from this socket.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'acceptbcast', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'acceptbcast', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0-NO. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether the socket will accept
 //incoming broadcast UDP datagrams: <br><br>
@@ -2625,15 +2058,11 @@ Object.defineProperty(sock, 'acceptbcast', {
 //broadcast UDP datagrams).<br><br>
 //This property is irrelevant for TCP communications (<font color="maroon"><b>sock.protocol</b></font>=<font color="olive"><b>
 //PL_SOCK_PROTOCOL_TCP</b></font>).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'targetip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'targetip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //For active opens on the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies the target IP
 //to which the socket will attempt to connect to. <br><br>
@@ -2644,25 +2073,17 @@ Object.defineProperty(sock, 'targetip', {
 //current IP on the "other side" of the connection can always be checked through the <font color="maroon"><b>sock.remoteip </b></font> read-only
 //property.<br><br> 
 //See also <font color="maroon"><b>sock.targetport</b></font> and <font color="maroon"><b>sock.remoteport</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'targetmac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'targetmac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'targetport', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'targetport', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
 //For active opens on the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies the target port
 //to which the socket will attempt to connect to. <br><br>
@@ -2672,15 +2093,11 @@ Object.defineProperty(sock, 'targetport', {
 //Current port on the "other side" of the connection can always be checked through the <font color="maroon"><b>sock.remoteport</b></font>
 //read-only property.<br><br>
 //See also <font color="maroon"><b>sock.targetip</b></font> and <font color="maroon"><b>sock.remoteip</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'targetbcast', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'targetbcast', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether this port will be
 //sending its outgoing UDP datagrams as link-level broadcasts: <br><br>
@@ -2690,15 +2107,11 @@ Object.defineProperty(sock, 'targetbcast', {
 //PL_SOCK_PROTOCOL_UDP</b></font>). When this property is set to <font color="olive"><b>1- YES </b></font>the socket will be sending out all UDP 
 //datagrams as broadcasts and incoming datagrams won't cause port switchover, even if the latter is enabled through the 
 //<font color="maroon"><b>sock.reconmode </b></font> property.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'remotemac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'remotemac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the MAC address of the host with
 //which this socket had the most recent or currently has a connection. <br><br>
@@ -2708,14 +2121,11 @@ Object.defineProperty(sock, 'remotemac', {
 //recent datagram received by the socket. <br><br>
 //Also see <font color="maroon"><b>sock.remoteip</b></font>, <font color="maroon"><b>sock.remoteport</b></font>, and <font color="maroon"><b>
 //sock.bcast </b></font> properties.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'remoteip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'remoteip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the IP address of the host with 
 //which this socket had the most recent or currently has a connection. The application cannot directly change this property, it can only specify
@@ -2726,14 +2136,11 @@ Object.defineProperty(sock, 'remoteip', {
 //recent datagram received by the socket.<br><br>
 //Also see <font color="maroon"><b>sock.remotemac</b></font>, <font color="maroon"><b>sock.remoteport</b></font>, and <font color="maroon"><b>
 //sock.bcast </b></font> properties. 
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'remoteport', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'remoteport', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the port number of the host with
 //which this socket had the most recent or currently has a connection. The application cannot directly change this property, it can only specify
@@ -2744,14 +2151,11 @@ Object.defineProperty(sock, 'remoteport', {
 //datagram received by the socket.<br><br>
 //Also see <font color="maroon"><b>sock.remotemac</b></font>, <font color="maroon"><b>sock.remoteip</b></font>, and <font color="maroon"><b>
 //sock.bcast </b></font> properties.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'bcast', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'bcast', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM BYTE), DEFAULT VALUE= 0- NO. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) reports whether the current or most
 //recently received UDP datagram was a broadcast one. <br><br>
@@ -2759,14 +2163,11 @@ Object.defineProperty(sock, 'bcast', {
 //will contain the broadcast status for the current datagram being processed.  <br><br>
 //Outside of the <font color="teal"><b>on_sock_data_arrival </b></font>event handler, the property will return the broadcast status of the most
 //recent datagram received by the socket.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'protocol', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'protocol', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SOCK_PROTOCOL_UDP (UDP transport protocol for the socket). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num </b></font>) selects the transport protocol:<br><br>
 //<font color="olive"><b>0- PL_SOCK_PROTOCOL_UDP </b></font> (UDP transport protocol), <br><br>
@@ -2776,15 +2177,11 @@ Object.defineProperty(sock, 'protocol', {
 //</b></font> property or using the <font color="maroon"><b>sock.httpmode </b></font> property. <br><br>
 //The program won't be able to change the value of this property when the socket is not idle (<font color="maroon"><b>sock.statesimple
 //</b></font><> <font color="olive"><b>0- PL_SSTS_CLOSED</b></font>).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'splittcppackets', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'splittcppackets', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) selects how TCP data should be processed:
 // <font color="olive"><b>0- NO </b></font>(normal processing), <font color="olive"><b>1- YES </b></font>(additional degree of control over
@@ -2800,15 +2197,11 @@ Object.defineProperty(sock, 'splittcppackets', {
 //<b>0- NO</b></font>. <br><br>
 //The program won't be able to change the value of this property when the socket is not idle (<font color="maroon"><b>sock.statesimple</b></font>
 //<> <font color="olive"><b>0- PL_SSTS_CLOSED</b></font>). <br>
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'httpmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'httpmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM BYTE), DEFAULT VALUE= 0- NO (not in HTTP mode). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether this socket is in the
 //HTTP mode: <font color="olive"><b>0- NO</b></font> ("regular" TCP connection), <font color="olive"><b>1- YES </b></font>(TCP HTTP connection). 
@@ -2821,29 +2214,21 @@ Object.defineProperty(sock, 'httpmode', {
 //sock.httpmode</b></font>=1. However, this operation is "sticky"- once you have converted the TCP connection into the HTTP mode you cannot 
 //convert it back into the regular mode- trying to set <font color="maroon"><b>sock.httpmode</b></font>=0 won't have any effect- the TCP 
 //connection will remain in the HTTP mode until this connection is closed. 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'httpnoclose', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'httpnoclose', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (will be closed). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) sets/returns whether TCP HTTP connection
 //will be kept opened after the HTTP request has been processed and the HTML page has been sent out: <font color="olive"><b>0- NO</b></font> 
 //(will be closed, standard behavior), <font color="olive"><b>1- YES </b></font>(will be kept open). <br><br>
 //In the second case the end of HTML page output is marked by CR/LF/CR/LF sequence.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'connectiontout', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'connectiontout', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0 (no timeout). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) sets/returns connection timeout threshold
 //for the socket in half-second increments. <br><br>
@@ -2852,15 +2237,11 @@ Object.defineProperty(sock, 'connectiontout', {
 //<br><br>
 //Actual time elapsed since the last data exchange across the socket can be obtained through the
 //<font color="maroon"><b>sock.toutcounter </b></font>R/O property.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'toutcounter', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'toutcounter', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0 </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the time, in 0.5 second intervals,
 //elapsed since the data was last send or received on this socket.
@@ -2881,14 +2262,11 @@ Object.defineProperty(sock, 'toutcounter', {
 //can reach is 1. That is, the
 //<font color="maroon"><b>sock.toutcounter </b></font>
 //will be at 0 after the data exchange, and at 1 if at least 0.5 seconds have passed since the last data exchange.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'inbandcommands', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'inbandcommands', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (inband commands disabled). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether inband command passing
 //is allowed: <font color="olive"><b>0- NO</b></font> (inband commands are not allowed), <font color="olive"><b>1- YES </b></font>(inband 
@@ -2900,15 +2278,11 @@ Object.defineProperty(sock, 'inbandcommands', {
 //Inband messaging will work even when redirection (buffer shorting) is enabled for the socket (see the <font color="maroon"><b>sock.redir 
 //</b></font>method). The program won't be able to change the value of this property when the socket is not idle (<font color="maroon"><b>
 //sock.statesimple</b></font><> <font color="olive"><b>0- PL_SSTS_CLOSED</b></font>).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'escchar', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'escchar', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 255. </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies the ASCII code of the 
 //character that will be used as an escape character for inband commands (messages). Each inband message starts with "EC OC", where "EC" is the 
@@ -2917,15 +2291,11 @@ Object.defineProperty(sock, 'escchar', {
 //irrelevant when inband commands are disabled (<font color="maroon"><b>sock.inbandcommands</b></font>= <font color="olive"><b>0- NO</b></font>). '<br><br>The program won't be able to change the value of this property when the socket is not idle (<font color="maroon"><b>
 //sock.statesimple</b></font><> <font color="olive"><b>0- PL_SSTS_CLOSED</b></font>).<br><br>
 //See also <font color="maroon"><b>sock.endchar</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'endchar', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'endchar', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 13 (CR). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies the ASCII code of the 
 //character that will end inband command (message). Each inband message has to end with this character, which will mark a return to the "regular"
@@ -2934,15 +2304,11 @@ Object.defineProperty(sock, 'endchar', {
 //0- NO</b></font>). The program won't be able to change the value of this property when the socket is not idle (<font color="maroon"><b>
 //sock.statesimple</b></font><> <font color="olive"><b>0- PL_SSTS_CLOSED</b></font>). <br><br>
 //See also <font color="maroon"><b>sock.escchar</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'gendataarrivalevent', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'gendataarrivalevent', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 1- YES (on_sock_data_arrival event will be generated). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) specifies whether the <font color="teal">
 //<b>on_sock_data_arrival </b></font>event will be generated once there is some data in the RX buffer: <br><br>
@@ -2953,15 +2319,11 @@ Object.defineProperty(sock, 'gendataarrivalevent', {
 //using the doevents. If this is the case the <font color="teal"><b>on_sock_data_arrival </b></font>event handler executed "inside" the doevents
 //would "steal" datagrams from you (the datagram is deleted from the RX buffer once the <font color="teal"><b>on_sock_data_arrival
 //</b></font>event handler is exited).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rxbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rxbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current RX buffer capacity in
 //bytes.<br><br>
@@ -2971,14 +2333,11 @@ Object.defineProperty(sock, 'rxbuffsize', {
 //where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.rxbuffrq</b></font>.  "-X" is because a number of bytes is needed for internal buffer
 //variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
 //The socket cannot RX data when the RX buffer has zero capacity.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'txbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'txbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current TX buffer capacity in
 //bytes. Buffer capacity can be changed through the <font color="maroon"><b>sock.txbuffrq </b></font> method followed by the 
@@ -2988,16 +2347,11 @@ Object.defineProperty(sock, 'txbuffsize', {
 //"num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.txbuffrq</b></font>. "-X" is because a number of bytes is needed for internal buffer
 //variables. X=17 on 16-bit platforms and 33 on 32-bit platforms.<br><br>
 //The socket cannot TX data when the TX buffer has zero capacity.
-    
-
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'cmdbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'cmdbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current CMD buffer capacity in
 //bytes.<br><br>
@@ -3007,14 +2361,11 @@ Object.defineProperty(sock, 'cmdbuffsize', {
 //where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.cmdbuffrq</b></font>.  "-33" is because this number of bytes is needed for internal buffer
 //variables.<br><br>
 //The CMD buffer is only required when inband commands are enabled (sock.inbandcommands= 1-YES).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rplbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rplbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current RPL buffer capacity in
 //bytes.<br><br>
@@ -3024,14 +2375,11 @@ Object.defineProperty(sock, 'rplbuffsize', {
 //where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.rplbuffrq</b></font>.  "-33" is because this number of bytes is needed for internal buffer
 //variables.<br><br>
 //The RPL buffer is only required when inband commands are enabled (sock.inbandcommands= 1-YES).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'varbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'varbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current VAR buffer capacity in
 //bytes.<br><br>
@@ -3041,14 +2389,11 @@ Object.defineProperty(sock, 'varbuffsize', {
 //where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.varbuffrq</b></font>.  "-33" is because this number of bytes is needed for internal buffer
 //variables.<br><br>
 //The VAR buffer is only required when you plan to use this socket in the HTTP mode- see sock.httpmode property, also sock.httpportlist.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'tx2buffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'tx2buffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns current TX2 buffer capacity in
 //bytes.<br><br>
@@ -3058,29 +2403,21 @@ Object.defineProperty(sock, 'tx2buffsize', {
 //where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>sock.tx2buffrq</b></font>.  "-33" is because this number of bytes is needed for internal buffer
 //variables.<br><br>
 //The TX2 buffer is only required when inband commands are enabled (sock.inbandcommands= 1-YES).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'httprqtype', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'httprqtype', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0 (PL_SOCK_HTTP_RQ_GET). </b><br><br>
 //For the currently selected socket (selection is made through sock.num), and provided that this socket is running in the HTTP mode (sock.httpmode= 1- YES),
 //returns the type of the HTTP request received from the browser.
 //<br><br>
 //Note that it only makes sense to query this property after the HTTP request has actually been received, i.e. in the code embedded inside or called from the HTML page.
-    
-
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns total number of bytes currently waiting
 //in the RX buffer to be extracted and processed by your application. <br><br>
@@ -3090,14 +2427,11 @@ Object.defineProperty(sock, 'rxlen', {
 //is handled. If, during the <font color="teal"><b>on_sock_data_arrival </b></font>event handler execution, not all data is extracted from the 
 //RX buffer, another <font color="teal"><b>on_sock_data_arrival </b></font>event is generated immediately after the <font color="teal"><b>
 //on_sock_data_arrival </b></font>event handler is exited.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'txlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'txlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the total number of bytes 
 //currently found in the TX buffer (including the uncommitted data).<br><br>
@@ -3105,40 +2439,31 @@ Object.defineProperty(sock, 'txlen', {
 //</b></font>event once the total number of committed bytes in the TX buffer drops below the level defined by the <font color="maroon"><b>
 //sock.notifysent</b></font> method. <br><br>
 //See also <font color="maroon"><b>sock.newtxlen</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'txfree', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'txfree', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the amount of free space in the TX 
 //buffer in bytes. Sock.txfree = sock.txbufflen - sock.txlen.<br><br>
 //Your application will not be able to store more data than this amount. To achieve asynchronous data processing, use the <font color="maroon">
 //<b>sock.notifysent</b></font> method to get <font color="teal"><b>on_sock_data_sent</b></font> event once the TX buffer gains required 
 //amount of free space.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'newtxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'newtxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the amount of uncommitted TX data in 
 //bytes. Uncommitted data is the one that was added to the TX buffer with the <font color="maroon"><b>sock.setdata </b></font> method but not 
 //yet committed using the <font color="maroon"><b>sock.send </b></font>method.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'httprqstring', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'httprqstring', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "". </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns up to 255 bytes of the HTTP
 //request string stored in the VAR buffer.
@@ -3160,11 +2485,8 @@ Object.defineProperty(sock, 'httprqstring', {
 //event and the
 //<font color="maroon"><b>sock.gethttprqstring </b></font>
 //method to handle large amounts of HTTP variable data correctly.
-    
-
-
 //--------------------------------------------------------------------
-sock.gethttprqstring = function( maxinplen) {}
+sock.gethttprqstring = function (maxinplen) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) extracts up to 255 bytes of the HTTP
 //request string from the VAR buffer.
@@ -3181,12 +2503,11 @@ sock.gethttprqstring = function( maxinplen) {}
 //event handler.
 //<br><br>
 //See also: <font color="maroon"><b>sock.httprqstring</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rxpacketlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rxpacketlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the length (in bytes) of the UDP 
 //datagram being extracted from the RX buffer. This property is only relevant when the <font color="maroon"><b>sock.protocol</b></font>= 
@@ -3194,39 +2515,30 @@ Object.defineProperty(sock, 'rxpacketlen', {
 //Correct way of using this property is within the <font color="teal"><b>on_sock_data_arrival </b></font>event or in conjunction with the
 //<font color="maroon"><b>sock.nextpacket</b></font> method.<br><br> 
 //See also <font color="maroon"><b>sock.rxlen </b></font> property.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'cmdlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'cmdlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the length of data (in bytes) waiting
 //to be processed in the CMD buffer. This buffer accumulates incoming inband commands (messages) and may contain more than one such command.
 //Use <font color="maroon"><b>sock.getinband </b></font> method to extract the data from the CMD buffer. <br><br>
 //See also <font color="maroon"><b>sock.rpllen </b></font> and <font color="maroon"><b>sock.inbandcommands</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'varlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'varlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the length of data (in bytes) waiting
 //to be processed in the VAR buffer. This buffer accumulates incoming HTTP request string.
 //Use <font color="maroon"><b>sock.gethttprqstring </b></font> method to extract the data from the CMD buffer. <br><br>
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rpllen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rpllen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the length of data (in bytes) waiting
 //to be send out from the RPL buffer; this is the buffer that keeps outgoing inband replies (messages). <br><br>
@@ -3234,14 +2546,11 @@ Object.defineProperty(sock, 'rpllen', {
 //inband replies may be waiting in the RPL buffer.<br><br>
 //See also <font color="maroon"><b>sock.cmdlen</b></font>, <font color="maroon"><b>sock.rplfree </b></font> and <font color="maroon"><b>
 //sock.inbandcommands</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'rplfree', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'rplfree', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the free space (in bytes) available in
 //the RPL buffer; this is the buffer that stores outgoing inband replies (messages). <br><br>
@@ -3249,39 +2558,31 @@ Object.defineProperty(sock, 'rplfree', {
 //replies may be waiting in the RPL buffer.<br><br>
 //See also <font color="maroon"><b>sock.cmdlen</b></font>, <font color="maroon"><b>sock.rpllen </b></font> and <font color="maroon"><b>
 //sock.inbandcommands</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'tx2len', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'tx2len', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the amount of data waiting to be sent
 //out in the TX2 buffer; this is the buffer that is needed to transmit outgoing TCP data when inband commands (messages) are enabled
 //(<font color="maroon"><b>sock.inbandcommands</b></font>= <font color="olive"><b>1- YES</b></font>).<br><br>
 //If your application needs to make sure that all data is actually sent out then it must verify that both TX and TX2 buffers are empty.<br><br>
 //See also <font color="maroon"><b>sock.txlen</b></font> and <font color="maroon"><b>sock.txfree</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-sock.rxclear = function() {}
+sock.rxclear = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) clears (deletes all data from) the RX buffer.
 //Invoking this method will have no effect when the socket is in the HTTP mode (<font color="maroon"><b>sock.httpmode</b></font>= 
 //<font color="olive"><b>1- YES</b></font>).
-
 //--------------------------------------------------------------------
-sock.txclear = function() {}
+sock.txclear = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) clears (deletes all data from) the TX buffer.
 //Invoking this method will have no effect when the socket is not idle (<font color="maroon"><b>sock.statesimple</b></font><> 
 //<font color="olive"><b>0- PL_SSTS_CLOSED</b></font>).
-
 //--------------------------------------------------------------------
-sock.getdata = function( maxinplen) {}
+sock.getdata = function (maxinplen) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the string that contains the data
 //extracted from the RX buffer. Extracted data is permanently deleted from the buffer. <br><br>
@@ -3291,9 +2592,8 @@ sock.getdata = function( maxinplen) {}
 //1-PL_SOCK_PROTOCOL_TCP</b></font>) the length of data that will be extracted is limited to the UDP datagram being processed. <br><br>
 //Additional conditions apply to UDP datagram processing; see <font color="teal"><b>on_sock_data_arrival </b></font>event and 
 //<font color="maroon"><b>sock.nextpacket </b></font> method.
-
 //--------------------------------------------------------------------
-sock.peekdata = function( maxinplen) {}
+sock.peekdata = function (maxinplen) { };
 //METHOD.
 //For the selected socket (selection is made through sock.num) returns the string that contains the "preview" of the data
 //from the RX buffer. The data is NOT deleted from the buffer. For TCP (sock.protocol= 1- PL_SOCK_PROTOCOL_UDP) the length of returned data is
@@ -3305,9 +2605,8 @@ sock.peekdata = function( maxinplen) {}
 //on_sock_data_arrival event even if your program only used sock.peekdata. Also, the amount of data returned by the sock.peekdata is
 //limited to the "next" UDP datagram waiting in the RX buffer.
 //See on_sock_data_arrival event and sock.nextpacket methods for additional info. See also: sock.getdata method.
-
 //--------------------------------------------------------------------
-sock.setdata = function( txdata) {}
+sock.setdata = function (txdata) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) adds the data passed in the txdata argument to
 //the contents of the TX buffer. If the buffer doesn't have enough space to accommodate the data being added then this data will be truncated. 
@@ -3317,17 +2616,15 @@ sock.setdata = function( txdata) {}
 //setting. <br><br>
 //Also see <font color="maroon"><b>sock.txlen</b></font>, <font color="maroon"><b>sock.txfree</b></font>, <font color="maroon"><b>
 //sock.notifysent</b></font>, and <font color="teal"><b>on_sock_data_sent</b></font>.
-
 //--------------------------------------------------------------------
-sock.send = function() {}
+sock.send = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) commits (allows sending) the data that was
 //previously saved into the TX buffer using the <font color="maroon"><b>sock.setdata </b></font> method. <br><br>
 //You can monitor the sending progress by checking the <font color="maroon"><b>sock.txlen</b></font> property or using the 
 //<font color="maroon"><b>sock.notifysent</b></font> method and the <font color="teal"><b>on_sock_data_sent</b></font> event. 
-
 //--------------------------------------------------------------------
-sock.getinband = function() {}
+sock.getinband = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) returns the string that contains the data
 //extracted from the CMD buffer; this is the buffer that accumulates inband commands. <br><br>
@@ -3338,9 +2635,8 @@ sock.getinband = function() {}
 //Inband commands stored in the CMD buffer will have escape character (see <font color="maroon"><b>sock.escchar </b></font> property) and the 
 //next character after the escape character already cut off, but the end character (see <font color="maroon"><b>sock.endchar </b></font> 
 //property) will still be present. Therefore, your application can separate inband command from each other by finding end characters.
-
 //--------------------------------------------------------------------
-sock.peekinband = function() {}
+sock.peekinband = function () { };
 //METHOD.
 //For the selected socket (selection is made through sock.num) returns the string that contains the "preview" of the data from
 //the CMD buffer; this is the buffer that accumulates inband commands. The data is NOT deleted from the
@@ -3353,9 +2649,8 @@ sock.peekinband = function() {}
 //finding end characters. Internally, the CMD buffer always stores complete commands. The sock.peekinband method only allows you
 //to preview "next" 255 bytes of the buffer contents, therefore, the preview of the data may contain a partial command.
 //See also: sock.getinband method. 
-
 //--------------------------------------------------------------------
-sock.setsendinband = function( data) {}
+sock.setsendinband = function (data) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) puts the data into the RPL buffer; this is the
 //buffer that stores outgoing inband replies (messages). This method also commits the newly stored data. This is different from the
@@ -3365,9 +2660,8 @@ sock.setsendinband = function( data) {}
 //<font color="maroon"><b>sock.escchar </b></font> property) and the end character (see the <font color="maroon"><b>sock.endchar </b></font>
 //property). <br><br>
 //When adding the data to the RPL buffer make sure you are adding entire inband message at once- you are not allowed to do this "in portions"!
-
 //--------------------------------------------------------------------
-sock.notifysent = function( threshold) {}
+sock.notifysent = function (threshold) { };
 //<b>METHOD. </b><br><br>
 //Using this method for the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) will cause the 
 //<font color="teal"><b>on_sock_data_sent </b></font>event to be generated when the amount of committed data in the TX buffer is found to be 
@@ -3377,9 +2671,8 @@ sock.notifysent = function( threshold) {}
 //This method, together with the <font color="teal"><b>on_sock_data_sent </b></font>event provides a way to handle data sending asynchronously.
 //Just like with <font color="maroon"><b>sock.txfree</b></font>, the trigger you set won't take into account any uncommitted data in the TX 
 //buffer.
-
 //--------------------------------------------------------------------
-sock.nextpacket = function() {}
+sock.nextpacket = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) in the UDP mode (<font color="maroon"><b>
 //sock.protocol</b></font>= <font color="olive"><b>0- PL_SOCK_PROTOCOL_UDP</b></font>) closes processing of current UDP datagram and moves to 
@@ -3391,9 +2684,8 @@ sock.nextpacket = function() {}
 //The method is useful when it is necessary to move to the next datagram without re-entering <font color="teal"><b>on_sock_data_arrival
 //</b></font>. Therefore, <font color="maroon"><b>sock.nextpacket </b></font> is only necessary when the application needs to process
 //several incoming UDP packets at once and within a single event handler.
-
 //--------------------------------------------------------------------
-sock.connect = function() {}
+sock.connect = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) causes the socket to attempt to connect to 
 //the target host specified by the <font color="maroon"><b>sock.targetport</b></font> and <font color="maroon"><b>sock.targetip</b></font>
@@ -3405,9 +2697,8 @@ sock.connect = function() {}
 //<br><br>
 //Method invocation will have effect only if connection was closed at the time when the method was called (<font color="maroon"><b>sock.state
 //</b></font> in one of <font color="olive"><b>PL_SST_CLOSED </b></font> states). 
-
 //--------------------------------------------------------------------
-sock.close = function() {}
+sock.close = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) causes the socket to close the connection 
 //with the other host. <br><br>
@@ -3418,9 +2709,8 @@ sock.close = function() {}
 //sock.discard </b></font> method is used). <br><br>
 //Method invocation will have NO effect if connection was closed at the time when the method was called (<font color="maroon"><b>sock.state
 //</b></font>in one of <font color="olive"><b>PL_SST_CLOSED </b></font> states).
-
 //--------------------------------------------------------------------
-sock.reset = function() {}
+sock.reset = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) causes the socket to abort the connection with
 //the other host. <br><br>
@@ -3432,17 +2722,15 @@ sock.reset = function() {}
 //Method invocation will have NO effect if connection was closed at the time when the method was called (<font color="maroon"><b>
 //sock.state</b></font> in one of <font color="olive"><b>PL_SST_CLOSED </b></font> states). <br><br>
 //See also <font color="maroon"><b>sock.close </b></font> method.
-
 //--------------------------------------------------------------------
-sock.discard = function() {}
+sock.discard = function () { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) causes the socket to discard the connection 
 //with the other host. Discarding the connection means simply forgetting about it without notifying the other side of the connection
 //in any way. <br><br>
 //See also <font color="maroon"><b>sock.close </b></font> and <font color="maroon"><b>sock.reset </b></font> methods.
-
 //--------------------------------------------------------------------
-sock.rxbuffrq = function( numpages) {}
+sock.rxbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the RX buffer of the socket. Returns actual number of pages that can be allocated.<br><br>
@@ -3460,9 +2748,8 @@ sock.rxbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>sock.txbuffrq </b></font> method.
-
 //--------------------------------------------------------------------
-sock.txbuffrq = function( numpages) {}
+sock.txbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the TX buffer of the socket. Returns actual number of pages that can be allocated.<br><bR>
@@ -3479,9 +2766,8 @@ sock.txbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>sock.tx2buffrq </b></font> method.
-
 //--------------------------------------------------------------------
-sock.cmdbuffrq = function( numpages) {}
+sock.cmdbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the CMD buffer of the socket; this is the buffer that accumulates incoming inband commands (messages). Returns actual 
@@ -3499,9 +2785,8 @@ sock.cmdbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>sock.rplbuffrq </b></font> method.
-
 //--------------------------------------------------------------------
-sock.rplbuffrq = function( numpages) {}
+sock.rplbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the RPL buffer of the socket; this is the buffer that stores outgoing inband replies (messages). Returns actual number
@@ -3519,9 +2804,8 @@ sock.rplbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //See also <font color="maroon"><b>sock.cmdbuffrq </b></font> method.
-
 //--------------------------------------------------------------------
-sock.varbuffrq = function( numpages) {}
+sock.varbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the VAR buffer of the socket; this is the buffer that stores the HTTP request string. Returns actual number of pages 
@@ -3539,9 +2823,8 @@ sock.varbuffrq = function( numpages) {}
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
 //<br><br>
 //The VAR buffer is only required when you plan to use this socket in the HTTP mode- see <font color="maroon"><b>sock.httpmode</b></font> 'roperty, also <font color="maroon"><b>sock.httpportlist</b></font>.
-
 //--------------------------------------------------------------------
-sock.tx2buffrq = function( numpages) {}
+sock.tx2buffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) pre-requests "numpages" number of buffer pages
 //(1 page= 256 bytes) for the TX2 buffer of the socket; this buffer is required when inband commands are enabled (<font color="maroon"><b>
@@ -3557,9 +2840,8 @@ sock.tx2buffrq = function( numpages) {}
 //buffer sizes of sockets that are closed.
 //<br><br>
 //<b>On the EM2000 and other 32-bit platforms, the maximum number of pages you can request for one buffer is limited to 255.</b>
-
 //--------------------------------------------------------------------
-sock.redir = function( redir) {}
+sock.redir = function (redir) { };
 //<b>METHOD. </b><br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) redirects the data being RXed to the TX buffer
 //of the same socket, different socket, or another object that supports compatible buffers.<br><br>
@@ -3568,26 +2850,21 @@ sock.redir = function( redir) {}
 //Specifying redir value of <font color="olive"><b>0- PL_REDIR_NONE </b></font> cancels redirection.<br><br>
 //This method returns actual redirection result: <font color="olive"><b>0- PL_REDIR_NONE </b></font>if redirection failed or the
 //same value as the one that was passed in the redir argument if redirection was successful.
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'inconenabledmaster', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'inconenabledmaster', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- YES (incoming connections are globally enabled). </b><br><br>
 //A master switch that globally defines whether incoming connections will be accepted: <font color="olive"><b>0- NO </b></font>(no socket will be
 //allowed to accept an incoming connection), <font color="olive"><b>1- YES </b></font>(incoming connections are globally enabled; individual 
 //socket's behavior and whether it will accept or reject a particular incoming connection depends on the setup of this socket).<br><br>
 //This property can be used to temporarily disable incoming connection acceptance on all sockets without changing individual setup of each socket.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'urlsubstitutes', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'urlsubstitutes', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "" (no substitutes set). </b><br><br>
 //A comma-separated list of filenames whose extensions will be automatically substituted for <i>.html </i>by the internal webserver of your device.
 //Max string length for this property is 40 bytes.
@@ -3601,15 +2878,11 @@ Object.defineProperty(sock, 'urlsubstitutes', {
 //<br><br>
 //This property allows programmatic generation of non-HTML files. In the above example it is possible to generate the BMP file through a
 //BASIC code. There is no other way to do this, since only HTML files are parsed for BASIC code inclusions.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'sinkdata', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'sinkdata', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (normal data processing). </b><br><br>
 //For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>)
 //specifies whether the incoming data should be discarded.
@@ -3630,15 +2903,11 @@ Object.defineProperty(sock, 'sinkdata', {
 //<font color="maroon"><b>Sock.connectiontout </b></font>and
 //<font color="maroon"><b>sock.toutcounter </b></font>
 //will work correctly as well. 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'allowedinterfaces', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'allowedinterfaces', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE is platform-dependent.</b>
 //<br><br>
 //For the selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>) defines the list of network interfaces on which
@@ -3658,15 +2927,11 @@ Object.defineProperty(sock, 'allowedinterfaces', {
 //See also:
 //<font color="maroon"><b>sock.targetinterface</b></font>,
 //<font color="maroon"><b>sock.currentinterface</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'availableinterfaces', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'availableinterfaces', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD). </b><br><br>
 //Returns the comma-delimited list of network interfaces available on this platform.
 //<br><br>
@@ -3677,14 +2942,11 @@ Object.defineProperty(sock, 'availableinterfaces', {
 //<font color="maroon"><b>sock.targetinterface</b></font>,
 //<font color="maroon"><b>sock.currentinterface</b></font>,
 //<font color="maroon"><b>sock.allowedinterfaces</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'targetinterface', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'targetinterface', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- PL_SOCK_INTERFACE_NET</b>.
 //<br><br>
 //For the selected socket (selection is made through
@@ -3699,15 +2961,11 @@ Object.defineProperty(sock, 'targetinterface', {
 //<font color="maroon"><b>sock.availableinterfaces</b></font>,
 //<font color="maroon"><b>sock.currentinterface</b></font>,
 //<font color="maroon"><b>sock.allowedinterfaces</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sock, 'currentinterface', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sock, 'currentinterface', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_SOCK_INTERFACE_NULL</b>.
 //<br><br>
 //For the selected socket (selection is made through
@@ -3726,20 +2984,14 @@ Object.defineProperty(sock, 'currentinterface', {
 //<font color="maroon"><b>sock.availableinterfaces</b></font>,
 //<font color="maroon"><b>sock.targetinterface</b></font>,
 //<font color="maroon"><b>sock.allowedinterfaces</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br>
 //At least one data byte is present in the CMD buffer (<font color="maroon"><b>sock.cmdlen</b></font>>0). Use the <font color="maroon"><b>
 //sock.getinband </b></font> method to extract the data from the CMD buffer. <br><br>
 //Another <font color="teal"><b>on_inband_command </b></font>event on a particular socket is never generated until the previous 
 //one is processed. When the event handler is entered the <font color="maroon"><b>sock.num </b></font>is automatically switched to the 
 //socket on which this event was generated. 
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br>
 //Generated when at least one data byte is present in the VAR buffer of the socket,
 //but only after the VAR buffer has become full at least once in the cause of the current HTTP request processing.
@@ -3751,9 +3003,7 @@ Object.defineProperty(sock, 'currentinterface', {
 //method or
 //<font color="maroon"><b>sock.httprqstring </b></font>
 //property to work with the VAR buffer's data.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br> 
 //Generated when at least one data byte is present in the RX buffer of the socket (i.e. for this socket the <font color="maroon"><b>
 //sock.rxlen</b></font>>0). When the event handler for this event is entered the <font color="maroon"><b>sock.num </b></font>property is
@@ -3770,9 +3020,7 @@ Object.defineProperty(sock, 'currentinterface', {
 //you exit the event handler.<br><br>
 //This event is not generated for a particular socket when buffer redirection is set for this socket through the <font color="maroon"><b>
 //sock.redir </b></font>method.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br> 
 //Notifies your program that the socket state has changed.
 //<br><br>
@@ -3790,9 +3038,7 @@ Object.defineProperty(sock, 'currentinterface', {
 //<font color="olive"><b>on_sock_event </b></font>
 //events may be waiting in the event queue. For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
 //for this event or the body of any procedure in the related call chain.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br> Data overrun has occurred in the RX buffer of the socket. Normally, this can only happen
 //for UDP communications as UDP has no "data flow control" and, hence, data overruns are normal.
 //<br><br>
@@ -3801,9 +3047,7 @@ Object.defineProperty(sock, 'currentinterface', {
 //<br><br>
 //When event handler for this event is entered the <font color="maroon"><b>sock.num  </b></font>is automatically switched to the socket on 
 //which this event was generated.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br> 
 //Generated after the total amount of committed data in the TX buffer of the socket (<font color="maroon"><b>sock.txlen</b></font>) is
 //found to be less than the threshold that was preset through the <font color="maroon"><b>sock.notifysent </b></font>method. This event may
@@ -3813,9 +3057,7 @@ Object.defineProperty(sock, 'currentinterface', {
 //When the event handler for this event is entered the <font color="maroon"><b>sock.num  </b></font>is automatically switched to the port on
 //which this event was generated. Please, remember that uncommitted data in the TX buffer is not taken into account for the 
 //<font color="teal"><b>on_sock_data_sent </b></font>event generation.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sock object. </b><br><br> 
 //Notifies your program that the TCP packet of a certain size has arrived.
 //<br><br>
@@ -3831,26 +3073,15 @@ Object.defineProperty(sock, 'currentinterface', {
 //<font color="olive"><b>on_sock_tcp_packet_arrival </b></font>
 //events may be waiting in the event queue. For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
 //for this event or the body of any procedure in the related call chain.
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
 //**************************************************************************************************
 //       STOR (Storage system for "settings") object
 //**************************************************************************************************
-
-
 //The stor object provides access to the non-volatile (EEPROM) memory in which your application can store data that
 //must not be lost when the device is switched off. <br><br>
 //Using this object you can also access and change the MAC address of the device (be careful with that!). 
-
 //--------------------------------------------------------------------
-stor.getdata = function( startaddr,  len) {}
+stor.getdata = function (startaddr, len) { };
 //<b>METHOD. </b><br><br> 
 //Reads up to len number of bytes from the EEPROM starting from address startaddr (addresses are counted from 1).
 //Actual amount of extracted data is also limited by the capacity of the receiving variable and the starting address.<br><br>
@@ -3863,9 +3094,8 @@ stor.getdata = function( startaddr,  len) {}
 //If you set the <font color="maroon"><b>stor.base </b></font>to 1 you will be able to access the EEPROM right from the physical address 0 and
 //change the MAC if necessary.<br><br>
 //Note: MAC address stored in the EEPROM has a certain formatting- see platform documentation for details.
-
 //--------------------------------------------------------------------
-stor.setdata = function( datatoset,  startaddr) {}
+stor.setdata = function (datatoset, startaddr) { };
 //<b>METHOD. </b><br><br> 
 //Writes data from the datatoset string into the EEPROM, starting from the address startaddr (addresses are counted from 1). Returns actual 
 //number of bytes written into the EEPROM. Hence, the operation has completed successfully if the value returned by this method equals the 
@@ -3883,12 +3113,11 @@ stor.setdata = function( datatoset,  startaddr) {}
 //Note: if you change the MAC address this change will only take effect after device reboot. This is the only time when the device loads its MAC
 //address from the EEPROM into the Ethernet controller. MAC address stored in the EEPROM has a certain formatting- see platform documentation for 
 //details.
-
 //--------------------------------------------------------------------
-Object.defineProperty(stor, 'base', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(stor, 'base', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 8. </b><br><br>
 //Returns the base address of the EEPROM from which the area available to your application starts. By default, the base address is 9 -- just 
 //above the special configuration area that stores MAC address of the device (8 bytes are needed for that).<br><br>
@@ -3898,15 +3127,11 @@ Object.defineProperty(stor, 'base', {
 //If your application needs to change the MAC address you can set the <font color="maroon"><b>stor.base </b></font>to 1- this way you will have
 //access to the entire memory.<br><br>
 //Also see <font color="maroon"><b>stor.size</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(stor, 'size', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(stor, 'size', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD), DEFAULT VALUE= "actual_EEPROM_capacity-8" </b><br><br>
 //Returns total EEPROM memory capacity (in bytes) for the current device. First 8 bytes of the EEPROM are used by the special configuration
 //section (on this platform it occupies 8 bytes and stores MAC address of the device). By default, special configuration area is not accessible
@@ -3917,44 +3142,29 @@ Object.defineProperty(stor, 'size', {
 //If you set the <font color="maroon"><b>stor.base </b></font>to 1 (for instance, to edit the MAC address), the <font color="maroon"><b>stor.size 
 //</b></font>will show the capacity of 2048. In other words, the number this property returns is actual_EEPROM_capacity-
 //<font color="maroon"><b>stor.base</b></font>+1.
-    
 //**************************************************************************************************
 //       SYS (System) object
 //**************************************************************************************************
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'limitbuffersize', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'limitbuffersize', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sys object. </b><br><br> First event to be generated after your devices boots up. Typically, initialization code for
 //your application is placed here.//**************************************************************************************************
 //       IO (Input/output) object
 //**************************************************************************************************
-
-Object.defineProperty(io, 'intcheck', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
+Object.defineProperty(io, 'intcheck', {
+    get() { return 0; },
+    set() { }
+});
 //**************************************************************************************************
 //       SYS (System) object
 //**************************************************************************************************
-
-
-
-
 //This is the system object that loosely combines "general system" stuff such as initialization (boot) event, buffer
 //management, system timer, and some other miscellaneous properties and methods.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the sys object. </b><br><br> Periodic event that is generated at intervals defined by the <font color="maroon"><b>sys.onsystimerperiod </b></font>property.
 //<br><br>
 //Multiple <font color="teal"><b>on_sys_timer </b></font> 
@@ -3966,91 +3176,66 @@ Object.defineProperty(io, 'intcheck', {
 //<br><br>
 //The <font color="teal"><b>on_sys_timer </b></font>
 //event is not generated when the program execution is PAUSED (in debug mode).
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Debugging is not possible, application execution starts immediately after device powers up. Severe errors
-                            //such as "divizion by zero" are ignored and do not stop execution.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                            //Debug mode in which it is possible to cross-debug the application (under the control of TIDE software). 
-                            //Application execution is not started automatically after the power up. Severe errors such as "divizion by 
-                            //zero" halt execution.
-
-
-Object.defineProperty(sys, 'runmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Debugging is not possible, application execution starts immediately after device powers up. Severe errors
+//such as "divizion by zero" are ignored and do not stop execution.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Debug mode in which it is possible to cross-debug the application (under the control of TIDE software). 
+//Application execution is not started automatically after the power up. Severe errors such as "divizion by 
+//zero" halt execution.
+Object.defineProperty(sys, 'runmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE). </b><br><br>
 //Returns current run (execution) mode: <br><br>
 //<font color="olive"><b>0- PL_SYS_MODE_RELEASE </b></font>(release mode),<br> <font color="olive"><b>1- PL_SYS_MODE_DEBUG </b></font> 
 //(debug mode).
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a self-reset.
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was not a self-reset.
-                                //or power cycle).
-
-
-Object.defineProperty(sys, 'resettype', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a self-reset.
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was not a self-reset.
+//or power cycle).
+Object.defineProperty(sys, 'resettype', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE). </b><br><br>
 //Returns the type of the most recent hardware reset:<br><br><font color="olive"><b>0- PL_SYS_RESET_TYPE_INTERNAL </b></font>(internal 
 //reset caused  by "self-reboot" of the CPU -- through TIDE command or <font color="maroon"><b>sys.reboot </b></font> execution),<br><font 
 //color="olive"><b>1- PL_SYS_RESET_TYPE_EXTERNAL </b></font> (caused by power-cycling of the device or applying reset pulse to the RST line).
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a self-reset.
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was caused by the watchdog timeout.
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a power-up/power-down reset.
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a brown-out reset.
-    //<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was initiated from the RST pin.
-
-
-Object.defineProperty(sys, 'extresettype', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a self-reset.
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was caused by the watchdog timeout.
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a power-up/power-down reset.
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was a brown-out reset.
+//<b>PLATFORM CONSTANT. </b><br><br> The most recent reset was initiated from the RST pin.
+Object.defineProperty(sys, 'extresettype', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE, enum pl_sys_ext_reset_type). </b><br><br>
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'totalbuffpages', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'totalbuffpages', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD). </b><br><br>
 //Returns the total amount of memory pages available for buffers (one page= 256 bytes). This is calculated as total available variable memory
 //(RAM) minus whatever is required to store variables of the current project. <br><br>
 //See also <font color="maroon"><b>sys.buffalloc </b></font> and <font color="maroon"><b>sys.freebuffpages</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'freebuffpages', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'freebuffpages', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD). </b><br><br>
 //Returns the number of free (not yet allocated) buffer pages (one page= 256 bytes). Only changes after the <font color="maroon"><b>
 //sys.buffalloc </b></font> method is used. Preparatory methods like <font color="maroon"><b>ser.rxbuffrq </b></font>do not influence what 
 //this property returns. <br><br>
 //See also <font color="maroon"><b>sys.totalbuffpages</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-sys.halt = function() {}
+sys.halt = function () { };
 //<b>METHOD. </b><br><br>
 //Stops your program execution (halts VM). In the debug mode (<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>
 //1- PL_SYS_MODE_DEBUG</b></font>) causes the same result as when you press PAUSE in TIDE during the debug session. <br><br>
@@ -4058,18 +3243,16 @@ sys.halt = function() {}
 //device to halt (stop) execution. <br><br>
 //Once this method has been used, there is no way for your device to resume execution on its own. <br><br>
 //See also <font color="maroon"><b>sys.reboot</b></font>.
-
 //--------------------------------------------------------------------
-sys.reboot = function() {}
+sys.reboot = function () { };
 //<b>METHOD. </b><br><br> 
 //Causes your device to reboot through internal reset. After the device reboots it will behave as after any other reboot: enter PAUSE 
 //mode if your program was compiled for debugging, or start execution if the program was compiled for release. <br><br>
 //The PLL mode will change after the reboot if you requested the changed through <font color="maroon"><b>sys.newpll </b></font>method.<br><br>
 //See also <font color="maroon"><b>sys.currentpll</b></font>, <font color="maroon"><b>sys.runmode</b></font>,
 //<font color="maroon"><b>sys.resettype</b></font>, and <font color="maroon"><b>sys.halt</b></font>.
-
 //--------------------------------------------------------------------
-sys.buffalloc = function() {}
+sys.buffalloc = function () { };
 //<b>METHOD. </b><br><br>
 //Allocates buffer memory as previously requested by "buffrq" methods of individual objects (such as <font color="maroon"><b>
 //ser.rxbuffrq</b></font>).<br><br>
@@ -4081,65 +3264,47 @@ sys.buffalloc = function() {}
 //"Idle" means different things for different objects: <font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>0- NO </b></font> 
 //for the serial port, <font color="maroon"><b> sock.statesimple</b></font>=  <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> for the 
 //socket, etc.
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'version', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'version', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING). </b><br><br>
 //Returns firmware (TiOS) version string. Example: "EM1000-1.20.00".
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'timercount', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'timercount', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD). </b><br><br>
 //Returns the time (in half-second intervals) elapsed since the device powered up. Once this timer reaches 65535 it rolls over to 0.<br><br>
 //See also <font color="teal"><b>on_sys_timer </b></font> event.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'timercount32', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'timercount32', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (DWORD). </b><br><br>
 //Returns the time (in half-second intervals) elapsed since the device powered up. Once this timer reaches &hFFFFFFFF it rolls over to 0.<br><br>
 //See also <font color="teal"><b>on_sys_timer </b></font> event.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'timercountms', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'timercountms', {
+    get() { return 0; },
+    set() { }
+});
 //<b> PROPERTY (DWORD). </b><br><br>
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'onsystimerperiod', { 
-            get() { return 50; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'onsystimerperiod', {
+    get() { return 50; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 50 (0.5 seconds). </b><br><br>
 //Defines, in 10ms increments, the period at which the <font color="teal"><b>on_sys_timer </b></font> event will be generated.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'serialnum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'serialnum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING). </b><br><br>
 //Returns the 12-byte or 128-byte string containing the serial number of the device.
 //<br><br>
@@ -4151,11 +3316,8 @@ Object.defineProperty(sys, 'serialnum', {
 //and remaining 64 bytes are one-time programmable. Use the
 //<font color="maroon"><b>sys.setserialnum </b></font>
 //method to set the data.
-    
-
-
 //--------------------------------------------------------------------
-sys.setserialnum = function( str) {}
+sys.setserialnum = function (str) { };
 //<b>METHOD. </b><br><br>
 //Sets the programmable portion (64 bytes) of the device's 128-byte serial number. Returns 
 //<font color="olive"><b>0- OK </b></font>if completed successfully, or 
@@ -4174,11 +3336,10 @@ sys.setserialnum = function( str) {}
 //<font color="olive"><b>0- NO </b></font>automatically.
 //<br><br>
 //The Entire 128-byte serial number can be obtained through the <font color="maroon"><b>sys.serialnum </b></font>R/O property.
-
 //--------------------------------------------------------------------
-sys.debugprint = function( str) {
+sys.debugprint = function (str) {
     console.log(str);
-}
+};
 //<b>METHOD. </b><br><br>
 //Sends (prints) a string to the TIDE's console output.
 //<br><br>
@@ -4186,170 +3347,107 @@ sys.debugprint = function( str) {
 //<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>1- PL_SYS_MODE_DEBUG</b></font>.
 //The method allows you to trace the execution of your debug application by
 //printing messages in the console output pane of TIDE. 
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-sys.sleep = function() {}
-
+sys.sleep = function () { };
 //--------------------------------------------------------------------
-sys.stop = function() {}
-
+sys.stop = function () { };
 //--------------------------------------------------------------------
-sys.standby = function() {}
-
+sys.standby = function () { };
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'wdenabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'wdenabled', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'wdautoreset', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'wdautoreset', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'wdperiod', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'wdperiod', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-sys.wdreset = function() {}
-
+sys.wdreset = function () { };
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> The slowest execution speed.
-    //<b>PLATFORM CONSTANT. </b><br><br> Medium execution speed.
-    //<b>PLATFORM CONSTANT. </b><br><br> Full execution speed.
-
-
-Object.defineProperty(sys, 'speed', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+//<b>PLATFORM CONSTANT. </b><br><br> The slowest execution speed.
+//<b>PLATFORM CONSTANT. </b><br><br> Medium execution speed.
+//<b>PLATFORM CONSTANT. </b><br><br> Full execution speed.
+Object.defineProperty(sys, 'speed', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'hsclock', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'hsclock', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'wakeupperiod', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(sys, 'wakeupperiod', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-sys.getexceptioninfo = function( hfsr,  cfsr,  lr,  pc,  current_lr) {}
-
+sys.getexceptioninfo = function (hfsr, cfsr, lr, pc, current_lr) { };
 //--------------------------------------------------------------------
-sys.causeexception = function() {}
-
+sys.causeexception = function () { };
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'monversion', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'monversion', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING). </b><br><br>
 //Returns the version of the Monitor/Loader.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(sys, 'userbuffpages', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(sys, 'userbuffpages', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD). </b><br><br>
-    
-
-
 //--------------------------------------------------------------------
-function sin( angle) {}
+function sin(angle) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the sin of angle. Angle is specified in degrees
-
 //--------------------------------------------------------------------
-function asin( x) {}
+function asin(x) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the arc sin. Return value angle is in degrees
-
 //--------------------------------------------------------------------
-function cos( angle) {}
+function cos(angle) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the cos of angle. Angle is specified in degrees
-
 //--------------------------------------------------------------------
-function acos( x) {}
+function acos(x) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the arc cos. Return value angle is in degrees
-
 //--------------------------------------------------------------------
-function tan( angle) {}
+function tan(angle) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the tan of angle. Angle is specified in degrees
-
 //--------------------------------------------------------------------
-function atan( x) {}
+function atan(x) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the arc tan. Return value angle is in degrees
-
 //--------------------------------------------------------------------
-function sqrt( x) {}
+function sqrt(x) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the square root.
-
 //--------------------------------------------------------------------
-function atan2( y,  x) {}
+function atan2(y, x) { }
 //<b>PLATFORM SYSCALL. </b><br><br>
 //Calculates the square root.
-
-
 //**************************************************************************************************
 //       NET (Ethernet network) object
 //**************************************************************************************************
-
-
-
-
 //The net object represents an Ethernet interface of your device. This object only specifies various parameters related
 //to the Ethernet interface (IP address, default gateway IP, netmask, etc.) and is not responsible for
 //sending/transmitting network data. The latter is the job of the sock object.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the net object.  </b><br><br> 
 //Generated when the state of the physical link of Ethernet port changes.
 //<br><br>
@@ -4361,10 +3459,7 @@ function atan2( y,  x) {}
 //call chain may lead to the skipping (loss) of identical events waiting in the queue. This will happen when the 
 //<font color="teal"><b>on_net_link_change </b></font>
 //event is taken off the queue in the cause of the doevents execution related to the same event taken off the queue earlier.
-
 //--------------------------------------------------------------------
-
-
 //<b>EVENT of the net object. </b><br><br> 
 //Generated when overflow occurs on the internal RX buffer of the Network Interface Controller (NIC) IC.
 //<br><br>
@@ -4374,45 +3469,32 @@ function atan2( y,  x) {}
 //Notice, that this event signifies the overrun of the hardware RX buffer of the NIC itself. This has nothing to do with the overrun of RX
 //buffers of individual sockets (see
 //<font color="teal"><b>on_sock_overrun </b></font>event).
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(net, 'mac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(net, 'mac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "as preset during device production". </b><br><br>
 //Returns current MAC (hardware Ethernet) address of the device. You cannot use the <font color="maroon"><b>net.mac </b></font>property to set the new MAC
 //address, but this address can be changed indirectly, by writing to a special area of the EEPROM (see <font color="maroon"><b>stor.setdata </b></font>and
 //<font color="maroon"><b>stor.base</b></font>s).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(net, 'ip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(net, 'ip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "1.0.0.1". </b><br><br>
 //Sets/returns the IP address of the Ethernet interface of your device.<br><br>
 //This property can only be written to when no socket is engaged in communications over the Ethernet interface, i.e. there is no socket
 //for which <font color="maroon"><b>sock.statesimple </b></font>is <u>not </u> equal to <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> and
 //<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
-
-
-
-
 //<br><br>
 //See also <font color="maroon"><b>net.gatewayip </b></font> and <font color="maroon"><b>net.netmask</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(net, 'netmask', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(net, 'netmask', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //Sets/returns the netmask of the Ethernet interface of your device.
 //<br><br>
@@ -4421,15 +3503,11 @@ Object.defineProperty(net, 'netmask', {
 //<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
 //<br><br>
 //See also <font color="maroon"><b>net.ip </b></font>and <font color="maroon"><b>net.gatewayip</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(net, 'gatewayip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(net, 'gatewayip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //Sets/returns the IP address of the default gateway for the Ethernet interface of your device.
 //<br><br>
@@ -4438,101 +3516,71 @@ Object.defineProperty(net, 'gatewayip', {
 //<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
 //<br><br>
 //See also <font color="maroon"><b>net.ip </b></font>and <font color="maroon"><b>net.netmask</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(net, 'failure', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(net, 'failure', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no failure). </b><br><br>
 //Reports whether the Network Interface Controller (NIC) IC has failed: <font color="olive"><b>0- NO </b></font>(no failure), 
 //<font color="olive"><b>1- YES </b></font>(NIC failure).
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br> No physical Ethernet link exists at the moment (the Ethernet port of the device is not connected to a hub).
-    //<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 10Mbit/sec. 
-    //<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 100Mbit/sec.
-
-
-Object.defineProperty(net, 'linkstate', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. </b><br><br> No physical Ethernet link exists at the moment (the Ethernet port of the device is not connected to a hub).
+//<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 10Mbit/sec. 
+//<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 100Mbit/sec.
+Object.defineProperty(net, 'linkstate', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_NET_LINKSTAT_NOLINK (no link). </b><br><br>
 //Returns current link status of the Ethernet port of the device: <font color="olive"><b>0- PL_NET_LINKSTAT_NOLINK </b></font>(no link),
 //<font color="olive"><b>1- PL_NET_LINKSTAT_10BASET </b></font>(linked at 10Mbit/s), <font color="olive"><b>2- PL_NET_LINKSTAT_100BASET 
 //</b></font>(linked at 100Mbit/s).<br><br>
 //See also <font color="teal"><b>on_net_link_change </b></font>event.
-    
 //**************************************************************************************************
 //       PPPOE (PPPoE) object
 //**************************************************************************************************
-
-
-
-
 //The pppoe object represents the PPPoE interface of your device. This object only specifies the interface itself and is not responsible for
 //sending/transmitting network data. The latter is the job of the sock object. The object does not perform PPPoE login and configuration either -- use
 //PPPOE library for this.
-
 //--------------------------------------------------------------------
-Object.defineProperty(pppoe, 'acmac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pppoe, 'acmac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
 //Sets/returns the MAC address of the ADSL modem (a.k.a. "access concentrator").
 //<br><br>
 //This property uniquely identifies the ADSL modem (access concentrator) that your device will use to access the Internet.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(pppoe, 'ip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pppoe, 'ip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //Sets/returns the IP address of the PPPoE interface of your device.
 //<br><br>
 //This property can only be written to when no socket is engaged in communications over the PPPoE interface, i.e. there is no socket
 //for which <b>sock.statesimple </b>is <u>not </u> equal to 0- PL_SSTS_CLOSED and <b>sock.currentinterface</b>= 1- PL_INTERFACE_PPPOE.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(pppoe, 'sessionid', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(pppoe, 'sessionid', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= 0. </b><br><br>
 //Sets/returns the ID of the current PPPoE session.
 //<br><br>
 //Session ID is required for correct interaction between your device and ADSL modem (access concentrator). Use the PPPOE library and let it take care of this and (almost) everything else.
-    
-    
 //**************************************************************************************************
 //       IO (Input/output) object
 //**************************************************************************************************
-
-
 //The io. object controls the I/O lines, 8-bit I/O ports, and interrupt lines of your device.
 //<br><br>
 //The lists of available I/O lines, ports, and interrupt lines are platform-specific and are defined by pl_io_num, pl_io_port_num, and  pl_int_num enums.
 //<br><br>
 //On this platform, the I/O lines are unidirectional, i.e. you must configure each I/O line to be an output or an input, as it can't be both at the same time.
 //This is done through io.enabled and io.portenabled properties.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the io. object.</b><br><br>
 //Generated when a change of state (from LOW to HIGH or from HIGH to LOW) on one of the enabled interrupt lines is detected.
 //<br><br>
@@ -4544,171 +3592,114 @@ Object.defineProperty(pppoe, 'sessionid', {
 //Another on_io_int event will not be generated until the previous one is processed.
 //The consequence is that if the first enabled interrupt line changes its state, and then the second enabled interrupt line changes its state while the first on_io_int event hasn't yet been processed,
 //then the second event will be lost.
-
 //--------------------------------------------------------------------
-Object.defineProperty(io, 'num', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'num', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0.</b><br><br>
 //Sets/returns the number of the currently selected I/O line. This selection is related to io.enabled and io.state properties.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-Object.defineProperty(io, 'portnum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'portnum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0.</b><br><br>
 //Sets/returns the number of the currently selected 8-bit I/O port. This selection is related to io.portenabled and io.portstate properties.
-    
-    
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(io, 'state', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'state', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE). DEFAULT_VALUE= 1- HIGH (typically)</b><br><br>
 //For the currently selected I/O line (selection is made through the io.num property), sets/returns this line's state.
 //<br><br>
 //The line must be configured as output (io.enabled= 1- YES) for writes to this property to have any effect.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-Object.defineProperty(io, 'portstate', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'portstate', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE). DEFAULT_VALUE= 255 (typically)</b><br><br>
 //For the currently selected 8-bit I/O port (selection is made through the io.portnum property), sets/returns the states of 8 port's lines.
 //<br><br>
 //Each individual bit in this byte value sets/returns the state of the corresponding I/O line within the port.
 //<br><br>
 //Port lines must be configured as outputs (io.portenabled= 255) for writes to this property to have (full) effect.
-    
-    
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(io, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
 //For the currently selected I/O line (selection is made through the io.num property), sets/returns the state of the line's output buffer,
 //i.e. configures the line as input (io.enabled=0) or output (io.enabled=1).
-    
-    
-
-
 //--------------------------------------------------------------------
-
-Object.defineProperty(io, 'portenabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'portenabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE). DEFAULT VALUE= 0.</b><br><br>
 //For the currently selected 8-bit I/O port (selection is made through the io.portnum property), sets/returns the state of the port's output buffers,
 //i.e. configures individual port lines as inputs or outputs.
 //<br><br>
 //For each bit (line) 0 means "input" and 1 means "output".
-    
-    
-
-
-
 //--------------------------------------------------------------------
-io.invert = function( num) {}
+io.invert = function (num) { };
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, inverts the state of this line (reads its current state and writes an opposite state into the output buffer).
 //<br><br>
 //The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
-
 //--------------------------------------------------------------------
-io.lineget = function( num) {}
+io.lineget = function (num) { };
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, returns this line's state.
-
 //--------------------------------------------------------------------
-io.lineset = function( num,  state) {}
+io.lineset = function (num, state) { };
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, sets the state of this line's output buffer.
 //The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
-
 //--------------------------------------------------------------------
-
-io.portget = function( num) {}
+io.portget = function (num) { };
 //<b>METHOD.</b><br><br>
 //For the 8-bit I/O port specified by the num argument, returns this port's state.
 //<br><br>
 //Each individual bit of the returned value carries the state of the corresponding I/O line within the port.
-
-
 //--------------------------------------------------------------------
-
-io.portset = function( num,  state) {}
+io.portset = function (num, state) { };
 //<b>METHOD.</b><br><br>
 //For the 8-bit I/O port specified by the num argument, sets the state of this port's output buffers.
 //<br><br>
 //Each individual bit of the state argument defines the state of the corresponding I/O line within the port.
 //<br><br>
 //Port lines must be configured as outputs (io.portenabled= 255) for writes to this property to have (full) effect.
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(io, 'intnum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'intnum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0.</b><br><br>
 //Sets/returns the number of the currently selected interrupt line. This selection is related to the io.intenebled property.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(io, 'intenabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(io, 'intenabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
 //For the currently selected interrupt line (selection is made through the io.intnum property), enables/disables on_io_int event generation for this line.
-    
-    
-
 //**************************************************************************************************
 //       BEEP (Beeper) object
 //**************************************************************************************************
-
-
-
-
 //The beep. object allows you to "play" sound patters using a buzzer attached to the CO pin of your device.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the beep object.</b><br><br> 
 //Generated when a pattern finishes playing. This can only happened for "non-looped" patterns.
 //<br><br>
 //The event won't be generated if the current pattern is superseded (overwritten) by a new call to beep.play.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. Tells the beep.play method that the new pattern can only be loaded if no pattern is playing at the moment.
-    //<b>PLATFORM CONSTANT. </b><br><br> Tells the beep.play method that the new pattern can be loaded even if another pattern is currently playing.
-
-
-beep.play = function( pattern,  patint) {}
+//<b>PLATFORM CONSTANT. Tells the beep.play method that the new pattern can only be loaded if no pattern is playing at the moment.
+//<b>PLATFORM CONSTANT. </b><br><br> Tells the beep.play method that the new pattern can be loaded even if another pattern is currently playing.
+beep.play = function (pattern, patint) { };
 //<b>METHOD. </b><br><br> 
 //Loads a new buzzer pattern to play.
 //<br><br>
@@ -4727,316 +3718,11 @@ beep.play = function( pattern,  patint) {}
 //At the normal speed, each step is 200 ms long. Therefore, the step duration is 100ms when the speed is doubled (*) and 50ms when the speed is quadrupled (**).
 //<br><br>
 //The patint argument determines if this method's invocation is allowed to interrupt another pattern that is already playing. 
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Object.defineProperty(beep, 'divider', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(beep, 'divider', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 1. </b><br><br>
 //Defines the buzzer frequency (frequency of the square wave output on the CO line).
 //<br><br>
@@ -5045,49 +3731,17 @@ Object.defineProperty(beep, 'divider', {
 //F = 30'000'000 / beep.divider.
 //<br><br>
 //The recommended divider value for this platform is 11111.
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //**************************************************************************************************
 //       RTC (Real-time Counter) object
 //**************************************************************************************************
-
-
-
-
 //Facilitates access to the real-time counter (RTC) of the device. The RTC is an independent hardware counter that has its
 //own power input. When the backup battery is installed, the RTC will continue running even when the rest of the device is
 //powered off. <br><br>
 //The RTC keeps track of elapsed days, minutes, and seconds, not actual date and time. This is why it is called the "counter",
 //not "clock". This platform includes a set of convenient date and time conversion functions that can be used to transform RTC
 //data into current weekday, date, and time (see <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, <font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, <font color="teal"><b>hours</b></font>, minutes).
-
 //--------------------------------------------------------------------
-rtc.getdata = function( daycount,  mincount,  seconds) {}
+rtc.getdata = function (daycount, mincount, seconds) { };
 //<b>METHOD. </b><br><br> 
 //Returns current RTC data as the number of elapsed days (daycount), minutes (mincount) and seconds.
 //This platform includes a set of convenient date and time conversion functions that can be used to transform "elapsed time"
@@ -5095,23 +3749,19 @@ rtc.getdata = function( daycount,  mincount,  seconds) {}
 //platform syscalls). <br><br>
 //Notice, that after the device powers up and provided that the backup power was not present at all times the RTC may be in the 
 //undetermined state and not work properly until the <font color="maroon"><b>rtc.setdata </b></font>method is executed at least once.
-
 //--------------------------------------------------------------------
-
-rtc.setdata = function( daycount,  mincount,  seconds) {}
+rtc.setdata = function (daycount, mincount, seconds) { };
 //<b>METHOD. 
 //</b><br><br> Presets the RTC with a number of elapsed days (daycount), minutes (mincount), and seconds. This platform includes
 //a set of convenient date and time conversion functions that can be used to transform actual date into time into
 //"elapsed time" values (see daycount and mincount). <br><br>
 //Notice, that after the device powers up and provided that the backup power was not present at all times the RTC may be in the 
 //undetermined state and not work properly until the <font color="maroon"><b>rtc.setdata </b></font>method is executed at least once.
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(rtc, 'running', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(rtc, 'running', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE). </b><br><br> 
 //Returns current RTC state: <font color="olive"><b>0- NO </b></font>(RTC not running), <font color="olive"><b>1- YES </b></font>(RTC is running). 
 //When this property returns <font color="olive"><b>0- NO </b></font>this typically is the sign of a hardware malfunction (for instance, 
@@ -5119,40 +3769,17 @@ Object.defineProperty(rtc, 'running', {
 //When the RTC is powered up after being off (that is, device had not power AND no backup power for a period of time), it may not work 
 //correctly until you set it using <font color="maroon"><b>rtc.setdata </b></font>method. <font color="maroon"><b> Rtc.running </b></font>
 //cannot be used to reliably check RTC state in this situation.
-    
-
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
 //**************************************************************************************************
 //       LCD object
 //**************************************************************************************************
-
-
-
-
-
-
 //The lcd object is for operating a display panel. 
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'backcolor', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'backcolor', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
 //Specifies current background color.
 //<br><br>
@@ -5173,15 +3800,11 @@ Object.defineProperty(lcd, 'backcolor', {
 //<br><br>See also: 
 //<font color="maroon"><b>lcd.forecolor</b></font>, 
 //<font color="maroon"><b>lcd.linewidth</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'bitsperpixel', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'bitsperpixel', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the number of bits available for each pixel of the currently selected controller/panel.
 //<br><br>
@@ -5201,14 +3824,11 @@ Object.defineProperty(lcd, 'bitsperpixel', {
 //<font color="maroon"><b>lcd.backcolor</b></font>, and 
 //<font color="maroon"><b>lcd.setpixel </b></font>are interpreted. Also, the output produced by 
 //<font color="maroon"><b>lcd.bmp </b></font>depends on this property.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'bluebits', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'bluebits', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //A 16-bit value packing two 8-bit parameters: number of "blue" bits per pixel (high byte) and the position of the least significant blue bit within the color word (low byte).
 //<br><br>
@@ -5221,11 +3841,8 @@ Object.defineProperty(lcd, 'bluebits', {
 //<font color="maroon"><b>lcd.setpixel</b></font>, 
 //<font color="maroon"><b>lcd.forecolor</b></font>, and 
 //<font color="maroon"><b>lcd.backcolor</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-lcd.bmp = function( offset,  x,  y,  x_offset,  y_offset,  maxwidth,  maxheight) {}
+lcd.bmp = function (offset, x, y, x_offset, y_offset, maxwidth, maxheight) { };
 //<b>METHOD. </b><br><br>
 //Displays a portion of or full image stored in a BMP file. Returns 
 //<font color="olive"><b>0- OK </b></font>if the image was processed successfully, or 
@@ -5252,15 +3869,13 @@ lcd.bmp = function( offset,  x,  y,  x_offset,  y_offset,  maxwidth,  maxheight)
 //Note that only 2-, 16-, and 256-color modes are currently supported and the 
 //<font color="maroon"><b>lcd.bmp </b></font>will return 
 //<font color="olive"><b>1- NG </b></font>if you try to display any other type of BMP file. Compressed BMP files will be rejected too.
-
 //--------------------------------------------------------------------
-lcd.bmpfromfile = function( ignored_parameter,  x,  y,  x_offset,  y_offset,  maxwidth,  maxheight) {}
-
+lcd.bmpfromfile = function (ignored_parameter, x, y, x_offset, y_offset, maxwidth, maxheight) { };
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
 //Specifies whether the display panel is enabled.
 //<br><br>
@@ -5279,16 +3894,11 @@ Object.defineProperty(lcd, 'enabled', {
 //<br><br>
 //Setting the property to 
 //<font color="olive"><b>0- NO </b></font>disables the controller/panel.
-
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'error', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'error', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no error detected).</b><br><br>
 //Indicates whether controller/panel I/O error has been detected.
 //<br><br>
@@ -5298,11 +3908,8 @@ Object.defineProperty(lcd, 'error', {
 //<font color="olive"><b>1- YES </b></font>on attempt to enable the display (set 
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>1- YES</b></font>).
-    
-
-
 //--------------------------------------------------------------------
-lcd.fill = function( x,  y,  width,  height) {}
+lcd.fill = function (x, y, width, height) { };
 //<b>METHOD. </b><br><br>
 //Paints the area with the "pen" color (
 //<font color="maroon"><b>lcd.forecolor</b></font>).
@@ -5327,9 +3934,8 @@ lcd.fill = function( x,  y,  width,  height) {}
 //<font color="maroon"><b>lcd.horline</b></font>, 
 //<font color="maroon"><b>lcd.rectangle</b></font>,
 //<font color="maroon"><b>lcd.filledrectangle</b></font>.
-
 //--------------------------------------------------------------------
-lcd.filledrectangle = function( x1,  y1,  x2,  y2) {}
+lcd.filledrectangle = function (x1, y1, x2, y2) { };
 //<b>METHOD. </b><br><br>
 //Draws a filled rectangle.
 //<br><br>
@@ -5362,12 +3968,11 @@ lcd.filledrectangle = function( x1,  y1,  x2,  y2) {}
 //<font color="maroon"><b>lcd.horline</b></font>, 
 //<font color="maroon"><b>lcd.rectangle</b></font>, 
 //<font color="maroon"><b>lcd.fill</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'fontheight', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'fontheight', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b><br><br>
 //Returns the maximum height, in pixels, of characters in the currently selected font.
 //<br><br>
@@ -5376,14 +3981,11 @@ Object.defineProperty(lcd, 'fontheight', {
 //<br><br>
 //See also: 
 //<font color="maroon"><b>lcd.fontpixelpacking</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'fontpixelpacking', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'fontpixelpacking', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_VERTICAL (vertically adjacent pixels are packed into each byte).</b><br><br>
 //Indicates how pixels are packed into bytes in a currently selected font: 
 //<font color="olive"><b>0- PL_VERTICAL </b></font>when vertically adjacent pixels are packed into each byte, 
@@ -5402,14 +4004,11 @@ Object.defineProperty(lcd, 'fontpixelpacking', {
 //<br><br>
 //See also: 
 //<font color="maroon"><b>lcd.fontheight</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'forecolor', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'forecolor', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 65535 (&hFFFF).</b><br><br>
 //Specifies current "pen" (drawing) color.
 //<br><br>
@@ -5440,12 +4039,8 @@ Object.defineProperty(lcd, 'forecolor', {
 //See also: 
 //<font color="maroon"><b>lcd.backcolor</b></font>, 
 //<font color="maroon"><b>lcd.linewidth</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.getprintwidth = function( str) {}
+lcd.getprintwidth = function (str) { };
 //<b>METHOD. </b><br><br>
 //Returns the width, in pixels, of the text output that will be produced if the <b>str</b> line is actually printed with the 
 //<font color="maroon"><b>lcd.print </b></font>method.
@@ -5457,12 +4052,11 @@ lcd.getprintwidth = function( str) {}
 //<br><br>
 //The width calculation will be affected by the value of the 
 //<font color="maroon"><b>lcd.texthorizontalspacing </b></font>property.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'greenbits', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'greenbits', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //A 16-bit value packing two 8-bit parameters: number of "green" bits per pixel (high byte) and the position of the least significant green bit within the color word (low byte).
 //<br><br>
@@ -5475,14 +4069,11 @@ Object.defineProperty(lcd, 'greenbits', {
 //<font color="maroon"><b>lcd.setpixel</b></font>, 
 //<font color="maroon"><b>lcd.forecolor</b></font>, and 
 //<font color="maroon"><b>lcd.backcolor</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'height', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'height', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
 //Sets the vertical resolution of the display panel in pixels.
 //<br><br>
@@ -5496,12 +4087,8 @@ Object.defineProperty(lcd, 'height', {
 //<br><br>
 //See also: 
 //<font color="maroon"><b>lcd.width</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.horline = function( x1,  x2,  y) {}
+lcd.horline = function (x1, x2, y) { };
 //<b>METHOD. </b><br><br>
 //Draws a horizontal line.
 //<br><br>
@@ -5528,12 +4115,11 @@ lcd.horline = function( x1,  x2,  y) {}
 //<font color="maroon"><b>lcd.rectangle</b></font>, 
 //<font color="maroon"><b>lcd.filledrectangle</b></font>, 
 //<font color="maroon"><b>lcd.fill</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'inverted', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'inverted', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (not inverted, higher memory value = higher pixel brightness).</b><br><br>
 //Specifies whether the image on the display panel has to be inverted: 
 //<font color="olive"><b>0- NO </b></font>(normal image), 
@@ -5547,15 +4133,11 @@ Object.defineProperty(lcd, 'inverted', {
 //This property can only be changed when the display is disabled (
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>0- NO</b></font>). 
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'iomapping', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'iomapping', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
 //Defines the list of I/O lines to interface with the currently selected controller/panel.
 //<br><br>
@@ -5566,12 +4148,8 @@ Object.defineProperty(lcd, 'iomapping', {
 //This property can only be changed when the display is disabled (
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>0- NO</b></font>).
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.line = function( x1,  y1,  x2,  y2) {}
+lcd.line = function (x1, y1, x2, y2) { };
 //<b>METHOD. </b><br><br>
 //Draws a line.
 //<br><br>
@@ -5601,12 +4179,11 @@ lcd.line = function( x1,  y1,  x2,  y2) {}
 //<font color="maroon"><b>lcd.rectangle</b></font>, 
 //<font color="maroon"><b>lcd.filledrectangle</b></font>, 
 //<font color="maroon"><b>lcd.fill</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'linewidth', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'linewidth', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
 //Specifies current "pen" width in pixels.
 //<br><br>
@@ -5620,12 +4197,8 @@ Object.defineProperty(lcd, 'linewidth', {
 //See also: 
 //<font color="maroon"><b>lcd.forecolor</b></font>, 
 //<font color="maroon"><b>lcd.backcolor</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.lock = function() {}
+lcd.lock = function () { };
 //<b>METHOD. </b><br><br>
 //Freezes display output (on controllers/panels that support this feature).
 //<br><br>
@@ -5638,12 +4211,11 @@ lcd.lock = function() {}
 //<font color="maroon"><b>lcd.lockcount </b></font>will increase with each call to the 
 //<font color="maroon"><b>lcd.lock</b></font>. This allows you to nest locks/unlocks.  The display is locked for all 
 //<font color="maroon"><b>lcd.lockcount </b></font>values other than 0.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'lockcount', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'lockcount', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0 (display unlocked).</b><br><br>
 //Indicates the current nesting level of the display lock.
 //<br><br>
@@ -5658,19 +4230,13 @@ Object.defineProperty(lcd, 'lockcount', {
 //Not all controllers/panels support this feature. If your display does not support locking, executing 
 //<font color="maroon"><b>lcd.lock </b></font>will have no effect and 
 //<font color="maroon"><b>lcd.lockcount </b></font>will always stay at 0.
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br> Monochrome or grayscale panel/controller.
-    //<b>PLATFORM CONSTANT.</b><br> Color panel/controller.
-
-
-Object.defineProperty(lcd, 'paneltype', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br> Monochrome or grayscale panel/controller.
+//<b>PLATFORM CONSTANT.</b><br> Color panel/controller.
+Object.defineProperty(lcd, 'paneltype', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE).</b><br><br>
 //Returns the type of the currently selected controller/panel: 
 //<font color="olive"><b>0- PL_LCD_PANELTYPE_GRAYSCALE </b></font> for a monochrome or grayscale panel/controller, 
@@ -5689,14 +4255,11 @@ Object.defineProperty(lcd, 'paneltype', {
 //<font color="maroon"><b>lcd.backcolor</b></font>, and 
 //<font color="maroon"><b>lcd.setpixel </b></font>are interpreted. Also, the output produced by 
 //<font color="maroon"><b>lcd.bmp </b></font>is affected by this.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'pixelpacking', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'pixelpacking', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_VERTICAL (vertically adjacent pixels are packed into each byte).</b><br><br>
 //Indicates how pixels are packed into controller memory for the currently selected controller/panel: 
 //<font color="olive"><b>0- PL_VERTICAL </b></font>when vertically adjacent pixels are packed into each byte,
@@ -5709,11 +4272,8 @@ Object.defineProperty(lcd, 'pixelpacking', {
 //Fonts can also have vertical or horizontal packing and the speed at which you can output the text onto the screen is improved when the 
 //<font color="maroon"><b>lcd.pixelpacking </b></font>and
 //<font color="maroon"><b>lcd.fontpixelpacking </b></font>have the same value, i.e. controller memory pixels and font encoding are "aligned".
-    
-
-
 //--------------------------------------------------------------------
-lcd.print = function( str,  x,  y) {}
+lcd.print = function (str, x, y) { };
 //<b>METHOD. </b><br><br>
 //Prints a <b>str </b>line of text at <b>x</b>, <b>y </b>coordinates. Returns total width of created output in pixels.
 //<br><br>
@@ -5729,9 +4289,8 @@ lcd.print = function( str,  x,  y) {}
 //<br><br>
 //See also: 
 //<font color="maroon"><b>lcd.getprintwidth</b></font>.
-
 //--------------------------------------------------------------------
-lcd.printaligned = function( str,  x,  y,  width,  height) {}
+lcd.printaligned = function (str, x, y, width, height) { };
 //<b>METHOD. </b><br><br>
 //Print texts, on several lines if necessary, within a specified rectangular area. Returns total number of text lines produced.
 //<br><br>
@@ -5760,9 +4319,8 @@ lcd.printaligned = function( str,  x,  y,  width,  height) {}
 //The display panel must be enabled (
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>1- YES</b></font>) for this method to work.
-
 //--------------------------------------------------------------------
-lcd.rectangle = function( x1,  y1,  x2,  y2) {}
+lcd.rectangle = function (x1, y1, x2, y2) { };
 //<b>METHOD. </b><br><br>
 //Draws an unfilled rectangle.
 //<br><br>
@@ -5790,12 +4348,11 @@ lcd.rectangle = function( x1,  y1,  x2,  y2) {}
 //<font color="maroon"><b>lcd.horline</b></font>, 
 //<font color="maroon"><b>lcd.filledrectangle</b></font>, 
 //<font color="maroon"><b>lcd.fill</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'redbits', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'redbits', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //A 16-bit value packing two 8-bit parameters: number of "red" bits per pixel (high byte) and the position of the least significant red bit within the color word (low byte).
 //<br><br>
@@ -5809,14 +4366,11 @@ Object.defineProperty(lcd, 'redbits', {
 //<font color="maroon"><b>lcd.setpixel</b></font>, 
 //<font color="maroon"><b>lcd.forecolor</b></font>, and 
 //<font color="maroon"><b>lcd.backcolor</b></font>.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'rotated', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'rotated', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (not rotated).</b><br><br>
 //Specifies whether the image on the display panel is to be rotated 180 degrees: 
 //<font color="olive"><b>0- NO </b></font>(not rotated), or 
@@ -5827,13 +4381,8 @@ Object.defineProperty(lcd, 'rotated', {
 //This property can only be changed when the display is disabled (
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>0- NO</b></font>). 
-
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.setfont = function( offset) {}
+lcd.setfont = function (offset) { };
 //<b>METHOD. </b><br><br>
 //Selects a font to use for printing text. Returns 
 //<font color="olive"><b>0- OK </b></font>if the font was found and the data appears to be valid. Returns 
@@ -5852,9 +4401,8 @@ lcd.setfont = function( offset) {}
 //When the font file is successfully selected, the 
 //<font color="maroon"><b>lcd.fontheight </b></font>and 
 //<font color="maroon"><b>lcd.fontpixelpacking </b></font>R/O properties will be updated to reflect actual font parameters.
-
 //--------------------------------------------------------------------
-lcd.setpixel = function( dt,  x,  y) {}
+lcd.setpixel = function (dt, x, y) { };
 //<b>METHOD. </b><br><br>
 //Directly writes pixel data <b>dt </b>for a single pixel at <b>x</b>, <b>y </b>coordinates.
 //<br><br>
@@ -5874,30 +4422,25 @@ lcd.setpixel = function( dt,  x,  y) {}
 //The display panel must be enabled (
 //<font color="maroon"><b>lcd.enabled</b></font>= 
 //<font color="olive"><b>1- YES</b></font>) for this method to work.
-
 //--------------------------------------------------------------------
-lcd.getpixel = function( x,  y) {}
+lcd.getpixel = function (x, y) { };
 //<b>METHOD. </b><br><br>
 //UNDOCUMENTED
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br> Top, left.
-    //<b>PLATFORM CONSTANT.</b><br> Top, center.
-    //<b>PLATFORM CONSTANT.</b><br> Top, right.
-    //<b>PLATFORM CONSTANT.</b><br> Middle, left.
-    //<b>PLATFORM CONSTANT.</b><br> Middle, center.
-    //<b>PLATFORM CONSTANT.</b><br> Middle, right.
-    //<b>PLATFORM CONSTANT.</b><br> Bottom, left.
-    //<b>PLATFORM CONSTANT.</b><br> Bottom, center.
-    //<b>PLATFORM CONSTANT.</b><br> Bottom, right.
-
-
+//<b>PLATFORM CONSTANT.</b><br> Top, left.
+//<b>PLATFORM CONSTANT.</b><br> Top, center.
+//<b>PLATFORM CONSTANT.</b><br> Top, right.
+//<b>PLATFORM CONSTANT.</b><br> Middle, left.
+//<b>PLATFORM CONSTANT.</b><br> Middle, center.
+//<b>PLATFORM CONSTANT.</b><br> Middle, right.
+//<b>PLATFORM CONSTANT.</b><br> Bottom, left.
+//<b>PLATFORM CONSTANT.</b><br> Bottom, center.
+//<b>PLATFORM CONSTANT.</b><br> Bottom, right.
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'textalignment', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'textalignment', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LCD_TEXT_ALIGNMENT_TOP_LEFT (top, left).</b><br><br>
 //Specifies the alignment for text output produced by the 
 //<font color="maroon"><b>lcd.printaligned </b></font>method. There are 9 alignment choices from "top, left" to "bottom, right". 
@@ -5911,15 +4454,11 @@ Object.defineProperty(lcd, 'textalignment', {
 //<font color="maroon"><b>lcd.textorientation</b></font>, 
 //<font color="maroon"><b>lcd.texthorizontalspacing</b></font>, 
 //<font color="maroon"><b>lcd.textverticalspacing</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'texthorizontalspacing', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'texthorizontalspacing', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
 //Specifies the gap, in pixels, between characters of text output produced by the 
 //<font color="maroon"><b>lcd.print </b></font>and 
@@ -5929,22 +4468,15 @@ Object.defineProperty(lcd, 'texthorizontalspacing', {
 //<font color="maroon"><b>lcd.textalignment</b></font>, 
 //<font color="maroon"><b>lcd.textorientation</b></font>, 
 //<font color="maroon"><b>lcd.textverticalspacing</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br> At 0 degrees.
-    //<b>PLATFORM CONSTANT.</b><br> At 90 degrees.
-    //<b>PLATFORM CONSTANT.</b><br> At 180 degrees.
-    //<b>PLATFORM CONSTANT.</b><br> At 270 degrees.
-
-
-Object.defineProperty(lcd, 'textorientation', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br> At 0 degrees.
+//<b>PLATFORM CONSTANT.</b><br> At 90 degrees.
+//<b>PLATFORM CONSTANT.</b><br> At 180 degrees.
+//<b>PLATFORM CONSTANT.</b><br> At 270 degrees.
+Object.defineProperty(lcd, 'textorientation', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_LCD_TEXT_ORIENTATION_0 (at 0 degrees).</b><br><br>
 //Specifies the print angle for text output produced by the 
 //<font color="maroon"><b>lcd.print </b></font>and 
@@ -5954,15 +4486,11 @@ Object.defineProperty(lcd, 'textorientation', {
 //<font color="maroon"><b>lcd.textalignment</b></font>, 
 //<font color="maroon"><b>lcd.texthorizontalspacing</b></font>, 
 //<font color="maroon"><b>lcd.textverticalspacing</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'textverticalspacing', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'textverticalspacing', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 1 (1 pixel).</b><br><br>
 //Specifies the gap, in pixels, between the lines of text output produced by the 
 //<font color="maroon"><b>lcd.printaligned </b></font>method.
@@ -5974,12 +4502,8 @@ Object.defineProperty(lcd, 'textverticalspacing', {
 //<font color="maroon"><b>lcd.textalignment</b></font>, 
 //<font color="maroon"><b>lcd.textorientation</b></font>, 
 //<font color="maroon"><b>lcd.texthorizontalspacing</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-lcd.unlock = function() {}
+lcd.unlock = function () { };
 //<b>METHOD. </b><br><br>
 //Unfreezes display output (on controllers/panels that support this feature).
 //<br><br>
@@ -5991,9 +4515,8 @@ lcd.unlock = function() {}
 //Each time you execute this method on a previously locked display, the value of the 
 //<font color="maroon"><b>lcd.lockcount </b></font>R/O property decreases by 1.  Once this value reaches 0, the display is unlocked and the user sees updated display data.  The 
 //<font color="maroon"><b>lcd.lockcount </b></font>allows you to nest locks/unlocks.
-
 //--------------------------------------------------------------------
-lcd.verline = function( x,  y1,  y2) {}
+lcd.verline = function (x, y1, y2) { };
 //<b>METHOD. </b><br><br>
 //Draws a vertical line.
 //<br><br>
@@ -6021,12 +4544,11 @@ lcd.verline = function( x,  y1,  y2) {}
 //<font color="maroon"><b>lcd.rectangle</b></font>, 
 //<font color="maroon"><b>lcd.filledrectangle</b></font>, 
 //<font color="maroon"><b>lcd.fill</b></font>.
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'width', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(lcd, 'width', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 0.</b><br><br>
 //Sets the horizontal resolution of the display panel in pixels.
 //<br><br>
@@ -6040,52 +4562,27 @@ Object.defineProperty(lcd, 'width', {
 //<br><br>
 //See also: 
 //<font color="maroon"><b>lcd.height</b></font>.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(lcd, 'buffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-
-
+Object.defineProperty(lcd, 'buffsize', {
+    get() { return 0; },
+    set() { }
+});
 //**************************************************************************************************
 //		KP (keypad) object
 //**************************************************************************************************
-
-
-
-
-
-
 //Depending on the kp.mode property, the keypad object works with a "matrix" keypad of up to 64 keys (8 scan lines by 8 return lines) or
 //"binary output" keypad of up to 255 keys that sends key codes through up to 8 return lines.
-
 //--------------------------------------------------------------------
-
-	//<b>PLATFORM CONSTANT. The keypad is of matrix type. </b><br><br>
-	//<b>PLATFORM CONSTANT. The keypad is of binary output type. </b><br><br>
-
-
-Object.defineProperty(kp, 'mode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. The keypad is of matrix type. </b><br><br>
+//<b>PLATFORM CONSTANT. The keypad is of binary output type. </b><br><br>
+Object.defineProperty(kp, 'mode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_KP_MODE_MATRIX (matrix type).</b><br><br>
 //Specifies the type of the keypad attached to your TiOS device.
 //<br><br>
@@ -6095,30 +4592,22 @@ Object.defineProperty(kp, 'mode', {
 //The kp.idlecode property must match the code sent by your binary keypad when no key is pressed.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'idlecode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'idlecode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0.</b><br><br>
 //Specifies the code that is expected to be present on the return lines of a binary keypad when no key is pressed.
 //<br><br>
 //This property is only relevant for binary keypads (kp.mode= 1- PL_KP_MODE_BINARY).
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'autodisablecodes', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'autodisablecodes', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
 //Defines what key event + key code combinations disable the keypad (set kp.enabled= 0- NO).
 //<br><br>
@@ -6135,15 +4624,11 @@ Object.defineProperty(kp, 'autodisablecodes', {
 //or the key with code 20 is detected to be _LONGRELEASED.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
 //Enables or disables the keypad.
 //<br><br>
@@ -6154,51 +4639,35 @@ Object.defineProperty(kp, 'enabled', {
 //Every time the keypad is re-enabled, each key's state is set to 0- PL_KP_EVENT_LONGRELEASED, and the keypad event FIFO is cleared.
 //<br><br>
 //It is only possible to change the values of kp. object's properties when kp.enabled= 0- NO.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'longpressdelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'longpressdelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 100 (1 sec).</b><br><br>
 //Defines (in 10ms increments) the amount of time a key will have to remain pressed for the key state to transition from _PRESSED into _LONGPRESSED. Value range is 0-254.
 //<br><br>
 //A new keypad event with 3- PL_KP_EVENT_LONGPRESSED event code will be added to the keypad event FIFO once a key transitions into the _LONGPRESSED state.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _LONGPRESSED state.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'longreleasedelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'longreleasedelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 100 (1 sec).</b><br><br>
 //Defines (in 10ms increments) the amount of time a key will have to remain released for the key state to transition from _RELEASED into _LONGRELEASED state. Value range is 0-254.
 //<br><br>
 //A new keypad event with 0- PL_KP_EVENT_LONGRELEASED event code will be added to the keypad event FIFO once a key transitions into the _LONGRELEASED state.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the "_LONGRELEASED state.
-	
-	
-
-
 //--------------------------------------------------------------------
-
-	//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longreleased" state.
-	//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "released" state.
-	//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "pressed" state.
-	//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longpressed" state.
-	//<b>PLATFORM CONSTANT.</b><br><br> Auto-repeat for the key.
-	//<b>PLATFORM CONSTANT.</b><br><br> The keypad appears to be jammed. Can only be generated when <font color="maroon"><b>kp.mode</b></font>='<font color="olive"><b> 1- PL_KP_MODE_BINARY</b></font>).
-
-
-
+//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longreleased" state.
+//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "released" state.
+//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "pressed" state.
+//<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longpressed" state.
+//<b>PLATFORM CONSTANT.</b><br><br> Auto-repeat for the key.
+//<b>PLATFORM CONSTANT.</b><br><br> The keypad appears to be jammed. Can only be generated when <font color="maroon"><b>kp.mode</b></font>='<font color="olive"><b> 1- PL_KP_MODE_BINARY</b></font>).
 //<b>EVENT of the kp object. </b><br><br>
 //When kp.genkpevent= 1- YES, this event is generated whenever a key transitions into a new state.
 //<br><br>
@@ -6207,51 +4676,40 @@ Object.defineProperty(kp, 'longreleasedelay', {
 //This event can only be generated when the keypad is enabled (kp.enabled= 1- YES).
 //<br><br>
 //Another on_kp event is never generated until the previous one is processed (even though multiple keypad events may be waiting in the keypad event FIFO).
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the kp object. </b><br><br>
 //Indicates that the keypad event FIFO has overflown and some key events may have been lost.
 //<br><br>
 //Once the FIFO overflows, the keypad is disabled (kp.enabled= 0- NO). You can re-enable the keypad by setting kp.enabled= 1- YES (this will also clear the FIFO).
 //<br><br>
 //Another on_kp_overflow event is never generated until the previous one is processed.
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'pressdelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'pressdelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 3 (30 ms).</b><br><br>
 //Defines (in 10ms increments) the amount of time a key will have to remain pressed for the key state to transition from _RELEASED into _PRESSED. Value range is 0-254.
 //<br><br>
 //A new keypad event with 2- PL_KP_EVENT_PRESSED event code will be added to the keypad event FIFO once a key transitions into the _PRESSED state.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _PRESSED state.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'releasedelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'releasedelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 3 (30 ms).</b><br><br>
 //Defines (in 10ms increments) the amount of time a key will have to remain released for the key state to transition from _PRESSED or _LONGPRESSED into _RELEASED. Value range is 0-254.
 //<br><br>
 //A new keypad event with 1- PL_KP_EVENT_RELEASED event code will be added to the keypad event FIFO once a key transitions into the _RELEASED state.
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _RELEASED state.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'repeatdelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'repeatdelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 50 (0.5 sec.).</b><br><br>
 //Defines (in 10ms increments) the time period at which the on_kp event with 4- PL_KP_EVENT_REPEATPRESSED event code will be generated once the key reaches the _LONGPRESSED state and remains pressed.
 //Value range is 0-254.
@@ -6260,30 +4718,22 @@ Object.defineProperty(kp, 'repeatdelay', {
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
 //Setting the property to 0 means that the key will never transition into the _REPEATPRESSED state.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'lockupdelay', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'lockupdelay', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (WORD), DEFAULT VALUE= 1000 (10sec).</b><br><br>
 //Defines (in 10ms increments) the amount of time any key will have to stay pressed for the keypad to enter the "lockup" state. 
 //<br><br>
 //Lockup is not a key state, it is the state of the keypad as a whole. Once the lockup condition is detected the keypad is disabled (kp.enabled= 0- NO).
 //<br><br>
 //This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the keypad will never enter the "lockup" state.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'returnlinesmapping', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'returnlinesmapping', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
 //Defines the list of up to 8 I/O lines that will serve as return lines of the keypad.
 //<br><br>
@@ -6296,15 +4746,11 @@ Object.defineProperty(kp, 'returnlinesmapping', {
 //A keypad must have at least one return line to be able to function.
 //<br><br>
 //Return lines of the keypad should be separate from the scan lines (see kp.scanlinesmapping).
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'scanlinesmapping', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'scanlinesmapping', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
 //Defines the list of up to 8 I/O lines that will serve as scan lines of the matrix keypad.
 //<br><br>
@@ -6317,72 +4763,46 @@ Object.defineProperty(kp, 'scanlinesmapping', {
 //<br><br>
 //Scan lines of the keypad should be separate from the return lines (see kp.returnlinesmapping).
 //Scan lines are only required if you are working with a matrix keypad.
-	
-	
-
-
 //--------------------------------------------------------------------
-kp.getkey = function( key_event,  key_code) {}
+kp.getkey = function (key_event, key_code) { };
 //<b>METHOD. </b><br><br> 
 //When kp.genkpevent= 0- NO, calling this method attempts to fetch one keypad event from the keypad event FIFO.
 //The method returns 0- OK if there was a keypad event waiting in the FIFO, or 1- NG if the FIFO was empty.
 //<br><br>
 //If the method returns 0- OK, the key state transition and the key code for the fetched event can be obtained through key_event and key_code byref arguments of the kp.getkey method.
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'genkpevent', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'genkpevent', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- YES (event will be generated).</b><br><br>
 //If kp.genkpevent= 1- YES, then you will be receiving keypad events through the on_kp event.
 //If kp.genkpevent= 0- NO, then you will need to use the kp.getkey method to poll for keypad events.
-	
-	
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(kp, 'overflow', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(kp, 'overflow', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no overflow).</b><br><br>
 //Informs whether the keypad is currently in the overflow state.
 //<br><br>
 //This is an alternative to using the on_kp_overflow event.
-	
-
-
 //--------------------------------------------------------------------
-kp.clearbuffer = function() {}
+kp.clearbuffer = function () { };
 //<b>METHOD. </b><br><br>
 //Clears the keypad event FIFO.
-
 //--------------------------------------------------------------------
-
-
-
-
-
-
-
-
 //**************************************************************************************************
 //       SSI (Synchronous Serial Interface) object
 //**************************************************************************************************
-
-
-
 //--------------------------------------------------------------------
-
 //The ssi. object implements up to four serial synchronous interfaces (SSI) on the general-purpose I/O lines of your device.
 //Examples of such interfaces are SPI, I2C, clock/data, and numerous variations on these interfaces.
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'baudrate', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'baudrate', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 1 (the fastest clock rate possible). </b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets the clock rate on the CLK line (1-255).
 //<br><br>
@@ -6394,29 +4814,21 @@ Object.defineProperty(ssi, 'baudrate', {
 //It is actually permissible to set the property to 0 -- this will be like setting it to 256 (slowest possible clock rate).
 //<br><br>
 //See also: ssi.direction, ssi.mode, ssi.zmode.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'channel', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'channel', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (channel #0 selected). </b><br><br>
 //Sets/returns the number of the currently selected SSI channel (channels are enumerated from 0).
 //There are four channels available (0-3).
 //<br><br>
 //All other properties and methods of this object relate to the channel selected through this property.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'clkmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'clkmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the clock (CLK) line of this channel.
 //<br><br>
@@ -6425,15 +4837,11 @@ Object.defineProperty(ssi, 'clkmap', {
 //On devices with unidirectional I/O lines, the CLK line must be "manually" configured as output (see io.enabled= 1- YES).
 //<br><br>
 //See also: ssi.dimap, ssi.domap.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'dimap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'dimap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the data in (DI) line of this channel.
 //<br><br>
@@ -6442,34 +4850,23 @@ Object.defineProperty(ssi, 'dimap', {
 //On devices with unidirectional I/O lines, the DI line must be "manually" configured as input (see io.enabled= 0- NO).
 //<br><br>
 //See also: ssi.clkmap, ssi.domap.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. Data input/output least significant bit first.</b><br><br>.
-    //<b>PLATFORM CONSTANT. Data input/output most significant bit first.</b><br><br>.
-
-
-Object.defineProperty(ssi, 'direction', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. Data input/output least significant bit first.</b><br><br>.
+//<b>PLATFORM CONSTANT. Data input/output most significant bit first.</b><br><br>.
+Object.defineProperty(ssi, 'direction', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_DIRECTION_RIGHT. </b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the direction of data input and output:
 //PL_SSI_DIRECTION_RIGHT means "least significant bit first", PL_SSI_DIRECTION_LEFT -- "most significant bit first".
 //<br><br>
 //This property can only be changed when ssi.enabled= 0- NO.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'domap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'domap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line).</b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the number of the general-purpose I/O line to serve as the data out (DO) line of this channel.
 //<br><br>
@@ -6478,37 +4875,26 @@ Object.defineProperty(ssi, 'domap', {
 //On devices with unidirectional I/O lines, the DO line must be "manually" configured as output (see io.enabled= 1- YES).
 //<br><br>
 //See also: ssi.clkmap, ssi.dimap.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(ssi, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(ssi, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
 //Enables/disables the currently selected SSI channel (see ssi.channel).
 //<br><br>
 //SSI channel's operating parameters (ssi.baudrate, ssi.mode, etc.) can only be changed when the channel is disabled.
 //<br><br>
 //You can only send and receive the data (ssi.value, ssi.str) when the channel is enabled.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>.
-    //<b>PLATFORM CONSTANT.</b><br><br>.
-    //<b>PLATFORM CONSTANT.</b><br><br>.
-    //<b>PLATFORM CONSTANT.</b><br><br>.
-
-
-Object.defineProperty(ssi, 'mode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br><br>.
+//<b>PLATFORM CONSTANT.</b><br><br>.
+//<b>PLATFORM CONSTANT.</b><br><br>.
+//<b>PLATFORM CONSTANT.</b><br><br>.
+Object.defineProperty(ssi, 'mode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_MODE_0. </b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the clock mode.
 //<br>
@@ -6533,25 +4919,18 @@ Object.defineProperty(ssi, 'mode', {
 //  - CPHA=1: data bits are captured on the CLK's rising edge and data bits are propagated on the CLK's falling edge.
 //<br><br>
 //See also: ssi.baudrate, ssi.direction, ssi.zmode.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. 8 bits per data byte. Acknowledgement bits are not transmitted (or expected to be received).</b><br><br>.
-    //<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are expected to be generated by the slave and their presence will be verified.
-                    //The slave device should pull the DI line LOW on the 9th bit of the byte transmission.
-                    //Data exchange will be aborted if the slave device fails to acknowledge any of the bytes. This doesn't apply to the last byte because the method execution will
-                    //end after the transmission of this byte anyway.</b><br><br>.
-    //<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte will be acknowledged by pulling the DI line low on the 9th bit
-                    //of the byte transmission.</b><br><br>.
-    //<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte <b>except the last </b>will be acknowledged by pulling the DI line low
-                    //on the 9th bit of the byte transmission.
+//<b>PLATFORM CONSTANT. 8 bits per data byte. Acknowledgement bits are not transmitted (or expected to be received).</b><br><br>.
+//<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are expected to be generated by the slave and their presence will be verified.
+//The slave device should pull the DI line LOW on the 9th bit of the byte transmission.
+//Data exchange will be aborted if the slave device fails to acknowledge any of the bytes. This doesn't apply to the last byte because the method execution will
+//end after the transmission of this byte anyway.</b><br><br>.
+//<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte will be acknowledged by pulling the DI line low on the 9th bit
+//of the byte transmission.</b><br><br>.
+//<b>PLATFORM CONSTANT. 9 bits per data byte. Acknowledgement bits are generated by this device and each byte <b>except the last </b>will be acknowledged by pulling the DI line low
+//on the 9th bit of the byte transmission.
 //on the 9th bit of the transmission.</b><br><br>.
-
-
-ssi.str = function( txdata,  ack_bit) {}
+ssi.str = function (txdata, ack_bit) { };
 //<b>METHOD.</b><br><br>
 //For the currently selected SSI channel (see ssi.channel) outputs a string of byte data to the slave device and simultaneously inputs the same amount of data from the slave device.
 //<br><br>
@@ -6565,9 +4944,8 @@ ssi.str = function( txdata,  ack_bit) {}
 //This method can be invoked only when ssi.enabled= 1- YES.
 //<br><br>
 //See also: ssi.value.
-
 //--------------------------------------------------------------------
-ssi.value = function( txdata,  len) {}
+ssi.value = function (txdata, len) { };
 //<b>METHOD.</b><br><br>
 //For the currently selected SSI channel (see ssi.channel) outputs a data word of up to 16 bits and simultaneously inputs a data word of the same length.
 //<br><br>
@@ -6583,17 +4961,13 @@ ssi.value = function( txdata,  len) {}
 //This method can be invoked only when ssi.enabled= 1- YES.
 //<br><br>
 //See also: ssi.str.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. The DO line toggles normally (by setting the output buffer to LOW or HIGH).</b><br><br>.
-    //<b>PLATFORM CONSTANT. For HIGH state, the output buffer of the DO line is turned off, for LOW state, the output buffer is turned on and the line is set to LOW.</b><br><br>.
-
-
-Object.defineProperty(ssi, 'zmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT. The DO line toggles normally (by setting the output buffer to LOW or HIGH).</b><br><br>.
+//<b>PLATFORM CONSTANT. For HIGH state, the output buffer of the DO line is turned off, for LOW state, the output buffer is turned on and the line is set to LOW.</b><br><br>.
+Object.defineProperty(ssi, 'zmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0- PL_SSI_ZMODE_ALWAYS_ENABLED. </b><br><br>
 //For the currently selected SSI channel (see ssi.channel) sets/returns the mode of the data out (DO) line:
 //<br>
@@ -6606,50 +4980,37 @@ Object.defineProperty(ssi, 'zmode', {
 //This property can only be changed when ssi.enabled= 0- NO.
 //<br><br>
 //See also: ssi.baudrate, ssi.direction, ssi.mode.
-    
-    
-
 //**************************************************************************************************
 //       FD (flash disk) object
 //**************************************************************************************************
-
-
-
-
-
-
 //This is the flash disk (fd.) object, it allows you to save data in the flash memory of your device.
 //<br><br>
 //The fd. object can be used to work with the flash memory in two different ways. You can
 //(1) read and write individual sectors of the flash memory directly, or
 //(2) create a formatted disk that stores files.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT. </b><br><br>Completed successfully.
-    //<b>PLATFORM CONSTANT. </b><br><br>Physical flash memory failure (fatal: disk dismounted, must be reformatted).
-    //<b>PLATFORM CONSTANT. </b><br><br>Checksum error has been detected in one of the disk sectors (fatal: disk dismounted, must be reformatted).
-    //<b>PLATFORM CONSTANT. </b><br><br>Disk formatting error has been detected (fatal: disk dismounted, must be reformatted).
-    //<b>PLATFORM CONSTANT. </b><br><br>Invalid argument have been provided for the invoked method.
-    //<b>PLATFORM CONSTANT. </b><br><br>File with this name already exists.
-    //<b>PLATFORM CONSTANT. </b><br><br>Maximum number of files that can be stored on the disk has been reached, new file cannot be created.
-    //<b>PLATFORM CONSTANT. </b><br><br>The disk is full, new data cannot be added.
-    //<b>PLATFORM CONSTANT. </b><br><br>The disk is not mounted.
-    //<b>PLATFORM CONSTANT. </b><br><br>File not found.
-    //<b>PLATFORM CONSTANT. </b><br><br>No file is currently opened "on" the current fd.filenum.
-    //<b>PLATFORM CONSTANT. </b><br><br>This file is already opened "on" some other file number.
-    //<b>PLATFORM CONSTANT. </b><br><br>Disk transaction has already been started (and cannot be restarted).
-    //<b>PLATFORM CONSTANT. </b><br><br>Disk transaction hasn't been started yet.
-    //<b>PLATFORM CONSTANT. </b><br><br>Too many disk sectors have been modified in the cause of the current transaction (fatal: disk dismounted).
-    //<b>PLATFORM CONSTANT. </b><br><br>The disk wasn't formatted to support transactions (use fd.formatj with maxjournalsectors>1 to enable transactions).
-    //<b>PLATFORM CONSTANT. </b><br><br>Flash IC wasn't detected during boot, fd. object cannot operate normally.
-
-
+//<b>PLATFORM CONSTANT. </b><br><br>Completed successfully.
+//<b>PLATFORM CONSTANT. </b><br><br>Physical flash memory failure (fatal: disk dismounted, must be reformatted).
+//<b>PLATFORM CONSTANT. </b><br><br>Checksum error has been detected in one of the disk sectors (fatal: disk dismounted, must be reformatted).
+//<b>PLATFORM CONSTANT. </b><br><br>Disk formatting error has been detected (fatal: disk dismounted, must be reformatted).
+//<b>PLATFORM CONSTANT. </b><br><br>Invalid argument have been provided for the invoked method.
+//<b>PLATFORM CONSTANT. </b><br><br>File with this name already exists.
+//<b>PLATFORM CONSTANT. </b><br><br>Maximum number of files that can be stored on the disk has been reached, new file cannot be created.
+//<b>PLATFORM CONSTANT. </b><br><br>The disk is full, new data cannot be added.
+//<b>PLATFORM CONSTANT. </b><br><br>The disk is not mounted.
+//<b>PLATFORM CONSTANT. </b><br><br>File not found.
+//<b>PLATFORM CONSTANT. </b><br><br>No file is currently opened "on" the current fd.filenum.
+//<b>PLATFORM CONSTANT. </b><br><br>This file is already opened "on" some other file number.
+//<b>PLATFORM CONSTANT. </b><br><br>Disk transaction has already been started (and cannot be restarted).
+//<b>PLATFORM CONSTANT. </b><br><br>Disk transaction hasn't been started yet.
+//<b>PLATFORM CONSTANT. </b><br><br>Too many disk sectors have been modified in the cause of the current transaction (fatal: disk dismounted).
+//<b>PLATFORM CONSTANT. </b><br><br>The disk wasn't formatted to support transactions (use fd.formatj with maxjournalsectors>1 to enable transactions).
+//<b>PLATFORM CONSTANT. </b><br><br>Flash IC wasn't detected during boot, fd. object cannot operate normally.
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'availableflashspace', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'availableflashspace', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //Returns the total number of sectors available to store application's data.
 //<br><br>
@@ -6657,14 +5018,11 @@ Object.defineProperty(fd, 'availableflashspace', {
 //<br><br>
 //On devices with shared flash memory, this is the amount of memory that is not occupied by the currently loaded firmware/application.
 //On devices with dedicated flash memory, this is the size of the second flash IC that stores fd. object's data.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'buffernum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'buffernum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (RAM buffer #0 selected).</b><br><br>
 //Sets/returns the number of the RAM buffer that will be used for direct sector access.
 //Possible values are 0 or 1.
@@ -6681,15 +5039,11 @@ Object.defineProperty(fd, 'buffernum', {
 //fd.checksum,
 //fd.copyfirmware,
 //fd.copyfirmwarelzo
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'capacity', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'capacity', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //Returns the capacity, in sectors, of the currently existing flash disk.
 //<br><br>
@@ -6697,16 +5051,10 @@ Object.defineProperty(fd, 'capacity', {
 //<br><br>
 //<b>See also: </b>
 //fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
-    
-
-
 //--------------------------------------------------------------------
-
-    //PLATFORM CONSTANT. Verify the checksum.
-    //PLATFORM CONSTANT. Calculate the checksum.
-
-
-fd.checksum = function( mode,  csum) {}
+//PLATFORM CONSTANT. Verify the checksum.
+//PLATFORM CONSTANT. Calculate the checksum.
+fd.checksum = function (mode, csum) { };
 //<b>METHOD. </b><br><br>
 //Calculates and writes into the RAM buffer, or verifies the checksum for the data in the currently selected RAM buffer of the flash memory
 //(selection is made through the fd.buffernum property).
@@ -6737,19 +5085,16 @@ fd.checksum = function( mode,  csum) {}
 //fd.setsector,
 //fd.copyfirmware,
 //fd.copyfirmwarelzo
-
 //--------------------------------------------------------------------
-fd.close = function() {}
+fd.close = function () { };
 //<b>METHOD. </b><br><br>
 //Closes the file opened "on" a currently selected file number (selection is made through fd.filenum).
 //<br><br>
 //Invoking the method also does the job performed by the fd.flush method.
 //<br><br>
 //Attempting to invoke this method "on" the file number that did not have any opened file associated with it generates no error. 
-
 //--------------------------------------------------------------------
-
-fd.copyfirmware = function( numsectors) {}
+fd.copyfirmware = function (numsectors) { };
 //<b>METHOD.</b><br><br>
 //Copies the specified number of sectors (starting from the logical sector 0) from the data area into the TiOS/application area of the flash memory, then reboots the device to make it run new TiOS/application.
 //<br><br>
@@ -6762,11 +5107,8 @@ fd.copyfirmware = function( numsectors) {}
 //fd.copyfirmwarelzo,
 //fd.copyfirmwarefromfile
 //fd.copyfirmwarefromfilelzo
-
-
 //--------------------------------------------------------------------
-
-fd.copyfirmwarefromfile = function() {}
+fd.copyfirmwarefromfile = function () { };
 //<b>METHOD.</b><br><br>
 //Copies the data from an opened and currently selected file of the flash disk (selection is made through fd.filenum) into the TiOS/application area of the flash memory,
 //then reboots the device to make it run new TiOS/application.
@@ -6780,56 +5122,26 @@ fd.copyfirmwarefromfile = function() {}
 //fd.copyfirmware
 //fd.copyfirmwarelzo,
 //fd.copyfirmwarefromfilelzo
-
-
 //--------------------------------------------------------------------
-
 //ARM
 //Keytroller
-
 //EM2000, TPP2(G2), TPP3(G2), other ARM platforms
-	fd.copyfirmwarelzo = function( app_present) {}
-	//<b>METHOD.</b><br><br>
-	//Assumes that there is a block of data containing the TiOS firmware, optionally followed by an LZO-compressed application binary stored beginning from the logical sector 0 of the flash memory.
-	//Copies TiOS firmware into the TiOS area of the flash. If the app_present argument is not zero, decompresses the application binary and copies it into the application area of the flash.
-	//After that, reboots the device to make it run new TiOS firmware (and application).
-	//<br><br>
-	//The application portion (compiled Tibbo BASIC/C application binary) is optional.
-	//<br><br>
-	//<b>BE VERY CAREFUL! </b>Using fd.copyfirmwarelzo on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
-	//<br><br>
-	//<b>See also: </b>
-	//fd.copyfirmware
-	//fd.copyfirmwarefromfile
-
+fd.copyfirmwarelzo = function (app_present) { };
+//<b>METHOD.</b><br><br>
+//Assumes that there is a block of data containing the TiOS firmware, optionally followed by an LZO-compressed application binary stored beginning from the logical sector 0 of the flash memory.
+//Copies TiOS firmware into the TiOS area of the flash. If the app_present argument is not zero, decompresses the application binary and copies it into the application area of the flash.
+//After that, reboots the device to make it run new TiOS firmware (and application).
+//<br><br>
+//The application portion (compiled Tibbo BASIC/C application binary) is optional.
+//<br><br>
+//<b>BE VERY CAREFUL! </b>Using fd.copyfirmwarelzo on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
+//<br><br>
+//<b>See also: </b>
+//fd.copyfirmware
+//fd.copyfirmwarefromfile
 //T1000
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //--------------------------------------------------------------------
-
-fd.copyfirmwarefromfilelzo = function() {}
+fd.copyfirmwarefromfilelzo = function () { };
 //<b>METHOD.</b><br><br>
 //Copies the data from an opened and currently selected file of the flash disk (selection is made through fd.filenum) into the TiOS/application area of the flash memory.
 //The optional application binary portion of the file is expected to be LZO-compressed. After that, reboots the device to make it run new TiOS/application.
@@ -6842,10 +5154,8 @@ fd.copyfirmwarefromfilelzo = function() {}
 //fd.copyfirmware
 //fd.copyfirmwarelzo,
 //fd.copyfirmwarefromfile
-
-
 //--------------------------------------------------------------------
-fd.cutfromtop = function( numsectors) {}
+fd.cutfromtop = function (numsectors) { };
 //<b>METHOD. </b><br><br>
 //Removed  a specified number of sectors from the beginning of a file opened "on" a currently selected file number (selection is made through fd.filenum). 
 //<br><br>
@@ -6855,9 +5165,8 @@ fd.cutfromtop = function( numsectors) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.setfilesize 
-
 //--------------------------------------------------------------------
-fd.create = function( name_attr) {}
+fd.create = function (name_attr) { };
 //<b>METHOD. </b><br><br>
 //Creates a new file with the specified name and attributes.
 //<br><br>
@@ -6869,9 +5178,8 @@ fd.create = function( name_attr) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.rename, fd.delete, fd.getnumfiles, fd.maxstoredfiles
-
 //--------------------------------------------------------------------
-fd.delete = function( name) {}
+fd.delete = function (name) { };
 //<b>METHOD. </b><br><br>
 //Deletes a file with the specified file name from the flash disk.
 //<br><br>
@@ -6879,27 +5187,22 @@ fd.delete = function( name) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.create, fd.rename, fd.getnumfiles, fd.maxstoredfiles
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'filenum', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'filenum', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (file #0 selected).</b><br><br>
 //Sets/returns the number of the currently selected file.
 //<br><br>
 //Several files can be opened (see fd.open) at the same time. Each file is said to be opened "on" a certain file number (the value of this property at the time of the file opening).
 //<br><br>
 //Although the file is opened by referring to its name, many other operations, such as fd.setdata or fd.close refer to the file number.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'fileopened', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'fileopened', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no file is currently opened on this file number).</b><br><br>
 //Reports if any file is currently opened "on" the selected file number (selection is made through fd.filenum.
 //<br><br>
@@ -6907,33 +5210,24 @@ Object.defineProperty(fd, 'fileopened', {
 //<br><br>
 //<b>See also: </b>
 //fd.maxopenedfiles 
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'filesize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'filesize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (DWORD).</b><br><br>
 //Returns the size, in bytes, of the file opened "on" the currently selected file number (selection is made through fd.filenum). Returns zero if no file is currently opened.
 //<br><br>
 //<b>See also: </b>
 //fd.getdata, fd.setdata, fd.pointer, fd.setpointer
-    
-
-
 //--------------------------------------------------------------------
-
-    //PLATFORM CONSTANT. Find data that is equal to the substr.
-    //PLATFORM CONSTANT. Find data that is not equal to the substr.
-    //PLATFORM CONSTANT. Find data with value greater than the value of the substr.
-    //PLATFORM CONSTANT. Find data with value greater than or equal to the value of the substr.
-    //PLATFORM CONSTANT. Find data with value less than the value of the substr.
-    //PLATFORM CONSTANT. Find data with value less than or equal to the value of the substr.
-
-
-fd.find = function( frompos,  substr,  instance,  dir,  incr,  mode) {}
+//PLATFORM CONSTANT. Find data that is equal to the substr.
+//PLATFORM CONSTANT. Find data that is not equal to the substr.
+//PLATFORM CONSTANT. Find data with value greater than the value of the substr.
+//PLATFORM CONSTANT. Find data with value greater than or equal to the value of the substr.
+//PLATFORM CONSTANT. Find data with value less than the value of the substr.
+//PLATFORM CONSTANT. Find data with value less than or equal to the value of the substr.
+fd.find = function (frompos, substr, instance, dir, incr, mode) { };
 //<b>METHOD. </b><br><br>
 //Finds the Nth instance of data satisfying selected criteria in a file opened "on" a currently selected file number (selection is made through fd.filenum).
 //<br><br>
@@ -6950,9 +5244,8 @@ fd.find = function( frompos,  substr,  instance,  dir,  incr,  mode) {}
 //<b>Incr </b>-- Search position increment (or decrement for BACK searches).
 //<br><br>
 //<b>Mode </b>-- Search mode (equal, not equal, etc.).
-
 //--------------------------------------------------------------------
-fd.flush = function() {}
+fd.flush = function () { };
 //<b>METHOD. </b><br><br>
 //Saves back to the flash memory ("flushes") the changes made to the most recently edited file.
 //<br><br>
@@ -6962,9 +5255,8 @@ fd.flush = function() {}
 //When the file is closed (see fd.close), RAM buffer "flushing" is done automatically.
 //However, if changes are made to any file and then no disk activity is performed, the buffer may keep the data in the RAM buffer indefinitely.
 //These changes will be lost if your device reboots. To prevent this, use fd.flush. 
-
 //--------------------------------------------------------------------
-fd.format = function( totalsize,  maxstoredfiles) {}
+fd.format = function (totalsize, maxstoredfiles) { };
 //<b>METHOD. </b><br><br>
 //Formats the flash memory to create a flash disk; no transaction journal sectors will be allocated.
 //Use fd.formatj (recommended) to create the disk that will support transaction.
@@ -6978,9 +5270,8 @@ fd.format = function( totalsize,  maxstoredfiles) {}
 //fd.formatj,
 //fd.mount,
 //fd.ready
-
 //--------------------------------------------------------------------
-fd.formatj = function( totalsize,  maxstoredfiles,  maxjournalsectors) {}
+fd.formatj = function (totalsize, maxstoredfiles, maxjournalsectors) { };
 //<b>METHOD. </b><br><br>
 //Formats the flash memory to create a flash disk.
 //<br><br>
@@ -6995,18 +5286,16 @@ fd.formatj = function( totalsize,  maxstoredfiles,  maxjournalsectors) {}
 //<b>See also: </b>
 //fd.mount,
 //fd.ready
-
 //--------------------------------------------------------------------
-fd.getattributes = function( name) {}
+fd.getattributes = function (name) { };
 //<b>METHOD. </b><br><br>
 //Returns the attributes string for a file with the specified file name. Affects the state of fd.laststatus.
 //<br><br>
 //<b>Name </b>-- A string (1-56 characters) with the file name. All characters after the first space encountered (excluding leading spaces) will be ignored. File names are case-sensitive.
 //<br><br>
 //File attributes can be set with fd.create or fd.setattributes methods.
-
 //--------------------------------------------------------------------
-fd.getbuffer = function( offset,  len) {}
+fd.getbuffer = function (offset, len) { };
 //<b>METHOD. </b><br><br>
 //Reads the specified number of bytes from the currently selected RAM buffer of the flash memory
 //(selection is made through the fd.buffernum property). 
@@ -7025,9 +5314,8 @@ fd.getbuffer = function( offset,  len) {}
 //fd.setsector,
 //fd.checksum,
 //fd.copyfirmware
-
 //--------------------------------------------------------------------
-fd.getdata = function( maxinplen) {}
+fd.getdata = function (maxinplen) { };
 //<b>METHOD. </b><br><br>
 //Reads a specified number of bytes from the file opened "on" a currently selected file number (selection is made through fd.filenum). The data is read starting at the fd.pointer position.
 //<br><br>
@@ -7038,9 +5326,8 @@ fd.getdata = function( maxinplen) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.setdata, fd.setpointer, fd.filesize
-
 //--------------------------------------------------------------------
-fd.getfreespace = function() {}
+fd.getfreespace = function () { };
 //<b>METHOD. </b><br><br>
 //Returns the total number of free data sectors available on the flash disk. Affects the state of the fd.laststatus.
 //<br><br>
@@ -7048,9 +5335,8 @@ fd.getfreespace = function() {}
 //<br><br>
 //<b>See also: </b>
 //fd.capacity, fd.numservicesectors, fd.totalsize, fd.maxstoredfiles, fd.getnumfiles
-
 //--------------------------------------------------------------------
-fd.getnextdirmember = function() {}
+fd.getnextdirmember = function () { };
 //<b>METHOD. </b><br><br>
 //Returns the next filename (if any) found in the disk directory. An empty string will be returned if no more files are found.
 //Affects the state of fd.laststatus.
@@ -7058,9 +5344,8 @@ fd.getnextdirmember = function() {}
 //Each time you invoke this method, internal directory "pointer" is incremented by one.
 //<br><br>
 //To obtain the list of disk files, use fd.resetdirpointer first, then invoke fd.getnextdirmember for the fd.getnumfiles number of times, or until the empty string is returned.
-
 //--------------------------------------------------------------------
-fd.getnumfiles = function() {}
+fd.getnumfiles = function () { };
 //<b>METHOD. </b><br><br>
 //Returns the total number of files currently stored on the disk. Affects the state of the fd.laststatus.
 //<br><br>
@@ -7068,9 +5353,8 @@ fd.getnumfiles = function() {}
 //<br><br>
 //<b>See also: </b>
 //fd.capacity, fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.maxstoredfiles
-
 //--------------------------------------------------------------------
-fd.getsector = function( num) {}
+fd.getsector = function (num) { };
 //<b>METHOD. </b><br><br>
 //Reads the entire 264 bytes from the specified sector into the currently selected RAM buffer of the flash memory (selection is made through the fd.buffernum property).
 //<br><br>
@@ -7090,12 +5374,11 @@ fd.getsector = function( num) {}
 //fd.setsector,
 //fd.checksum,
 //fd.copyfirmware
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'laststatus', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'laststatus', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_FD_STATUS_OK (completed successfully).</b><br><br>
 //Returns the execution result for the most recent disk-related method execution. See pl_fd_status_codes enum for the list of all possible status codes.
 //<br><br>
@@ -7106,26 +5389,20 @@ Object.defineProperty(fd, 'laststatus', {
 //<br><br>
 //Note that some errors are fatal and the disk is dismounted (fd.ready is set to 0- NO) immediately upon the detection of any such fatal error.
 //<br><br>
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'maxopenedfiles', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'maxopenedfiles', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the total number of files that can be simultaneously opened by your application.
 //<br><br>
 //The value of this property depends on the hardware (selected platform) and has nothing to do with the formatting of your flash disk.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'maxstoredfiles', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'maxstoredfiles', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the total number of files that can be simultaneously stored on the currently existing flash disk.
 //<br><br>
@@ -7135,11 +5412,8 @@ Object.defineProperty(fd, 'maxstoredfiles', {
 //<br><br>
 //<b>See also: </b>
 //fd.capacity, fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.getnumfiles
-    
-
-
 //--------------------------------------------------------------------
-fd.mount = function() {}
+fd.mount = function () { };
 //<b>METHOD. </b><br><br>
 //Mounts (prepares for use) the flash disk already existing in the flash memory. 
 //<br><br>
@@ -7152,12 +5426,11 @@ fd.mount = function() {}
 //The disk will be dismounted automatically if any fatal condition is detected.
 //<br><br>
 //This method also finishes the "transaction commit job" if it was started with the fd.transactioncommit method and wasn't completed properly due to the power failure or some other reason.
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'numservicesectors', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'numservicesectors', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE).</b><br><br>
 //Returns the total number of sectors occupied by the "housekeeping" data of the currently existing flash disk.
 //<br><br>
@@ -7165,11 +5438,8 @@ Object.defineProperty(fd, 'numservicesectors', {
 //<br><br>
 //<b>See also: </b>
 //fd.capacity, fd.totalsize, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
-    
-
-
 //--------------------------------------------------------------------
-fd.open = function( name) {}
+fd.open = function (name) { };
 //<b>METHOD. </b><br><br>
 //Opens a file with a specified name "on" a currently selected file number (selection is made through fd.filenum).
 //<br><br>
@@ -7183,12 +5453,11 @@ fd.open = function( name) {}
 //<br><br>
 //<b>See also: </b>
 //fd.fileopened, fd.maxopenedfiles
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'pointer', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'pointer', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (DWORD).</b><br><br>
 //Returns the pointer position for the file opened "on" the currently selected file number (selection is made through fd.filenum). Returns zero if no file is currently opened or the file is empty.
 //<br><br>
@@ -7198,14 +5467,11 @@ Object.defineProperty(fd, 'pointer', {
 //<br><br>
 //Move the pointer with fd.setpointer. Fd.getdata and fd.setdata also move the pointer by the amount of bytes read or written.
 //Reducing the file size with fd.setfilesize or fd.cutfromtop may affect the pointer position.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'ready', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'ready', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (the disk is not mounted and is not ready for use).</b><br><br>
 //Informs whether the flash disk is mounted and ready for use.
 //<br><br>
@@ -7213,11 +5479,8 @@ Object.defineProperty(fd, 'ready', {
 //<br><br>
 //<b>See also: </b> 
 //fd.formatj
-    
-
-
 //--------------------------------------------------------------------
-fd.rename = function( old_name,  new_name) {}
+fd.rename = function (old_name, new_name) { };
 //<b>METHOD. </b><br><br>
 //Renames a file specified by its name. 
 //<br><br>
@@ -7230,9 +5493,8 @@ fd.rename = function( old_name,  new_name) {}
 //<br><br>
 //<b>See also: </b>
 //fd.create, fd.delete, fd.getnumfiles, fd.maxstoredfiles
-
 //--------------------------------------------------------------------
-fd.resetdirpointer = function() {}
+fd.resetdirpointer = function () { };
 //<b>METHOD. </b><br><br>
 //Resets the directory pointer to zero.
 //<br><br>
@@ -7240,12 +5502,11 @@ fd.resetdirpointer = function() {}
 //<br><br>
 //<b>See also: </b>
 //fd.getnumfiles
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'sector', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'sector', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //Returns the physical sector number corresponding to the current position of the file pointer position (see fd.pointer).
 //<br><br>
@@ -7253,11 +5514,8 @@ Object.defineProperty(fd, 'sector', {
 //corresponding to the current file pointer position (see fd.pointer).
 //<br><br>
 //This property exists purely for informational purposes. There is no real need for you to know where the fd. object stores your data.
-    
-
-
 //--------------------------------------------------------------------
-fd.setattributes = function( name,  attr) {}
+fd.setattributes = function (name, attr) { };
 //<b>METHOD. </b><br><br>
 //Sets the attributes string for a file with the specified file name.
 //<br><br>
@@ -7268,9 +5526,8 @@ fd.setattributes = function( name,  attr) {}
 //<br><br>
 //<b>See also: </b>
 //fd.getattributes, fd.create
-
 //--------------------------------------------------------------------
-fd.setbuffer = function( data,  offset) {}
+fd.setbuffer = function (data, offset) { };
 //<b>METHOD. </b><br><br>
 //Writes a specified number of bytes into the currently selected RAM buffer of the flash memory (selection is made through the fd.buffernum property). 
 //<br><br>
@@ -7293,9 +5550,8 @@ fd.setbuffer = function( data,  offset) {}
 //fd.setsector,
 //fd.checksum,
 //fd.copyfirmware
-
 //--------------------------------------------------------------------
-fd.setdata = function( data) {}
+fd.setdata = function (data) { };
 //<b>METHOD. </b><br><br>
 //Writes the data string to a file opened "on" a currently selected file number (selection is made through fd.filenum). The data is written starting at the fd.pointer position.
 //<br><br>
@@ -7308,9 +5564,8 @@ fd.setdata = function( data) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.getdata, fd.setpointer
-
 //--------------------------------------------------------------------
-fd.setfilesize = function( newsize) {}
+fd.setfilesize = function (newsize) { };
 //<b>METHOD. </b><br><br>
 //Sets (reduces) the file size of a file opened "on" a currently selected file number (selection is made through fd.filenum.
 //<br><br>
@@ -7321,9 +5576,8 @@ fd.setfilesize = function( newsize) {}
 //<br><br>
 //<b>See also: </b> 
 //fd.cutfromtop
-
 //--------------------------------------------------------------------
-fd.setpointer = function( pos) {}
+fd.setpointer = function (pos) { };
 //<b>METHOD. </b><br><br>
 //Sets the new pointer position for a file opened "on" a currently selected file number (selection is made through fd.filenum). 
 //<br><br>
@@ -7336,9 +5590,8 @@ fd.setpointer = function( pos) {}
 //<br><br>
 //<b>See also: </b>
 //fd.pointer
-
 //--------------------------------------------------------------------
-fd.setsector = function( num) {}
+fd.setsector = function (num) { };
 //<b>METHOD. </b><br><br>
 //Writes the entire 264 bytes of the specified sector with the data from the currently selected RAM buffer of the flash memory
 //(selection is made through the fd.buffernum property). 
@@ -7361,12 +5614,11 @@ fd.setsector = function( num) {}
 //fd.getsector,
 //fd.checksum,
 //fd.copyfirmware
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'totalsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'totalsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD).</b><br><br>
 //Returns the total number of sectors occupied by the currently existing flash disk.
 //<br><br>
@@ -7376,145 +5628,21 @@ Object.defineProperty(fd, 'totalsize', {
 //<br><br>
 //<b>See also: </b>
 //fd.capacity, fd.numservicesectors, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'leveling', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(fd, 'leveling', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-Object.defineProperty(fd, 'errordata', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-
-
+Object.defineProperty(fd, 'errordata', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'transactioncapacityremaining', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'transactioncapacityremaining', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0 (0 sectors).</b><br><br>
 //Returns the number of sectors that can still be changed in the cause of the current disk transaction.
 //<br><br>
@@ -7526,11 +5654,8 @@ Object.defineProperty(fd, 'transactioncapacityremaining', {
 //<br><br>
 //<b>See also: </b>
 //fd.transactioncommit,fd.transactionstarted 
-    
-
-
 //--------------------------------------------------------------------
-fd.transactioncommit = function() {}
+fd.transactioncommit = function () { };
 //<b>METHOD. </b><br><br>
 //Commits a disk transaction that was previously started with the fd.transactionstart method.
 //<br><br>
@@ -7538,9 +5663,8 @@ fd.transactioncommit = function() {}
 //<br><br>
 //<b>See also: </b>
 //fd.transactionstarted, fd.transactioncapacityremaining
-
 //--------------------------------------------------------------------
-fd.transactionstart = function() {}
+fd.transactionstart = function () { };
 //<b>METHOD. </b><br><br>
 //Starts a disk transaction.
 //<br><br>
@@ -7551,12 +5675,11 @@ fd.transactionstart = function() {}
 //<br><br>
 //<b>See also: </b>
 //fd.transactionstarted, fd.transactioncapacityremaining
-
 //--------------------------------------------------------------------
-Object.defineProperty(fd, 'transactionstarted', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(fd, 'transactionstarted', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (transaction hasn't been started yet).</b><br><br>
 //Reports whether a disk transaction is currently in progress.
 //<br><br>
@@ -7564,87 +5687,50 @@ Object.defineProperty(fd, 'transactionstarted', {
 //<br><br>
 //<b>See also: </b>
 //fd.transactioncapacityremaining
-    
-
-
 //--------------------------------------------------------------------
 //Keytroller
-
-
-fd.copymonitor = function( x1,  x2,  x3,  x4) {}
-
-
+fd.copymonitor = function (x1, x2, x3, x4) { };
 //**************************************************************************************************
 //       TPRAM (Tamper-proof non-volatile RAM) object
 //**************************************************************************************************
-
-
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(tpram, 'triggerpolarity', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(tpram, 'triggerpolarity', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(tpram, 'tamperdetection', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(tpram, 'tamperdetection', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(tpram, 'timestamping', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-    
-
-
+Object.defineProperty(tpram, 'timestamping', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-Object.defineProperty(tpram, 'capacity', { 
-            get() { return 0; },
-            set() {  } 
-        });
-    
-
-
+Object.defineProperty(tpram, 'capacity', {
+    get() { return 0; },
+    set() { }
+});
 //--------------------------------------------------------------------
-tpram.getdata = function( startaddr,  len) {}
+tpram.getdata = function (startaddr, len) { };
 //<b>METHOD. </b><br><br> 
-
 //--------------------------------------------------------------------
-tpram.setdata = function( datatoset,  startaddr) {}
+tpram.setdata = function (datatoset, startaddr) { };
 //<b>METHOD. </b><br><br> 
-
 //--------------------------------------------------------------------
-tpram.gettimestamp = function( daycount,  mincount,  seconds,  overflow) {}
-
+tpram.gettimestamp = function (daycount, mincount, seconds, overflow) { };
 //**************************************************************************************************
 //       WLN (Wi-Fi) object
 //**************************************************************************************************
-
-
-
-
-
-
 //The wln. object represents the Wi-Fi interface of your device. This object is responsible for finding and associating with Wi-Fi networks, as well as for creating your own network.
 //It also specifies various parameters related to the Wi-Fi interface (IP address, default gateway IP, netmask, etc.).  The object is not in charge of
 //sending/transmitting data. The latter is the job of the sock. object.
 //<br><br>
 //The wln. object is designed to work with the GA1000 and WA2000 devices.
-
 //--------------------------------------------------------------------
-wln.activescan = function( ssid) {}
+wln.activescan = function (ssid) { };
 //<b>METHOD.</b>
 //<b>METHOD.</b>
 //<br><br>
@@ -7663,15 +5749,11 @@ wln.activescan = function( ssid) {}
 //<br><br>
 //Scanning while the Wi-Fi interface is in the associated state (wln.associationstate= 1- PL_WLN_ASSOCIATED) or running its own network
 //(wln.associationstate= 2- PL_WLN_OWN_NETWORK) will temporarily disrupt communications between your device and other stations.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br> Infrastructure mode.
-    //<b>PLATFORM CONSTANT.</b><br><br> Ad-hoc (device-to-device) mode.
-
-
+//<b>PLATFORM CONSTANT.</b><br><br> Infrastructure mode.
+//<b>PLATFORM CONSTANT.</b><br><br> Ad-hoc (device-to-device) mode.
 //--------------------------------------------------------------------
-wln.associate = function( bssid,  ssid,  channel,  bssmode) {}
+wln.associate = function (bssid, ssid, channel, bssmode) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to attempt association with the specified wireless network.
@@ -7697,18 +5779,14 @@ wln.associate = function( bssid,  ssid,  channel,  bssmode) {}
 //<br><br>
 //Association is a complex subject. It is difficult to explain everything there is to explain in a tooltip like this.
 //To get more information (and there is <i>a lot </i>of information to get!), highlight wln.associate in your code and press F1.  
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is idle.
-    //<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is associated with a wireless network.
-    //<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is running its own ad-hoc network.   
-
-
-Object.defineProperty(wln, 'associationstate', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is idle.
+//<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is associated with a wireless network.
+//<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is running its own ad-hoc network.   
+Object.defineProperty(wln, 'associationstate', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_NOT_ASSOCIATED (the Wi-Fi interface is idle). </b>
 //<br><br>
 //Indicates whether the Wi-Fi interface is idle, associated with another network, or running its own network.
@@ -7718,27 +5796,21 @@ Object.defineProperty(wln, 'associationstate', {
 //<br><br>
 //After the Wi-Fi interface succeeds in creating its own network (see wln.networkstart), the value of this property becomes 2- PL_WLN_OWN_NETWORK.
 //The value is reset back to 0- PL_WLN_NOT_ASSOCIATED when the network is terminated with wln.networkstop.
-    
-
-
 //--------------------------------------------------------------------
-
-    //2.4GHz band, 802.11b/g. 
-    //2.4GHz band, 802.11b. 
-    //5GHz band, 802.11a. 
-    //2.4G and 5G band, 802.11a/b/g. 
-    //2.4GHz band, 802.11g. 
-    //2.4G and 5G band (default), 802.11a/b/g/n. 
-    //11n-only with 2.4GHz band, 802.11n. 
-    //2.4GHz band, 802.11g/n. 
-    //5GHz band, 802.11a/n. 
-    //2.4GHz band, 802.11b/g/n. 
-    //2.4G and 5G band, 802.11a/g/n. 
-    //11n-only with 5GHz band, 802.11n. 
-
-
+//2.4GHz band, 802.11b/g. 
+//2.4GHz band, 802.11b. 
+//5GHz band, 802.11a. 
+//2.4G and 5G band, 802.11a/b/g. 
+//2.4GHz band, 802.11g. 
+//2.4G and 5G band (default), 802.11a/b/g/n. 
+//11n-only with 2.4GHz band, 802.11n. 
+//2.4GHz band, 802.11g/n. 
+//5GHz band, 802.11a/n. 
+//2.4GHz band, 802.11b/g/n. 
+//2.4G and 5G band, 802.11a/g/n. 
+//11n-only with 5GHz band, 802.11n. 
 //--------------------------------------------------------------------
-wln.boot = function( offset) {}
+wln.boot = function (offset) { };
 //<b>METHOD.</b>
 //<br><br>
 //Boots up the Wi-Fi add-on module.
@@ -7755,9 +5827,8 @@ wln.boot = function( offset) {}
 //On the WA2000, the method will fail if the offset is anything but 0.
 //<br><br>
 //Finally, the method will fail if the Wi-Fi hardware is already booted and operational.
-
 //--------------------------------------------------------------------
-wln.buffrq = function( numpages) {}
+wln.buffrq = function (numpages) { };
 //<b>METHOD.</b>
 //<br><br>
 //Pre-requests a number of buffer pages (1 page= 256 bytes) for the TX buffer of the wln. object.
@@ -7768,25 +5839,21 @@ wln.buffrq = function( numpages) {}
 //will be unable to operate properly if its TX buffer has inadequate capacity.
 //<br><br>
 //Buffer allocation will not work if the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'buffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'buffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes).</b>
 //<br><br>
 //Returns the current capacity (in bytes) of the wln object's TX buffer.
 //<br><br>
 //Buffer capacity is set using wln.buffrq method.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'clkmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'clkmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
 //<br><br>
 //Sets/returns the number of the GPIO line acting as the clock (CLK) line of the Wi-Fi module's SPI interface. The line is selected from
@@ -7795,15 +5862,11 @@ Object.defineProperty(wln, 'clkmap', {
 //This selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
 //<br><br>
 //This property has no effect on the EM500W platform.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'csmap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'csmap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
 //<br><br>
 //Sets/returns the number of the GPIO line acting as the chip select (CS) line of the Wi-Fi module's SPI interface. The line is selected from
@@ -7812,15 +5875,11 @@ Object.defineProperty(wln, 'csmap', {
 //This selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
 //<br><br>
 //This property has no effect on the EM500W platform.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'dimap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'dimap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
 //<br><br>
 //Sets/returns the number of the GPIO line acting as the data in (DI) line of the Wi-Fi module's SPI interface. The line is selected from
@@ -7831,12 +5890,8 @@ Object.defineProperty(wln, 'dimap', {
 //This DI line must be connected to the DO pin of the GA1000.
 //<br><br>
 //This property has no effect on the EM500W platform.
-    
-    
-
-
 //--------------------------------------------------------------------
-wln.disassociate = function() {}
+wln.disassociate = function () { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence disassociation from a wireless network.
@@ -7845,19 +5900,15 @@ wln.disassociate = function() {}
 //<br><br>
 //Wln.disassociate will also be rejected if the Wi-Fi interface is not operational (wln.enabled=0- NO) or
 //if the Wi-Fi interface is not currently associated (wln.associationstate <> 1- PL_WLN_ASSOCIATED).
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br> FCC (US), default. GA1000: channels 1-11 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range.
-    //<b>PLATFORM CONSTANT.</b><br><br> European Union. GA1000: channels 1-13 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range. 
-    //<b>PLATFORM CONSTANT.</b><br><br> Japan. GA1000: channels 1-14 of the 2.4GHz range; WA2000: the same plus channels 34-36 of the 5.0GHz range. 
-
-
+//<b>PLATFORM CONSTANT.</b><br><br> FCC (US), default. GA1000: channels 1-11 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range.
+//<b>PLATFORM CONSTANT.</b><br><br> European Union. GA1000: channels 1-13 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range. 
+//<b>PLATFORM CONSTANT.</b><br><br> Japan. GA1000: channels 1-14 of the 2.4GHz range; WA2000: the same plus channels 34-36 of the 5.0GHz range. 
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'domain', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'domain', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_DOMAIN_FCC. </b>
 //<br><br>
 //Selects the domain (area of the world) in which this device is operating. This defines the list of channels on which the Wi-Fi interface
@@ -7866,15 +5917,11 @@ Object.defineProperty(wln, 'domain', {
 //Passive scanning (wln.scan) is performed on all channels of enabled bands (wln.band), regardless of the value of wln.domain.
 //<br><br>
 //This property can't be changed while the Wi-Fi hardware is operational (wln.enabled= 1- YES).
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'domap', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'domap', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
 //<br><br>
 //Sets/returns the number of the GPIO line acting as the data out (DO) line of the Wi-Fi module's SPI interface. The line is selected from
@@ -7885,15 +5932,11 @@ Object.defineProperty(wln, 'domap', {
 //This DO line must be connected to the DI pin of the GA1000.
 //<br><br>
 //This property has no effect on the EM500W platform.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
 //<br><br>
 //Indicates whether the Wi-Fi interface is operational.
@@ -7902,201 +5945,53 @@ Object.defineProperty(wln, 'enabled', {
 //<br><br>
 //The Wi-Fi interface is disabled and the wln.enabled is reset to 0- NO if wln.disable is called, or the Wi-Fi hardware is disconnected, powered down, malfunctioned,
 //or was intentionally reset. In all these cases the on_wln_event(0- PL_WLN_EVENT_DISABLED) event is generated, too.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'gatewayip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'gatewayip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //Sets/returns the IP address of the default gateway for the Wi-Fi interface of your device.
 //<br><br>
 //This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
 //sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-	
-	
-
-
 //--------------------------------------------------------------------
-
-    //Main firmware region.
-	//Monitor/Loader firmware region.
-
-
+//Main firmware region.
+//Monitor/Loader firmware region.
 //T1000 Based Devices and EM500W
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //--------------------------------------------------------------------
-wln.getmoduletype = function() {}
+wln.getmoduletype = function () { };
 //<b>R/O PROPERTY (BYTE, ENUM). </b><br><br>
 //Detects and returns the Wi-Fi module type, or just returns the module type if it has already been detected earlier.
 //<br><br>
 //The actual module type detection happens on the first invocation of wln.getmoduletype or wln.boot, whichever is called first after the reset of the Wi-Fi module.
 //<br><br>
 //Wln.getmoduletype also has a side job -- it can be used to boot the WA2000 into the Monitor/Loader, which is necessary for performing firmware updates.
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'monversion', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'monversion', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING). </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's Monitor/Loader.
 //<br><br>
 //This property starts returning the Monitor/Loader version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
 //<br><br>
 //When the GA1000 device is used, this property always returns an empty string.
-  
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'fwversion', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'fwversion', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING). </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's main firmware.
 //<br><br>
 //This property starts returning the firmware version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
 //<br><br>
 //When the GA1000 device is used, this property always returns an empty string.
-    
-
-
 //--------------------------------------------------------------------
-wln.disable = function() {}
+wln.disable = function () { };
 //<b>METHOD. </b><br><br>
 //Causes the wln. object to be disabled.
 //<br><br>
@@ -8107,9 +6002,8 @@ wln.disable = function() {}
 //Alternatively, wait for the on_wln_event(0- PL_WLN_EVENT_DISABLED) event -- it is generated when the wln. object is disabled.
 //<br><br>
 //You can enable the wln. object again by resetting the Wi-Fi module and calling wln.boot.
-
 //--------------------------------------------------------------------
-wln.setupgraderegion = function( region) {}
+wln.setupgraderegion = function (region) { };
 //<b>METHOD. </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, specifies what region (portion) of the WA2000's firmware is going to be upgraded -- the main firmware or the Monitor/Loader.
 //<br><br>
@@ -8117,9 +6011,8 @@ wln.setupgraderegion = function( region) {}
 //<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
 //<br><br>
 //Invoking this method while using the GA1000 device will have no effect.
-
 //--------------------------------------------------------------------
-wln.writeflashpage = function( page) {}
+wln.writeflashpage = function (page) { };
 //<b>METHOD. </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, sends a 128-byte page (block) of firmware data into the module. The method should be called repeatedly until the entire firmware "file" has been uploaded onto the WA2000.
 //<br><br>
@@ -8127,9 +6020,8 @@ wln.writeflashpage = function( page) {}
 //<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
 //<br><br>
 //Invoking this method while using the GA1000 device will have no effect. 
-
 //--------------------------------------------------------------------
-wln.upgrade = function( region,  fwlength,  checksum) {}
+wln.upgrade = function (region, fwlength, checksum) { };
 //<b>METHOD. </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, initiates copying of the firmware "file" (that was uploaded onto the WA2000 using wln.writeflashpage) from the spare area into the target region of the module's flash memory. The target region 'is selected with wln.setupgraderegion.
 //<br><br>
@@ -8137,9 +6029,8 @@ wln.upgrade = function( region,  fwlength,  checksum) {}
 //<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
 //<br><br>
 //Invoking this method while using the GA1000 device will have no effect.
-
 //--------------------------------------------------------------------
-wln.waitforupgradecompletion = function() {}
+wln.waitforupgradecompletion = function () { };
 //<b>METHOD. </b><br><br>
 //For the WA2000 Wi-Fi/BLE add-on, waits for the firmware copying to complete and returns the result of the copying process. Firmware copying is initiated using wln.upgrade.
 //<br><br>
@@ -8147,12 +6038,11 @@ wln.waitforupgradecompletion = function() {}
 //<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
 //<br><br>
 //Invoking this method while using the GA1000 device will have no effect.
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'band', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'band', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 5- WIFI_PHY_11ABGN_MIXED (2.4G and 5G bands, 802.11a/b/g/n).</b>
 //<br><br>
 //Specifies what frequency bands (2.4GHz, 5.0GHz, or both) and 802.11 communications standards ("a", "b", "g", "n" or combinations thereof) are enabled.
@@ -8160,31 +6050,21 @@ Object.defineProperty(wln, 'band', {
 //Since the GA1000 device only supports 2.4GHz "b" and "g" modes, the value of this property is reset to 0- WIFI_PHY_11BG_MIXED as soon as the wln.boot or wln.getmoduletype method is executed (and the Wi-Fi module type is detected).
 //<br><br>
 //The value of this property cannot be changed when the wln.enabled R/O property is at 1- ENABLED (the wln.boot method has been executed). 
-    
-    
-
-
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'ip', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'ip', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "1.0.0.1". </b><br><br>
 //Sets/returns the IP address of the Wi-Fi interface of your device.
 //<br><br>
 //This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
 //sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'mac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'mac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b>
 //<br><br>
 //Sets/returns the MAC address of the Wi-Fi interface.
@@ -8196,26 +6076,18 @@ Object.defineProperty(wln, 'mac', {
 //<br><br>
 //Alternatively, set your own MAC address before calling wln.boot. This MAC address, and not the internal MAC of the Wi-Fi module will
 //be used (but only until the module is rebooted). The MAC address hardcoded into the module is never overwitten or erased.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'netmask', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'netmask', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
 //Sets/returns the netmask of the Wi-Fi interface of your device.
 //<br><br>
 //This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
 //sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
-    
-    
-
-
 //--------------------------------------------------------------------
-wln.networkstart = function( ssid,  channel) {}
+wln.networkstart = function (ssid, channel) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence creating its own network.
@@ -8230,9 +6102,8 @@ wln.networkstart = function( ssid,  channel) {}
 //<br><br>
 //The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time. 
 //Completion does not imply success -- the result has to be verified by reading the state of the wln.associationstate R/O property.
-
 //--------------------------------------------------------------------
-wln.networkstop = function() {}
+wln.networkstop = function () { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence the termination of its own network.
@@ -8241,14 +6112,9 @@ wln.networkstop = function() {}
 //The task will also be rejected if the Wi-Fi hardware is not operational (wln.enabled=0- NO) or the Wi-Fi interface is not currently running own network (wln.assiciationstate <> 2- PL_WLN_OWN_NETWORK).
 //<br><br>
 //The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi hardware has been disconnected, powered-down, reset, or is malfunctioning.
-    //<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi interface has been disassociated from the wireless network.
-
-
-
+//<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi hardware has been disconnected, powered-down, reset, or is malfunctioning.
+//<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi interface has been disassociated from the wireless network.
 //<b>EVENT of the wln object.</b>
 //<br><br>
 //Generated when the wln. object detects disassociation from the wireless network, the Wi-Fi interface is disabled by calling wln.disable,
@@ -8259,26 +6125,21 @@ wln.networkstop = function() {}
 //Multiple on_wln_event events may be waiting in the event queue.
 //For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
 //for this event or the body of any procedure in the related call chain.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>No task (idle). 
-    //<b>PLATFORM CONSTANT.</b><br><br>Passive scan task.
-    //<b>PLATFORM CONSTANT.</b><br><br>Association task.
-    //<b>PLATFORM CONSTANT.</b><br><br>TX power adjustment task (completes immediately).
-    //<b>PLATFORM CONSTANT.</b><br><br>WEP mode and keys setup task (completes immediately).
-    //<b>PLATFORM CONSTANT.</b><br><br>Disassociation task.
-    //<b>PLATFORM CONSTANT.</b><br><br>Network start task.
-    //<b>PLATFORM CONSTANT.</b><br><br>Network stop task.
-    //<b>PLATFORM CONSTANT.</b><br><br>WPA mode and keys setup task (completes immediately). 
-    //<b>PLATFORM CONSTANT.</b><br><br>Active scan task.
-    //<b>PLATFORM CONSTANT.</b><br><br>RSSI update task.
-	//<b>PLATFORM CONSTANT.</b><br><br>EAP-TLS mode and keys setup task (completes immediately). 
-	//<b>PLATFORM CONSTANT.</b><br><br>EAP-PEAP mode and keys setup task (completes immediately). 
-	//<b>PLATFORM CONSTANT.</b><br><br>EAP-TTLS mode and keys setup task (completes immediately).     
-
-
-
+//<b>PLATFORM CONSTANT.</b><br><br>No task (idle). 
+//<b>PLATFORM CONSTANT.</b><br><br>Passive scan task.
+//<b>PLATFORM CONSTANT.</b><br><br>Association task.
+//<b>PLATFORM CONSTANT.</b><br><br>TX power adjustment task (completes immediately).
+//<b>PLATFORM CONSTANT.</b><br><br>WEP mode and keys setup task (completes immediately).
+//<b>PLATFORM CONSTANT.</b><br><br>Disassociation task.
+//<b>PLATFORM CONSTANT.</b><br><br>Network start task.
+//<b>PLATFORM CONSTANT.</b><br><br>Network stop task.
+//<b>PLATFORM CONSTANT.</b><br><br>WPA mode and keys setup task (completes immediately). 
+//<b>PLATFORM CONSTANT.</b><br><br>Active scan task.
+//<b>PLATFORM CONSTANT.</b><br><br>RSSI update task.
+//<b>PLATFORM CONSTANT.</b><br><br>EAP-TLS mode and keys setup task (completes immediately). 
+//<b>PLATFORM CONSTANT.</b><br><br>EAP-PEAP mode and keys setup task (completes immediately). 
+//<b>PLATFORM CONSTANT.</b><br><br>EAP-TTLS mode and keys setup task (completes immediately).     
 //<b>EVENT of the wln object.</b>
 //<br><br>
 //Generated when the Wi-Fi interface completes executing a given task.
@@ -8291,12 +6152,11 @@ wln.networkstop = function() {}
 //Multiple on_wln_task_complete events may be waiting in the event queue.
 //For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
 //for this event or the body of any procedure in the related call chain.
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'rssi', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'rssi', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b>
 //<br><br>
 //Indicates the strength of the signal being received from the wireless peer.
@@ -8304,17 +6164,12 @@ Object.defineProperty(wln, 'rssi', {
 //The signal strength is expressed in 256 arbitrary levels that do not correspond to any standard measurement unit.
 //<br><br>
 //This property is only updated while the Wi-Fi interface is in the non-idle state (wln.associationstate <> 0- PL_WLN_NOT_ASSOCIATED).
-    
-
-
 //--------------------------------------------------------------------
-
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence RSSI value updating.
-
 //--------------------------------------------------------------------
-wln.scan = function( ssid) {}
+wln.scan = function (ssid) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence either the passive detection of available wireless networks or obtainment of an additional information about a particular network specified by its SSID (name).
@@ -8332,72 +6187,55 @@ wln.scan = function( ssid) {}
 //<br><br>
 //Scanning while the Wi-Fi interface is in the associated state (wln.associationstate= 1- PL_WLN_ASSOCIATED) or running its own network
 //(wln.associationstate= 2- PL_WLN_OWN_NETWORK) will temporarily disrupt communications between your device and other stations.
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure and ad-hoc networks.
-    //<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure networks only.
-    //<b>PLATFORM CONSTANT.</b><br><br> Scan for ad-hoc networks only.
-
-
-Object.defineProperty(wln, 'scanfilter', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure and ad-hoc networks.
+//<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure networks only.
+//<b>PLATFORM CONSTANT.</b><br><br> Scan for ad-hoc networks only.
+Object.defineProperty(wln, 'scanfilter', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_SCAN_ALL. </b>
 //<br><br>
 //Determines what wireless networks are included in the scan results (after scanning with wln.scan or wln.activescan): all networks, only infrastructure networks (access points), or only ad-hoc networks.
 //<br><br>
 //Note that WA2000 does not support association with ad-hoc networks.
-    
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultbssid', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultbssid', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
 //<br><br>
 //After a successful scan for a particular network (wln.scan or wln.activescan with the SSID specified) this property will contain the BSSID ("MAC address") of this network. 
 //<br><br>
 //This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultbssmode', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultbssmode', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_BSS_MODE_INFRASTRUCTURE.</b>
 //<br><br>
 //After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the network mode of this network
 //(infrastructure or ad-hoc).
 //<br><br>
 //This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultchannel', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultchannel', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 1 (channel 1).</b>
 //<br><br>
 //After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the number of the channel on which this network operates.
 //<br><br>
 //This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultrssi', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultrssi', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b>
 //<br><br>
 //After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the strength of the signal received from this network.
@@ -8405,14 +6243,11 @@ Object.defineProperty(wln, 'scanresultrssi', {
 //This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
 //<br><br>
 //The signal strength is expressed in 256 arbitrary levels that do not correspond to any standard measurement unit.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultssid', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultssid', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
 //<br><br>
 //After a scan (wln.scan or wln.activescan) this property will contain a comma-delimited list of discovered networks or the name of a particular network depending on how the scan was performed.
@@ -8420,14 +6255,11 @@ Object.defineProperty(wln, 'scanresultssid', {
 //If the wln.scan or wln.activescan method was invoked with its name argument left empty, this property will contain the list of all discovered networks.
 //If the name argument specified a particular network and scanning found this network to be present, then this property will contain the name of this network
 //(otherwise an empty string will be returned).
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'scanresultwpainfo', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'scanresultwpainfo', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
 //<br><br>
 //On GA1000, after a successful scan for a particular network (wln.scan or wln.activescan with the SSID specified) this property will contain binary data required for WPA/WPA2 security protocol.
@@ -8436,11 +6268,8 @@ Object.defineProperty(wln, 'scanresultwpainfo', {
 //This property will not be updated if the wln.scan method is invoked with its ssid argument left empty ("search for all networks" mode).
 //<br><br>
 //The string returned by this property is not intended for humans. The property exists to facilitate the operation of the WLN library, which calculates the WPA key for the GA1000.
-    
-
-
 //--------------------------------------------------------------------
-wln.settxpower = function( level) {}
+wln.settxpower = function (level) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence the adjustment of the TX power to the specified level.
@@ -8453,16 +6282,11 @@ wln.settxpower = function( level) {}
 //<br><br>
 //"Immediate" means you don't have to wait for the task to complete -- it is finished as soon as wln.settxpower is done executing.
 //The on_wln_task_complete event is still generated.
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>WEP is disabled.
-    //<b>PLATFORM CONSTANT.</b><br><br>WEP-64 is enabled.
-    //<b>PLATFORM CONSTANT.</b><br><br>WEP-128 is enabled.
-
-
-wln.setwep = function( wepkey,  wepmode) {}
+//<b>PLATFORM CONSTANT.</b><br><br>WEP is disabled.
+//<b>PLATFORM CONSTANT.</b><br><br>WEP-64 is enabled.
+//<b>PLATFORM CONSTANT.</b><br><br>WEP-128 is enabled.
+wln.setwep = function (wepkey, wepmode) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to set new WEP mode and key.
@@ -8482,25 +6306,15 @@ wln.setwep = function( wepkey,  wepmode) {}
 //The on_wln_task_complete event is still generated.
 //<br><br> 
 //The task will be rejected if the Wi-Fi interface is not operational (wln.enabled= 0- NO).
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>WPA disabled.
-    //<b>PLATFORM CONSTANT.</b><br><br>WPA1-PSK mode.
-    //<b>PLATFORM CONSTANT.</b><br><br>WPA2-PSK mode.
-
-
-
-    //<b>PLATFORM CONSTANT.</b><br><br>Install TKIP key.
-    //<b>PLATFORM CONSTANT.</b><br><br>Install AES key.
-
-
-
-    //<b>PLATFORM CONSTANT.</b><br><br>Install unicast key.
-    //<b>PLATFORM CONSTANT.</b><br><br>Install multicast key.
-
-
-wln.setwpa = function( wpamode,  algorithm,  wpakey,  cast) {}
+//<b>PLATFORM CONSTANT.</b><br><br>WPA disabled.
+//<b>PLATFORM CONSTANT.</b><br><br>WPA1-PSK mode.
+//<b>PLATFORM CONSTANT.</b><br><br>WPA2-PSK mode.
+//<b>PLATFORM CONSTANT.</b><br><br>Install TKIP key.
+//<b>PLATFORM CONSTANT.</b><br><br>Install AES key.
+//<b>PLATFORM CONSTANT.</b><br><br>Install unicast key.
+//<b>PLATFORM CONSTANT.</b><br><br>Install multicast key.
+wln.setwpa = function (wpamode, algorithm, wpakey, cast) { };
 //<b>METHOD.</b>
 //<br><br>
 //Causes the Wi-Fi interface to commence setting new WPA mode and key.
@@ -8522,126 +6336,51 @@ wln.setwpa = function( wpamode,  algorithm,  wpakey,  cast) {}
 //The on_wln_task_complete event is still generated.
 //<br><br> 
 //The task will be rejected if the Wi-Fi interface is not operational (wln.enabled= 0- NO).
-
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'task', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'task', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_TASK_IDLE.</b>
 //<br><br>
 //Indicates the current wln. task being executed.
 //<br><br>
 //The wln. object will only accept another task for execution after the previous task has been completed
 //(wln.task= 0- PL_WLN_TASK_IDLE). Every time the task completes, the on_wln_task_complete event is generated.
-    
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>Continuous output.
-    //<b>PLATFORM CONSTANT.</b><br><br>Burst output.
-    //<b>PLATFORM CONSTANT.</b><br><br>Continuous output of data.
-
-
-
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 1 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 2 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 5.5 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 11 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 22 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 6 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 9 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 12 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 18 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 24 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 36 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 48 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 54 Mbps.
-    //<b>PLATFORM CONSTANT.</b><br><br>Rate = 72 Mbps.
-
-
-
-
+//<b>PLATFORM CONSTANT.</b><br><br>Continuous output.
+//<b>PLATFORM CONSTANT.</b><br><br>Burst output.
+//<b>PLATFORM CONSTANT.</b><br><br>Continuous output of data.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 1 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 2 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 5.5 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 11 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 22 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 6 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 9 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 12 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 18 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 24 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 36 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 48 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 54 Mbps.
+//<b>PLATFORM CONSTANT.</b><br><br>Rate = 72 Mbps.
 //--------------------------------------------------------------------
-Object.defineProperty(wln, 'mfgenabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(wln, 'mfgenabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //**************************************************************************************************
 //       BT (Bluetooth) object
 //**************************************************************************************************
-
-
-
-
-
-
 //The bt. object represents the BLE interface of your device.
 //<br><br>
 //The bt. object is designed to work with the WA2000 add-on Wi-Fi/BLE module. For BT (BLE) radio to work, you must first boot the module using the wln.boot method.
 //This will enable not only the Wi-Fi, but also the BT (BLE) portion of the WA2000.
-
 //--------------------------------------------------------------------
-bt.enable = function() {}
+bt.enable = function () { };
 //<b>METHOD. </b><br><br>
 //Instructs the WA2000 Wi-Fi/BLE add-on module to turns the BLE radio on. This is an asynchronous method -- it returns control back to the app immediately. On_bt_event(PL_BT_EVENT_ENABLED) is generated when the radio turns on. 
 //<br><br>
@@ -8649,50 +6388,42 @@ bt.enable = function() {}
 //<br><br>
 //This method has no effect on the GA1000 device.
 //<br><br>
-
-
 //--------------------------------------------------------------------
-bt.disable = function() {}
+bt.disable = function () { };
 //<b>METHOD. </b><br><br>
 //Instructs the WA2000 Wi-Fi/BLE add-on module to turn the BLE radio off. This is an asynchronous method -- it returns control back to the app immediately. On_bt_event(PL_BT_EVENT_DISABLED) is generated when the radio turns off.
 //<br><br>
 //This method will only have effect if the WA2000 is booted (wln.boot was called and wln.enabled= 1- YES) and if the BLE radio is currently on (bt.enabled= 1-YES).
 //<br><br>
 //This method has no effect on the GA1000 device.
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'enabled', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'enabled', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
 //<br><br>
 //Informs whether the BLE interface of the Wi-Fi/BLE add-on module is on. The interface turns on after the bt.enable method is invoked. 
 //<br><br>
 //The BLE interface is disabled and the bt.enabled is reset to 0- NO if the module is disconnected, powered down, malfunctions, or is put in reset.
 //When this happens, the on_bt_event(PL_BT_EVENT_DISABLED) event is generated as well.
-    
-
-
 //--------------------------------------------------------------------
 //enum pl_wln_bt_modes
 //    PL_WLN_BT_MODE_NOT_SUPPORTED, '<b>PLATFORM CONSTANT.</b><br><br> Bluetooth is not supported by this module.'
 //    PL_WLN_BT_MODE_LE	'<b>PLATFORM CONSTANT.</b><br><br> Bluetooth Low Energy Mode.
-	//PL_WLN_BT_MODE_EDR	'<b>PLATFORM CONSTANT.</b><br><br> Bluetooth Classic Mode.
+//PL_WLN_BT_MODE_EDR	'<b>PLATFORM CONSTANT.</b><br><br> Bluetooth Classic Mode.
 //end enum
-
 //property bt.mode
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font> PL_WLN_BT_MODE_NOT_SUPPORTED. </b><br>
 //The value of this will not be updated until module type has been detected.<br>
 //    get = syscall(754) as pl_wln_bt_modes
 //    'set = syscall(755) (value as pl_wln_bt_modes)
 //end property
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'name', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'name', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (STRING), DEFAULT VALUE= "". </b><br><br>
 //Defines the BLE advertising name. The name can be up to 21 characters long.
 //<br><br>
@@ -8700,10 +6431,6 @@ Object.defineProperty(bt, 'name', {
 //<br><br>
 //<b>Note that your phone (central device) will typically cache advertising data. </b>
 //On iOS, restarting the iOS device will clear the advertising cache. On Android, you can clear the Bluetooth cache via the settings (plus, some applications allow scanning without caching).<br>
-    
-    
-
-
 //--------------------------------------------------------------------
 //property bt.advstring
 //<b>PROPERTY (STRING), DEFAULT VALUE= "". </b><br><br>
@@ -8714,28 +6441,20 @@ Object.defineProperty(bt, 'name', {
 //    get = syscall(758) as string
 //    set = syscall(759) (byref btadvstring as string)
 //end property
-
 //--------------------------------------------------------------------
-
-	//<b>PLATFORM CONSTANT.</b><br><br> Emulates the TI UART-over-BLE service. Not fully supported at this time.
-	//<b>PLATFORM CONSTANT.</b><br><br> Emulates the NORDIC UART-over-BLE service.
-	//<b>PLATFORM CONSTANT.</b><br><br> Emulates the Microchip UART-over-BLE service.
-
-
-Object.defineProperty(bt, 'emulation', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT.</b><br><br> Emulates the TI UART-over-BLE service. Not fully supported at this time.
+//<b>PLATFORM CONSTANT.</b><br><br> Emulates the NORDIC UART-over-BLE service.
+//<b>PLATFORM CONSTANT.</b><br><br> Emulates the Microchip UART-over-BLE service.
+Object.defineProperty(bt, 'emulation', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 2- PL_WLN_BT_EMULATION_MODE_MICROCHIP. </b><br><br>
 //Configures the BLE interface to mimic TI, Nordic, or Microchip BLE devices. 
 //<br><br>
 //The value of this property can only be changed when bt.enabled= 0- NO (that is, before calling bt.enable).
-    
-    
-
-
 //--------------------------------------------------------------------
-bt.rxbuffrq = function( numpages) {}
+bt.rxbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //Pre-requests the "numpages" number of buffer pages (1 page is 256 bytes) for the RX buffer of the BLE interface. Returns the actual number of pages that can be allocated.
 //The actual buffer allocation happens when the sys.buffalloc method is called.
@@ -8750,9 +6469,8 @@ bt.rxbuffrq = function( numpages) {}
 //Buffer allocation will not work if the BLE interface is enabled (bt.enabled= 1- YES at the time when sys.buffalloc executes).
 //<br><br>
 //The maximum number of pages you can request for this buffer is limited to 255.
-
 //--------------------------------------------------------------------
-bt.txbuffrq = function( numpages) {}
+bt.txbuffrq = function (numpages) { };
 //<b>METHOD. </b><br><br>
 //Pre-requests the "numpages" number of buffer pages (1 page is 256 bytes) for the TX buffer of the BLE interface. Returns the actual number of pages that can be allocated.
 //The actual buffer allocation happens when the sys.buffalloc method is called.
@@ -8767,12 +6485,11 @@ bt.txbuffrq = function( numpages) {}
 //Buffer allocation will not work if the BLE interface is enabled (bt.enabled= 1- YES at the time when sys.buffalloc executes).
 //<br><br>
 //The maximum number of pages you can request for this buffer is limited to 255.
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'rxbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'rxbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the current capacity, in bytes, of the BLE's RX buffer.  
 //To change the buffer capacity, use the bt.rxbuffrq method followed by the sys.buffalloc method.
@@ -8783,14 +6500,11 @@ Object.defineProperty(bt, 'rxbuffsize', {
 //"-33" is because a number of bytes is needed for internal buffer variables.
 //<br><br>
 //The BLE interface is unable to receive data when its RX buffer has zero capacity.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'txbuffsize', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'txbuffsize', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the current capacity, in bytes, of the BLE's TX buffer.  
 //To change the buffer capacity, use the bt.txbuffrq method followed by the sys.buffalloc method.
@@ -8801,73 +6515,55 @@ Object.defineProperty(bt, 'txbuffsize', {
 //"-33" is because a number of bytes is needed for internal buffer variables.
 //<br><br>
 //The BLE interface is unable to transmit data when its TX buffer has zero capacity.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'rxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'rxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the total number of bytes currently waiting in the RX buffer of the BLE interface.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'txlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'txlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the total number of committed bytes in the TX buffer of the BLE interface.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'txfree', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'txfree', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the amount of free space, in bytes, in the TX buffer of the BLE interface, not taking into the account uncommitted data.
 //<br><br>
 //The actual free space in the buffer is bt.txfree - bt.newtxlen. Your application will not be able to store more data than this amount.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'newtxlen', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'newtxlen', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
 //Returns the total number of uncommitted bytes in the TX buffer of the BLE interface.
 //<br><br>
 //Uncommited data is data that was added to the TX buffer using bt.setdata but hasn't been committed using bt.send.
-    
-
-
 //--------------------------------------------------------------------
-bt.rxclear = function() {}
+bt.rxclear = function () { };
 //<b>METHOD. </b><br><br>
 //Clears the RX buffer of the BLE interface.
-
 //--------------------------------------------------------------------
-bt.txclear = function() {}
+bt.txclear = function () { };
 //<b>METHOD. </b><br><br>
 //Clears the TX buffer of the BLE interface.
-
 //--------------------------------------------------------------------
-bt.getdata = function( maxinplen) {}
+bt.getdata = function (maxinplen) { };
 //<b>METHOD. </b><br><br>
 //Returns the string containing the data extracted from the RX buffer of the BLE interface. Extracted data is removed from the buffer.
 //<br><br>
 //The length of extracted data is limited by one of the three factors, whichever is smaller: the amount of data in the RX buffer itself,
 //capacity of the receiving string variable, and the limit set by the maxinplen argument.
-
 //--------------------------------------------------------------------
-bt.peekdata = function( maxinplen) {}
+bt.peekdata = function (maxinplen) { };
 //<b>METHOD.</b><br><br>
 //Returns the string containing the "preview" of data from the RX buffer of the BLE interface. The data is NOT removed from the buffer.
 //<br><br>
@@ -8875,9 +6571,8 @@ bt.peekdata = function( maxinplen) {}
 //and the limit set by the maxinplen argument.
 //<br><br>
 //Since string variables can hold up to 255 bytes of data, this method will only allow you to preview up to this number of bytes.
-
 //--------------------------------------------------------------------
-bt.setdata = function( txdata) {}
+bt.setdata = function (txdata) { };
 //<b>METHOD. </b><br><br>
 //Stores the data passed in the txdata argument into the TX buffer of the BLE inteface.
 //<br><br>
@@ -8885,14 +6580,12 @@ bt.setdata = function( txdata) {}
 //<br><br>
 //The newly stored data is not sent out immediately. This only happens after the bt.send method is used to commit this data.
 //This allows your application to prepare large amounts of data before sending it out.
-
 //--------------------------------------------------------------------
-bt.send = function() {}
+bt.send = function () { };
 //<b>METHOD. </b><br><br>
 //Commits (allows sending out) the data that was previously saved into the TX buffer of the BLE interface using the bt.setdata method.
-
 //--------------------------------------------------------------------
-bt.notifysent = function( threshold) {}
+bt.notifysent = function (threshold) { };
 //<b>METHOD. </b><br><br>
 //Invoking this method will cause the on_bt_data_sent event to be generated when the amount of committed data in the TX buffer of the BLE interface drops to or below
 //the "threshold" number of bytes.
@@ -8900,31 +6593,22 @@ bt.notifysent = function( threshold) {}
 //This method, together with on_bt_data_sent provides a way to handle data sending asynchronously.
 //<br><br>
 //Only one on_bt_data_sent event will be generated each time after bt.notifysent is invoked.
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'advertise', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'advertise', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font></b><br><br>
 //Setting this property to 1 -YES will start the advertising service on the BLE interface. Setting the property to 0- NO halts BLE advertising.
 //<br><br>
 //The value of this property can only be set to 1- YES when the BLE interface is enabled (bt.enabled= 1- YES, i.e. bt.enable was previously called).
 //<br><br>
 //The value of this property is reset to 0- NO if the BLE interface becomes disabled (bt.enabled= 0- NO) for any reason.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-    //<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has accepted an incoming connection.
-    //<b>PLATFORM CONSTANT.</b><br><br>The BLE interface is no longer engaged in a connection.
-    //<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been enabled.
-    //<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been disabled.
-
-
-
+//<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has accepted an incoming connection.
+//<b>PLATFORM CONSTANT.</b><br><br>The BLE interface is no longer engaged in a connection.
+//<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been enabled.
+//<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been disabled.
 //<b>EVENT of the bt object. </b><br><br>
 //Generated when the following BLE events occur:
 //<br><br>
@@ -8935,9 +6619,7 @@ Object.defineProperty(bt, 'advertise', {
 //2- _ENABLED -- The BLE interface has been enabled (through bt.enable).
 //<br><br>
 //3- _DISABLED -- The BLE interface has been disabled (through bt.disable).
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the bt object. </b><br><br> 
 //Generated as soon as the BLE interface receives data into the RX buffer.
 //<br><br>
@@ -8947,38 +6629,30 @@ Object.defineProperty(bt, 'advertise', {
 //If, during the on_bt_data_arrival event handler execution, not all data is extracted from the RX 
 //buffer, another on_bt_data_arrival event is generated immediately after the 
 //on_bt_data_arrival event handler is exited.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the bt object. </b><br><br> 
 //Generated after the total amount of committed data in the TX buffer of the BLE interface drops to or below the threshold that was preset through the bt.notifysent method.
 //<br><br>
 //This event, together with bt.notifysent provides a way to handle data sending asynchronously.
 //<br><br>
 //Only one on_bt_data_sent event will be generated each time after bt.notifysent is invoked.
-
 //--------------------------------------------------------------------
-
 //<b>EVENT of the bt object. </b><br><br>
 //Generated when the RX buffer of the BLE interface overflows.
 //<br><br>
 //An overrun may happen if the BLE interface is receiving data faster than the speed at which your app is extracting and processing it.
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'connected', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'connected', {
+    get() { return 0; },
+    set() { }
+});
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b><br><br>
 //Indicates whether the BLE interface is engaged in a connection.
-    
-
-
 //--------------------------------------------------------------------
-Object.defineProperty(bt, 'mac', { 
-            get() { return 0; },
-            set() {  } 
-        });
+Object.defineProperty(bt, 'mac', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY(STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
 //Sets and returns the MAC address of the BLE interface.
 //<br><br>
@@ -8989,16 +6663,8 @@ Object.defineProperty(bt, 'mac', {
 //<br><br>
 //To set a different Bluetooth MAC, assign a new value to this property before calling wln.boot.
 //The value of the property cannot be changed after the wln.boot method has been invoked.
-    
-    
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
-
-
 //--------------------------------------------------------------------
 //property bt.num
 //<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (bt channel selected). </b><br><br>
@@ -9009,22 +6675,16 @@ Object.defineProperty(bt, 'mac', {
 //    get = syscall(798) as byte
 //    set = syscall(799) (value as byte)
 //end property
-
-
-
-
-
 //<b>ENUM. </b><br><br> 
 //Contains the list of constants related to the flow control for the bluetooth object.
-    //<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
-                //No flow control, the on_bt_overrun event will be received.
-    //<b>PLATFORM CONSTANT. </b><br><br> 
-                //Flow control enabled. When receiving data via reliable writes the data will no longer be accepted once all bluetooth buffers are full. 
-
-
-Object.defineProperty(bt, 'flowcontrol', { 
-            get() { return 0; },
-            set() {  } 
-        });
+//<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+//No flow control, the on_bt_overrun event will be received.
+//<b>PLATFORM CONSTANT. </b><br><br> 
+//Flow control enabled. When receiving data via reliable writes the data will no longer be accepted once all bluetooth buffers are full. 
+Object.defineProperty(bt, 'flowcontrol', {
+    get() { return 0; },
+    set() { }
+});
 //<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- DISABLED. </b><br><br> 
 //Sets/returns flow control mode for bluetooth object. When enabled this property will stop receiving data from the bluetooth link when its RX buffer is full. It is only relevant when the application that is sending data to the device is using reliable writes. When this property is enabled it is not possible to receive the on_bt_overrun event. 
+//# sourceMappingURL=tios.js.map

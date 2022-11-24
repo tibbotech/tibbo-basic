@@ -7,7 +7,7 @@
 		"sourceMap": true,
 		"allowJs": true,
 		"strict": true,
-		"outDir": "out",
+		"outDir": "lib",
 		"rootDir": "src",
 		"noImplicitAny": false
 	},
