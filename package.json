@@ -1,5 +1,5 @@
 {
-    "name": "tibbo-basic",
+    "name": "@tibbo/tibbo-basic",
     "displayName": "Tibbo Basic Language",
     "description": "Tibbo Basic Language Support",
     "author": {
@@ -30,7 +30,6 @@
         "compile": "tsc -b",
         "build": "tsc -b",
         "watch": "tsc -b -w",
-        "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
         "webpack": "webpack --mode production --config ./client/webpack.config.js && webpack --mode production --config ./server/webpack.config.js",
         "vscode:prepublish": "npm run webpack",
         "package": "vsce package",
