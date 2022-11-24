@@ -29,21 +29,51 @@
 			]
 		},
 		{
-            "name": "Transpile",
-            "type": "node",
-            "request": "launch",
-            "args": [
-                "${workspaceFolder}/server/src/testTranspiler.ts"
-            ],
-            "runtimeArgs": [
-                "--nolazy",
-                "-r",
-                "ts-node/register"
-            ],
-            "sourceMaps": true,
-            "cwd": "${workspaceRoot}",
-            "protocol": "inspector"
-        }
+			"name": "Transpile",
+			"type": "node",
+			"request": "launch",
+			"args": [
+				"${workspaceFolder}/server/src/testTranspiler.ts"
+			],
+			"runtimeArgs": [
+				"--nolazy",
+				"-r",
+				"ts-node/register"
+			],
+			"sourceMaps": true,
+			"cwd": "${workspaceRoot}",
+			"protocol": "inspector"
+		},
+		{
+			"name": "RunSimulator",
+			"type": "node",
+			"request": "launch",
+			"args": [
+				"${workspaceFolder}/main.js"
+			],
+			"runtimeArgs": [
+				"--nolazy",
+				"-r",
+				"ts-node/register"
+			],
+			"sourceMaps": true,
+			"cwd": "${workspaceRoot}",
+		},
+		{
+			"name": "CompilerTest",
+			"type": "node",
+			"request": "launch",
+			"args": [
+				"${workspaceFolder}/server/src/testJSCompiler.ts"
+			],
+			"runtimeArgs": [
+				"--nolazy",
+				"-r",
+				"ts-node/register"
+			],
+			"sourceMaps": true,
+			"cwd": "${workspaceRoot}",
+		}
 	],
 	"compounds": [
 		{
