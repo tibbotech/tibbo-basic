@@ -1,0 +1,618 @@
+'**************************************************************************************************
+'       LSOCK (Linux socket) object
+'**************************************************************************************************
+
+object lsock
+'This is the object that manages sockets on Linux.
+'The number of available sockets can be obtained through
+'the <font color="maroon"><b>lsock.numofsock </b></font> read-only property. <br><br>
+'Selection of a particular socket to work with is done through the <font color="maroon"><b>lsock.num </b></font>property. Most other 
+'properties and methods refer to the currently selected socket. <br><br>
+'When the handler for one of the socket events is entered the <font color="maroon"><b>lsock.num  </b></font>is automatically switched 
+'to the socket for which this event was generated.
+
+'--------------------------------------------------------------------
+enum pl_lsock_state
+'<b>ENUM. </b><br><br> Contains the list of constants related to possible socket states.
+    PL_LSST_CLOSED, '<b>PLATFORM CONSTANT. </b><br><br> Connection is closed.<br><br>Applies both to UDP and TCP.
+    PL_LSST_PO,     '<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is a passive open).<br><br>Applies only to TCP.
+    PL_LSST_AO,     '<b>PLATFORM CONSTANT. </b><br><br> Connection is being established (it is an active open).<br><br>Applies only to TCP.
+    PL_LSST_EST,    '<b>PLATFORM CONSTANT. </b><br><br> Connection is established.<br><br>Applies both to UDP and TCP.
+    PL_LSST_PC,     '<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is a passive close).<br><br>Applies only to TCP.
+    PL_LSST_AC      '<b>PLATFORM CONSTANT. </b><br><br> Connection is being closed (it is an active close).<br><br>Applies only to TCP.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_lsock_protocol
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants that specify the transport protocol for the socket.
+    PL_LSOCK_PROTOCOL_UDP, '<b>PLATFORM CONSTANT. </b><br><br> Specifies UDP transport protocol for the socket.
+    PL_LSOCK_PROTOCOL_TCP  '<b>PLATFORM CONSTANT. </b><br><br> Specifies TCP transport protocol for the socket.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_lsock_inconmode
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to whether the socket accepts any incoming connections and, if yes, from which sources.
+    PL_LSOCK_INCONMODE_NONE,                 '<b>PLATFORM CONSTANT. </b><br><br> The socket does not accept any incoming connections.
+    PL_LSOCK_INCONMODE_SPECIFIC_IPPORT,      '<b>PLATFORM CONSTANT. </b><br><br> The socket will only accept an incoming connection from specific IP (matching <font color="maroon"><b>lsock.targetip</b></font>) and specific port (matching <font color="maroon"><b>lsock.targetport</b></font>)
+    PL_LSOCK_INCONMODE_SPECIFIC_IP_ANY_PORT, '<b>PLATFORM CONSTANT. </b><br><br> The socket will only accept an incoming connection from specific IP (matching <font color="maroon"><b>lsock.targetip</b></font>), but any port.
+    PL_LSOCK_INCONMODE_ANY_IP_ANY_PORT       '<b>PLATFORM CONSTANT. </b><br><br> The socket will accept an incoming connection from any IP and any port.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_lsock_reconmode
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants that specify whether the socket accepts reconnects, and, if yes, from which sources. Reconnect situation is 
+'when a passive open and resulting connection replace, for the same socket, the connection that was already in progress. <br><br>
+'For UDP, these constants additionally define whether a "port switchover" will occur as a result of an incoming connection (passive open)
+'or a reconnect.<br><br>
+'Port switchover is when the socket starts sending its outgoing UDP datagrams to the port from which the most recent UDP datagram was received,
+'rather than the port specified by the <font color="maroon"><b>lsock.targetport </b></font> property.
+    PL_LSOCK_RECONMODE_0, '<b>PLATFORM CONSTANT. </b><br><br> 
+                          'For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection 
+                          'with this socket, but any port; port switchover will not happen. <br><br>
+                          'TCP: reconnects are not accepted at all.
+    PL_LSOCK_RECONMODE_1, '<b>PLATFORM CONSTANT. </b><br><br> 
+                          'For UDP: Reconnects accepted from any IP, any port; port switchover will not happen. <br><br>
+                          'TCP: reconnects accepted only from the same IP and port as the ones already engaged in the current connection 
+                          'with this socket.
+    PL_LSOCK_RECONMODE_2, '<b>PLATFORM CONSTANT. </b><br><br> 
+                          'For UDP: Reconnects accepted only from the same IP as the one already engaged in the current connection with 
+                          'this socket, but any port; port switchover will happen. <br><br>
+                          'TCP: reconnects accepted only from the same IP as the one already engaged in the current connection with this
+                          'socket, but any port.
+    PL_LSOCK_RECONMODE_3  '<b>PLATFORM CONSTANT. </b><br><br> 
+                          'For UDP: Reconnects accepted from any IP, any port; port switchover will happen. <br><br>
+                          'TCP: reconnects accepted from any IP, any port.
+end enum
+
+'--------------------------------------------------------------------
+property lsock.num
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (socket #0 selected). </b><br><br>
+'Sets/returns the number of the currently selected socket (sockets are enumerated from 0).<br><br>
+'Most other properties and methods of this object relate to the socket selected through this property. Note that socket-related events such 
+'as <font color="teal"><b>on_lsock_data_arrival </b></font> change the currently selected socket!<br><br>
+'The value of this property won't exceed <font color="maroon"><b>lsock.numofsock</b></font>-1 (even if you attempt to set higher value).
+    get = syscall(658) as byte
+    set = syscall(659) (socket as byte)
+end property
+
+'--------------------------------------------------------------------
+property lsock.numofsock
+'<b>R/O PROPERTY (BYTE). </b><br><br> Returns total number of sockets available. See also <font color="maroon"><b>
+'lsock.num </b></font>property.
+    get = syscall(660) as byte
+end property
+
+'--------------------------------------------------------------------
+property lsock.state
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0-PL_LSST_CLOSED (connection is closed). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the current socket state
+'(as opposed to <font color="teal"><b>on_lsock_event </b></font>that returns the state at the moment of a particular <font color="teal">
+'<b>on_lsock_event </b></font>event generation). See <font color="olive"><b>pl_lsock_state </b></font>constants for state descriptions.
+    get = syscall(667) as pl_lsock_state
+end property
+
+'--------------------------------------------------------------------
+syscall(690) lsock.rxbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) pre-requests "numpages" number of buffer pages
+'(1 page= 256 bytes) for the RX buffer of the socket. Returns actual number of pages that can be allocated.<br><br>
+'Actual allocation happens when the <font color="maroon"><b>sys.buffalloc </b></font> method is used. The socket is unable to RX data if its RX
+'buffer has 0 capacity. Actual current buffer capacity can be checked through the <font color="maroon"><b>lsock.rxbuffsize </b></font> which
+'returns buffer capacity in bytes. Relationship between the two is as follows:<br><br>
+'<font color="maroon"><b>lsock.rxbuffsize</b></font>=num_pages*256 (or =0 when num_pages=0), where "num_pages" is the number of buffer pages
+'that was GRANTED through the <font color="maroon"><b>lsock.rxbuffrq</b></font>.
+'<br><br>
+'Buffer allocation will not work if the socket to which this buffer belongs is not idle (<font color="maroon"><b>lsock.state</b></font><>
+'<font color="olive"><b>0- PL_LSST_CLOSED</b></font>) at the time when <font color="maroon"><b>sys.buffalloc </b></font> executes. You can only change 
+'buffer sizes of sockets that are closed.
+'See also <font color="maroon"><b>lsock.txbuffrq </b></font> method.
+
+'--------------------------------------------------------------------
+property lsock.rxbuffsize
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns current RX buffer capacity in
+'bytes.<br><br>
+'Buffer capacity can be changed through the <font color="maroon"><b>lsock.rxbuffrq</b></font>. The <font color="maroon"><b>lsock.rxbuffrq
+'</b></font> requests buffer size in 256-byte pages whereas this property returns buffer size in bytes.<br><br>
+'Relationship between the two is as follows: <font color="maroon"><b>lsock.rxbuffsize</b></font>=num_pages*256 (or =0 when num_pages=0), 
+'where "num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>lsock.rxbuffrq</b></font>.
+'The socket cannot RX data when the RX buffer has zero capacity.
+    get = syscall(689) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(691) lsock.txbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) pre-requests "numpages" number of buffer pages
+'(1 page= 256 bytes) for the TX buffer of the socket. Returns actual number of pages that can be allocated.<br><bR>
+'Actual allocation happens when the <font color="maroon"><b>sys.buffalloc </b></font>method is used. The socket is unable to TX data if its TX 
+'buffer has 0 capacity. Actual current buffer capacity can be checked through the <font color="maroon"><b>lsock.txbuffsize </b></font> which
+'returns buffer capacity in bytes. Relationship between the two is as follows: <br><br>
+'<font color="maroon"><b>lsock.txbuffsize</b></font>=num_pages*256 (or =0 when num_pages=0), where "num_pages" is the number of buffer pages
+'that was GRANTED through the <font color="maroon"><b>lsock.txbuffrq</b></font>.
+'Buffer allocation will not work if the socket to which this buffer belongs is not idle (<font color="maroon"><b>lsock.state</b></font><>
+'<font color="olive"><b>0- PL_LSST_CLOSED</b></font>) at the time when <font color="maroon"><b>sys.buffalloc </b></font> executes. You can only change 
+'buffer sizes of sockets that are closed.
+
+'--------------------------------------------------------------------
+property lsock.txbuffsize
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns current TX buffer capacity in
+'bytes. Buffer capacity can be changed through the <font color="maroon"><b>lsock.txbuffrq </b></font> method followed by the 
+'<font color="maroon"><b>sys.buffalloc </b></font> method.<br><br>
+'The <font color="maroon"><b>lsock.txbuffrq </b></font> requests buffer size in 256-byte pages whereas this property returns buffer size in bytes.
+'Relationship between the two is as follows: <font color="maroon"><b>sock.txbuffsize</b></font>=num_pages*256 (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through the <font color="maroon"><b>lsock.txbuffrq</b></font>.
+'The socket cannot TX data when the TX buffer has zero capacity.
+    get = syscall(684) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property lsock.protocol
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LSOCK_PROTOCOL_UDP (UDP transport protocol for the socket). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num </b></font>) selects the transport protocol:<br><br>
+'<font color="olive"><b>0- PL_LSOCK_PROTOCOL_UDP </b></font> (UDP transport protocol), <br><br>
+'<font color="olive"><b>1- PL_LSOCK_PROTOCOL_TCP</b></font> (TCP transport protocol).<br><br>
+'The program won't be able to change the value of this property when the socket is not idle
+'(<font color="maroon"><b>lsock.state</b></font><> <font color="olive"><b>0- PL_LSST_CLOSED</b></font>).
+    get = syscall(661) as pl_lsock_protocol
+    set = syscall(662) (proto as pl_lsock_protocol)
+end property
+
+'--------------------------------------------------------------------
+property lsock.localportlist
+'<b>PROPERTY (STRING), DEFAULT VALUE= "" (empty string). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) sets/returns the list of listening ports
+'on any of which this socket will accept an incoming UDP or TCP connection (as defined by the <font color="maroon"><b>lsock.protocol </b></font>
+'property and provided that incoming connections are allowed by the <font color="maroon"><b>lsock.inconmode </b></font> property).
+'<br><br>
+'This property is of string type and the list of ports is a comma-separated string, i.e. "1001,3000".
+    get = syscall(656) as string
+    set = syscall(657) (byref lplist as string)
+end property
+
+'--------------------------------------------------------------------
+syscall(676) lsock.close()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) causes the socket to close the connection 
+'with the other host.
+'<br><br>
+'For established TCP connections this will be a "graceful disconnect", if the TCP connection was in the "connection opening" state this will
+'be a reset (i.e. active open will be canceled).
+'<br><br>
+'If the transport protocol was UDP (<font color="maroon"><b>lsock.protocol</b></font>=  
+'<font color="olive"><b>0- PL_LSOCK_PROTOCOL_UDP</b></font>) the connection will be discarded.
+'<br><br>
+'Method invocation will have NO effect if connection was closed at the time when the method was called (<font color="maroon"><b>lsock.state
+'</b></font>in one of <font color="olive"><b>PL_LSST_CLOSED </b></font> states).
+
+'--------------------------------------------------------------------
+property lsock.localport
+'<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the current local port of the socket.
+'<br><br>Your application cannot set the local port directly. Instead, a list of ports on which the socket is allowed to accept an incoming 
+'connection (passive open) is supplied via the <font color="maroon"><b>lsock.localportlist </b></font> property.<br><br>
+'An incoming connection is accepted on any port from that list. The <font color="maroon"><b>lsock.localport </b></font> property reflects 
+'the current or the most recent local port on which a connection was accepted.
+    get = syscall(688) as word
+end property
+
+'--------------------------------------------------------------------
+property lsock.remoteip
+'<b>R/O PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the IP address of the host with 
+'which this socket had the most recent or currently has a connection. The application cannot directly change this property, it can only specify
+'the target IP address for active opens through the <font color="maroon"><b>lsock.targetip </b></font> property.<br><br>
+'For UDP connections, when the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler is entered, the <font color="maroon"><b>
+'lsock.remoteip </b></font> will contain the IP address of the sender of the current datagram being processed. <br><br>
+'Outside of the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler, the property will return the source IP address of the most
+'recent datagram received by the socket.<br><br>
+'Also see <font color="maroon"><b>lsock.remoteport</b></font> and <font color="maroon"><b>lsock.bcast </b></font> properties. 
+    get = syscall(663) as string
+end property
+
+'--------------------------------------------------------------------
+property lsock.remoteport
+'<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the port number of the host with
+'which this socket had the most recent or currently has a connection. The application cannot directly change this property, it can only specify
+'the target port for active opens through the <font color="maroon"><b>lsock.targetport </b></font> property. <br><br>
+'For UDP connections, when the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler is entered, the <font color="maroon"><b>
+'lsock.remoteport</b></font> will contain the port number of the sender of the current datagram being processed. <br><br>
+'Outside of the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler, the property will return the source port of the most recent
+'datagram received by the socket.<br><br>
+'Also see <font color="maroon"><b>lsock.remoteip</b></font> and <font color="maroon"><b>lsock.bcast </b></font> properties.
+    get = syscall(664) as word
+end property
+
+'--------------------------------------------------------------------
+property lsock.inconenabledmaster
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- YES (incoming connections are globally enabled). </b><br><br>
+'A master switch that globally defines whether incoming connections will be accepted: <font color="olive"><b>0- NO </b></font>(no socket will be
+'allowed to accept an incoming connection), <font color="olive"><b>1- YES </b></font>(incoming connections are globally enabled; individual 
+'socket's behavior and whether it will accept or reject a particular incoming connection depends on the setup of this socket).<br><br>
+'This property can be used to temporarily disable incoming connection acceptance on all sockets without changing individual setup of each socket.
+    get = syscall(652) as no_yes
+    set = syscall(653) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property lsock.targetip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'For active opens on the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) specifies the target IP
+'to which the socket will attempt to connect to. <br><br>
+'For passive opens, whether this property will matter or not is defined by the <font color="maroon"><b>lsock.inconmode</b></font> property. 
+'When the <font color="maroon"><b>lsock.inconmode</b></font>= <font color="olive"><b>1- PL_LSOCK_INCONMODE_SPECIFIC_IPPORT </b></font> or
+'<font color="olive"><b>2- PL_LSOCK_INCONMODE_SPECIFIC_IP_ANY_PORT </b></font> only the host with the IP matching the one set in the 
+'<font color="maroon"><b>lsock.targetip</b></font> property will be able to connect to the socket.<br><br>
+'The current IP on the "other side" of the connection can always be checked through the <font color="maroon"><b>lsock.remoteip </b></font> read-only
+'property.<br><br> 
+'See also <font color="maroon"><b>lsock.targetport</b></font> and <font color="maroon"><b>lsock.remoteport</b></font>.
+    get = syscall(670) as string
+    set = syscall(671) (byref targetip as string)
+end property
+
+'--------------------------------------------------------------------
+property lsock.targetport
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0. </b><br><br>
+'For active opens on the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) specifies the target port
+'to which the socket will attempt to connect to. <br><br>
+'For passive opens, whether this property will matter or not is defined by the <font color="maroon"><b>lsock.inconmode</b></font> property. 
+'When the <font color="maroon"><b>lsock.inconmode</b></font>= <font color="olive"><b>1- PL_LSOCK_INCONMODE_SPECIFIC_IPPORT </b></font> an incoming
+'connection will only be accepted from the port matching the one set in the <font color="maroon"><b>lsock.targetport</b></font> property.<br><br>
+'The current port on the "other side" of the connection can always be checked through the <font color="maroon"><b>lsock.remoteport</b></font>
+'read-only property.<br><br>
+'See also <font color="maroon"><b>lsock.targetip</b></font> and <font color="maroon"><b>lsock.remoteip</b></font>.
+    get = syscall(672) as word
+    set = syscall(673) (targetport as word)
+end property
+
+'--------------------------------------------------------------------
+property lsock.inconmode
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LSOCK_INCONMODE_NONE (does not accept any incoming connections). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) specifies whether incoming connections
+'(passive opens) will be accepted and, if yes, from which sources: <br><br>
+'<font color="olive"><b>0- PL_LSOCK_INCONMODE_NONE </b></font>(incoming connections are not accepted at all),<br><br>
+'<font color="olive"><b>1- PL_LSOCK_INCONMODE_SPECIFIC_IPPORT </b></font>(incoming connections accepted only from specific IP (matching 
+'<font color="maroon"><b>lsock.targetip</b></font>) and specific port (matching <font color="maroon"><b>lsock.targetport</b></font>)), <br><br>
+'<font color="olive"><b>2- PL_LSOCK_INCONMODE_SPECIFIC_IP_ANY_PORT </b></font>(incoming connections accepted only from specific IP (matching 
+'<font color="maroon"><b>lsock.targetip</b></font>), but any port),<br><br>
+'<font color="olive"><b>3- PL_LSOCK_INCONMODE_ANY_IP_ANY_PORT </b></font>(incoming connections accepted from any IP and any port). 
+    get = syscall(654) as pl_lsock_inconmode
+    set = syscall(655) (inconmode as pl_lsock_inconmode)
+end property
+
+'--------------------------------------------------------------------
+property lsock.outport
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0 (automatic). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) sets/returns the number of the port that
+'will be used by the socket to establish outgoing connections. <br><br>
+'If this property is set to 0 then the socket will use "automatic" port numbers. <br><br>
+'Actual local port of a connection can be queried through the <font color="maroon"><b>lsock.localport </b></font> read-only property. If this 
+'property is not at zero then the port it specifies will be used for all outgoing connections from this socket.
+    get = syscall(717) as word
+    set = syscall(718) (outport as word)
+end property
+
+'--------------------------------------------------------------------
+syscall(675) lsock.connect()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) causes the socket to attempt to connect to 
+'the target host specified by the <font color="maroon"><b>lsock.targetport</b></font> and <font color="maroon"><b>lsock.targetip</b></font>
+'(unless, for UDP, the socket is to broadcast the data- see the <font color="maroon"><b>lsock.targetbcast </b></font> property).
+'<br><br>
+'Method invocation will have effect only if connection was closed at the time when the method was called (<font color="maroon"><b>lsock.state</b></font>=
+'<font color="olive"><b>0- PL_LSST_CLOSED</b></font>). 
+
+'--------------------------------------------------------------------
+property lsock.reconmode
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LSOCK_RECONMODE_0. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) whether the socket accepts reconnects, 
+'and, if yes, from which sources. A reconnect situation is when a passive open and resulting connection replace, for the same socket, the 
+'connection that was already in progress. <br><br>
+'For UDP, this property additionally defines whether a "port switchover" will occur as a result of an incoming connection (passive open) or a
+'reconnect. Port switchover is when the socket starts sending its outgoing UDP datagrams to the port from which the most recent UDP datagram
+'was received, rather than the port specified by the <font color="maroon"><b>lsock.targetport</b></font> property. <br><br>
+'See <font color="olive"><b>PL_LSOCK_RECONMODE_ </b></font>constants for available choices.
+    get = syscall(719) as pl_lsock_reconmode
+    set = syscall(720) (reconmode as pl_lsock_reconmode)
+end property
+
+'--------------------------------------------------------------------
+syscall(678) lsock.setdata(byref txdata as string)
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) adds the data passed in the txdata argument to
+'the contents of the TX buffer. If the buffer doesn't have enough space to accommodate the data being added then this data will be truncated. 
+'Newly saved data is not sent out immediately. This only happens after the <font color="maroon"><b>lsock.send</b></font> method
+'is used to commit the data. This allows your application to prepare large amounts of data before sending it out.<br><br>
+'Total amount of newly added (uncommitted) data in the buffer can be checked through the <font color="maroon"><b>lsock.newtxlen </b></font> 
+'setting. <br><br>
+'Also see <font color="maroon"><b>lsock.txlen</b></font>, <font color="maroon"><b>lsock.txfree</b></font>, <font color="maroon"><b>
+'lsock.notifysent</b></font>, and <font color="teal"><b>on_lsock_data_sent</b></font>.
+
+'--------------------------------------------------------------------
+property lsock.newtxlen
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the amount of uncommitted TX data in 
+'bytes. Uncommitted data is the one that was added to the TX buffer with the <font color="maroon"><b>lsock.setdata </b></font> method but not 
+'yet committed using the <font color="maroon"><b>lsock.send </b></font>method.
+    get = syscall(680) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(681) lsock.txclear()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) clears (deletes all data from) the TX buffer.
+'Invoking this method will have no effect when the socket is not idle (<font color="maroon"><b>lsock.state</b></font><> 
+'<font color="olive"><b>0- PL_LSST_CLOSED</b></font>).
+
+'--------------------------------------------------------------------
+property lsock.txlen
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the total number of bytes 
+'currently found in the TX buffer (including the uncommitted data).<br><br>
+'Your application may use the <font color="maroon"><b>lsock.notifysent </b></font>method to get <font color="teal"><b>on_lsock_data_sent
+'</b></font>event once the total number of committed bytes in the TX buffer drops below the level defined by the <font color="maroon"><b>
+'lsock.notifysent</b></font> method. <br><br>
+'See also <font color="maroon"><b>lsock.newtxlen</b></font>.
+    get = syscall(683) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(679) lsock.send()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) commits (allows sending) the data that was
+'previously saved into the TX buffer using the <font color="maroon"><b>lsock.setdata </b></font> method. <br><br>
+'You can monitor the sending progress by checking the <font color="maroon"><b>lsock.txlen</b></font> property or using the 
+'<font color="maroon"><b>lsock.notifysent</b></font> method and the <font color="teal"><b>on_lsock_data_sent</b></font> event. 
+
+'--------------------------------------------------------------------
+property lsock.txfree
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the amount of free space in the TX 
+'buffer in bytes. Lsock.txfree = lsock.txbufflen - lsock.txlen.<br><br>
+'Your application will not be able to store more data than this amount. To achieve asynchronous data processing, use the <font color="maroon">
+'<b>lsock.notifysent</b></font> method to get <font color="teal"><b>on_lsock_data_sent</b></font> event once the TX buffer gains required 
+'amount of free space.
+    get = syscall(682) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(685) lsock.notifysent(threshold as word)
+'<b>METHOD. </b><br><br>
+'Using this method for the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) will cause the 
+'<font color="teal"><b>on_lsock_data_sent </b></font>event to be generated when the amount of committed data in the TX buffer is found to be 
+'equal or below "threshold" number of bytes.<br><br>
+'Only one <font color="teal"><b>on_lsock_data_sent </b></font>event will be generated each time after the <font color="maroon"><b>
+'lsock.notifysent</b></font> is invoked. <br><br>
+'This method, together with the <font color="teal"><b>on_lsock_data_sent </b></font>event provides a way to handle data sending asynchronously.
+'Just like with <font color="maroon"><b>lsock.txfree</b></font>, the trigger you set won't take into account any uncommitted data in the TX 
+'buffer.
+
+'--------------------------------------------------------------------
+property lsock.rxlen
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns total number of bytes currently waiting
+'in the RX buffer to be extracted and processed by your application. <br><br>
+'The <font color="teal"><b>on_lsock_data_arrival </b></font>event is generated once the RX buffer is not empty, i.e. there is data to process. 
+'There may be only one <font color="teal"><b>on_lsock_data_arrival </b></font>event for each socket waiting to be processed in the event queue.
+'<br><br>Another <font color="teal"><b>on_lsock_data_arrival </b></font>event for the same socket may be generated only after the previous one 
+'is handled. If, during the <font color="teal"><b>on_sock_data_arrival </b></font>event handler execution, not all data is extracted from the 
+'RX buffer, another <font color="teal"><b>on_lsock_data_arrival </b></font>event is generated immediately after the <font color="teal"><b>
+'on_lsock_data_arrival </b></font>event handler is exited.
+    get = syscall(687) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(677) lsock.getdata(maxinplen as word) as string
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the string that contains the data
+'extracted from the RX buffer. Extracted data is permanently deleted from the buffer. <br><br>
+'Length of extracted data is limited by one of the three factors (whichever is smaller): amount of data in the RX buffer itself, capacity of 
+'the "receiving" string variable, and the limit set by the maxinplen argument.<br><br>
+'Additionally, if this socket uses UDP transport protocol (<font color="maroon"><b>lsock.protocol</b></font>= <font color="olive"><b>
+'1-PL_LSOCK_PROTOCOL_TCP</b></font>) the length of data that will be extracted is limited to the UDP datagram being processed. <br><br>
+'Additional conditions apply to UDP datagram processing; see <font color="teal"><b>on_lsock_data_arrival </b></font>event and 
+'<font color="maroon"><b>lsock.nextpacket </b></font> method.
+
+'--------------------------------------------------------------------
+syscall(716) lsock.rxclear()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) clears (deletes all data from) the RX buffer.
+
+'--------------------------------------------------------------------
+property lsock.sinkdata
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (normal data processing). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>)
+'specifies whether the incoming data should be discarded.
+'<br><br>
+'Setting this property to
+'<font color="olive"><b>1- YES </b></font>
+'causes the socket to automatically discard all incoming data without passing it to your application.
+'<br><br>
+'The <font color="teal"><b>on_lsock_data_arrival </b></font>
+'event will not be generated, reading
+'<font color="maroon"><b>lsock.rxlen </b></font>
+'will always return zero, and so on. No data will be reaching its destination even in case of buffer redirection
+'(see <font color="maroon"><b>lsock.redir</b></font>).
+'<br><br>
+'<font color="maroon"><b>Lsock.connectiontout </b></font>and
+'<font color="maroon"><b>Lsock.toutcounter </b></font>
+'will work correctly as well.
+    get = syscall(665) as no_yes
+    set = syscall(666) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+syscall(692) lsock.peekdata(maxinplen as word) as string
+'METHOD.
+'For the selected socket (selection is made through lsock.num) returns the string that contains the "preview" of the data
+'from the RX buffer. The data is NOT deleted from the buffer. For TCP (lsock.protocol= 1- PL_LSOCK_PROTOCOL_UDP) the length of returned data is
+'limited by one of the three factors (whichever is smaller): amount of data in the RX buffer itself, capacity of the
+'"receiving" string variable, and the limit set by the maxinplen argument. String variables can hold up to 255 bytes of data, so this
+'method will only allow you to preview up to 255 "next" bytes from the RX buffer.
+'For UDP (lsock.protocol= 0- PL_LSOCK_PROTOCOL_UDP), additional limitations apply. The "current" UDP datagram is always deleted automatically
+'when the on_lsock_data_arrival event is exited. This means that you will "lose" this datagram from the buffer upon exiting the
+'on_lsock_data_arrival event even if your program only used lsock.peekdata. Also, the amount of data returned by the lsock.peekdata is
+'limited to the "next" UDP datagram waiting in the RX buffer.
+'See on_lsock_data_arrival event and lsock.nextpacket methods for additional info. See also: lsock.getdata method.
+
+'--------------------------------------------------------------------
+property lsock.connectiontout
+'<b>PROPERTY (WORD), DEFAULT VALUE= 0 (no timeout). </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) sets/returns connection timeout threshold
+'for the socket in half-second increments. <br><br>
+'When no data is exchanged across the connection for lsock.connectiontout/2 number of seconds this connection is aborted (reset for TCP and 
+'discarded for UDP). Connection timeout of 0 means "no timeout".
+'<br><br>
+'Actual time elapsed since the last data exchange across the socket can be obtained through the
+'<font color="maroon"><b>lsock.toutcounter </b></font>R/O property.
+    get = syscall(650) as word
+    set = syscall(651) (connectiontout as word)
+end property
+
+'--------------------------------------------------------------------
+property lsock.toutcounter
+'<b>R/O PROPERTY (WORD), DEFAULT VALUE= 0 </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the time, in 0.5 second intervals,
+'elapsed since the data was last send or received on this socket.
+'<br><br>
+'This property is reset to 0 each time there is some data exchanged across the socket connection.
+'The property increments at 0.5 second intervals while no data is moving through this socket.
+'<br><br>
+'If the <font color="maroon"><b>lsock.connectiontout </b></font>is not at 0, this property increments until it reaches the value of the
+'<font color="maroon"><b>lsock.connectiontout </b></font>and the connection is terminated.
+'The <font color="maroon"><b>lsock.toutcounter </b></font>then stays at this value.
+'<br><br>
+'If the <font color="maroon"><b>lsock.connectiontout </b></font>is at 0, the maximum value that the<font color="maroon"><b>lsock.toutcounter </b></font>
+'can reach is 1. That is, the <font color="maroon"><b>lsock.toutcounter </b></font>
+'will be at 0 after the data exchange, and at 1 if at least 0.5 seconds have passed since the last data exchange.
+    get = syscall(674) as word
+end property
+
+'--------------------------------------------------------------------
+property lsock.targetbcast
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) specifies whether this port will be
+'sending its outgoing UDP datagrams as link-level broadcasts: <br><br>
+'<font color="olive"><b>0- NO </b></font> (will send as "normal" packets),<br><br> <font color="olive"><b>1- YES </b></font>(will send as 
+'broadcast packets).<br><br>
+'This property is only relevant for UDP communications (<font color="maroon"><b>lsock.protocol</b></font>=<font color="olive"><b>
+'PL_LSOCK_PROTOCOL_UDP</b></font>). When this property is set to <font color="olive"><b>1- YES </b></font>the socket will be sending out all UDP 
+'datagrams as broadcasts and incoming datagrams won't cause port switchover, even if the latter is enabled through the 
+'<font color="maroon"><b>lsock.reconmode </b></font> property.
+    get = syscall(668) as no_yes
+    set = syscall(669) (targetbcast as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property lsock.rxpacketlen
+'<b>R/O PROPERTY (DWORD), DEFAULT VALUE= 0 (0 bytes). </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) returns the length (in bytes) of the UDP
+'datagram being extracted from the RX buffer. This property is only relevant when the <font color="maroon"><b>lsock.protocol</b></font>=
+'<font color="olive"><b>1-PL_SOCK_PROTOCOL_UDP</b></font>. <br><br>
+'Correct way of using this property is within the <font color="teal"><b>on_lsock_data_arrival </b></font>event or in conjunction with the
+'<font color="maroon"><b>lsock.nextpacket</b></font> method.<br><br>
+'See also <font color="maroon"><b>lsock.rxlen </b></font> property.
+    get = syscall(721) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(686) lsock.nextpacket()
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) in the UDP mode (<font color="maroon"><b>
+'lsock.protocol</b></font>= <font color="olive"><b>0- PL_SOCK_PROTOCOL_UDP</b></font>) closes processing of current UDP datagram and moves to 
+'the next datagram. <br><br>
+'For UDP, the <font color="maroon"><b>lsock.getdata </b></font>method only extracts the data from a single UDP datagram even if several 
+'datagrams are stored in the RX buffer. When incoming UDP datagram processing is based on the <font color="teal"><b>on_lsock_data_arrival
+'</b></font>event the use of the <font color="maroon"><b>lsock.nextpacket </b></font> is not required since each invocation of the 
+'<font color="teal"><b>on_lsock_data_arrival </b></font>event handler "moves" processing to the next UDP datagram.<br><br>
+'The method is useful when it is necessary to move to the next datagram without re-entering <font color="teal"><b>on_lsock_data_arrival
+'</b></font>. Therefore, <font color="maroon"><b>lsock.nextpacket </b></font> is only necessary when the application needs to process
+'several incoming UDP packets at once and within a single event handler.
+
+'--------------------------------------------------------------------
+property lsock.acceptbcast
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0-NO. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) specifies whether the socket will accept
+'incoming broadcast UDP datagrams: <br><br>
+'<font color="olive"><b>0- NO </b></font>(won't accept broadcast UDP datagrams),<br><br> <font color="olive"><b>1- YES </b></font> (will accept
+'broadcast UDP datagrams).<br><br>
+'This property is irrelevant for TCP communications (<font color="maroon"><b>lsock.protocol</b></font>=<font color="olive"><b>
+'PL_LSOCK_PROTOCOL_TCP</b></font>).
+    get = syscall(647) as no_yes
+    set = syscall(648) (acceptbcast as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property lsock.bcast
+'<b>R/O PROPERTY (ENUM BYTE), DEFAULT VALUE= 0- NO. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) reports whether the current or most
+'recently received UDP datagram was a broadcast one. <br><br>
+'When the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler is entered, the <font color="maroon"><b>lsock.bcast </b></font> 
+'will contain the broadcast status for the current datagram being processed.  <br><br>
+'Outside of the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler, the property will return the broadcast status of the most
+'recent datagram received by the socket.
+    get = syscall(649) as no_yes
+end property
+
+'--------------------------------------------------------------------
+syscall(693) lsock.redir(redir as pl_redir) as pl_redir
+'<b>METHOD. </b><br><br>
+'For the selected socket (selection is made through <font color="maroon"><b>lsock.num</b></font>) redirects the data being RXed to the TX buffer
+'of the same socket, different socket, or another object that supports compatible buffers.<br><br>
+'The redir argument, as well as the value returned by this method are of "<font color="olive"><b>enum pl_redir</b></font>" type. The 
+'<font color="olive"><b>pl_redir </b></font>defines a set of inter-object constants that include all possible redirections for this platform.
+'Specifying redir value of <font color="olive"><b>0- PL_REDIR_NONE </b></font> cancels redirection.<br><br>
+'This method returns actual redirection result: <font color="olive"><b>0- PL_REDIR_NONE </b></font>if redirection failed or the
+'same value as the one that was passed in the redir argument if redirection was successful.
+
+'--------------------------------------------------------------------
+event(26)  on_lsock_event(newstate as pl_lsock_state)
+'<b>EVENT of the lsock object. </b><br><br> 
+'Notifies your program that the socket state has changed.
+'<br><br>
+'The newstate argument carries the state as it was at the moment of event generation.
+'This is different from the <font color="maroon"><b>lsock.state </b></font> R/O property that returns the current socket state.
+'<br><br>
+'See the <font color="olive"><b>pl_lsock_state </b></font>
+'constant for descriptions of reported socket states.
+'<br><br>
+'Multiple
+'<font color="olive"><b>on_lsock_event </b></font>
+'events may be waiting in the event queue. For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
+'for this event or the body of any procedure in the related call chain.
+
+'--------------------------------------------------------------------
+event(27) on_lsock_data_sent
+'<b>EVENT of the lsock object. </b><br><br> 
+'Generated after the total amount of committed data in the TX buffer of the socket (<font color="maroon"><b>lsock.txlen</b></font> - <font color="maroon"><b>lsock.newtxlen</b></font>) is
+'found to be less than the threshold that was preset through the <font color="maroon"><b>lsock.notifysent </b></font>method. This event may
+'be generated only after the <font color="maroon"><b>lsock.notifysent</b></font> method was used. <br><br>
+'Your application needs to use the <font color="maroon"><b>lsock.notifysent</b></font> method EACH TIME it wants to cause the 
+'<font color="teal"><b>on_lsock_data_sent </b></font>event generation for a particular socket. <br><br>
+'When the event handler for this event is entered the <font color="maroon"><b>lsock.num  </b></font>is automatically switched to the port on
+'which this event was generated. Please, remember that uncommitted data in the TX buffer is not taken into account for the 
+'<font color="teal"><b>on_lsock_data_sent </b></font>event generation.
+
+'--------------------------------------------------------------------
+event(25)  on_lsock_data_arrival
+'<b>EVENT of the lsock object. </b><br><br>
+'Generated when at least one data byte is present in the RX buffer of the socket (i.e. for this socket the <font color="maroon"><b>
+'lsock.rxlen</b></font>>0). When the event handler for this event is entered the <font color="maroon"><b>lsock.num </b></font>property is
+'automatically switched to the socket for which this event was generated.<br><br>
+'Another <font color="teal"><b>on_lsock_data_arrival </b></font>event on a particular socket is never generated until the previous 
+'one is processed. Use <font color="maroon"><b>lsock.getdata </b></font>method to extract the data from the RX buffer.<br><br>
+'For TCP protocol (<font color="maroon"><b>lsock.protocol</b></font>= <font color="olive"><b>1- PL_LSOCK_PROTOCOL_TCP</b></font>), there is 
+'no separation into individual packets and you get all arriving data as a "stream". You don't have to process all data in the RX buffer at 
+'once. If you exit the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler while there is still some unprocessed 
+'data in the RX buffer another <font color="teal"><b>on_lsock_data_arrival </b></font>event will be generated immediately.<br><br>
+'For UDP protocol (<font color="maroon"><b>lsock.protocol</b></font>= <font color="olive"><b>0- PL_LSOCK_PROTOCOL_UDP</b></font>), the RX 
+'buffer preserves datagram boundaries. Each time you enter the <font color="teal"><b>on_lsock_data_arrival </b></font>event handler
+'you get to process next UDP datagram. If you do not process entire datagram contents the unread portion of the datagram is discarded once 
+'you exit the event handler.<br><br>
+'This event is not generated for a particular socket when buffer redirection is set for this socket through the <font color="maroon"><b>
+'lsock.redir </b></font>method.

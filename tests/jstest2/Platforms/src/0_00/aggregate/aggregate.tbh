@@ -1,0 +1,204 @@
+'***********************************************************************************************************
+'			AGGREGATE AGENT LIBRARY
+'***********************************************************************************************************
+
+#ifndef AGG_DEBUG_PRINT
+	#define AGG_DEBUG_PRINT 0
+#endif
+
+#ifndef AGG_LOGIN_CONTROL
+	#define AGG_LOGIN_CONTROL 0
+#endif
+
+#ifndef AGG_TABLE_CONTROL
+	#define AGG_TABLE_CONTROL 0
+#endif
+
+#ifndef AGG_SETTING_CONTROL
+	#define AGG_SETTING_CONTROL 0
+#endif
+
+#ifndef AGG_DESCRIPTOR_FILE
+	#define AGG_DESCRIPTOR_FILE "aggregate.txt"
+#endif
+
+#ifndef AGG_MAX_CONTEXT_NAME_LEN 
+	#define AGG_MAX_CONTEXT_NAME_LEN 4		
+#endif
+
+#ifndef AGG_MAX_SCRIPT_LINE_NAME_LEN 
+	#define AGG_MAX_SCRIPT_LINE_NAME_LEN 12
+#endif
+
+#ifndef AGG_MAX_NUM_ENTITY_TYPES
+	#define AGG_MAX_NUM_ENTITY_TYPES 2
+#endif
+
+#ifndef AGG_MAX_NUM_SCRIPT_LINES
+	#define AGG_MAX_NUM_SCRIPT_LINES 0
+#endif
+
+#ifndef AGG_TEMP_TABLE_NAME
+	#define AGG_TEMP_TABLE_NAME "Tmp"
+#endif
+
+#ifndef AGG_MAX_RECONNECTION_DELAY
+	#define AGG_MAX_RECONNECTION_DELAY 15
+#endif
+
+#ifndef AGG_MAX_FUNCTION_NAME_LEN
+	#define AGG_MAX_FUNCTION_NAME_LEN 12
+#endif
+
+#ifndef AGG_MULTI_CONTEXT
+	#define AGG_MULTI_CONTEXT 0
+#endif
+
+#ifndef AGG_SEND_WAIT_TIME
+	#define AGG_SEND_WAIT_TIME 0
+#endif
+
+#ifndef AGG_MAX_NUM_STORED_EVENTS
+	#define AGG_MAX_NUM_STORED_EVENTS 0
+#endif
+
+#ifndef AGG_STORED_EVENT_LVL_FIELD
+	#define AGG_STORED_EVENT_LVL_FIELD "AEL"
+#endif
+
+#ifndef AGG_REMOTE_FIRMWARE_UPLOAD
+	#define AGG_REMOTE_FIRMWARE_UPLOAD 1
+#endif
+
+#ifndef AGG_CUSTOM_RTC
+	#define AGG_CUSTOM_RTC 0	'0:standard RTC, 1:external RTC, 2:no RTC
+#endif
+
+#ifndef AGG_KEEPALIVE_TMR_CTR
+	#define AGG_KEEPALIVE_TMR_CTR 20
+#endif
+
+const AGG_FIRMWARE_FILENAME="firmware.bin"
+
+'------------------------------------------------------------------------------
+enum en_agg_rdwr
+	EN_AGG_GET,
+	EN_AGG_SET
+end enum
+
+enum en_agg_status_codes
+	EN_AGG_STATUS_OK,
+	EN_AGG_STATUS_NOT_STARTED,
+	EN_AGG_STATUS_WRONG_DESCRIPTOR,
+	EN_AGG_STATUS_OUT_OF_SOCKETS,
+	EN_AGG_STATUS_INVALID_INTERFACE,
+	EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE,
+	EN_AGG_STATUS_CONNECTION_LOST,
+	EN_AGG_STATUS_UNABLE_TO_CONNECT,
+	EN_AGG_STATUS_SETTING_ERROR,
+	EN_AGG_STATUS_TABLE_ERROR,
+	EN_AGG_STATUS_FUNCTION_ERROR,
+	EN_AGG_STATUS_ITEM_NOT_FOUND
+end enum
+
+enum en_agg_link_states
+	EN_AGG_LINK_STATE_IDLE,
+	EN_AGG_LINK_STATE_CONNECTING,
+	EN_AGG_LINK_STATE_SYNCRONIZING,
+	EN_AGG_LINK_STATE_DISCONNECTED,
+	EN_AGG_LINK_STATE_ESTABLISHED
+end enum
+
+enum en_agg_event_levels
+	EN_AGG_EVENT_LEVEL_NONE,
+	EN_AGG_EVENT_LEVEL_NOTICE,
+	EN_AGG_EVENT_LEVEL_INFO,
+	EN_AGG_EVENT_LEVEL_WARNING,
+	EN_AGG_EVENT_LEVEL_ERROR,
+	EN_AGG_EVENT_LEVEL_FATAL,
+	EN_AGG_EVENT_LEVEL_USE_DEFAULT
+end enum
+
+'------------------------------------------------------------------------------
+declare function agg_start(interface as pl_sock_interfaces, byref onwer_name as string, byref device_name as string, byref password as string, byref agg_server_ip as string, agg_server_port as word, agg_server_tout as word, auto_reg as no_yes) as en_agg_status_codes
+declare sub agg_stop()
+declare sub agg_fire_instant_event(byref context_name as string, byref event_name as string, byref event_string as string, event_level as en_agg_event_levels)
+declare sub agg_get_connection_state(byref link_state as en_agg_link_states, byref sock_state as pl_sock_state_simple)
+
+declare sub agg_proc_timer()
+declare sub agg_proc_data()
+declare sub agg_proc_sock_event(sock_state as pl_sock_state, sock_state_simple as pl_sock_state_simple)
+declare function agg_record_decode(byref encode_string as string, field_index as byte) as string
+declare sub agg_record_encode(byref encode_string as string, byref field_value as string)
+declare sub agg_keep_alive()
+
+declare function callback_agg_external_data_source(byref source_type as string, byref parameter1 as string, byref parameter2 as string, byref parameter3 as string, rw as en_agg_rdwr)as ok_ng
+'Callback procedure, to allow the possibility of reading and writing to a user defined data structure which is not part of our libraries.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare function callback_agg_external_data_modtime_sg(byref source_type as string, byref item_name as string, byref date_time as string, op as en_agg_rdwr) as ok_ng
+'Callback procedure, to allow the possibility of reading and writing to the modtime of a user defined data structure.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare function callback_agg_get_firmware_version() as string
+'Callback procedure, reads firmware version, firmware version could be used by multiple modules, therefore should not be included in the library.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_agg_pre_buffrq(required_buff_pages as byte)
+'Callback procedure, informs of the insufficient number of free buffer pages available for use by the library.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_agg_buff_released()
+'Callback procedure, informs of the release of buffer pages by the library.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_agg_error(failure_code as en_agg_status_codes, byref error_item as string)
+'Callback procedure, informs of the error happened during AggreGate related operations.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare function callback_agg_device_function(byref function_name as string ,byref context_name as string, byref function_input as string, byref function_output as string) as ok_ng
+'Callback procedure, calls user defined operations, allows users to expend the functions that can be called from AggreGate Server.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+declare sub callback_agg_synchronized()
+'Callback procedure, informs of the success of data synchronization with AggreGate Server.
+'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+#if AGG_CUSTOM_RTC=1
+	declare sub callback_agg_rtc_sg(byref wdaycount as word, byref wmincount as word, byref bsec as byte, byref wmilsec as word, op as en_agg_rdwr)
+	'Callback procedure, reads and sets external RTC, instead of using the onboard RTC IC
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+#endif
+
+#if AGG_SETTING_CONTROL
+	declare function callback_agg_setting_saved(byref setting_name as string,index as byte, byref setting_val as string) as en_stg_status_codes
+	'Callback procedure, informs settings has been modified by AggreGate Server
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	
+	declare sub callback_agg_setting_error(byref setting_name as string, error_code as en_stg_status_codes)
+	'Callback procedure, informs of errors happened during accessing settings by AggreGate Server.
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	
+	declare function callback_agg_convert_setting(byref setting_name as string, index as byte, byref setting_value as string, op as en_agg_rdwr) as ok_ng
+	'Callback procedure, allows settings to be converted, in the case that settings stored in device and on AggreGate Server are in different format.
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	
+#endif
+
+#if AGG_TABLE_CONTROL
+	declare sub agg_proc_stored_events()
+	declare sub agg_proc_data_sent()
+	declare sub agg_stored_event_added(byref event_name as string)
+	
+	declare sub callback_agg_table_error(byref table_name as string, error_code as en_tbl_status_codes)
+	'Callback procedure, informs of errors happened during accessing tables by AggreGate Server.
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	declare sub callback_agg_convert_table_field(byref table_name as string, byref field_name as string, byref field_value as string, op as en_agg_rdwr)
+	'Callback procedure, allows table fields to be converted, in the case that table fields stored in device and on AggreGate Server are in different format.
+	'Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	
+#endif
+
+#if AGG_REMOTE_FIRMWARE_UPLOAD
+	declare sub callback_agg_firmware_upload_progress(total_size as dword, remain_size as dword)
+#endif 

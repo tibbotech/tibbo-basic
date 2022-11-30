@@ -1,0 +1,260 @@
+'***********************************************************************************************************
+'			SUPER SPI
+'***********************************************************************************************************
+
+include "global.tbh"
+
+const SSPI_STAMP="SSPI> "
+const SSPI_CR_LF=chr(13)+chr(10)
+const SSPI_MAX_SLOTS=16
+const SSPI_UNUSED_SIGNATURE="----"
+const SSPI_INIT_SIGNATURE=&h9503
+
+declare sub sspi_init()
+declare sub sspi_debugprint(byref print_data as string)
+
+dim sspi_in_use(SSPI_MAX_SLOTS) as no_yes
+dim sspi_user_signature(SSPI_MAX_SLOTS) as string(SSPI_MAX_SIGNATURE_LEN)
+dim sspi_mode as spi_modes(SSPI_MAX_SLOTS)
+dim sspi_init_flag as word
+dim sspi_num as byte
+
+public dim sspi_mosi(SSPI_MAX_SLOTS),sspi_miso(SSPI_MAX_SLOTS),sspi_scl(SSPI_MAX_SLOTS) as pl_io_num
+
+'==============================================================================
+public function sspi_register(byref signature as string,mosi as pl_io_num,miso as pl_io_num, scl as pl_io_num,mode as spi_modes,use_ssi as no_yes) as byte
+'Returns a free spi number or 255 if no free spi slots left.
+	dim f as byte
+	if sspi_init_flag<>SSPI_INIT_SIGNATURE then
+		sspi_init()
+		sspi_init_flag=SSPI_INIT_SIGNATURE
+	end if
+
+	for f=0 to SSPI_MAX_SLOTS-1
+		if sspi_user_signature(f) = signature then 
+			sspi_register=f
+			exit function
+		end if
+	next f
+
+	if use_ssi=NO then
+register_normal_slot:
+		for f=4 to SSPI_MAX_SLOTS-1
+			if sspi_in_use(f)=NO then
+				sspi_in_use(f)=YES
+				sspi_user_signature(f)=signature
+				sspi_mode(f)=mode
+				sspi_mosi(f)=mosi
+				sspi_miso(f)=miso
+				sspi_scl(f)=scl
+				sspi_register=f
+
+				io.num=scl
+				if mode>SPI_MODE_1 then
+					io.state=HIGH
+				else
+					io.state=LOW
+				end if
+				io.enabled=YES
+				io.num=mosi
+				io.state=HIGH
+				io.enabled=YES
+				io.num=miso
+				io.state=HIGH
+				io.enabled=NO
+				#if SSPI_DEBUG_PRINT
+					sspi_debugprint("'"+sspi_user_signature(f)+"' register spi #"+str(f))
+				#endif
+				exit function
+			end if
+		next f
+	else
+		' hi speed (SSI-based) mode
+		f=ssi_get(signature)
+		if f=255 then
+			' could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
+			#if SSPI_DEBUG_PRINT
+				sspi_debugprint("could not register a spi hi-speed (SSI-based) mode, change to normal mode.")
+			#endif
+			goto register_normal_slot
+		end if
+
+		sspi_in_use(f)=YES
+		sspi_user_signature(f)=signature
+		sspi_mosi(f)=mosi
+		sspi_miso(f)=miso
+		sspi_scl(f)=scl
+		sspi_register=f
+
+		io.num=scl
+		io.state=HIGH
+		io.enabled=YES
+		io.num=mosi
+		io.state=HIGH
+		io.enabled=YES
+		io.num=miso
+		io.state=HIGH
+		io.enabled=NO
+
+		if mode <=SPI_MODE_1 then
+			io.lineset(scl,LOW)
+		else
+			io.lineset(scl,HIGH)
+		end if
+
+		#if SSPI_DEBUG_PRINT
+			sspi_debugprint("'"+sspi_user_signature(f)+"' register spi #"+str(f))
+		#endif
+		exit function
+	end if
+	'no free spi slot found
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("'"+signature+"' could not register a spi slot: no free slots left")
+	#endif
+	sspi_register=255
+end function
+
+public function sspi_who_uses(num as byte) as string
+'Returns the signature of the specified socket's user.
+	if sspi_init_flag<>SSPI_INIT_SIGNATURE then
+		sspi_init()
+		sspi_init_flag=SSPI_INIT_SIGNATURE
+	end if
+
+	if sspi_in_use(num)=NO then
+		sspi_who_uses=SSPI_UNUSED_SIGNATURE
+	else
+		sspi_who_uses=sspi_user_signature(num)
+	end if
+end function
+
+public sub sspi_release(num as byte)
+'Releases the sspi (number).
+	if sspi_init_flag<>SSPI_INIT_SIGNATURE then
+		sspi_init()
+		sspi_init_flag=SSPI_INIT_SIGNATURE
+	end if
+
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("'"+sspi_user_signature(num)+"' released slot #"+str(num))
+	#endif
+
+	sspi_in_use(num)=NO
+	sspi_user_signature(num)=SSPI_UNUSED_SIGNATURE
+
+	io.num=sspi_scl(num)
+	io.enabled=NO
+	io.num=sspi_mosi(num)
+	io.enabled=NO
+	io.num=sspi_miso(num)
+	io.enabled=NO
+
+
+	sspi_scl(num)=PL_IO_NULL
+	sspi_mosi(num)=PL_IO_NULL
+	sspi_miso(num)=PL_IO_NULL
+
+	if num <=3 then
+		ssi_release(num)
+	end if
+end sub
+
+sub sspi_get(num as byte)
+	sspi_num=num
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("#"+str(num)+" got slot")
+	#endif
+end sub
+
+sub sspi_write(data as byte)
+	dim bitCnt as byte						'Bits counter	
+	dim compval as byte						'Value to compare - MASK
+	dim BitData as boolean					'Comparison result (1 or 0)
+
+	if sspi_num>3 then
+		compval = &h80						'Initialize the MASK
+
+		io.num = sspi_scl(sspi_num)			'Select SSI_CLK line
+
+		if sspi_mode(sspi_num)=SPI_MODE_0 or sspi_mode(sspi_num)=SPI_MODE_2 then
+			io.state = HIGH						'Initialize the transmition
+		else
+			io.state=LOW
+		end if
+		
+		for bitCnt = 0 to 7 step 1	
+			BitData = data AND compval		'Define the state of the bit(MSB-->LSB)
+			compval = compval / 2			'Move the comparision to the next bit(MSB-->LSB)
+
+			if(BitData) then 
+				io.lineset(sspi_mosi(sspi_num),HIGH)'Bit is 1
+			else
+				io.lineset(sspi_mosi(sspi_num),LOW)'Bit is 0
+			end if
+
+			'io.lineset(sspi_scl(sspi_num),HIGH)'Write the bit to SPI device
+			io.invert(sspi_scl(sspi_num))
+			io.invert(sspi_scl(sspi_num))
+		next bitCnt
+	else
+		ssi.channel=sspi_num
+		ssi.str(chr(data),PL_SSI_ACK_OFF)
+	end if
+end sub
+
+function sspi_read() as byte
+	dim bitCnt as byte							'Bit counter
+	dim compval as byte							'Value to compare - MASK
+
+	io.lineset(sspi_mosi(sspi_num),LOW)
+	if sspi_num>3 then
+		sspi_read=0
+		compval=&h80							'Initialize the MASK
+
+		for bitCnt=0 to 7 step 1
+			if sspi_mode(sspi_num)=SPI_MODE_0 or sspi_mode(sspi_num)=SPI_MODE_2 then
+				io.lineset(sspi_scl(sspi_num),LOW)	'Read one bit from SPI device
+			else
+				io.lineset(sspi_scl(sspi_num),HIGH)	'Read one bit from SPI device
+			end if
+
+			if(io.lineget(sspi_miso(sspi_num))) then				'Devine the state of the bit
+				sspi_read=sspi_read OR compval	'Store the value of the bit
+			end if
+
+			compval=compval/2					'Move the comparision to the next bit(MSB-->LSB)
+			if sspi_mode(sspi_num)=SPI_MODE_0 or sspi_mode(sspi_num)=SPI_MODE_2 then
+				io.lineset(sspi_scl(sspi_num),HIGH)	'Clear the clock line (the data can change now...)
+			else
+				io.lineset(sspi_scl(sspi_num),LOW)	'Clear the clock line (the data can change now...)
+			end if
+		next bitCnt
+
+		io.lineset(sspi_mosi(sspi_num),HIGH)
+		#if SSPI_DEBUG_PRINT
+			sspi_debugprint("spi read data:"+ hex(sspi_read))
+		#endif
+	else
+		dim tmp as word=0
+		ssi.channel=sspi_num
+		tmp=ssi.value(&hFFFF,8)
+		sspi_read=tmp and &h00FF
+	end if
+end function
+
+sub sspi_init()
+	dim f as byte
+	for f=0 to SSPI_MAX_SLOTS-1
+		sspi_in_use(f)=NO
+		sspi_user_signature(f)=SSPI_UNUSED_SIGNATURE
+		sspi_mosi(f)=PL_IO_NULL
+		sspi_miso(f)=PL_IO_NULL
+		sspi_scl(f)=PL_IO_NULL
+	next f
+end sub
+
+#if SSPI_DEBUG_PRINT
+sub sspi_debugprint(byref print_data as string)
+	sys.debugprint(SSPI_STAMP+print_data+SSPI_CR_LF)
+end sub
+#endif

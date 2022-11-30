@@ -1,0 +1,151 @@
+#define MAX_NUM_FILE_UPG 12
+#define FW_UPG_BLK_LEN 128
+#define DISK_SIZE 4096
+
+declare num_of_files as byte
+declare upload_started as boolean
+declare dns_socket, upgrade_socket as byte
+
+
+
+type pl_manifest
+	dev_type as string
+	hw_ver as string
+	tmon_ver as string 
+	wifi_type as string
+	wifi_hw_ver as string
+	wifi_fw_ver as string
+	wifi_mon_ver as string	
+end type
+
+type socket_assignment
+	dns_socket as byte
+	upgrade_socket as byte
+	http_socket as byte
+end type
+
+enum PL_FW_UPG_STATE
+	PL_FW_UPG__INIT=0,
+    PL_FW_READ_HEADER,
+	PL_FW_UPG_READ_FW_TYPE,
+	PL_FW_UPG_READ_LEN,
+	PL_FW_UPG_READ_CHECKSUM,
+	PL_FW_UPG_READ_FW,
+	PL_FW_UPG_COMPLETE,
+	PL_FW_UPG_FAIL,
+	PL_FW_UPG_CANCEL
+end enum 
+
+
+enum PL_UPG_FW_TYPE
+	TIOS_MON = 0,
+	COMPRESSED_TIOS,
+	UNCOMPRESSED_TIOS,
+	COMPRESSED_APP,
+	UNCOMPRESSED_APP,
+	COMPRESSED_TIOS_APP,
+	UNCOMPRESSED_TIOS_APP,
+	WA2000_MON ,  
+	WA2000_APP,  
+	MANIFEST, 
+	WA3000_MON, 
+	WA3000_APP
+end enum 
+
+enum PL_FW_UPG_SOURCE
+	PL_FW_UPG_BLE=0,
+	PL_FW_UPG_WEB,
+	PL_FW_UPG_SOCK,
+	PL_FW_UPG_SER,
+	PL_FW_UPG_HTTP
+end enum
+
+enum PL_FW_UPG_FAIL_REASON
+	PL_FW_FAIL_NONE=0,
+	PL_FW_FAIL_CANCEL,
+	PL_FW_FAIL_NUMFILES,
+	PL_FW_FAIL_INVALID_FW_TYPE,
+	PL_FW_FAIL_INVALID_FW_LENGTH,
+	PL_FW_FAIL_INVALID_FW_CHECKSUM,
+	PL_FW_FAIL_SOURCE_UNKNOWN,
+	PL_FW__FAIL_INVALID_HARDWARE
+end enum
+
+type pl_upg_state_t
+     state as enum PL_FW_UPG_STATE
+	 source as enum PL_FW_UPG_SOURCE
+	 fw_fail_reason as PL_FW_UPG_FAIL_REASON
+	 fw_totalsize as dword
+	 fw_total_remaining as dword
+	 fw_numfiles as byte
+	 fw_types(MAX_NUM_FILE_UPG) as byte
+	 fw_lengths(MAX_NUM_FILE_UPG) as float
+	 fw_checksums(MAX_NUM_FILE_UPG) as dword
+	 
+	 fw_currentfile as byte
+	 fw_total_percent as byte	 
+	 fw_percent as byte
+	 fw_remaining as dword	
+	 fw_sector  as word	
+	 fw_page  as word		 
+	 fw_checksum as dword
+	 source_num as byte
+	 fw_receivedfiles as byte
+end type
+
+enum baudrates	
+	b1200,
+	b2400,
+	b4800,
+	b9600,
+	b19200,
+	b38400,
+	b56000,
+	b57600,
+	b115200,
+	b128000,
+	b153600,
+	b230400,
+	b256000,
+	b460800,
+	b921600
+end enum
+ 
+declare current_fw_upg_state as pl_upg_state_t
+
+declare function device_firmware_upload_async(source as PL_FW_UPG_SOURCE, number as byte) as no_yes
+declare function device_firmware_upload_update() as no_yes
+
+declare function hex_mac(mac as string) as string
+
+declare sub set_baudrate(baudrate as dword)
+declare sub start_dns(domainName as string)
+declare sub DHCP_DNS_init()
+
+
+declare function get_fw_upg_state() as pl_upg_state_t
+
+'Callback when the file type is read to let app know what will be updated.  
+declare sub on_firmware_update_start(byref current_fw_upg_state as pl_upg_state_t) 
+
+declare sub on_firmware_update_data_received(byref current_fw_upg_state as pl_upg_state_t) 
+
+'Callback when data has been written to flash. 
+declare sub on_firmware_update_percent_change(byref current_fw_upg_state as pl_upg_state_t) 
+	
+'Callback when all files have been downloaded. 
+declare sub on_firmware_update_file_complete(byref current_fw_upg_state as pl_upg_state_t)		
+
+'Callback when all files have been downloaded. 
+declare sub on_firmware_update_complete(byref current_fw_upg_state as pl_upg_state_t)	
+
+declare sub init_serial(port as byte, baud as dword)
+declare sub init_receive_socket(receive_interface as string)
+declare sub device_firmware_write_tios_app(fw as string) 
+declare sub device_firmware_write_wa2000_mon_app(fw as string)
+declare sub device_firmware_read_manifest(manifest as string)
+declare sub device_firmware_get_fw_block(byref dev_fw_upg_state as pl_upg_state_t )
+declare function device_firmware_bytes_available() as dword
+declare function device_firmware_read_32_uint() as dword
+declare function get_firmware_index(fwtype as PL_UPG_FW_TYPE) as integer
+declare sub upgrade_WA2000_firmware(fw_type as PL_UPG_FW_TYPE,  index as byte)

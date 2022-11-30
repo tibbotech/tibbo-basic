@@ -1,0 +1,58 @@
+'**************************************************************************************************
+'       PWM (Pulse-width modulation) object
+'**************************************************************************************************
+
+object pwm
+'PWM. object provides access to the Pulse-width modulation (PWM) capabilities of lines.
+
+'--------------------------------------------------------------------
+property pwm.num
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE = 0.</b><br><br>
+'Sets or returns the number of the currently selected PWM channel.<br><br>
+'PWM inputs are mapped to regular GPIO lines, and such mapping is platform-specific. For more information, see the <font color="olive"><b>pl_pwm_num enum</b></font> of your platform.
+    get = syscall(857) as pl_pwm_num
+    set = syscall(858) (num as pl_pwm_num)
+end property
+
+'--------------------------------------------------------------------
+property pwm.frequency
+'<b>PROPERTY (REAL), DEFAULT VALUE = 1000.</b><br><br>
+'For the currently selected PWM channel (selection is made through <font color="maroon"><b>pwm.num</b></font>), indicates the frequency of modulation.<br><br>
+'The unit for the value range is hertz, meaning the usable range is from 30Hz to 20kHz. 
+'After setting or modifying the duty cycle of any given PWM channel, you need to call <font color="maroon"><b>pwm.update</b></font> or <font color="maroon"><b>pwm.updateall</b></font> for the changes to take effect.
+    get = syscall(859) as real
+    set = syscall(860) (value as real)
+end property
+
+'--------------------------------------------------------------------
+property pwm.dutycycle
+'<b>PROPERTY (REAL), DEFAULT VALUE = 0.</b><br><br>
+'For the currently selected PWM channel (selection is made through <font color="maroon"><b>pwm.num</b></font>), indicates the duty cycle.<br><br>
+'The duty cycle is the proportion of "on" time for the channel, where 0 is always off and 100 is always on.
+'After setting or modifying the duty cycle of any given PWM channel, you need to call <font color="maroon"><b>pwm.update</b></font> or <font color="maroon"><b>pwm.updateall</b></font> for the changes to take effect.
+    get = syscall(861) as real
+    set = syscall(862) (value as real)
+end property
+
+'--------------------------------------------------------------------
+property pwm.enabled
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE = 0 - NO.</b><br><br>
+'For the currently selected PWM channel (selection is made through <font color="maroon"><b>pwm.num</b></font>), indicates whether it is enabled or disabled: 
+'<font color="olive"><b>0 - NO</b></font> (the PWM channel is disabled), <font color="olive"><b>1 - YES</b></font> (the PWM channel is enabled).<br><br>
+'Setting this property to <font color="olive"><b>0 - NO</b></font> disables the PWM channel and allows the corresponding line to work as a regular GPIO line.
+'Note that after you set <font color="maroon"><b>pwm.enabled</b></font> to <font color="olive"><b>0 - NO</b></font>, the corresponding GPIO line will be configured as an input and its output register will be set to HIGH.
+    get = syscall(863) as no_yes
+    set = syscall(864) (state as no_yes)
+end property
+
+
+syscall(873) pwm.update()
+'<b>METHOD.</b><br><br>
+'For the currently selected PWM channel (selection is made through <font color="maroon"><b>pwm.num</b></font>), updates the frequency and duty cycle.<br><br>
+'After setting or modifying the duty cycle of any given PWM channel, you need to call <font color="maroon"><b>pwm.update</b></font> or <font color="maroon"><b>pwm.updateall</b></font> for the changes to take effect.
+
+
+syscall(874) pwm.updateall()
+'<b>METHOD.</b><br><br>
+'Updates the frequency and duty cycle for all enabled PWM channels.
+'After setting or modifying the duty cycle of any given PWM channel, you need to call <font color="maroon"><b>pwm.update</b></font> or <font color="maroon"><b>pwm.updateall</b></font> for the changes to take effect.

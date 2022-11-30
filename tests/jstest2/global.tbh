@@ -1,0 +1,62 @@
+'DEFINES-------------------------------------------------------------
+#define DHCP_DEBUG_PRINT 1
+#define DHCP_POST_FAIL_DELAY 30
+#define DHCP_WAIT_TIME 8
+#define SOCK_MAX_SIGNATURE_LEN 32
+#define SSI_MAX_SIGNATURE_LEN 32
+#define SI2C_MAX_SIGNATURE_LEN 32
+#define SSPI_MAX_SIGNATURE_LEN 32
+#define CTS_MAP 0
+#define RTS_MAP 0
+
+
+
+
+const FIRMWARE_VERSION="{MyDevice 1.0.0}"
+
+const MAX_NUM_INTERFACES=4
+
+
+
+'INCLUDES------------------------------------------------------------
+includepp "filenum.xtxt"
+includepp "tables.xtxt"
+
+
+include "libraries/sock/sock.tbh"
+include "libraries/time/time.tbh"
+include "libraries/wln/wln.tbh"
+include "libraries/dhcp/dhcp.tbh"
+include "libraries/time/datetime.tbh"
+include "libraries/utils/utils.tbh"
+include "libraries/upgrade/upgrade.tbh"
+include "libraries/filenum/filenum.tbh"
+include "libraries/tables/tables.tbh"
+include "libraries/tables/tables_web.tbh"
+
+
+'DECLARATIONS--------------------------------------------------------
+
+declare function datetime_timestamp_mins(timestamp as dword) as dword
+declare function datetime_mins_to_timestamp(mins as word) as dword
+
+
+declare device_net_ip as string(16)
+declare device_net_mask as string(16)
+declare device_net_gateway as string(16)
+
+declare sub interface_set(interface as pl_sock_interfaces, state as no_yes)
+
+declare interface_ready(MAX_NUM_INTERFACES) as no_yes
+declare APP_TIMEZONE as en_td_timezones
+
+declare current_interface as pl_sock_interfaces
+
+declare sub change_current_interface(new_interface as pl_sock_interfaces)
+declare sub close_interface_sockets(interface as pl_sock_interfaces)
+declare upgrade_socket_http as byte
+declare function web_get_url_params(byref http_req_string as string, byref argument as string) as string
+declare function tbl_record_find_sorted(record_type as en_tbl_record_states, byref search_data as string, byref field_name as string, byref rec_num as word, wraparound as boolean, find_method as pl_fd_find_modes) as en_tbl_status_codes
+
+
+declare sub boot()

@@ -1,0 +1,469 @@
+'***********************************************************************************************************
+'			DATE/TIME LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'------------------------------------------------------------------------------
+const TD_DEFAULT_TD_STR="20000101000000000"
+const TD_DEFAULT_BINSTR=chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)
+
+'------------------------------------------------------------------------------
+declare sub td_get_tzone_offset(timezone as en_td_timezones, byref minutes_offset as word)
+
+'==============================================================================
+public function td_from_binstr(byref td_str as string, byref day_count as word, byref min_count as word, byref seconds as byte, byref mseconds as word) as ok_ng
+	dim time_str as string(7)
+	
+	select case len(td_str)
+	case 0,2,4,5,7:
+		time_str=td_str+right(TD_DEFAULT_BINSTR,7-len(td_str))
+	case else
+		td_from_binstr=NG
+		exit function
+	end select
+	
+	day_count=256*asc(mid(time_str,1,1))+asc(mid(time_str,2,1))
+	min_count=256*asc(mid(time_str,3,1))+asc(mid(time_str,4,1))
+	seconds=asc(mid(time_str,5,1))
+	mseconds=256*asc(mid(time_str,6,1))+asc(mid(time_str,7,1))
+	
+	if day_count=65535 or min_count=65535 or seconds>59 or mseconds>999 then 
+		td_from_binstr=NG
+	else
+		td_from_binstr=OK
+	end if
+
+end function
+
+'------------------------------------------------------------------------------
+public function td_to_binstr(byref td_str as string, day_count as word, min_count as word, seconds as byte, mseconds as word) as ok_ng
+
+	if day_count>36524 or min_count>1439 or seconds>59 or mseconds>999 then
+		td_str=""
+		td_to_binstr=NG
+		exit function
+	end if
+	
+	td_str=chr(day_count/256)
+	td_str=td_str+chr(day_count and &hFF)
+	td_str=td_str+chr(min_count/256)
+	td_str=td_str+chr(min_count and &hFF)
+	td_str=td_str+chr(seconds)
+	td_str=td_str+chr(mseconds/256)
+	td_str=td_str+chr(mseconds and &hFF)
+	
+	td_to_binstr=OK
+end function
+
+'------------------------------------------------------------------------------
+public function td_from_str(byref td_str as string, byref day_count as word, byref min_count as word, byref seconds as byte, byref mseconds as word) as ok_ng
+	dim year_byte, month_byte,date_byte, hour_byte, minute_byte as byte
+	dim month_str, date_str, hour_str, minute_str, second_str as string(2)
+	dim msecond_str as string(3)
+	dim year_str as string(4)
+	dim time_str as string(17)
+	
+	select case len(td_str)
+	case 0,4,6,8,10,12,14,17:
+		time_str=td_str+right(TD_DEFAULT_TD_STR,17-len(td_str))
+	case else
+		td_from_str=NG
+		exit function
+	end select
+		
+	year_str=left(time_str,4)
+	month_str=mid(time_str,5,2)
+	date_str=mid(time_str,7,2)
+	hour_str=mid(time_str,9,2)
+	minute_str=mid(time_str,11,2)
+	second_str=mid(time_str,13,2)
+	msecond_str=mid(time_str,15,3)
+	
+	year_byte=val(year_str)-2000
+	month_byte=val(month_str)
+	date_byte=val(date_str)
+	hour_byte=val(hour_str)
+	minute_byte=val(minute_str)
+	
+	seconds=val(second_str)
+	mseconds=val(msecond_str)
+	day_count=daycount(year_byte,month_byte,date_byte)
+	min_count=mincount(hour_byte,minute_byte)
+	
+	if day_count=65535 or min_count=65535 or seconds>59 or mseconds>999 then 
+		td_from_str=NG
+	else
+		td_from_str=OK
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function td_to_str(byref td_str as string, day_count as word,min_count as word, seconds as byte, mseconds as word) as ok_ng
+	dim month_str, date_str, hour_str, minute_str, second_str as string(2)
+	dim msecond_str as string(3)
+	dim year_str as string(4)
+	
+	if day_count>36524 or min_count>1439 or seconds>59 or mseconds>999 then
+		td_str=""
+		td_to_str=NG
+		exit function
+	end if
+	
+	year_str=str(year(day_count)+2000)
+	month_str=str(month(day_count))
+	date_str=str(date(day_count))
+	hour_str=str(hours(min_count))
+	minute_str=str(minutes(min_count))
+	second_str=str(seconds)
+	msecond_str=str(mseconds)
+		
+	if len(hour_str)<2 then 
+		hour_str="0"+hour_str 
+	end if
+	if len(minute_str)<2 then 
+		minute_str="0"+minute_str 
+	end if
+	if len(second_str)<2 then 
+		second_str="0"+second_str 
+	end if
+	if len(date_str)<2 then 
+		date_str="0"+date_str 
+	end if
+	if len(month_str)<2 then 
+		month_str="0"+month_str
+	end if
+	msecond_str=strgen(3-len(msecond_str),0)+msecond_str
+
+	td_str=year_str+month_str+date_str+hour_str+minute_str+second_str+msecond_str
+	td_to_str=OK
+end function
+
+'------------------------------------------------------------------------------
+public function td_str_to_binstr(byref td_str as string) as ok_ng
+	dim day_count, min_count, mseconds as word
+	dim seconds, length as byte
+	
+	length=len(td_str)
+	select case length
+	case 0,4,6,8,10,12,14,17:
+	case else
+		td_str_to_binstr=NG
+		td_str=""
+		exit function
+	end select
+
+	if td_from_str(td_str,day_count,min_count,seconds,mseconds)=OK then
+		td_str_to_binstr=td_to_binstr(td_str,day_count,min_count,seconds,mseconds)
+	else
+		td_str=""
+		td_str_to_binstr=NG
+		exit function
+	end if
+	select case length
+	case 0: td_str=""
+	case 4,6,8: td_str=left(td_str,2)
+	case 10,12: td_str=left(td_str,4)
+	case 14: td_str=left(td_str,5)
+	end select
+	
+end function
+
+'------------------------------------------------------------------------------
+public function td_binstr_to_str(byref td_str as string) as ok_ng
+	dim day_count, min_count, mseconds as word
+	dim seconds, length as byte
+	
+	length=len(td_str)
+	select case length
+	case 0,2,4,5,7:
+	case else
+		td_binstr_to_str=NG
+		td_str=""
+		exit function
+	end select
+	if td_from_binstr(td_str,day_count,min_count,seconds,mseconds)=OK then
+		td_binstr_to_str=td_to_str(td_str,day_count,min_count,seconds,mseconds)
+	else
+		td_str=""
+		td_binstr_to_str=NG
+		exit function
+	end if	
+	select case length
+	case 0: td_str=""
+	case 2: td_str=left(td_str,8)
+	case 4: td_str=left(td_str,12)
+	case 5: td_str=left(td_str,14)
+	end select
+	
+end function
+
+'------------------------------------------------------------------------------ 
+public function td_str_date_time_reformat(byref td_str as string,op as en_td_string_ops, date_format as en_td_date_formats) as ok_ng
+	dim length as byte
+	dim year_str as string(4)
+	dim ms_str as string(3)
+	dim month_str, date_str, hour_str, minute_str, second_str as string(2)
+	
+	length=len(td_str)
+	if op=TD_STR_ADD_FORMATTING then	
+		select case length
+		case 0,4,6,8,10,12,14,17:
+			td_str=td_str+right(TD_DEFAULT_TD_STR,17-len(td_str))
+		case else
+			td_str=""
+			td_str_date_time_reformat=NG
+			exit function
+		end select
+		year_str=left(td_str,4)
+		month_str=mid(td_str,5,2)
+		date_str=mid(td_str,7,2)
+		hour_str=mid(td_str,9,2)
+		minute_str=mid(td_str,11,2)
+		second_str=mid(td_str,13,2)
+		ms_str=mid(td_str,15,3)
+			
+		select case date_format
+		case TD_DATE_FORMAT_YYYYMMDD: td_str=year_str+"-"+month_str+"-"+date_str
+		case TD_DATE_FORMAT_MMDDYYYY: td_str=month_str+"-"+date_str+"-"+year_str
+		case TD_DATE_FORMAT_DDMMYYYY: td_str=date_str+"-"+month_str+"-"+year_str
+		end select
+		select case length
+		case 0:
+			td_str=""
+		case 10,12:
+			td_str=td_str+" "+hour_str+":"+minute_str
+		case 14:
+			td_str=td_str+" "+hour_str+":"+minute_str+":"+second_str
+		case 17:
+			td_str=td_str+" "+hour_str+":"+minute_str+":"+second_str+"."+ms_str
+		end select
+	else
+		select case length
+		case 0,10,16,19,23:
+		case else
+			td_str=""
+			td_str_date_time_reformat=NG
+			exit function
+		end select
+	
+		select case date_format
+		case TD_DATE_FORMAT_YYYYMMDD:
+			year_str=mid(td_str,1,4)
+			month_str=mid(td_str,6,2)
+			date_str=mid(td_str,9,2)
+			
+		case TD_DATE_FORMAT_MMDDYYYY:
+			year_str=mid(td_str,7,4)
+			month_str=mid(td_str,1,2)
+			date_str=mid(td_str,4,2)
+		
+		case TD_DATE_FORMAT_DDMMYYYY:
+			year_str=mid(td_str,7,4)
+			month_str=mid(td_str,4,2)
+			date_str=mid(td_str,1,2)
+		
+		end select
+		hour_str=mid(td_str,12,2)
+		minute_str=mid(td_str,15,2)
+		second_str=mid(td_str,18,2)
+		ms_str=mid(td_str,21,3)
+		select case length
+		case 0: 
+			td_str=""
+		case 10:
+			td_str=year_str+month_str+date_str
+		case 16:
+			td_str=year_str+month_str+date_str+hour_str+minute_str
+		case 19:
+			td_str=year_str+month_str+date_str+hour_str+minute_str+second_str
+		case 23:
+			td_str=year_str+month_str+date_str+hour_str+minute_str+second_str+ms_str
+		end select
+	end if
+	td_str_date_time_reformat=OK
+end function
+
+'------------------------------------------------------------------------------ 
+public function td_str_time_reformat(byref t_str as string, op as en_td_string_ops) as ok_ng
+	dim length as byte
+	dim ms_str as string(3)
+	dim hour_str, minute_str, second_str as string(2)
+
+	length=len(t_str)
+	if op=TD_STR_ADD_FORMATTING then	
+		select case length
+		case 0,2,4,6,9:
+			t_str=t_str+right(TD_DEFAULT_TD_STR,9-len(t_str))
+		case else
+			t_str=""
+			td_str_time_reformat=NG
+			exit function
+		end select
+		hour_str=mid(t_str,1,2)
+		minute_str=mid(t_str,3,2)
+		second_str=mid(t_str,5,2)
+		ms_str=mid(t_str,7,3)
+			
+		select case length
+		case 0: 
+			t_str=""
+		case 2,4:
+			t_str=hour_str+":"+minute_str
+		case 6:
+			t_str=hour_str+":"+minute_str+":"+second_str
+		case 9:
+			t_str=hour_str+":"+minute_str+":"+second_str+"."+ms_str
+		end select
+	else
+		select case length
+		case 0,5,8,12:
+		case else
+			t_str=""
+			td_str_time_reformat=NG
+			exit function
+		end select
+	
+		hour_str=mid(t_str,1,2)
+		minute_str=mid(t_str,4,2)
+		second_str=mid(t_str,7,2)
+		ms_str=mid(t_str,10,3)
+		select case length
+		case 0:
+			t_str=""
+		case 5:
+			t_str=hour_str+minute_str
+		case 8:
+			t_str=hour_str+minute_str+second_str
+		case 12:
+			t_str=hour_str+minute_str+second_str+ms_str
+		end select
+	end if
+	td_str_time_reformat=OK
+	
+end function
+
+'------------------------------------------------------------------------------ 
+public function td_local_to_gmt(byref day_count as word, byref min_count as word, timezone as en_td_timezones, dst as off_on) as ok_ng
+	dim minute_offset, wtemp1 as word
+	
+	'calculate daylight saving time
+	if dst=PL_ON then
+		if min_count>59 then
+			min_count=min_count-60
+		else
+			day_count=day_count-1
+			min_count=min_count-60+1440
+		end if	
+	end if
+	
+	if day_count>36524 or min_count>1439 then 
+		td_local_to_gmt=NG
+		exit function
+	end if	
+	td_get_tzone_offset(timezone, minute_offset)
+
+	if timezone>TD_TIMEZONE_GMT then
+		if min_count<minute_offset then
+			day_count=day_count-1 
+			wtemp1=1439-minute_offset
+			min_count=min_count+wtemp1+1
+		else
+ 			min_count=min_count-minute_offset
+ 		end if	
+	end if
+	if timezone<TD_TIMEZONE_GMT then
+		wtemp1=1439-minute_offset
+		if min_count>wtemp1 then
+			day_count=day_count+1
+			min_count=min_count-wtemp1-1
+		else 
+			min_count=min_count+minute_offset
+		end if 
+	end if	
+	td_local_to_gmt=OK
+end function
+
+'------------------------------------------------------------------------------ 
+public function td_gmt_to_local(byref day_count as word, byref min_count as word, timezone as en_td_timezones, dst as off_on) as ok_ng
+	dim minute_offset, wtemp1 as word
+	
+	'calculate daylight saving time
+	if dst=PL_ON then
+		if min_count<1380 then
+			min_count=min_count+60
+		else
+			day_count=day_count+1
+			min_count=min_count+60-1439
+		end if	
+	end if
+	
+	if day_count>36524 or min_count>1439 then 
+		td_gmt_to_local=NG
+		exit function
+	end if
+	td_get_tzone_offset(timezone, minute_offset)
+	
+	if timezone>TD_TIMEZONE_GMT then
+		wtemp1=1439-minute_offset
+		if min_count>wtemp1 then
+			day_count=day_count+1
+			min_count=min_count-wtemp1-1
+		else 
+			min_count=min_count+minute_offset
+		end if 
+	end if
+	if timezone<TD_TIMEZONE_GMT then
+		if min_count<minute_offset then
+			day_count=day_count-1 
+			wtemp1=1439-minute_offset
+			min_count=min_count+wtemp1+1
+		else
+ 			min_count=min_count-minute_offset
+ 		end if
+	end if
+	td_gmt_to_local=OK
+end function
+
+'------------------------------------------------------------------------------
+sub td_get_tzone_offset(timezone as en_td_timezones, byref minutes_offset as word)
+	
+	select case timezone
+	case TD_TIMEZONE_GMT_MINUS_12_00: minutes_offset=12*60
+	case TD_TIMEZONE_GMT_MINUS_11_00: minutes_offset=11*60
+	case TD_TIMEZONE_GMT_MINUS_10_00: minutes_offset=10*60
+	case TD_TIMEZONE_GMT_MINUS_09_00: minutes_offset=9*60
+	case TD_TIMEZONE_GMT_MINUS_08_00: minutes_offset=8*60
+	case TD_TIMEZONE_GMT_MINUS_07_00: minutes_offset=7*60
+	case TD_TIMEZONE_GMT_MINUS_06_00: minutes_offset=6*60
+	case TD_TIMEZONE_GMT_MINUS_05_00: minutes_offset=5*60
+	case TD_TIMEZONE_GMT_MINUS_04_30: minutes_offset=4*60+30
+	case TD_TIMEZONE_GMT_MINUS_04_00: minutes_offset=4*60
+	case TD_TIMEZONE_GMT_MINUS_03_30: minutes_offset=3*60+30
+	case TD_TIMEZONE_GMT_MINUS_03_00: minutes_offset=3*60
+	case TD_TIMEZONE_GMT_MINUS_02_00: minutes_offset=2*60
+	case TD_TIMEZONE_GMT_MINUS_01_00: minutes_offset=1*60
+	case TD_TIMEZONE_GMT: minutes_offset=0
+	case TD_TIMEZONE_GMT_PLUS_01_00: minutes_offset=1*60
+	case TD_TIMEZONE_GMT_PLUS_02_00: minutes_offset=2*60
+	case TD_TIMEZONE_GMT_PLUS_03_00: minutes_offset=3*60
+	case TD_TIMEZONE_GMT_PLUS_03_30: minutes_offset=3*60+30
+	case TD_TIMEZONE_GMT_PLUS_04_00: minutes_offset=4*60
+	case TD_TIMEZONE_GMT_PLUS_04_30: minutes_offset=4*60+30
+	case TD_TIMEZONE_GMT_PLUS_05_00: minutes_offset=5*60
+	case TD_TIMEZONE_GMT_PLUS_05_30: minutes_offset=5*60+30
+	case TD_TIMEZONE_GMT_PLUS_05_45: minutes_offset=5*60+45
+	case TD_TIMEZONE_GMT_PLUS_06_00: minutes_offset=6*60
+	case TD_TIMEZONE_GMT_PLUS_06_30: minutes_offset=6*60+30
+	case TD_TIMEZONE_GMT_PLUS_07_00: minutes_offset=7*60
+	case TD_TIMEZONE_GMT_PLUS_08_00: minutes_offset=8*60
+	case TD_TIMEZONE_GMT_PLUS_09_00: minutes_offset=9*60
+	case TD_TIMEZONE_GMT_PLUS_09_30: minutes_offset=9*60+30
+	case TD_TIMEZONE_GMT_PLUS_10_00: minutes_offset=10*60
+	case TD_TIMEZONE_GMT_PLUS_11_00: minutes_offset=11*60
+	case TD_TIMEZONE_GMT_PLUS_12_00: minutes_offset=12*60
+	case TD_TIMEZONE_GMT_PLUS_13_00: minutes_offset=13*60
+	case else
+		minutes_offset=0
+	end select
+end sub

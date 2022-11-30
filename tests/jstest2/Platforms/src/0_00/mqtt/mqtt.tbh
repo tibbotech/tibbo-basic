@@ -1,0 +1,118 @@
+'***********************************************************************************************************
+'											MQTT Library 
+'***********************************************************************************************************
+#ifndef MQTT_LARGE_PACKETS
+	#define MQTT_LARGE_PACKETS 0
+#endif
+
+#ifndef MQTT_DEBUG_PRINT
+	#define MQTT_DEBUG_PRINT 0
+#endif
+
+#ifndef MQTT_RX_BUFF
+	#define MQTT_RX_BUFF 16
+#endif
+
+#ifndef MQTT_TX_BUFF
+	#define MQTT_TX_BUFF 16
+#endif
+
+#ifndef MQTT_PING_TIMER
+	#define MQTT_PING_TIMER 30
+#endif
+
+#ifndef MQTT_CONNECTION_TIMER
+	#define MQTT_CONNECTION_TIMER 30
+#endif
+
+#if MQTT_CER_FILE
+	#if TLS_AVAILABLE=0
+		#error "MQTT certification file defined but TLS_AVAILABLE not true"
+	#endif
+#endif
+
+#ifndef MQTT_RECONNECT_TIME
+    #define MQTT_RECONNECT_TIME 20
+#endif
+
+enum en_qos_choices
+	QOS_AT_MOST_ONCE=0,
+	QOS_AT_LEAST_ONCE=1,
+	QOS_EXACTLY_ONCE=2
+end enum
+
+
+
+declare sub mqtt_start(target_interface as pl_sock_interfaces, byref server as string,dst_port as word,byref user as string,byref password as string,byref client_id as string, encrypted as boolean)
+'API procedure, starts the MQTT library.
+'MUST be called first, before any other procedure in this library is used.
+
+declare function mqtt_connect() as ok_ng
+'API function, instructs the library to connect to the MQTT server (broker).<br><br>
+'<b>dst_ip</b>- the IP address of the MQTT server,<br>
+'<b>dst_port</b>- target port on the MATT server,<br>
+'<b>user</b> and <b>password</b>- MQTT server login credentials,<br>
+'<b>keep_alive</b>- the interval, in seconds, at which the server will ping this device.<br><br>
+'Returns OK if executed successfully.
+
+declare sub mqtt_disconnect()
+'API procedure, disconnects the device from the MQTT server (broker).	
+
+declare sub mqtt_publish(byref topic as string, byref data as string, qos as en_qos_choices)
+'API procedure, publishes a <b>topic</b> and its <b>data</b> to the MQTT server (broker).
+
+declare sub mqtt_sub(byref topic as string, qos as en_qos_choices)
+'API procedure, subscribes the device to the specified topic on the MQTT server (broker).<br><br>
+'<b>topic</b>- the topic to subscribe to,<br>
+'<b>qos</b>- requested quality of service, according to the en_qos_choices enum.
+
+declare sub mqtt_unsub(byref topic as string)
+'API procedure, unsubscribes the device from the specified topic.<br><br>
+'<b>topic</b>- message to unsubscribe from.
+
+declare sub mqtt_dns_answer_acquired(return_type as en_dns_return_type, byref return_string as string)
+
+declare sub mqtt_proc_timer()
+'Event procedure, call it from the on_sys_timer() event handler.
+
+declare sub mqtt_proc_data()
+'Event procedure, call it from the on_sock_data_arrival event handler.
+
+declare sub callback_mqtt_connect_ok()
+'MQTT callback procedure. Must be implemented elsewhere in the user's program.
+'Called when the device successfully connects to the MQTT server.
+
+declare sub callback_mqtt_connect_lost()
+'MQTT callback procedure. Must be implemented elsewhere in the user's program.
+'Called when connection to the MQTT server is lost.
+
+declare sub callback_mqtt_sub_ok()
+'MQTT callback procedure. Must be implemented elsewhere in the user's program.
+'Called on the subscriber when the MQTT server confirms the requested subscription.
+
+	
+declare sub callback_mqtt_notif(byref topic as string,byref data as string,remaining_bytes as dword)
+'MQTT callback function. Must be implemented elsewhere in the user's program.
+'Called when the subscriber receives a message from the MQTT server for the topic this subscriber is subscribed to.
+'<b>topic</b> - Name of the topic receieved
+'<b>data</b> - Data received
+'<b>length</b> - Total number of bytes remaining to be received. When this value is 0, the entire packet has been sent.
+
+
+#if MQTT_LARGE_PACKETS 
+
+	declare sub mqtt_start_publish(byref topic as string, qos as en_qos_choices, length as dword)
+	'API procedure, starts the procedure of publishing to the MQTT server (broker). Must be called before calling mqtt_continue_publish().
+	'<b>topic</b> - Name of the topic to be published
+	'<b>qos</b> - QoS level
+	'<b>length</b> - Total length of the payload to be sent
+
+	declare sub mqtt_continue_publish(byref data as string)
+	'API procedure, continues publishing to the MQTT server (broker). Must be called until the number of bytes set in mqtt_start_publish() has been reached.
+	'<b>data</b> - Data to be sent. Cannot exceed 255 bytes. To send a payload greater than 255 bytes, the subroutine must be called again.
+
+
+#endif
+
+declare sub mqtt_sock_event(newstate as enum pl_sock_state, newstatesimple as enum pl_sock_state_simple)
+declare sub mqtt_send_data(data as string)

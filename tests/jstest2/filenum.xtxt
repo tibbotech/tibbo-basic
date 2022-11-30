@@ -1,0 +1,1 @@
+#define FILENUM_MAX_FILENAME_LEN 11

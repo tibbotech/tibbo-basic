@@ -1,0 +1,288 @@
+'***********************************************************************************************************
+'			SUPER I2C
+'***********************************************************************************************************
+
+include "global.tbh"
+
+const SI2C_STAMP="SI2C> "
+const SI2C_CR_LF=chr(13)+chr(10)
+const SI2C_MAX_SLOTS=16
+const SI2C_UNUSED_SIGNATURE="----"
+const SI2C_INIT_SIGNATURE=&h9502
+
+declare sub si2c_init()
+declare sub si2c_debugprint(byref print_data as string)
+
+dim si2c_in_use(SI2C_MAX_SLOTS) as no_yes
+dim si2c_user_signature(SI2C_MAX_SLOTS) as string(SI2C_MAX_SIGNATURE_LEN)
+dim si2c_init_flag as word
+dim si2c_num as byte
+public dim si2c_sda(SI2C_MAX_SLOTS),si2c_scl(SI2C_MAX_SLOTS) as pl_io_num
+
+'==============================================================================
+public function si2c_register(byref signature as string,sda as pl_io_num, scl as pl_io_num, use_ssi as no_yes) as byte
+'Returns a free i2c number or 255 if no free i2c slots left.
+	dim f as byte
+
+	if si2c_init_flag<>SI2C_INIT_SIGNATURE then
+		si2c_init()
+		si2c_init_flag=SI2C_INIT_SIGNATURE
+	end if
+
+	for f=0 to SI2C_MAX_SLOTS-1
+		if si2c_user_signature(f) = signature then 
+			si2c_register=f
+			exit function
+		end if
+	next f
+
+	if use_ssi=NO then
+register_normal_slot:
+		for f=4 to SI2C_MAX_SLOTS-1
+			if si2c_in_use(f)=NO then
+				si2c_in_use(f)=YES
+				si2c_user_signature(f)=signature
+				si2c_sda(f)=sda
+				si2c_scl(f)=scl
+				si2c_register=f
+
+				io.num=scl
+				io.state=HIGH
+				io.enabled=YES
+				io.num=sda
+				io.state=HIGH
+				io.enabled=NO
+
+				#if SI2C_DEBUG_PRINT
+					si2c_debugprint("'"+si2c_user_signature(f)+"' register i2c #"+str(f))
+				#endif
+				exit function
+			end if
+		next f
+	else
+		' hi speed (SSI-based) mode
+		f=ssi_get(signature)
+		if f=255 then
+			' could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
+			#if SI2C_DEBUG_PRINT
+				si2c_debugprint("could not register a i2c hi-speed (SSI-based) mode, change to normal mode.")
+			#endif
+			goto register_normal_slot
+		end if
+
+		si2c_in_use(f)=YES
+		si2c_user_signature(f)=signature
+		si2c_sda(f)=sda
+		si2c_scl(f)=scl
+		si2c_register=f
+
+		io.num=scl
+		io.state=HIGH
+		io.enabled=YES
+		io.num=sda
+		io.state=HIGH
+		io.enabled=NO
+
+		#if SI2C_DEBUG_PRINT
+			si2c_debugprint("'"+si2c_user_signature(f)+"' register i2c #"+str(f))
+		#endif
+		exit function
+	end if
+
+	'no free i2c slot found
+	#if SI2C_DEBUG_PRINT
+		si2c_debugprint("'"+signature+"' could not register a i2c slot: no free slots left")
+	#endif
+	si2c_register=255
+end function
+
+public function si2c_who_uses(num as byte) as string
+'Returns the signature of the specified socket's user.
+	if si2c_init_flag<>SI2C_INIT_SIGNATURE then
+		si2c_init()
+		si2c_init_flag=SI2C_INIT_SIGNATURE
+	end if
+
+	if si2c_in_use(num)=NO then
+		si2c_who_uses=SI2C_UNUSED_SIGNATURE
+	else
+		si2c_who_uses=si2c_user_signature(num)
+	end if
+end function
+
+public sub si2c_release(num as byte)
+'Releases the si2c (number).
+	if si2c_init_flag<>SI2C_INIT_SIGNATURE then
+		si2c_init()
+		si2c_init_flag=SI2C_INIT_SIGNATURE
+	end if
+
+	#if SI2C_DEBUG_PRINT
+		si2c_debugprint("'"+si2c_user_signature(num)+"' released slot #"+str(num))
+	#endif
+
+	si2c_in_use(num)=NO
+	si2c_user_signature(num)=SI2C_UNUSED_SIGNATURE
+
+	io.num=si2c_scl(num)
+	io.enabled=NO
+	io.num=si2c_sda(num)
+	io.enabled=NO
+
+	si2c_sda(num)=PL_IO_NULL
+	si2c_scl(num)=PL_IO_NULL
+
+	if num <=3 then
+		ssi_release(num)
+	end if
+end sub
+
+sub si2c_get(num as byte)
+	si2c_num=num
+	#if SI2C_DEBUG_PRINT
+		si2c_debugprint("#"+str(num)+" got slot")
+	#endif
+end sub
+
+sub si2c_start()
+	io.num=si2c_sda(si2c_num)
+	io.enabled=YES
+	
+	io.lineset(si2c_scl(si2c_num),HIGH)
+	io.lineset(si2c_sda(si2c_num),HIGH)
+	io.lineset(si2c_sda(si2c_num),LOW)
+	io.lineset(si2c_scl(si2c_num),LOW)
+end sub
+
+sub si2c_stop()
+	io.num=si2c_sda(si2c_num)
+	io.enabled=YES
+
+	io.lineset(si2c_sda(si2c_num),LOW)
+	io.lineset(si2c_scl(si2c_num),HIGH)
+	io.lineset(si2c_sda(si2c_num),HIGH)
+end sub
+
+sub si2c_write(data as byte)
+	dim bitCnt as byte						'Bits counter	
+	dim compval as byte						'Value to compare - MASK
+	dim BitData as boolean					'Comparison result (1 or 0)
+
+	if si2c_num>3 then
+		compval = &h80						'Initialize the MASK
+
+		io.num = si2c_scl(si2c_num)			'Select SSI_CLK line
+		io.state = LOW						'Initialize the transmition
+
+		io.num = si2c_sda(si2c_num)			'Select SSI_SDA line
+		io.enabled=YES						'Set as output
+
+		for bitCnt = 0 to 7 step 1	
+			BitData = data AND compval		'Define the state of the bit(MSB-->LSB)
+			compval = compval / 2			'Move the comparision to the next bit(MSB-->LSB)
+
+			if(BitData) then 
+				io.state = HIGH				'Bit is 1
+			else 
+				io.state = LOW				'Bit is 0
+			end if
+
+			io.num = si2c_scl(si2c_num)		'Write the bit to I2C device
+			io.state = HIGH
+			io.invert(si2c_scl(si2c_num))
+
+			io.num = si2c_sda(si2c_num)		'Select SSI_SDA line, NOTE: this must be the last
+											'statement in the loop so we can release the SSI_SDA
+											'line as soon as possible to alow for the ack
+		next bitCnt
+
+		io.num = si2c_sda(si2c_num)
+		io.enabled=NO						'Set SSI_SDA as input to allow ack receive
+
+		io.num = si2c_scl(si2c_num)			'Emulate the ACK frame
+		io.state = HIGH
+		io.invert(si2c_scl(si2c_num))		'Finish the ACK frame
+	else
+		ssi.channel=si2c_num
+		ssi.str(chr(data),PL_SSI_ACK_RX)
+	end if
+end sub
+
+function si2c_read(acknak_request as boolean) as byte
+	dim bitCnt as byte						'Bit counter
+	dim compval as byte						'Value to compare - MASK
+
+	if si2c_num>3 then
+		si2c_read=0
+		compval=&h80							'Initialize the MASK
+
+		io.num=si2c_sda(si2c_num)				'Select SSI_SDA line
+		io.enabled=NO							'Set as input
+
+		io.num=si2c_scl(si2c_num)				'Select SSI_CLK line
+		io.state=LOW							'Initialize the transmition
+
+		for bitCnt=0 to 7 step 1
+			io.state=HIGH						'Read one bit from I2C device
+			io.num=si2c_sda(si2c_num)	
+			if(io.state=HIGH) then				'Devine the state of the bit
+				si2c_read=si2c_read OR compval	'Store the value of the bit
+			end if
+			compval=compval/2					'Move the comparision to the next bit(MSB-->LSB)
+
+			io.num=si2c_scl(si2c_num)
+			io.state=LOW						'Clear the clock line (the data can change now...)
+		next bitCnt
+
+		io.num = si2c_sda(si2c_num)				'Select SSI_SDA line
+		io.enabled=YES							'Enable SSI_DO as output
+
+		if acknak_request=TRUE then				'Does user want to send an ack or not
+			io.state = LOW						'Bring Low for ACK
+		else
+			io.state = HIGH						'Bring high for NACK
+		end if	
+
+		io.num=si2c_scl(si2c_num)				'Select SSI_CLK line
+		io.state=HIGH							'Set SSI_CLK line
+		io.invert(si2c_scl(si2c_num))			'Clear SSI_CLK line	
+
+
+		#if SI2C_DEBUG_PRINT
+			si2c_debugprint("i2c read data:"+ hex(si2c_read))
+		#endif
+	else
+		dim tmp as word=0
+		ssi.channel=si2c_num
+		if acknak_request=true then
+			tmp=ssi.value(&hFFFE,9)/2
+		else
+			tmp=ssi.value(&hFFFF,9)/2
+		end if
+		si2c_read=tmp and &h00FF
+	end if
+end function
+
+sub si2c_init()
+	dim f as byte
+	for f=0 to SI2C_MAX_SLOTS-1
+		si2c_in_use(f)=NO
+		si2c_user_signature(f)=SI2C_UNUSED_SIGNATURE
+		si2c_sda(f)=PL_IO_NULL
+		si2c_scl(f)=PL_IO_NULL
+	next f
+end sub
+
+function si2c_is_busy(num as byte)as no_yes
+	if io.lineget(si2c_scl(num))=LOW then
+		si2c_is_busy=YES
+	else
+		si2c_is_busy=NO
+	end if
+end function
+
+#if SI2C_DEBUG_PRINT
+sub si2c_debugprint(byref print_data as string)
+	sys.debugprint(SI2C_STAMP+print_data+SI2C_CR_LF)
+end sub
+#endif

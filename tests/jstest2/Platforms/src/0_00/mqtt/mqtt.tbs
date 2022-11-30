@@ -1,0 +1,762 @@
+include "global.tbh"
+
+'http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html
+'https://www.hivemq.com/blog/mqtt-essentials-part-6-mqtt-quality-of-service-levels/
+
+const MQTT_INIT_SIGNATURE=&h1688
+const MQTT_STAMP="MQTT> "
+const MQTT_CR_LF=chr(13)+chr(10)
+const MQTT_TIMEOUT=2000
+
+'mqtt protocol string
+const MQTT_LEVEL	=&h04
+const MQTT_PROTOCOL	="MQTT"
+
+enum en_mqtt_states
+	
+	EN_MQTT_STATES_IDLE,
+	EN_MQTT_STATES_NOT_CONNECTED,
+	EN_MQTT_STATES_DNS_NOT_COMPLETE,
+	EN_MQTT_STATES_CONNECTING,
+	EN_MQTT_STATES_CONNECTED,
+	EN_MQTT_STATES_LOGGED_IN
+	
+end enum
+
+enum en_mqtt_message_types
+
+	CONNECT=&h10
+	CONNACK=&h20
+	PUBLISH=&h30
+	PUBACK=&h40
+	PUBREC=&h50
+	PUBREL=&h60
+	PUBCOMP=&h70
+	SUBSCRIBE=&h80
+	SUBACK=&h90
+	UNSUBSCRIBE=&hA0
+	UNSUBACK=&hB0
+	PINGREQ=&hC0
+	PINGRESP=&hD0
+	DISCONNECT=&hE0
+	
+end enum
+
+enum en_mqtt_proc_data_states
+	
+	EN_MQTT_PD_STATES_READING_HEADER,
+	EN_MQTT_PD_STATES_READING_PAYLOAD,
+	EN_MQTT_PD_STATES_READING_PAYLOAD_DATA
+	
+end enum
+
+type mqtt_proc_data_variable
+
+	message_type as en_mqtt_message_types
+	topic_length as word
+	topic as string
+	qos as en_qos_choices
+	remaining_length as word
+	fixed_header_length as word
+	packet_identifier as string
+	
+end type
+
+dim proc_data_state as en_mqtt_proc_data_states 
+dim mqtt_proc_data_variables as mqtt_proc_data_variable
+dim mqtt_init_flag as word
+dim mqtt_packet_identifier as word
+dim mqtt_sock_num as byte = 255
+dim mqtt_state as en_mqtt_states
+dim mqtt_connection_counter as word
+dim mqtt_ping_counter as word
+dim mqtt_server_port as word
+dim mqtt_server_address as string
+dim mqtt_server_ip as string(15)
+dim mqtt_user as string
+dim mqtt_pw	as string
+dim mqtt_packet_length as long
+dim mqtt_client_id as string=""
+dim mqtt_target_interface as pl_sock_interfaces
+dim mqtt_encrypted as boolean
+dim mqtt_unreplied_ping_count as byte=0
+
+#if MQTT_DEBUG_PRINT=1
+	declare sub mqtt_debug_print(data as string)
+#endif
+
+'-------------------------------------------------------------
+sub mqtt_start(target_interface as pl_sock_interfaces, byref server as string, dst_port as word, byref user as string, byref password as string, byref client_id as string, encrypted as boolean)
+'API procedure, starts the MQTT library.
+'MUST be called first, before any other procedure in this library is used.
+	
+	if mqtt_init_flag=MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("MQTT library already initialized.")
+		#endif
+		exit sub
+	end if
+
+	#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("---START---")
+	#endif
+
+	#if TLS_AVAILABLE=0
+		if encrypted=true then
+			mqtt_debug_print("Device does not support TLS")
+			exit sub
+		end if
+	#endif
+		
+	mqtt_init_flag=MQTT_INIT_SIGNATURE
+	mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+	mqtt_packet_identifier=0
+	mqtt_sock_num=sock_get("MQTT")
+    mqtt_target_interface=target_interface
+	mqtt_server_port=dst_port
+	mqtt_server_address=server
+    mqtt_user=user
+    mqtt_pw=password
+	mqtt_encrypted=encrypted
+    if client_id<>"" then mqtt_client_id=client_id
+	sock.num=mqtt_sock_num
+	sock.targetinterface=target_interface
+	sock.targetport=dst_port
+	sock.protocol=PL_SOCK_PROTOCOL_TCP
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.gendataarrivalevent=YES
+	sock.reconmode=PL_SOCK_RECONMODE_3
+	sock.connectiontout=MQTT_PING_TIMER*2+20
+	if sys.freebuffpages<MQTT_RX_BUFF+MQTT_TX_BUFF then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("Insufficient buffer memory.")
+		#endif
+		exit sub
+	end if
+	sock.rxbuffrq(MQTT_RX_BUFF)
+	sock.txbuffrq(MQTT_TX_BUFF)
+	sys.buffalloc()
+	mqtt_connect()
+	
+end sub
+
+
+function mqtt_build_remaining_length(size as dword) as string(2)
+	mqtt_build_remaining_length = ""
+	do
+		dim encodedByte as byte = size mod 128
+		size = size / 128
+		if (size > 0) then encodedByte = encodedByte or 128
+		mqtt_build_remaining_length = mqtt_build_remaining_length + chr(encodedByte)
+	loop while (size > 0)
+end function
+
+function mqtt_get_packet_identifier() as string(2)
+	mqtt_packet_identifier = (mqtt_packet_identifier mod 65535) + 1
+	mqtt_get_packet_identifier = chr(mqtt_packet_identifier/256)+chr(mqtt_packet_identifier mod 256)
+end function
+
+
+function mqtt_sock_getdata(byref maxinplen as word) as string
+if mqtt_encrypted then
+#if TLS_AVAILABLE
+	mqtt_sock_getdata=sock.tlsgetdata(maxinplen)
+#endif
+else
+	mqtt_sock_getdata=sock.getdata(maxinplen)
+end if
+end function
+
+function mqtt_sock_peekdata (byref maxinplen as word) as string
+if mqtt_encrypted=true then
+#if TLS_AVAILABLE
+	mqtt_sock_peekdata =sock.tlspeekdata(maxinplen)
+#endif
+else
+	mqtt_sock_peekdata  =sock.peekdata(maxinplen)
+end if
+end function
+
+function mqtt_sock_peeklen() as dword
+if mqtt_encrypted=true then
+#if TLS_AVAILABLE
+	mqtt_sock_peeklen=sock.tlsrxlen
+#endif
+else
+	mqtt_sock_peeklen=sock.rxlen
+end if
+end function
+
+sub mqtt_send_login()
+	dim buf as string
+	dim client_id, user_id, password as string	
+	dim size as dword=0
+	if mqtt_user = "" then
+		buf=chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&h02)+chr(0)+chr(&h3c)+chr(0)+chr(len(mqtt_client_id))+mqtt_client_id
+		buf=chr(CONNECT)+mqtt_build_remaining_length(len(buf)) + buf
+		mqtt_send_data(buf)
+	else
+		buf=chr(&h0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(&hc2)+chr(0)+chr(&h3c)
+		size=size+len(buf)
+		client_id=chr(0)+chr(len(mqtt_client_id))+mqtt_client_id 
+		size=size+len(client_id)
+		user_id=chr(0)+chr(len(mqtt_user)) + mqtt_user 
+		size=size+len(user_id)
+		password=chr(0)+chr(len(mqtt_pw)) + mqtt_pw
+		size=size+len(password)		
+		
+		mqtt_send_data(chr(CONNECT)+mqtt_build_remaining_length(size))
+		mqtt_send_data(buf)
+		mqtt_send_data(client_id)
+		mqtt_send_data(user_id)
+		mqtt_send_data(password)
+	end if
+end sub
+
+sub mqtt_connect_socket()
+
+	if mqtt_encrypted=true then
+		#if TLS_AVAILABLE
+			sock.num=sock.tlscurrentnum
+			sock.tlsdeinit()
+			sock.num=mqtt_sock_num
+			#if PLATFORM_ID <> WM2000
+				sock.tlsbuffrq(39)	
+				sys.buffalloc()
+			#endif
+			#ifdef MQTT_CER_FILE
+				romfile.open(MQTT_CER_FILE)
+				sock.tlsinit(romfile.offset)  'check return state
+			#else
+				sock.tlsinit(0)
+			#endif
+			sock.rxclear()
+			sock.txclear()
+		#endif
+	end if
+	sock.num=mqtt_sock_num
+	sock.targetip=mqtt_server_ip	
+	sock.connect()
+	mqtt_state=EN_MQTT_STATES_CONNECTING
+	mqtt_connection_counter=MQTT_CONNECTION_TIMER*2
+end sub
+
+function mqtt_connect() as ok_ng
+'API function, instructs the library to connect to the MQTT server (broker).<br><br>
+'<b>dst_ip</b>- the IP address of the MQTT server,<br>
+'<b>dst_port</b>- target port on the MATT server,<br>
+'<b>user</b> and <b>password</b>- MQTT server login credentials,<br>
+'<b>url</b> is used for ssl certerficate validation<br>
+'<b>client_id</b> unique client ID string for your app must be defined to use MQTT<br>
+'<b>keep_alive</b>- the interval, in seconds, at which the server will ping this device.<br><br>
+'Returns OK if executed successfully.
+	mqtt_connect = NG
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit function
+	end if
+	
+	sock.num=mqtt_sock_num	
+	dim is_ip_address as boolean=true
+	dim b as byte
+	mqtt_connection_counter=MQTT_CONNECTION_TIMER*2
+	for b=1 to len(mqtt_server_address)
+        dim s as string=mid(mqtt_server_address,b,1)
+        dim ascii as word=asc(s)
+        if ascii>=46 and ascii<=57 then
+        else
+            is_ip_address=false
+            exit for
+        end if
+    next b
+
+    if is_ip_address = false then
+        if dns_connect(mqtt_target_interface,"",0) = EN_STATUS_DNS_OK then
+            dns_query(mqtt_server_address)	
+		end if
+	else
+		mqtt_server_ip=mqtt_server_address
+		mqtt_connect_socket()
+	end if	
+	
+end function
+
+sub mqtt_disconnect()
+'API procedure, disconnects the device from the MQTT server (broker).	
+	
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	
+	dim current_sock as byte = sock.num
+	dim buf as string = chr(DISCONNECT)+chr(0)
+	mqtt_state=EN_MQTT_STATES_IDLE
+	mqtt_send_data(buf)
+	
+end sub
+
+sub mqtt_sub(byref topic as string,qos as en_qos_choices)
+'API procedure, subscribes the device to the specified topic on the MQTT server (broker).<br><br>
+'<b>topic</b>- the topic to subscribe to,<br>
+'<b>qos</b>- requested quality of service, according to the en_qos_choices enum.
+	
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	if mqtt_state<>EN_MQTT_STATES_LOGGED_IN then exit sub
+
+	dim buf as string
+	dim current_sock as byte = sock.num
+	
+	#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("Subscribing to: data="+topic)
+	#endif
+	
+	buf=mqtt_get_packet_identifier()+chr(0)+chr(len(topic))+topic+chr(qos)
+	buf=chr(SUBSCRIBE+2)+mqtt_build_remaining_length(len(buf)) + buf
+	mqtt_send_data(buf)
+	
+end sub
+
+sub mqtt_unsub(byref topic as string)
+'API procedure, unsubscribes the device from the specified topic.<br><br>
+'<b>topic</b>- message to unsubscribe from.
+	
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	if mqtt_state<>EN_MQTT_STATES_LOGGED_IN then exit sub
+
+	dim buf as string
+	dim current_sock as byte = sock.num
+	
+	#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("Unsubscribing from: data="+topic)
+	#endif
+	
+	buf=mqtt_get_packet_identifier()+chr(0)+chr(len(topic))+topic
+	buf=chr(UNSUBSCRIBE+2)+mqtt_build_remaining_length(len(buf)) + buf
+	mqtt_send_data(buf)
+	
+end sub
+
+sub mqtt_ping()
+	
+	mqtt_ping_counter=mqtt_ping_counter-1
+	if mqtt_ping_counter=0 then
+		sock.num=mqtt_sock_num
+		if sock.rxlen=0 then
+			#if MQTT_DEBUG_PRINT=1
+				mqtt_debug_print("Ping.")
+			#endif
+			mqtt_send_data(chr(PINGREQ)+chr(0))
+			mqtt_ping_counter=MQTT_PING_TIMER*2
+			mqtt_unreplied_ping_count=mqtt_unreplied_ping_count+1
+			if mqtt_unreplied_ping_count>3 then
+				mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+				mqtt_debug_print("PING is unresponsive, disconnecting...")
+				sock.discard()
+			end if
+		end if
+	end if
+
+end sub
+
+sub mqtt_proc_timer()
+'Event procedure, call it from the on_sys_timer() event handler.
+
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then exit sub
+	
+	if mqtt_state=EN_MQTT_STATES_LOGGED_IN then 
+		mqtt_ping()
+	else
+		if mqtt_connection_counter>0 then
+		mqtt_connection_counter=mqtt_connection_counter-1
+		if mqtt_connection_counter=0 then
+			select case mqtt_state
+			case EN_MQTT_STATES_NOT_CONNECTED:
+				mqtt_connect_socket()
+				#if MQTT_DEBUG_PRINT=1
+					mqtt_debug_print("Retrying connection...")
+				#endif
+			case EN_MQTT_STATES_CONNECTING:
+				mqtt_connect_socket()
+				#if MQTT_DEBUG_PRINT=1
+					mqtt_debug_print("Connection timed out. Reconnecting...")
+				#endif
+			case EN_MQTT_STATES_CONNECTED:
+				mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+				mqtt_connection_counter=MQTT_RECONNECT_TIME*2
+				#if MQTT_DEBUG_PRINT=1
+					mqtt_debug_print("Unable to log in to server...")
+				#endif		
+			end select
+		end if
+		else
+			mqtt_connection_counter=MQTT_CONNECTION_TIMER*2
+		end if
+	end if
+			
+end sub
+
+
+sub mqtt_sock_event(newstate as enum pl_sock_state, newstatesimple as enum pl_sock_state_simple)
+	
+	if sock.num<>mqtt_sock_num then 
+		exit sub 
+	end if 
+	
+	select case newstate
+	case PL_SST_CLOSED, PL_SST_CL_PCLOSED,PL_SST_CL_PRESET_EST:
+		if mqtt_state<>EN_MQTT_STATES_IDLE then
+			mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+			mqtt_connection_counter=MQTT_RECONNECT_TIME*2
+			#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("Lost server connection.")
+			#endif
+		end if
+	case PL_SST_EST_AOPENED:
+		if mqtt_encrypted=false then
+			mqtt_send_login()
+			mqtt_state=EN_MQTT_STATES_CONNECTED
+		else
+#if TLS_AVAILABLE
+			if mqtt_server_address<>mqtt_server_ip then
+				sock.tlshandshake(mqtt_server_address)
+			else
+				sock.tlshandshake("")
+			end if
+#endif
+			mqtt_connection_counter=MQTT_CONNECTION_TIMER*2
+		end if
+	case PL_SST_EST_TLS:
+		mqtt_send_login()
+		mqtt_state=EN_MQTT_STATES_CONNECTED
+	end select
+	
+end sub
+
+sub mqtt_publish_reply()
+	dim buf as string
+	if mqtt_proc_data_variables.remaining_length=0 then
+		if mqtt_proc_data_variables.qos=QOS_AT_LEAST_ONCE then
+			#if MQTT_DEBUG_PRINT=1
+				mqtt_debug_print("Publish ack.")
+			#endif 
+			buf = chr(PUBACK) + chr(2) + mqtt_proc_data_variables.packet_identifier
+			mqtt_send_data(buf)
+		else if	mqtt_proc_data_variables.qos=QOS_EXACTLY_ONCE then
+			#if MQTT_DEBUG_PRINT=1
+				mqtt_debug_print("Publish rec.")
+			#endif 
+			buf=chr(PUBREC) + chr(2) + mqtt_proc_data_variables.packet_identifier
+			mqtt_send_data(buf)
+		end if		
+		proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+	end if		
+end sub
+
+
+sub mqtt_proc_data()
+'Event procedure, call it from the on_sock_data_arrival event handler.
+	
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then exit sub
+	if sock.num<>mqtt_sock_num then exit sub
+	dim buf as string = mqtt_sock_peekdata(5)
+	
+	if proc_data_state=EN_MQTT_PD_STATES_READING_HEADER then
+		
+		if (len(buf) < 2) then exit sub
+		dim tmr as dword
+		dim index as byte=2
+		dim multiplier as dword=1
+		dim encodedByte as byte
+		dim continuation_bit as boolean
+		mqtt_proc_data_variables.fixed_header_length = 1
+		mqtt_proc_data_variables.remaining_length=0
+		mqtt_proc_data_variables.topic_length=0
+		mqtt_proc_data_variables.packet_identifier=""
+		do
+			encodedByte=asc(mid(buf,index,1))
+			mqtt_proc_data_variables.remaining_length=mqtt_proc_data_variables.remaining_length+(encodedByte and 127) * multiplier
+			multiplier=multiplier * 128
+			index=index+1
+			continuation_bit = (encodedByte and 128) <> 0
+			if index>len(buf) and continuation_bit then exit sub 
+			mqtt_proc_data_variables.fixed_header_length = mqtt_proc_data_variables.fixed_header_length + 1
+			
+		loop while continuation_bit
+		proc_data_state=EN_MQTT_PD_STATES_READING_PAYLOAD
+		mqtt_proc_data_variables.message_type=asc(left(buf,1))
+		mqtt_proc_data_variables.qos=(mqtt_proc_data_variables.message_type and &h06) shr 1
+		mqtt_proc_data_variables.message_type=(mqtt_proc_data_variables.message_type and &hF0)
+		tmr=sys.timercountms
+		while sock.txfree<200 and sys.timercountms-tmr<MQTT_TIMEOUT
+		wend	
+		mqtt_sock_getdata(mqtt_proc_data_variables.fixed_header_length)		
+	end if
+
+	if mqtt_proc_data_variables.message_type<>PUBLISH then
+		buf = mqtt_sock_peekdata(mqtt_proc_data_variables.remaining_length)	
+		if len(buf)<>mqtt_proc_data_variables.remaining_length and len(buf)<255 then exit sub
+		mqtt_proc_data_variables.packet_identifier = mqtt_sock_getdata(mqtt_proc_data_variables.remaining_length)		
+	end if
+		
+	select case (mqtt_proc_data_variables.message_type)
+		
+		case CONNACK:	#if MQTT_DEBUG_PRINT=1		
+							mqtt_debug_print("Connected to server.")
+						#endif
+						mqtt_ping_counter=MQTT_PING_TIMER*2
+						mqtt_state=EN_MQTT_STATES_LOGGED_IN
+						mqtt_connection_counter=MQTT_CONNECTION_TIMER*2
+						callback_mqtt_connect_ok()
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case PUBLISH:	select case proc_data_state
+						case EN_MQTT_PD_STATES_READING_PAYLOAD:
+							if mqtt_sock_peeklen()<2 then exit sub
+							dim topic_length_bytes as byte(2)=mqtt_sock_getdata(2)
+							mqtt_proc_data_variables.topic_length=(topic_length_bytes(0) shl 8) or topic_length_bytes(1)
+							if mqtt_sock_peeklen()<mqtt_proc_data_variables.topic_length then exit sub
+							mqtt_proc_data_variables.topic=mqtt_sock_getdata(mqtt_proc_data_variables.topic_length)
+							if mqtt_proc_data_variables.qos<>QOS_AT_MOST_ONCE then
+								mqtt_proc_data_variables.packet_identifier=mqtt_sock_getdata(2)
+							end if
+							mqtt_proc_data_variables.remaining_length=mqtt_proc_data_variables.remaining_length-mqtt_proc_data_variables.topic_length-len(mqtt_proc_data_variables.packet_identifier)-2
+							if mqtt_proc_data_variables.remaining_length=0 then
+								#if MQTT_DEBUG_PRINT=1
+									mqtt_debug_print("Notification: topic="+mqtt_proc_data_variables.topic+", NO DATA SENT")
+								#endif
+								mqtt_publish_reply()
+							else	
+								proc_data_state=EN_MQTT_PD_STATES_READING_PAYLOAD_DATA
+							end if
+						case EN_MQTT_PD_STATES_READING_PAYLOAD_DATA:
+							buf=mqtt_sock_getdata(mqtt_proc_data_variables.remaining_length)						
+							mqtt_proc_data_variables.remaining_length=mqtt_proc_data_variables.remaining_length-len(buf)						
+							#if MQTT_DEBUG_PRINT=1
+								mqtt_debug_print("Notification: topic="+mqtt_proc_data_variables.topic+", data="+buf)
+							#endif
+							callback_mqtt_notif(mqtt_proc_data_variables.topic,buf,mqtt_proc_data_variables.remaining_length)
+							mqtt_publish_reply()
+						end select		
+												
+		case PUBACK:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Publish ack.")
+						#endif
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case PUBREC:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Publish rec.")
+						#endif
+						buf=chr(PUBREL+2) + chr(2) + mqtt_proc_data_variables.packet_identifier
+						mqtt_send_data(buf)
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case PUBREL:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Publish rel.")
+						#endif 
+						buf=chr(PUBCOMP) + chr(2) + mqtt_proc_data_variables.packet_identifier
+						mqtt_send_data(buf)		
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case PUBCOMP:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Publish comp.")
+						#endif
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case SUBACK:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Subscribe ack.")
+						#endif
+						callback_mqtt_sub_ok()
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case UNSUBACK:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Unsubscribe ack.")
+						#endif
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+		
+		case PINGRESP:	#if MQTT_DEBUG_PRINT=1
+							mqtt_debug_print("Ping response.")
+						#endif
+						proc_data_state=EN_MQTT_PD_STATES_READING_HEADER
+						mqtt_unreplied_ping_count=0
+	end select
+
+end sub
+
+sub mqtt_dns_answer_acquired(return_type as en_dns_return_type, byref return_string as string)
+	
+	if(return_type=EN_DNS_RET_IP) then
+        if dns_current_domain() = mqtt_server_address then
+            mqtt_server_ip = ddstr(return_string) 
+			mqtt_connect_socket()
+        end if
+	end if
+	
+end sub
+
+sub mqtt_send_data(data as string)
+	
+	dim current_sock as byte = sock.num
+	sock.num=mqtt_sock_num
+	
+	dim tmr as dword
+	dim length as byte=len(data)
+	tmr=sys.timercountms
+	while length>0 and sys.timercountms-tmr<MQTT_TIMEOUT
+		if mqtt_encrypted=true then
+#if TLS_AVAILABLE
+			if sock.state<>PL_SST_EST_TLS then
+				mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+				mqtt_debug_print("unable to send, disconnected")
+				exit sub
+			end if
+			
+			dim b as byte=sock.tlssetdata(data)
+			length=length-b
+			data=right(data,len(data)-length)
+#endif
+
+		else
+			if sock.statesimple<>PL_SSTS_EST then
+				mqtt_state=EN_MQTT_STATES_NOT_CONNECTED
+				mqtt_debug_print("unable to send, disconnected")
+				exit sub
+			end if		
+			dim tx_free as word = sock.txfree/2
+			if length<=tx_free then
+				sock.setdata(data)
+				length=0
+			else
+				sock.setdata(left(data,tx_free))
+				data=right(data,len(data)-tx_free)
+				length=length-tx_free
+			end if		
+		end if			
+		sock.send
+		tmr=sys.timercountms
+	wend
+	sock.num = current_sock
+	
+end sub
+
+sub mqtt_publish(byref topic as string, byref data as string, qos as en_qos_choices)
+'API procedure, publishes a <b>topic</b> and its <b>data</b> to the MQTT server (broker).
+	
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	if mqtt_state<>EN_MQTT_STATES_LOGGED_IN then exit sub
+
+	dim buf as string
+	dim remaining_length as byte
+
+
+	#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("Publishing: topic="+topic+", data="+data)
+	#endif
+
+	if (qos = QOS_AT_MOST_ONCE) then
+		buf=chr(0)+chr(len(topic))+topic+data
+	else
+		buf=chr(0)+chr(len(topic))+topic+mqtt_get_packet_identifier()+data
+	end if
+	
+	buf=chr(PUBLISH+1+(qos*2))+mqtt_build_remaining_length(len(buf)) + buf
+'	buf=chr(&h03+1+(qos*2))+mqtt_build_remaining_length(len(buf)) + buf
+
+	mqtt_send_data(buf)
+	mqtt_ping_counter=MQTT_PING_TIMER*2
+
+end sub
+
+#if MQTT_LARGE_PACKETS
+	
+sub mqtt_start_publish(byref topic as string, qos as en_qos_choices, length as dword)
+'API procedure, starts the procedure of publishing to the MQTT server (broker). Must be called before calling mqtt_continue_publish().
+'<b>topic</b> - Name of the topic to be published
+'<b>qos</b> - QoS level
+'<b>length</b> - Total length of the payload to be sent
+
+
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	if mqtt_state<>EN_MQTT_STATES_LOGGED_IN then exit sub
+		
+	if mqtt_packet_length<>0 then
+		#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("ERROR: Previous MQTT packet not fully sent. " + str(mqtt_packet_length) + " bytes remaining.")
+		#endif
+		mqtt_packet_length=0
+		exit sub
+	end if
+	mqtt_packet_length=length
+	dim buf as string
+	dim remaining_length as byte
+	dim tmr as dword
+	#if MQTT_DEBUG_PRINT=1
+		mqtt_debug_print("Publishing: topic="+topic)
+	#endif
+	if (qos = QOS_AT_MOST_ONCE) then
+		buf=chr(0)+chr(len(topic))+topic
+	else
+		buf=chr(0)+chr(len(topic))+topic+mqtt_get_packet_identifier()
+	end if
+	buf=chr(PUBLISH+1+(qos*2))+mqtt_build_remaining_length(len(buf) + length) + buf
+	mqtt_send_data(buf)	
+
+end sub
+
+sub mqtt_continue_publish(byref data as string)
+'API procedure, continues publishing to the MQTT server (broker). Must be called until the number of bytes set in mqtt_start_publish() has been reached.
+'<b>data</b> - Data to be sent. Cannot exceed 255 bytes. To send a payload greater than 255 bytes, the subroutine must be called again.
+
+	dim tmr as dword
+
+	if mqtt_init_flag<>MQTT_INIT_SIGNATURE then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.")
+		#endif
+		exit sub
+	end if
+	if mqtt_state<>EN_MQTT_STATES_LOGGED_IN then exit sub
+
+	mqtt_packet_length=mqtt_packet_length-len(data)
+	if mqtt_packet_length < 0 then
+		#if MQTT_DEBUG_PRINT=1
+			mqtt_debug_print("ERROR: Number of bytes being sent exceeds number set in header")
+		#endif
+		mqtt_packet_length=0
+		exit sub
+	end if
+	mqtt_send_data(data)	
+
+end sub
+
+#endif
+ 
+#if MQTT_DEBUG_PRINT=1
+sub mqtt_debug_print(data as string)
+	sys.debugprint(MQTT_STAMP+data+MQTT_CR_LF)
+end sub
+#endif

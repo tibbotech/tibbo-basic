@@ -1,0 +1,261 @@
+'**************************************************************************************************
+'		KP (keypad) object
+'**************************************************************************************************
+
+#if OBJECT_KP=KP_ENABLED
+
+#define KP_AVAILABLE 1
+
+object kp
+'Depending on the kp.mode property, the keypad object works with a "matrix" keypad of up to 64 keys (8 scan lines by 8 return lines) or
+'"binary output" keypad of up to 255 keys that sends key codes through up to 8 return lines.
+
+'--------------------------------------------------------------------
+enum pl_kp_modes 
+	PL_KP_MODE_MATRIX,	'<b>PLATFORM CONSTANT. The keypad is of matrix type. </b><br><br>
+	PL_KP_MODE_BINARY	'<b>PLATFORM CONSTANT. The keypad is of binary output type. </b><br><br>
+end enum
+
+property kp.mode
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_KP_MODE_MATRIX (matrix type).</b><br><br>
+'Specifies the type of the keypad attached to your TiOS device.
+'<br><br>
+'Matrix keypads (kp.mode= 0- PL_KP_MODE_MATRIX) are defined by a number of scan and return lines (see kp.scanlinesmapping and kp.returnlinesmapping).
+'<br><br>
+'Binary keypads (kp.mode= 1- PL_KP_MODE_BINARY) only need return lines and directly output the binary codes of keys.
+'The kp.idlecode property must match the code sent by your binary keypad when no key is pressed.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+	get = syscall(545,"68.TDL"+) as pl_kp_modes
+	set = syscall(546,"68.TDL"+) (value as pl_kp_modes)
+end property
+
+'--------------------------------------------------------------------
+property kp.idlecode
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Specifies the code that is expected to be present on the return lines of a binary keypad when no key is pressed.
+'<br><br>
+'This property is only relevant for binary keypads (kp.mode= 1- PL_KP_MODE_BINARY).
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+	get = syscall(547,"68.TDL"+) as byte
+	set = syscall(548,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property kp.autodisablecodes
+'<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
+'Defines what key event + key code combinations disable the keypad (set kp.enabled= 0- NO).
+'<br><br>
+'This property should contain a comma-separated list of event codes and key codes, for example: "2,15,0,20".
+'In this example, two event/code pairs are "2,15" and "0,20":
+'<br>
+'Event "2" is 2-PL_KP_EVENT_PRESSED;
+'<br>
+'Event "0" is 0-PL_KP_EVENT_LONGRELEASED;
+'<br>
+'"15" and "20" are key codes.
+'<br><br>
+'So, the keypad will be disabled when the key with code 15 is detected to be _RESSED,
+'or the key with code 20 is detected to be _LONGRELEASED.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+	get = syscall(445,"68.TDL"+) as string
+	set = syscall(446,"68.TDL"+) (byref mapping as string)
+end property
+
+'--------------------------------------------------------------------
+property kp.enabled
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (disabled).</b><br><br>
+'Enables or disables the keypad.
+'<br><br>
+'The keypad is only active when the kp. object is enabled (kp.enabled= 1- YES).
+'<br><br>
+'The keypad will be auto-disabled if an overflow is detected (see on_kp_overflow event), or if one of the conditions for automatic keypad disablement is met (see kp.autodisablecodes).
+'<br><br>
+'Every time the keypad is re-enabled, each key's state is set to 0- PL_KP_EVENT_LONGRELEASED, and the keypad event FIFO is cleared.
+'<br><br>
+'It is only possible to change the values of kp. object's properties when kp.enabled= 0- NO.
+	get = syscall(429,"68.TDL"+) as no_yes
+	set = syscall(430,"68.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property kp.longpressdelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 100 (1 sec).</b><br><br>
+'Defines (in 10ms increments) the amount of time a key will have to remain pressed for the key state to transition from _PRESSED into _LONGPRESSED. Value range is 0-254.
+'<br><br>
+'A new keypad event with 3- PL_KP_EVENT_LONGPRESSED event code will be added to the keypad event FIFO once a key transitions into the _LONGPRESSED state.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _LONGPRESSED state.
+	get = syscall(433,"68.TDL"+) as byte
+	set = syscall(434,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property kp.longreleasedelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 100 (1 sec).</b><br><br>
+'Defines (in 10ms increments) the amount of time a key will have to remain released for the key state to transition from _RELEASED into _LONGRELEASED state. Value range is 0-254.
+'<br><br>
+'A new keypad event with 0- PL_KP_EVENT_LONGRELEASED event code will be added to the keypad event FIFO once a key transitions into the _LONGRELEASED state.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the "_LONGRELEASED state.
+	get = syscall(439,"68.TDL"+) as byte
+	set = syscall(440,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+enum pl_kp_event_codes 
+	PL_KP_EVENT_LONGRELEASED,	'<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longreleased" state.
+	PL_KP_EVENT_RELEASED,		'<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "released" state.
+	PL_KP_EVENT_PRESSED,		'<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "pressed" state.
+	PL_KP_EVENT_LONGPRESSED,	'<b>PLATFORM CONSTANT.</b><br><br> The key has transitioned into the "longpressed" state.
+	PL_KP_EVENT_REPEATPRESSED,	'<b>PLATFORM CONSTANT.</b><br><br> Auto-repeat for the key.
+	PL_KP_EVENT_LOCKEDUP		'<b>PLATFORM CONSTANT.</b><br><br> The keypad appears to be jammed. Can only be generated when <font color="maroon"><b>kp.mode</b></font>='<font color="olive"><b> 1- PL_KP_MODE_BINARY</b></font>).
+end enum
+
+event(20) on_kp(key_event as pl_kp_event_codes, key_code as byte)
+'<b>EVENT of the kp object. </b><br><br>
+'When kp.genkpevent= 1- YES, this event is generated whenever a key transitions into a new state.
+'<br><br>
+'Pressing and releasing any key on the keypad can generate up to five different events.
+'<br><br>
+'This event can only be generated when the keypad is enabled (kp.enabled= 1- YES).
+'<br><br>
+'Another on_kp event is never generated until the previous one is processed (even though multiple keypad events may be waiting in the keypad event FIFO).
+
+'--------------------------------------------------------------------
+event(21) on_kp_overflow()
+'<b>EVENT of the kp object. </b><br><br>
+'Indicates that the keypad event FIFO has overflown and some key events may have been lost.
+'<br><br>
+'Once the FIFO overflows, the keypad is disabled (kp.enabled= 0- NO). You can re-enable the keypad by setting kp.enabled= 1- YES (this will also clear the FIFO).
+'<br><br>
+'Another on_kp_overflow event is never generated until the previous one is processed.
+
+'--------------------------------------------------------------------
+property kp.pressdelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 3 (30 ms).</b><br><br>
+'Defines (in 10ms increments) the amount of time a key will have to remain pressed for the key state to transition from _RELEASED into _PRESSED. Value range is 0-254.
+'<br><br>
+'A new keypad event with 2- PL_KP_EVENT_PRESSED event code will be added to the keypad event FIFO once a key transitions into the _PRESSED state.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _PRESSED state.
+	get = syscall(431,"68.TDL"+) as byte
+	set = syscall(432,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property kp.releasedelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 3 (30 ms).</b><br><br>
+'Defines (in 10ms increments) the amount of time a key will have to remain released for the key state to transition from _PRESSED or _LONGPRESSED into _RELEASED. Value range is 0-254.
+'<br><br>
+'A new keypad event with 1- PL_KP_EVENT_RELEASED event code will be added to the keypad event FIFO once a key transitions into the _RELEASED state.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the key will never transition into the _RELEASED state.
+	get = syscall(437,"68.TDL"+) as byte
+	set = syscall(438,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property kp.repeatdelay
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 50 (0.5 sec.).</b><br><br>
+'Defines (in 10ms increments) the time period at which the on_kp event with 4- PL_KP_EVENT_REPEATPRESSED event code will be generated once the key reaches the _LONGPRESSED state and remains pressed.
+'Value range is 0-254.
+'<br><br>
+'A new keypad event with 4- PL_KP_EVENT_REPEATPRESSED event code will be added to the keypad event FIFO when a key (re-) transitions into the _REPEATPRESSED state.
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+'Setting the property to 0 means that the key will never transition into the _REPEATPRESSED state.
+	get = syscall(435,"68.TDL"+) as byte
+	set = syscall(436,"68.TDL"+) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property kp.lockupdelay
+'<b>PROPERTY (WORD), DEFAULT VALUE= 1000 (10sec).</b><br><br>
+'Defines (in 10ms increments) the amount of time any key will have to stay pressed for the keypad to enter the "lockup" state. 
+'<br><br>
+'Lockup is not a key state, it is the state of the keypad as a whole. Once the lockup condition is detected the keypad is disabled (kp.enabled= 0- NO).
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO). Setting the property to 0 means that the keypad will never enter the "lockup" state.
+	get = syscall(588,"68.TDL"+) as word
+	set = syscall(589,"68.TDL"+) (value as word)
+end property
+
+'--------------------------------------------------------------------
+property kp.returnlinesmapping
+'<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
+'Defines the list of up to 8 I/O lines that will serve as return lines of the keypad.
+'<br><br>
+'This property should contain a comma-separated list of I/O lines numbers, for example: "24, 26, 27". Line numbers correspond to those of the pl_io_num enum.
+'The order in which you list the return lines does matter! 
+'<br><br>
+'On platforms with output buffer control, all intended return lines should be configured as inputs by your application (see io.num and io.enabled).
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+'A keypad must have at least one return line to be able to function.
+'<br><br>
+'Return lines of the keypad should be separate from the scan lines (see kp.scanlinesmapping).
+	get = syscall(443,"68.TDL"+) as string
+	set = syscall(444,"68.TDL"+) (byref mapping as string)
+end property
+
+'--------------------------------------------------------------------
+property kp.scanlinesmapping
+'<b>PROPERTY (STRING), DEFAULT VALUE= "".</b><br><br>
+'Defines the list of up to 8 I/O lines that will serve as scan lines of the matrix keypad.
+'<br><br>
+'This property should contain a comma-separated list of I/O lines numbers, for example: "24, 26, 27". Line numbers correspond to those of the pl_io_num enum.
+'The order in which you list the scan lines does matter! 
+'<br><br>
+'On platforms with output buffer control, all intended scan lines should be configured as outputs by your application (see io.num and io.enabled).
+'<br><br>
+'This property can only be changed when the keypad is disabled (kp.enabled= 0- NO).
+'<br><br>
+'Scan lines of the keypad should be separate from the return lines (see kp.returnlinesmapping).
+'Scan lines are only required if you are working with a matrix keypad.
+	get = syscall(441,"68.TDL"+) as string
+	set = syscall(442,"68.TDL"+) (byref mapping as string)
+end property
+
+'--------------------------------------------------------------------
+syscall(417) kp.getkey(byref key_event as pl_kp_event_codes, byref key_code as byte) as ok_ng
+'<b>METHOD. </b><br><br> 
+'When kp.genkpevent= 0- NO, calling this method attempts to fetch one keypad event from the keypad event FIFO.
+'The method returns 0- OK if there was a keypad event waiting in the FIFO, or 1- NG if the FIFO was empty.
+'<br><br>
+'If the method returns 0- OK, the key state transition and the key code for the fetched event can be obtained through key_event and key_code byref arguments of the kp.getkey method.
+
+'--------------------------------------------------------------------
+property kp.genkpevent
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 1- YES (event will be generated).</b><br><br>
+'If kp.genkpevent= 1- YES, then you will be receiving keypad events through the on_kp event.
+'If kp.genkpevent= 0- NO, then you will need to use the kp.getkey method to poll for keypad events.
+	get = syscall(425,"68.TDL"+) as no_yes
+	set = syscall(426,"68.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+property kp.overflow
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no overflow).</b><br><br>
+'Informs whether the keypad is currently in the overflow state.
+'<br><br>
+'This is an alternative to using the on_kp_overflow event.
+	get = syscall(418,"68.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+syscall(450,"68.TDL") kp.clearbuffer()
+'<b>METHOD. </b><br><br>
+'Clears the keypad event FIFO.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID=SIMULATOR
+syscall(696) kp.setlabel(key_code as byte, byref label as string)
+'<b>METHOD. </b><br><br>
+'Use this method to set a label on a keypad button in TiOS Simulator.
+
+#endif
+
+#endif
