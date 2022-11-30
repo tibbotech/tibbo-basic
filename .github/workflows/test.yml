@@ -11,6 +11,6 @@ jobs:
         with:
           node-version: '14.x'
       - name: Install dependencies
-        run: cd client && npm install && cd ../server && npm install && cd ..
+        run: npm install
       - run: npm run build --if-present
       - run: npm test
