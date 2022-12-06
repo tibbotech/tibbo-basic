@@ -73,7 +73,18 @@
 			],
 			"sourceMaps": true,
 			"cwd": "${workspaceRoot}",
-		}
+		},
+		{
+			"name": "DebugWasm",
+			"type": "node",
+			"request": "launch",
+			"preLaunchTask": "compilewasm",
+			"args": [
+				"${workspaceFolder}/src/wasm/app.js"
+			],
+			"sourceMaps": true,
+			"cwd": "${workspaceRoot}",
+		},
 	],
 	"compounds": [
 		{

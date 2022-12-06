@@ -2,6 +2,7 @@
     "files.associations": {
         "*.tbh": "c",
         "*.tc": "c",
-        "*.th": "c"
+        "*.th": "c",
+        "sstream": "cpp"
     }
 }

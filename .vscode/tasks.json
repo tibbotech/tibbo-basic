@@ -28,6 +28,37 @@
 			"problemMatcher": [
 				"$tsc-watch"
 			]
-		}
+		},
+		{
+            "label": "compilewasm",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/src/wasm/"
+            },
+            "command": "${workspaceFolder}/src/wasm/compile.sh",
+            "promptOnClose": true,
+            "isBackground": true,
+            "problemMatcher": {
+                "severity": "error",
+                "fileLocation": "absolute",
+                "pattern": [
+                    {
+                        "regexp": "ERROR in (.*)",
+                        "file": 1
+                    },
+                    {
+                        "regexp": "\\((\\d+),(\\d+)\\):(.*)",
+                        "line": 1,
+                        "column": 2,
+                        "message": 3
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Compiling\\.\\.\\.",
+                    "endsPattern": "Terminal will be reused by tasks, press any key to close it"
+                }
+            }
+        }
 	]
 }
