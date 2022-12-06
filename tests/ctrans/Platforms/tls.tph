@@ -1,0 +1,111 @@
+'**************************************************************************************************
+'       TLS Support
+'**************************************************************************************************
+
+#define TLS_AVAILABLE 1
+
+'--------------------------------------------------------------------
+
+
+'--------------------------------------------------------------------
+enum pl_tls_result
+'<b>ENUM. </b><br><br> Contains a list of constants related to possible TLS errors.
+    PL_TLS_SUCCESS,         '<b>PLATFORM CONSTANT.</b><br><br> Attempt was successful.
+    PL_TLS_REJECTED,        '<b>PLATFORM CONSTANT.</b><br><br> Attempt was rejected.
+    PL_TLS_ERROR_IN_USE,    '<b>PLATFORM CONSTANT.</b><br><br> TLS is already in use on another socket.
+    PL_TLS_ERROR_CERT,      '<b>PLATFORM CONSTANT.</b><br><br> Certificate error.
+    PL_TLS_ERROR_NO_BUFF    '<b>PLATFORM CONSTANT.</b><br><br> Insufficient memory.
+    PL_TLS_ERROR_INTERNAL   '<b>PLATFORM CONSTANT.</b><br><br> Unspecified internal error.
+end enum
+
+
+
+'--------------------------------------------------------------------
+syscall(834) sock.tlsinit(offset as dword) as pl_tls_result
+'<b>METHOD.</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), initializes all resources required for establishing a TLS connection.<br><br>
+'This method initializes the certificate authority (CA) - based on the certificate included in the project as a resource file - and the TLS context for the selected socket. 
+'If 0 is passed as the value of <i>offset</i>, <font color="maroon"><b>sock.tlsinit</b></font> will skip the verification of the certificate.<br><br>
+'If <font color="maroon"><b>sock.tlsinit</b></font> is called after TLS has already been initialized on the current socket (<font color="maroon"><b>sock.tlscurrentnum</b></font> = <font color="maroon"><b>sock.num</b></font>), 
+'it will return <font color="olive"><b>PL_TLS_REJECTED</b></font>. If called after TLS has already been initialized on a different socket (<font color="maroon"><b>sock.num</b></font> <> <font color="maroon"><b>sock.tlscurrentnum</b></font>), 
+'it will return <font color="olive"><b>PL_TLS_ERROR_IN_USE</b></font>.<br><br>
+'<font color="olive"><b>PL_TLS_ERROR_CERT</b></font> will be returned if the certificate can't be parsed because it is not an X.509 certificate or because is uses an unsupported cypher suite.
+
+
+'--------------------------------------------------------------------
+syscall(835) sock.tlshandshake(byref server_name as string) as pl_tls_result
+'<b>METHOD.</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), initiates the TLS handshake process to upgrade the socket to an encrypted connection.<br><br>
+'This method's sole parameter, <i>server_name</i>, requires a fully qualified domain name (i.e., everything after "https://" up to the first forward slash). 
+'If you do not want to verify the server name against the certificate, pass an empty string - this is useful when connecting directly to an IP address.<br><br>
+'Attempting to call <font color="maroon"><b>sock.tlshandshake</b></font> on a socket other than the one on which <font color="maroon"><b>sock.tlsinit</b></font> was executed will return <font color="olive"><b>PL_TLS_ERROR_IN_USE</b></font>.<br><br>
+'Additionally, calling <font color="maroon"><b>sock.tlshandshake</b></font> will result in <font color="olive"><b>PL_TLS_REJECTED</b></font> in the following scenarios: 
+'The selected protocol is not TCP (<font color="maroon"><b>sock.protocol<b></font> <> <font color="olive"><b>PL_SOCK_PROTOCOL_TCP</b></font>),
+'the TCP connection is not an outgoing connection (<font color="maroon"><b>sock.state</b></font> <> <font color="olive"><b>PL_SST_EST_AOPENED</b></font>),
+'or <font color="maroon"><b>sock.tlsinit</b></font> has not been executed on any socket (<font color="maroon"><b>sock.tlscurrentnum</b></font> = 255).<br><br>
+'Even if <font color="maroon"><b>sock.tlshandshake</b></font> returns <font color="olive"><b>PL_TLS_SUCCESS</b></font>, the creation of the secure connection may still fail due to a number of reasons. 
+'The final and definitive indicator of the successful establishment of the TLS link is the transition of <font color="maroon"><b>sock.state</b></font> into <font color="olive"><b>PL_SST_EST_TLS</b></font>.
+
+'--------------------------------------------------------------------
+syscall(836) sock.tlsdeinit() as accepted_rejected
+'<b>METHOD.</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), de-initializes the TLS encryption.<br><br>
+'It is recommended that the socket's TCP connection be closed (that is, <font color="maroon"><b>sock.state</b></font> is at <font color="olive"><b>PL_SST_CLOSED</b></font>) before this method is called.<br><br>
+'REJECTED can only be returned under two circumstances: No socket has been initialized for TLS via <font color="maroon"><b>sock.tlsinit</b></font> (<font color="maroon"><b>sock.tlscurrentnum</b></font> = 255), 
+'or the currently selected socket is not being used for TLS (<font color="maroon"><b>sock.tlscurrentnum</b></font> <> <font color="maroon"><b>sock.num</b></font>).
+
+'--------------------------------------------------------------------
+syscall(837) sock.tlssetdata(byref txdata as string) as word
+'<b>METHOD. </b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num<b/></font>), adds the data passed in the txdata argument to the contents of the TLS TX buffer. The data is then encrypted by the TLS engine.<br><br>
+'If the buffer doesn't have enough space to accommodate all the data being added, this data will be truncated. The newly added data is not sent out immediately. 
+'This only happens after the <font color="maroon"><b>sock.send</b></font> method is used to commit the data. This allows your application to prepare large amounts of data before sending it out.<br><br>
+'This method will return 0 if called on a socket that is not running in the TLS mode (<font color="maroon"><b>sock.tlscurrentnum</b></font> <> <font color="maroon"><b>sock.num</b></font>).
+
+'--------------------------------------------------------------------
+syscall(838) sock.tlsgetdata(maxinplen as word) as string
+'<b>METHOD.</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), returns the string that contains the decrypted data extracted from the TLS RX buffer.<br><br>
+'Extracted data is permanently deleted from the buffer. The length of the extracted data is limited by one of the three factors (whichever is smaller): 
+'The amount of data in the TLS RX buffer (see <font color="maroon"><b>sock.tlsrxlen</b></font>), the capacity of the "receiving" string variable, and the limit set by the <i>maxinplen</i> parameter.<br><br>
+'When using TLS, <font color="maroon"><b>sock.getdata</b></font> should <b>never</b> be used, because attempting to retrieve the data from the RX buffer will likely result in the collapse of the secure connection.
+
+#if PLATFORM_ID<>WM2000
+''--------------------------------------------------------------------
+syscall(839) sock.tlsbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD.</b><br><br>
+'Pre-requests the number (<i>numpages</i>) of buffer pages (1 page is 256 bytes) for the buffer used for TLS operations. Returns the actual number of pages that can be allocated.<br><br>
+'The actual buffer allocation happens when the <font color="maroon"><b>sys.buffalloc</b></font> method is called.<br><br>
+'On the this platform, TLS requires a minimum of 39 buffer pages. Buffer allocation must take place prior to calling <font color="maroon"><b>sock.tlsinit</b></font>.
+#endif 
+
+'--------------------------------------------------------------------
+syscall(840) sock.tlspeekdata(maxinplen as word) as string
+'<b>METHOD.</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), returns a string that contains a "preview" of the data in the TLS RX buffer. The data is NOT deleted from the TLS RX buffer.<br><br>
+'The length of returned data is limited by one of the three factors (whichever is smaller): the amount of data in the TLS RX buffer itself, capacity of the "receiving" string variable, and the limit set by the maxinplen argument. 
+'String variables can hold up to 255 bytes of data, so this method will only allow you to preview up to 255 "next" bytes from the TLS RX buffer.
+
+'--------------------------------------------------------------------
+property !sock.tlstxfree
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Indicates the amount of available space in the TX buffer of the current socket (<font color="maroon"><b>sock.num</b></font>).
+'The amount of space remaining in the TX buffer is calculated by subtracting the size of the encrypted data placed in the buffer and overhead from the overall capacity.<br><br>
+'For asynchronous data processing, use the <font color="maroon"><b>sock.notifysent</b></font> method to generate the <font color="teal"><b>on_sock_data_sent</b></font> event once the TX buffer gains the necessary free space.
+    get = syscall(841) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property sock.tlsrxlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE = 0 (0 bytes).</b><br><br>
+'For the currently selected socket (selection is made through <font color="maroon"><b>sock.num</b></font>), returns the total number of bytes currently waiting in the TLS RX buffer to be extracted and processed by your application.
+    get = syscall(842) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property sock.tlscurrentnum
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE = 255 (not in use).</b><br><br>
+'Indicates which socket, if any, is using TLS encryption.<br><br>
+'Only a single socket can use TLS encryption at any given time. This read-only property returns 255 whenever TLS is not in use by any socket, or the number of the socket using the TLS at the moment.
+    get = syscall(877) as BYTE
+end property

@@ -1,0 +1,948 @@
+'***********************************************************************************************************
+'		PPPOE LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'--------------------------------------------------------------------
+const PPPOE_STAMP="PPPoE> "
+const PPPOE_CR_LF=chr(13)+chr(10)
+const PPPOE_SOCK_GET_SIGNATURE="PPE"
+const PPPOE_INIT_SIGNATURE=&h46AF
+const PPPOE_BUFFER_PAGES=2
+const PPPOE_MAX_REPLY_WAIT_TIME=6
+const PPPOE_MAX_RETRIES=3
+
+'--------------------------------------------------------------------
+enum pppoe_phases
+	PPPOE_IDLE,
+	PPPOE_DISCOVERY,
+	PPPOE_SELECTION,
+	PPPOE_SESSION,
+	PPPOE_TERMINATION,
+	PPPOE_TERMINATION_AND_STOP
+end enum
+
+enum pppoe_sock_modes
+	PPPOE_SOCK_MODE_NONE,
+	PPPOE_SOCK_MODE_PADI_PADO,
+	PPPOE_SOCK_MODE_PADR_PADS_PADT,
+	PPPOE_SOCK_MODE_SESSION
+end enum
+
+'--------------------------------------------------------------------
+declare sub pppoe_send_padi()
+declare sub pppoe_send_padr()
+declare sub pppoe_send_padt()
+declare sub pppoe_add_tag(byref packet_str as string, tag_code as word, byref tag_data as string)
+declare function pppoe_get_verify_tag(byref packet_str as string, tag_code as word, byref tag_data as string) as ok_ng
+declare sub pppoe_send_lcp()
+declare sub pppoe_send_reply(byref packet_str as string)
+declare sub pppoe_send_auth()
+declare sub pppoe_send_ip(byref ip as string)
+declare sub pppoe_send_echo()
+declare sub pppoe_lcp_add_tag(byref packet_str as string, tag_code as byte, byref tag_data as string)
+declare function pppoe_lcp_get_verify_tag(byref packet_str as string, tag_code as byte, byref tag_data as string) as ok_ng
+declare sub pppoe_set_phase(phase as pppoe_phases)
+declare sub pppoe_reset_vars()
+declare sub pppoe_close_sock()
+declare sub pppoe_open_sock(sock_mode as pppoe_sock_modes)
+declare sub pppoe_init()
+declare sub pppoe_debugprint_packet(mode as byte, byref packet_str as string, it_is_tx as no_yes)
+declare sub pppoe_debugprint(byref print_data as string)
+
+'--------------------------------------------------------------------
+dim pppoe_init_flag as word
+dim pppoe_socket as byte
+dim pppoe_phase as pppoe_phases
+dim pppoe_tout_ctr as byte
+dim pppoe_retry_ctr as byte
+dim pppoe_ac_name as string(32)
+dim pppoe_serv_name as string(32)
+dim pppoe_ac_cookie as string(32)
+dim pppoe_curr_sock_mode as pppoe_sock_modes
+dim pppoe_ac_mac as string(6)
+dim pppoe_session_id as word
+dim pppoe_host_uniq as string(6)
+dim pppoe_lcp_id as byte
+dim pppoe_magic as string(4)
+dim pppoe_ac_lcp_ok,pppoe_dev_lcp_ok,pppoe_dev_auth_ok,pppoe_dev_ip_configured,pppoe_ac_ip_configured as no_yes
+dim pppoe_success_reported as no_yes
+dim pppoe_login,pppoe_password as string(32)
+dim pppoe_dev_ip as string(4)
+
+'====================================================================
+public function pppoe_get_info(info_element as pppoe_info_elements, byref extra_data as string) as string
+'Returns library-specific information for the requested info element
+
+	pppoe_get_info=""
+	select case info_element
+	case PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS:
+		pppoe_get_info=str(PPPOE_BUFFER_PAGES)
+	
+	end select
+end function
+
+'--------------------------------------------------------------------
+public function pppoe_start(byref login as string, byref password as string) as en_pppoe_status_codes
+	dim x as byte
+	
+	if pppoe_init_flag<>PPPOE_INIT_SIGNATURE then
+		pppoe_init()
+		pppoe_init_flag=PPPOE_INIT_SIGNATURE
+	end if
+
+	pppoe_start=PPPOE_STATUS_OK
+
+	'is this process already going?
+	if pppoe_phase<>PPPOE_IDLE then
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("PPPoE already started")
+		#endif
+		exit function
+	end if
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("---START---")
+	#endif
+
+	pppoe_login=login
+	pppoe_password=password
+
+	'prepare the socket for PPPoE/LCP/etc. comms
+	pppoe_socket=sock_get(PPPOE_SOCK_GET_SIGNATURE)
+	if pppoe_socket>=sock.numofsock then
+		pppoe_start=PPPOE_STATUS_OUT_OF_SOCKETS
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("ERROR: out of sockets")
+		#endif
+		exit function
+	end if
+	
+	'check buffer space
+	x=val(pppoe_get_info(PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS,""))
+	if x>sys.freebuffpages then
+		callback_pppoe_pre_buffrq(x-sys.freebuffpages)
+		
+		if x>sys.freebuffpages then
+			pppoe_start=PPPOE_STATUS_INSUFFICIENT_BUFFER_SPACE
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("ERROR: insufficient buffer space")
+			#endif
+			exit function
+		end if
+	end if
+
+	'setup the socket (the part that is always the same)
+	sock.num=pppoe_socket
+	sock.rxbuffrq(1)
+	sock.txbuffrq(1)
+	sys.buffalloc
+	sock.protocol=PL_SOCK_PROTOCOL_RAW
+	sock.targetinterface=PL_SOCK_INTERFACE_NET
+	sock.allowedinterfaces="NET"
+	sock.inconmode=PL_SOCK_INCONMODE_NONE
+	sock.reconmode=PL_SOCK_RECONMODE_3
+
+	'reset variables
+	pppoe_curr_sock_mode=PPPOE_SOCK_MODE_NONE
+	pppoe_set_phase(PPPOE_DISCOVERY)
+	pppoe_host_uniq=ddval(net.mac)
+	pppoe_magic=right(ddval(net.mac),4)
+end function
+
+'--------------------------------------------------------------------
+public sub pppoe_stop()
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("---STOP---")
+	#endif
+	if pppoe_phase=PPPOE_SELECTION or pppoe_phase=PPPOE_SESSION then
+		pppoe_set_phase(PPPOE_TERMINATION_AND_STOP)
+	else
+		pppoe_set_phase(PPPOE_IDLE)
+		callback_pppoe_failure(PPPOE_STOPPED)
+	end if
+end sub
+
+'--------------------------------------------------------------------
+public sub pppoe_proc_data()
+'Call this from the on_sock_data_arrival() event
+	dim rx_data as string
+	dim proto as word
+	dim code as byte
+	dim s as string(2)
+
+	if pppoe_init_flag<>PPPOE_INIT_SIGNATURE or sock.num<>pppoe_socket then
+		exit sub
+	end if
+
+	rx_data=sock.getdata(255)
+	
+	if pppoe_phase=PPPOE_IDLE then exit sub
+	if asc(mid(rx_data,1,1))<>&h11 then exit sub 									'ver and type must be &h11
+
+	#if PPPOE_DEBUG_PRINT
+		select case sock.remoteport
+		case 34915:	pppoe_debugprint_packet(0,rx_data,NO)
+		case 34916: pppoe_debugprint_packet(1,rx_data,NO)
+		case else:	pppoe_debugprint("Stray packet RXed and discarted")
+		end select
+	#endif
+
+	select case pppoe_phase
+	case PPPOE_DISCOVERY: '----------------------------------------------------------
+		if sock.remoteport<>34915 then goto wrong_packet									'protocol # must be correct
+		if asc(mid(rx_data,2,1))<>&h07 then goto wrong_packet								'we expect an offer	
+		pppoe_ac_mac=ddval(sock.remotemac)													'now we know who we are talking to
+		
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("AC MAC= "+ddstr(pppoe_ac_mac))
+		#endif
+		
+		if pppoe_get_verify_tag(rx_data,&h0101,pppoe_serv_name)=NG then goto wrong_packet	'get service-name
+		if pppoe_get_verify_tag(rx_data,&h0103,pppoe_host_uniq)=NG then goto wrong_packet	'get host-uniq
+		if pppoe_get_verify_tag(rx_data,&h0102,pppoe_ac_name)=NG then goto wrong_packet		'get AC-name
+		if pppoe_get_verify_tag(rx_data,&h0104,pppoe_ac_cookie)=NG then goto wrong_packet	'get AC-cookie
+		pppoe_set_phase(PPPOE_SELECTION)
+	
+	case PPPOE_SELECTION: '----------------------------------------------------------
+		if sock.remoteport<>34915 then goto wrong_packet									'protocol # must be correct
+		if ddval(sock.remotemac)<>pppoe_ac_mac then goto wrong_packet						'confirmation must come from the selected AC
+		if asc(mid(rx_data,2,1))<>&h65 then goto wrong_packet								'we expect confirmation	
+
+		pppoe_session_id=asc(mid(rx_data,3,1))*256+asc(mid(rx_data,4,1))    				'we get session ID
+		if pppoe_session_id=0 then goto wrong_packet										'session ID can't be 0
+		if pppoe_get_verify_tag(rx_data,&h0101,pppoe_serv_name)=NG then goto wrong_packet	'verify service-name
+		if pppoe_get_verify_tag(rx_data,&h0103,pppoe_host_uniq)=NG then goto wrong_packet	'verify host-uniq
+		pppoe_set_phase(PPPOE_SESSION)
+	
+	case PPPOE_SESSION: '------------------------------------------------------------
+		if sock.remoteport<>34916 then goto wrong_packet									'protocol # must be correct
+		proto=asc(mid(rx_data,7,1))*256+asc(mid(rx_data,8,1))								'we support LCP (C021), IPCONF (8021), PAP (C023)
+		if proto<>&hC021 and proto<>&h8021 and proto<>&hC023 then goto wrong_packet			'reject if some other protocol
+		
+		code=asc(mid(rx_data,9,1))															'everything depends on the code
+		select case code
+		case 1:		'----- CONFIGURE-REQUEST -----
+			select case proto
+			case &hC021:
+				'we specifically look for confirmation that PAP protocol can be used
+				if pppoe_lcp_get_verify_tag(rx_data,&h03,s)=NG then
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("ERROR: AC did not provide 'Authentication-Protocol' tag")
+					#endif
+					goto failure
+				end if
+				
+				if asc(mid(s,1,1))*256+asc(mid(s,2,1))<>&hC023 then
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("ERROR: AC provided some other authentication protocol (not PAP)")
+					#endif
+					goto failure
+				end if
+								
+				insert(rx_data,9,chr(2)) 'replace "conf-req" with "conf-ack" and send it back
+				pppoe_send_reply(rx_data)
+				pppoe_ac_lcp_ok=YES
+				goto can_start_auth
+			
+			case &h8021:
+				insert(rx_data,9,chr(2)) 'replace "conf-req" with "conf-ack" and send it back
+				pppoe_send_reply(rx_data)
+				pppoe_ac_ip_configured=YES
+				if pppoe_dev_ip_configured=YES then pppoe_tout_ctr=0 'this way timer event will happen soon
+				
+			end select
+		
+		case 2:		'----- CONFIGURE-ACK -----
+			select case proto
+			case &hC021:
+				pppoe_dev_lcp_ok=YES
+can_start_auth:	if pppoe_dev_lcp_ok=YES and pppoe_ac_lcp_ok=YES then
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("LCP configuration complete, can proceed to authentication")
+					#endif
+					pppoe_tout_ctr=0
+					pppoe_retry_ctr=PPPOE_MAX_RETRIES
+				end if
+
+			case &hC023:
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("Authentication complete, can proceed to IP configuration")
+				#endif
+				pppoe_dev_auth_ok=YES
+				pppoe_tout_ctr=0
+				pppoe_retry_ctr=PPPOE_MAX_RETRIES
+
+			case else:
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("Configuration complete. Device IP= "+ddstr(pppoe_dev_ip))
+				#endif
+				pppoe_dev_ip_configured=YES
+				if pppoe_ac_ip_configured=YES then pppoe_tout_ctr=0 'this way timer event will happen soon
+			
+			end select
+
+		case 3: 	'----- CONFIGURE-NAK -----
+			select case proto
+			case &hC021:
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("ERROR: LCP configuration failed (NAK from AC)")
+				#endif
+				goto failure
+
+			case &hC023:
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("ERROR: Authentication failed (NAK from AC)")
+				#endif
+				goto failure
+			
+			case &h8021:
+				'we requested IP 0.0.0.0 and expect that it will be rejected
+				pppoe_dev_ip=mid(rx_data,15,4)
+				pppoe_tout_ctr=0 'now will resend our request with proper IP
+				pppoe_retry_ctr=PPPOE_MAX_RETRIES
+			
+			end select
+
+		case 4: 	'----- CONFIGURE-REJECT -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC rejected our configuration request")
+			#endif
+			goto failure
+		
+		case 5: 	'----- TERMINATE-REQUEST -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC requested link termination")
+			#endif
+			goto failure
+
+		case 7,8: 	'----- CODE-REJECT and PROTOCOL-REJECT -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC rejected our configuration request")
+			#endif
+			goto failure
+		
+		case 9:		'----- ECHO-REQUST -----
+			insert(rx_data,9,chr(2)) 'replace "conf-req" with "conf-ack" and send it back
+			pppoe_send_reply(rx_data)
+			pppoe_ac_lcp_ok=YES
+		
+		case 10:	'----- ECHO-REPLY -----
+			pppoe_retry_ctr=PPPOE_MAX_RETRIES
+		
+		end select
+	end select
+exit sub
+
+wrong_packet: '---------------------------------------------------------------
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("ERROR: Packet rejected (did not pass all acceptance criteria)")
+	#endif
+	exit sub
+
+failure: '--------------------------------------------------------------------
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("ERROR: Something went wrong, details possibly printed above)")
+		pppoe_debugprint("---FAILURE---")
+	#endif
+	pppoe_set_phase(PPPOE_TERMINATION)
+end sub
+
+'--------------------------------------------------------------------
+public sub pppoe_proc_timer()
+'Call this from the on_sys_timer() event (running at default 0.5 sec intervals).
+
+	if pppoe_init_flag<>PPPOE_INIT_SIGNATURE or pppoe_phase=PPPOE_IDLE then
+		exit sub
+	end if
+
+	if pppoe_tout_ctr=0 then
+		if pppoe_retry_ctr=0 then
+			'no more retry attempts
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("ERROR: timeout while waiting for the reply from the AC")
+			#endif
+			if pppoe_phase=PPPOE_SELECTION or pppoe_phase=PPPOE_SESSION then
+				pppoe_set_phase(PPPOE_TERMINATION)
+			else	
+				callback_pppoe_failure(PPPOE_TIMEOUT)			
+				pppoe_set_phase(PPPOE_DISCOVERY)
+			end if
+	else
+			select case pppoe_phase
+			case PPPOE_DISCOVERY:
+				pppoe_reset_vars()
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADI_PADO)
+				pppoe_send_padi()
+				
+			case PPPOE_SELECTION:
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADR_PADS_PADT)
+				pppoe_send_padr()
+
+			case PPPOE_SESSION:
+				if pppoe_dev_lcp_ok=NO or pppoe_ac_lcp_ok=NO then
+					pppoe_open_sock(PPPOE_SOCK_MODE_SESSION)
+					pppoe_send_lcp()
+				else if pppoe_dev_auth_ok=NO then
+					pppoe_send_auth()
+				else if pppoe_dev_ip_configured=NO then
+					pppoe_send_ip(pppoe_dev_ip)
+				else if pppoe_ac_ip_configured=NO then
+					'no need to do anything
+				else	
+					'we are in the established session
+					if pppoe_success_reported=NO then
+						pppoe_success_reported=YES
+						pppoe.acmac=ddstr(pppoe_ac_mac)
+						pppoe.ip=ddstr(pppoe_dev_ip)
+						pppoe.sessionid=pppoe_session_id
+						callback_pppoe_ok()
+					end if
+					pppoe_send_echo()
+				end if
+			
+			case PPPOE_TERMINATION,PPPOE_TERMINATION_AND_STOP:
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADR_PADS_PADT)
+				pppoe_send_padt()
+				if pppoe_phase=PPPOE_TERMINATION then	
+					callback_pppoe_failure(PPPOE_CONFIGURATION_ERROR)
+					pppoe_set_phase(PPPOE_DISCOVERY)
+				else
+					pppoe_set_phase(PPPOE_IDLE)
+					callback_pppoe_failure(PPPOE_STOPPED)
+				end if
+			end select
+			pppoe_tout_ctr=PPPOE_MAX_REPLY_WAIT_TIME
+			pppoe_retry_ctr=pppoe_retry_ctr-1
+		end if
+	else
+		pppoe_tout_ctr=pppoe_tout_ctr-1
+	end if
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_padi()
+	'form and send PADI (PPPoE Active Discovery Initiation)
+
+	dim s as string
+
+	'we start from the payload
+	s=""
+	pppoe_add_tag(s,&h0101,pppoe_serv_name)
+	pppoe_add_tag(s,&h0103,pppoe_host_uniq)
+
+	'put header fields in front:
+	'&h11 -- fixed ver/type fields (4 bits each)
+	'&h09 -- code: active discovery initiation (1 byte)
+	'0 and 0 -- session ID (2 bytes)
+	'0 and chr(len(s)) -- payload length (2 bytes)
+	s=chr(&h11)+chr(&h09)+chr(0)+chr(0)+chr(0)+chr(len(s))+s      
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_padr()
+	'form and send PADR (PPPoE Active Discovery Request)
+
+	dim s as string
+
+	'we start from the payload
+	s=""
+	pppoe_add_tag(s,&h0101,pppoe_serv_name)
+	pppoe_add_tag(s,&h0103,pppoe_host_uniq)
+	pppoe_add_tag(s,&h0104,pppoe_ac_cookie)
+
+	'put header fields in front:
+	'&h11 -- fixed ver/type fields (4 bits each)
+	'&h19 -- code: active discovery request (1 byte)
+	'0 and 0 -- session ID (2 bytes)
+	'0 and chr(len(s)) -- payload length (2 bytes)
+	s=chr(&h11)+chr(&h19)+chr(0)+chr(0)+chr(0)+chr(len(s))+s      
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_padt()
+	'form and send PADT (PPPoE Active Discovery Termination)
+
+	dim s as string
+
+	'we start from the payload (which is empty)
+	s=""
+
+	'put header fields in front:
+	'&h11 -- fixed ver/type fields (4 bits each)
+	'&hA7 -- code: active discovery termination (1 byte)
+	'session ID (2 bytes)
+	'0 and chr(len(s)) -- payload length (2 bytes)
+	s=chr(&h11)+chr(&hA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id and &hFF)+chr(0)+chr(len(s))+s      
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_add_tag(byref packet_str as string, tag_code as word, byref tag_data as string)
+	packet_str=packet_str+chr(tag_code/256)
+	packet_str=packet_str+chr(tag_code and &hFF)
+	packet_str=packet_str+chr(0)
+	packet_str=packet_str+chr(len(tag_data))
+	packet_str=packet_str+tag_data
+end sub
+
+'--------------------------------------------------------------------
+function pppoe_get_verify_tag(byref packet_str as string, tag_code as word, byref tag_data as string) as ok_ng
+	dim s as string(32)
+	dim ptr,payload_len as byte	
+	dim tag_type,tag_len as word
+
+	pppoe_get_verify_tag=OK
+	payload_len=asc(mid(packet_str,5,1))*256+asc(mid(packet_str,6,1))
+	ptr=0
+	while ptr<payload_len
+		'take one tag
+		tag_type=asc(mid(packet_str,7+ptr,1))*256+asc(mid(packet_str,7+ptr+1,1))
+		tag_len=asc(mid(packet_str,7+ptr+2,1))*256+asc(mid(packet_str,7+ptr+3,1))
+		if tag_type=tag_code then
+			'this is the tag we've been looking for
+			s=mid(packet_str,7+ptr+4,tag_len)
+			if tag_data="" then
+				tag_data=s 'memorize tag contents
+			else
+				'compare tag contents
+				if s<>tag_data then
+					pppoe_get_verify_tag=NG 'tag does not match previously received data
+				end if
+			end if
+			exit function
+		else
+			ptr=ptr+4+tag_len 'some other tag
+		end if
+	wend 
+	pppoe_get_verify_tag=NG 'tag not found
+end function
+
+'--------------------------------------------------------------------
+sub pppoe_send_lcp()
+	dim s as string
+
+	'we start from the payload
+	s=""
+	pppoe_lcp_add_tag(s,&h05,right(pppoe_magic,4))
+
+	'put header fields in front:
+	'&h01 -- configure-request
+	'LCP ID (1 byte)
+	'LCP length (2 bytes)
+	s=chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s
+		
+	s=chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id and &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h21)+s
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+
+	pppoe_lcp_id=pppoe_lcp_id+1
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_reply(byref packet_str as string)
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,packet_str,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(packet_str)
+	sock.send
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_auth()
+	dim s as string
+
+	'we start from the payload
+	s=chr(len(pppoe_login))+pppoe_login+chr(len(pppoe_password))+pppoe_password
+
+	'put header fields in front:
+	'&h01 -- configure-request
+	'LCP ID (1 byte)
+	'LCP length (2 bytes)
+	s=chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s
+	
+	s=chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id and &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h23)+s
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+
+	pppoe_lcp_id=pppoe_lcp_id+1
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_ip(byref ip as string)
+	dim s as string
+
+	'we start from the payload
+	s=ddval("3.6")+ip 'we start from invalid IP 0.0.0.0 on purpose
+
+	'put header fields in front:
+	'&h01 -- configure-request
+	'LCP ID (1 byte)
+	'LCP length (2 bytes)
+	s=chr(&h01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s
+	
+	s=chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id and &hFF)+chr(0)+chr(6+len(s))+chr(&h80)+chr(&h21)+s
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+
+	pppoe_lcp_id=pppoe_lcp_id+1
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_send_echo()
+	dim s as string
+
+	s=pppoe_magic 'we start from invalid IP 0.0.0.0 on purpose
+
+	'put header fields in front:
+	'&h01 -- configure-request
+	'LCP ID (1 byte)
+	'LCP length (2 bytes)
+	s=chr(&h09)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s
+	
+	s=chr(&h11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id and &hFF)+chr(0)+chr(6+len(s))+chr(&hC0)+chr(&h21)+s
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES)
+	#endif
+
+	sock.num=pppoe_socket
+	sock.setdata(s)
+	sock.send
+
+	pppoe_lcp_id=pppoe_lcp_id+1
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_lcp_add_tag(byref packet_str as string, tag_code as byte, byref tag_data as string)
+	packet_str=packet_str+chr(tag_code)
+	packet_str=packet_str+chr(2+len(tag_data))
+	packet_str=packet_str+tag_data
+end sub
+
+'--------------------------------------------------------------------
+function pppoe_lcp_get_verify_tag(byref packet_str as string, tag_code as byte, byref tag_data as string) as ok_ng
+	dim s as string(32)
+	dim ptr,payload_len as byte	
+	dim tag_type,tag_len as byte
+
+	pppoe_lcp_get_verify_tag=OK
+	payload_len=asc(mid(packet_str,11,1))*256+asc(mid(packet_str,12,1))
+	if payload_len>4 then
+		payload_len=payload_len-4 'LCP length includes len field, code, and ID
+	else
+		pppoe_lcp_get_verify_tag=OK
+		exit function
+	end if
+	ptr=0
+	while ptr<payload_len
+		'take one tag
+		tag_type=asc(mid(packet_str,13+ptr,1))
+		tag_len=asc(mid(packet_str,13+ptr+1,1))
+		if tag_type=tag_code then
+			'this is the tag we've been looking for
+			s=mid(packet_str,13+ptr+2,tag_len-2)
+			if tag_data="" then
+				tag_data=s 'memorize tag contents
+			else
+				'compare tag contents
+				if s<>tag_data then
+					pppoe_lcp_get_verify_tag=NG 'tag does not match previously received data
+				end if
+			end if
+			exit function
+		else
+			ptr=ptr+tag_len 'some other tag
+		end if
+	wend 
+	pppoe_lcp_get_verify_tag=NG 'tag not found
+end function
+
+'--------------------------------------------------------------------
+sub pppoe_set_phase(phase as pppoe_phases)	
+
+	#if PPPOE_DEBUG_PRINT
+		dim s as string(50)
+		
+		select case phase 
+		case PPPOE_IDLE:		s="IDLE"
+		case PPPOE_DISCOVERY:	s="PADI/PADO (initiation and offer)"
+		case PPPOE_SELECTION:	s="PADR/PADS (request and confirmation)"
+		case PPPOE_SESSION:		s="SESSION (including LCP, etc.)"
+		case PPPOE_TERMINATION:	s="PADT (termination)"
+		case PPPOE_TERMINATION_AND_STOP: s="PADT (termination + go into IDLE state)"
+		end select
+		s="PHASE: "+str(phase)+"-"+s
+		pppoe_debugprint(s)
+	#endif
+
+	pppoe_close_sock()
+	pppoe_phase=phase
+	pppoe_retry_ctr=PPPOE_MAX_RETRIES
+	pppoe_tout_ctr=0 'this way we will do something right on next timer event
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_reset_vars()
+	pppoe_ac_name=""
+	pppoe_serv_name=""
+	pppoe_ac_cookie=""
+	pppoe_ac_lcp_ok=NO
+	pppoe_dev_lcp_ok=NO
+	pppoe_dev_auth_ok=NO
+	pppoe_dev_ip=ddval("0.0.0.0")
+	pppoe_dev_ip_configured=NO
+	pppoe_ac_ip_configured=NO
+	pppoe_success_reported=NO
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_close_sock()
+	dim i as word
+	
+	sock.num=pppoe_socket
+	if sock.statesimple<>PL_SSTS_CLOSED then
+		sock.discard
+		i=sys.timercount
+		while sock.statesimple<>PL_SSTS_EST  and sys.timercount-i<3 and sys.timercount>=i
+		wend
+		pppoe_curr_sock_mode=PPPOE_SOCK_MODE_NONE
+	end if
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_open_sock(sock_mode as pppoe_sock_modes)
+	dim i as word
+
+	sock.num=pppoe_socket
+	if sock_mode<>pppoe_curr_sock_mode then
+		pppoe_curr_sock_mode=sock_mode
+		
+		select case pppoe_curr_sock_mode
+		case PPPOE_SOCK_MODE_PADI_PADO:
+			sock.targetbcast=YES
+			sock.targetport=34915
+			sock.outport=sock.targetport
+			sock.localportlist=str(sock.targetport)
+
+		case PPPOE_SOCK_MODE_PADR_PADS_PADT:
+			sock.targetbcast=NO
+			sock.targetmac=ddstr(pppoe_ac_mac)
+			sock.targetport=34915
+			sock.outport=sock.targetport
+			sock.localportlist=str(sock.targetport)
+
+		case PPPOE_SOCK_MODE_SESSION:
+			sock.targetbcast=YES
+			sock.targetport=34916
+			sock.outport=sock.targetport
+			sock.localportlist=str(sock.targetport)
+		
+		end select
+	end if
+	
+	sock.connect
+	i=sys.timercount
+	while sock.statesimple<>PL_SSTS_EST  and sys.timercount-i<3 and sys.timercount>=i
+		doevents 'very important
+	wend
+end sub
+
+'--------------------------------------------------------------------
+sub pppoe_init()
+	pppoe_phase=PPPOE_IDLE
+end sub
+
+'--------------------------------------------------------------------
+#if PPPOE_DEBUG_PRINT
+sub pppoe_debugprint_packet(mode as byte, byref packet_str as string, it_is_tx as no_yes)
+'Set mode=0 for pure PPPoE, other -- for LCP, etc.
+
+	dim s as string
+	dim ptr,payload_len,code as byte	
+	dim tag_type,tag_len,proto as word
+
+	if it_is_tx=NO then
+		s="Rx "
+	else
+		s="Tx "
+	end if
+	
+	if mode=0 then
+		'This is pure PPPoE
+		
+		s=s+"PPPoE "
+		
+		select case asc(mid(packet_str,2,1))
+		case &h09:	s=s+"PADI ("
+		case &h07:	s=s+"PADO ("
+		case &h19:	s=s+"PADR ("
+		case &h65:	s=s+"PADS ("
+		case &hA7:	s=s+"PADT ("
+		case else:	s=s+"???? ("
+		end select
+		
+		s=s+"Session ID: "+str(asc(mid(packet_str,3,1))*256+asc(mid(packet_str,4,1)))+"; "
+		s=s+"Length: "+str(asc(mid(packet_str,5,1))*256+asc(mid(packet_str,6,1)))+")"
+		pppoe_debugprint(s)
+
+		payload_len=asc(mid(packet_str,5,1))*256+asc(mid(packet_str,6,1))
+		ptr=0
+		while ptr<payload_len
+			'take one tag
+			tag_type=asc(mid(packet_str,7+ptr,1))*256+asc(mid(packet_str,7+ptr+1,1))
+			tag_len=asc(mid(packet_str,7+ptr+2,1))*256+asc(mid(packet_str,7+ptr+3,1))
+			s=mid(packet_str,7+ptr+4,tag_len)
+			
+			select case tag_type
+			case &h0000: pppoe_debugprint("...End-Of-List")
+			case &h0101: pppoe_debugprint("...Service-Name: "+str(tag_len)+": "+s)
+			case &h0102: pppoe_debugprint("...AC-Name: "+str(tag_len)+": "+s)
+			case &h0103: pppoe_debugprint("...Host-Uniq: "+str(tag_len)+": "+ddstr(s))
+			case &h0104: pppoe_debugprint("...AC-Cookie: "+str(tag_len)+": "+ddstr(s))
+			case &h0105: pppoe_debugprint("...Vendor-Specific: "+str(tag_len)+": "+ddstr(s))
+			case &h0110: pppoe_debugprint("...Relay-Session-Id: "+str(tag_len)+": "+ddstr(s))
+			case &h0201: pppoe_debugprint("...Service-Name-Error")
+			case &h0202: pppoe_debugprint("...AC-System-Error")
+			case &h0203: pppoe_debugprint("...Generic Error")
+			case else:   pppoe_debugprint("...Unknown tag "+str(tag_type)+": "+str(tag_len)+": "+ddstr(s))
+			end select
+			ptr=ptr+4+tag_len
+		wend 
+	else
+		'This is LCP, etc.
+		
+		proto=asc(mid(packet_str,7,1))*256+asc(mid(packet_str,8,1))
+		select case proto
+		case &hC021:	s=s+"LCP "
+		case &h8021:	s=s+" IP "
+		case &hC023:	s=s+"PAP "
+		case else: 		s=s+"Unknown proto "+str(proto)+" "
+		end select
+
+		code=asc(mid(packet_str,9,1))
+		select case code
+		case 1:		s=s+"CONF-REQ ("
+		case 2:		s=s+"CONF-ACK ("
+		case 3: 	s=s+"CONF-NAK ("
+		case 4: 	s=s+"CONF-REJ ("
+		case 5: 	s=s+"TERM-REQ ("
+		case 6: 	s=s+"TERM-ACK ("
+		case 7: 	s=s+"CODE-REJ ("
+		case 8: 	s=s+"PROT-REJ ("
+		case 9:		s=s+"ECHO-REQ ("
+		case 10:	s=s+"ECHO-REP ("
+		case else:	s=s+"UNKN "+str(code)+" ("
+		end select
+
+		s=s+"Session ID: "+str(asc(mid(packet_str,3,1))*256+asc(mid(packet_str,4,1)))+"; "
+		s=s+"Message ID: "+str(asc(mid(packet_str,10,1)))+"; "
+		s=s+"Length: "+str(asc(mid(packet_str,5,1))*256+asc(mid(packet_str,6,1)))+")"
+
+		pppoe_debugprint(s)
+
+		payload_len=asc(mid(packet_str,11,1))*256+asc(mid(packet_str,12,1))
+		if payload_len>4 then
+			payload_len=payload_len-4 'LCP length includes len field, code, and ID
+		else
+			payload_len=0
+			exit sub
+		end if
+		ptr=0
+		select case proto
+		case &hC023
+			if code=1 then
+				tag_len=asc(mid(packet_str,13+ptr,1))
+				s=mid(packet_str,13+ptr+1,tag_len)
+				pppoe_debugprint("...Login: "+str(tag_len)+": "+s)
+				ptr=ptr+tag_len+1
+				tag_len=asc(mid(packet_str,13+ptr,1))
+				s=mid(packet_str,13+ptr+1,tag_len)
+				pppoe_debugprint("...Password: "+str(tag_len)+": "+s)
+			end if
+		case &h8021
+			tag_len=asc(mid(packet_str,13+ptr+1,1))
+			s=mid(packet_str,13+ptr+2,tag_len-2)
+			pppoe_debugprint("...IP: "+str(tag_len-2)+": "+ddstr(s))
+			
+		case else
+			select case code
+			case 9,10:
+					'---
+			
+			case else:
+				while ptr<payload_len
+					'take one tag
+					tag_type=asc(mid(packet_str,13+ptr,1))
+					tag_len=asc(mid(packet_str,13+ptr+1,1))-2
+					s=mid(packet_str,13+ptr+2,tag_len)
+					select case tag_type
+					case &h01: pppoe_debugprint("...Maximum-Receive-Unit: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))))
+					case &h03: pppoe_debugprint("...Authentication-Protocol: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))))
+					case &h04: pppoe_debugprint("...Quality-Protocol: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))))
+					case &h05: pppoe_debugprint("...Magic-Number: "+str(tag_len)+": "+ddstr(s))
+					case &h07: pppoe_debugprint("...Protocol-Field-Compression: "+str(tag_len)+": "+ddstr(s))
+					case &h08: pppoe_debugprint("...Address-And-Control-Field-Compression: "+str(tag_len)+": "+ddstr(s))
+					case else: pppoe_debugprint("...Unknown tag "+str(tag_type)+": "+str(tag_len)+": "+ddstr(s))
+					end select
+					ptr=ptr+tag_len+2 'some other tag
+				wend 
+			end select
+		end select
+	end if
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if PPPOE_DEBUG_PRINT
+sub pppoe_debugprint(byref print_data as string)
+
+	sys.debugprint(PPPOE_STAMP+print_data+PPPOE_CR_LF)
+end sub
+#endif
+
+

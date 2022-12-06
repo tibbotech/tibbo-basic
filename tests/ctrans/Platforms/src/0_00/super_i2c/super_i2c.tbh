@@ -1,0 +1,29 @@
+'***********************************************************************************************************
+'			SUPER I2C 
+'***********************************************************************************************************
+
+#define SSI_MAX_SIGNATURE_LEN 5
+
+'1- debug output in console.
+'0- no debug output.
+#ifndef SI2C_DEBUG_PRINT
+	#define SI2C_DEBUG_PRINT 0
+#endif
+
+'Maximum length of the I2C user's signature string
+#ifndef SI2C_MAX_SIGNATURE_LEN
+	#define SI2C_MAX_SIGNATURE_LEN SSI_MAX_SIGNATURE_LEN
+#endif
+
+'------------------------------------------------------------------------------
+declare function si2c_register(byref signature as string,sda as pl_io_num, scl as pl_io_num,use_ssi as no_yes) as byte
+
+declare function si2c_who_uses(num as byte) as string
+declare sub si2c_release(num as byte)
+
+declare sub si2c_get(num as byte)
+declare sub si2c_start()
+declare sub si2c_stop()
+declare sub si2c_write(data as byte)
+declare function si2c_read(acknak_request as boolean) as byte
+declare function si2c_is_busy(num as byte)as no_yes

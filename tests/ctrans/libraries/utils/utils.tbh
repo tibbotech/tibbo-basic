@@ -1,0 +1,5 @@
+declare function math_pow(base as integer, exp as integer) as real
+declare function math_hex_to_float(num as string) as real
+declare sub base64_encode(byref input_str as string, input_len as byte, byref result as string)
+declare sub base64_decode(byref input as string, byref result as string)
+declare function ftofixed(r as real, decimals as byte) as string

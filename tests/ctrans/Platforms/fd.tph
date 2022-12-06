@@ -1,0 +1,912 @@
+'**************************************************************************************************
+'       FD (flash disk) object
+'**************************************************************************************************
+
+#if OBJECT_FD=FD_ENABLED
+
+#define FD_AVAILABLE 1
+
+object fd
+'This is the flash disk (fd.) object, it allows you to save data in the flash memory of your device.
+'<br><br>
+'The fd. object can be used to work with the flash memory in two different ways. You can
+'(1) read and write individual sectors of the flash memory directly, or
+'(2) create a formatted disk that stores files.
+
+'--------------------------------------------------------------------
+enum pl_fd_status_codes 
+    PL_FD_STATUS_OK,                            '<b>PLATFORM CONSTANT. </b><br><br>Completed successfully.
+    PL_FD_STATUS_FAIL,                          '<b>PLATFORM CONSTANT. </b><br><br>Physical flash memory failure (fatal: disk dismounted, must be reformatted).
+    PL_FD_STATUS_CHECKSUM_ERR,                  '<b>PLATFORM CONSTANT. </b><br><br>Checksum error has been detected in one of the disk sectors (fatal: disk dismounted, must be reformatted).
+    PL_FD_STATUS_FORMAT_ERR,                    '<b>PLATFORM CONSTANT. </b><br><br>Disk formatting error has been detected (fatal: disk dismounted, must be reformatted).
+    PL_FD_STATUS_INV_PARAM,                     '<b>PLATFORM CONSTANT. </b><br><br>Invalid argument have been provided for the invoked method.
+    PL_FD_STATUS_DUPLICATE_NAME,                '<b>PLATFORM CONSTANT. </b><br><br>File with this name already exists.
+    PL_FD_STATUS_FILE_TABLE_FULL,               '<b>PLATFORM CONSTANT. </b><br><br>Maximum number of files that can be stored on the disk has been reached, new file cannot be created.
+    PL_FD_STATUS_DATA_FULL,                     '<b>PLATFORM CONSTANT. </b><br><br>The disk is full, new data cannot be added.
+    PL_FD_STATUS_NOT_READY,                     '<b>PLATFORM CONSTANT. </b><br><br>The disk is not mounted.
+    PL_FD_STATUS_NOT_FOUND,                     '<b>PLATFORM CONSTANT. </b><br><br>File not found.
+    PL_FD_STATUS_NOT_OPENED,                    '<b>PLATFORM CONSTANT. </b><br><br>No file is currently opened "on" the current fd.filenum.
+    PL_FD_STATUS_ALREADY_OPENED,                '<b>PLATFORM CONSTANT. </b><br><br>This file is already opened "on" some other file number.
+    PL_FD_STATUS_TRANSACTION_ALREADY_STARTED,   '<b>PLATFORM CONSTANT. </b><br><br>Disk transaction has already been started (and cannot be restarted).
+    PL_FD_STATUS_TRANSACTION_NOT_YET_STARTED,   '<b>PLATFORM CONSTANT. </b><br><br>Disk transaction hasn't been started yet.
+    PL_FD_STATUS_TRANSACTION_CAPACITY_EXCEEDED, '<b>PLATFORM CONSTANT. </b><br><br>Too many disk sectors have been modified in the cause of the current transaction (fatal: disk dismounted).
+    PL_FD_STATUS_TRANSACTIONS_NOT_SUPPORTED,    '<b>PLATFORM CONSTANT. </b><br><br>The disk wasn't formatted to support transactions (use fd.formatj with maxjournalsectors>1 to enable transactions).
+    PL_FD_STATUS_FLASH_NOT_DETECTED             '<b>PLATFORM CONSTANT. </b><br><br>Flash IC wasn't detected during boot, fd. object cannot operate normally.
+end enum
+
+'--------------------------------------------------------------------
+property fd.availableflashspace
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'Returns the total number of sectors available to store application's data.
+'<br><br>
+'The value depends on the flash capacity and the flash memory arrangement of your device.
+'<br><br>
+'On devices with shared flash memory, this is the amount of memory that is not occupied by the currently loaded firmware/application.
+'On devices with dedicated flash memory, this is the size of the second flash IC that stores fd. object's data.
+    get = syscall(372,"63.TDL"+) as word
+end property
+
+'--------------------------------------------------------------------
+property fd.buffernum
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (RAM buffer #0 selected).</b><br><br>
+'Sets/returns the number of the RAM buffer that will be used for direct sector access.
+'Possible values are 0 or 1.
+'<br><br>
+'All file-based operations of the flash disk also load data into the RAM buffers.
+'Switch to the RAM buffer #0 <i>each time </i>before performing direct sector access with this or other related methods --
+'this will guarantee that you won't corrupt the files and/or the file system and cause disk dismounting (fd.ready becoming 0- NO).
+'<br><br>
+'<b>See also: </b>
+'fd.getbuffer,
+'fd.setbuffer,
+'fd.getsector,
+'fd.setsector,
+'fd.checksum,
+'fd.copyfirmware,
+'fd.copyfirmwarelzo
+    get = syscall(402,"63.TDL"+) as byte
+    set = syscall(403,"63.TDL"+) (buffernum as byte)
+end property
+
+'--------------------------------------------------------------------
+property fd.capacity
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'Returns the capacity, in sectors, of the currently existing flash disk.
+'<br><br>
+'The disk must be mounted (see fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
+    get = syscall(374,"63.TDL"+) as word
+end property
+
+'--------------------------------------------------------------------
+enum pl_fd_csum_mode 
+    PL_FD_CSUM_MODE_VERIFY,   'PLATFORM CONSTANT. Verify the checksum.
+    PL_FD_CSUM_MODE_CALCULATE 'PLATFORM CONSTANT. Calculate the checksum.
+end enum
+
+syscall(408,FD_DRIVER_TDL) fd.checksum(mode as pl_fd_csum_mode, byref csum as word) as ok_ng
+'<b>METHOD. </b><br><br>
+'Calculates and writes into the RAM buffer, or verifies the checksum for the data in the currently selected RAM buffer of the flash memory
+'(selection is made through the fd.buffernum property).
+'<br><br>
+'<b>Mode </b>--
+'<br>
+'0- PL_FD_CSUM_MODE_VERIFY: verify the checksum.
+'<br>
+'1- PL_FD_CSUM_MODE_CALCULATE: calculate the checksum.
+'<br><br>
+'<b>Csum </b>-- After the checksum calculation, indirectly returns calculated value.
+'<br><br>
+'<b>Returns </b>--
+'<br>
+'0- OK: Completed successfully.
+'<br>
+'1- NG : The checksum was found to be invalid.
+'<br>
+'Also returns the calculation result indirectly, through the csum argument.
+'<br><br>
+'The checksum is calculated on bytes 0-263 of the selected RAM buffer and is stored at bytes 264 and 265 of the buffer.
+'<br><br>
+'<b>See also: </b>
+'fd.buffernum,
+'fd.getbuffer,
+'fd.setbuffer,
+'fd.getsector,
+'fd.setsector,
+'fd.copyfirmware,
+'fd.copyfirmwarelzo
+
+'--------------------------------------------------------------------
+syscall(416,"66.TDL") fd.close() as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Closes the file opened "on" a currently selected file number (selection is made through fd.filenum).
+'<br><br>
+'Invoking the method also does the job performed by the fd.flush method.
+'<br><br>
+'Attempting to invoke this method "on" the file number that did not have any opened file associated with it generates no error. 
+
+'--------------------------------------------------------------------
+#if COPY_FIRMWARE=1
+syscall(0,FD_COPYFIRMWARE) fd.copyfirmware(numsectors as word)
+'<b>METHOD.</b><br><br>
+'Copies the specified number of sectors (starting from the logical sector 0) from the data area into the TiOS/application area of the flash memory, then reboots the device to make it run new TiOS/application.
+'<br><br>
+'The data must start with TiOS firmware, optionally followed by the compiled Tibbo BASIC/C application binary.
+'The numsectors argument must be specified to cover at least the size of the TiOS firmware. Specifying fewer sectors than that will abort the execution of this method.
+'<br><br>
+'<b>BE VERY CAREFUL! </b>Using the fd.copyfirmware on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.</b>
+'<br><br>
+'<b>See also: </b>
+'fd.copyfirmwarelzo,
+'fd.copyfirmwarefromfile
+'fd.copyfirmwarefromfilelzo
+#endif
+
+'--------------------------------------------------------------------
+#if COPY_FIRMWARE=1
+syscall(68,"76.TDL") fd.copyfirmwarefromfile() as pl_fd_status_codes
+'<b>METHOD.</b><br><br>
+'Copies the data from an opened and currently selected file of the flash disk (selection is made through fd.filenum) into the TiOS/application area of the flash memory,
+'then reboots the device to make it run new TiOS/application.
+'<br><br>
+'The file is expected to start with TiOS firmware, optionally followed by a compiled Tibbo BASIC/C application binary.
+'If the file is smaller than the size of TiOS firmware for this platform, the execution will be aborted.
+'<br><br>
+'<b>BE VERY CAREFUL! </b>Using the fd.copyfirmwarefromfile on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
+'<br><br>
+'<b>See also: </b>
+'fd.copyfirmware
+'fd.copyfirmwarelzo,
+'fd.copyfirmwarefromfilelzo
+#endif
+
+'--------------------------------------------------------------------
+#if COPY_FIRMWARE=1
+#if EXTENDED_FD=1 'ARM
+#if PLATFORM_ID=KLM601_32 or PLATFORM_ID=KLM106_32  'Keytroller
+	syscall(20) fd.copyfirmwarelzo(app_present as no_yes, source_sector as word) as byte
+#else 'EM2000, TPP2(G2), TPP3(G2), other ARM platforms
+	syscall(20) fd.copyfirmwarelzo(app_present as no_yes)
+	'<b>METHOD.</b><br><br>
+	'Assumes that there is a block of data containing the TiOS firmware, optionally followed by an LZO-compressed application binary stored beginning from the logical sector 0 of the flash memory.
+	'Copies TiOS firmware into the TiOS area of the flash. If the app_present argument is not zero, decompresses the application binary and copies it into the application area of the flash.
+	'After that, reboots the device to make it run new TiOS firmware (and application).
+	'<br><br>
+	'The application portion (compiled Tibbo BASIC/C application binary) is optional.
+	'<br><br>
+	'<b>BE VERY CAREFUL! </b>Using fd.copyfirmwarelzo on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
+	'<br><br>
+	'<b>See also: </b>
+	'fd.copyfirmware
+	'fd.copyfirmwarefromfile
+#endif	
+#else 'T1000
+#if PLATFORM_ID=KLM601 'Keytroller
+	syscall(20,"89b.TDL") fd.copyfirmwarelzo(source_sector as word, byref length as dword, dest_sector as word, byref output_len as dword, displ_x as word, displ_y as word, display_w as word, display_h as byte, reported_cs as word) as byte
+#else 'other T1000 platforms
+	syscall(20,"89.TDL") fd.copyfirmwarelzo(byref length as dword)
+	'<b>METHOD.</b><br><br>
+	'Assumes that there is LZO-compressed firmware/application file of <b>length </b>bytes stored at logical sector 0 of the flash memory. Decompresses the file into the firmware/application area
+	'(starting from physical sector 0), then reboots the device to make it run the new firmware/application. 
+	'<br><br>
+	'<b>This method is not supported on the EM500 platform.</b>
+	'<br><br>
+	'<b>BE VERY CAREFUL! </b>Using the fd.copyfirmwarelzo on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
+	'<br><br>
+	'<b>See also: </b>
+	'fd.buffernum,
+	'fd.getbuffer,
+	'fd.setbuffer,
+	'fd.getsector,
+	'fd.setsector,
+	'fd.checksum,
+	'fd.copyfirmware
+#endif
+#endif
+#endif
+
+'--------------------------------------------------------------------
+#if COPY_FIRMWARE=1 and EXTENDED_FD=1
+syscall(723) fd.copyfirmwarefromfilelzo() as pl_fd_status_codes
+'<b>METHOD.</b><br><br>
+'Copies the data from an opened and currently selected file of the flash disk (selection is made through fd.filenum) into the TiOS/application area of the flash memory.
+'The optional application binary portion of the file is expected to be LZO-compressed. After that, reboots the device to make it run new TiOS/application.
+'<br><br>
+'The file is expected to start with TiOS firmware, optionally followed by an LZO-compressed compiled Tibbo BASIC/C application binary.
+'If the file is smaller than the size of TiOS firmware for this platform, the execution will be aborted.
+'<br><br>
+'<b>BE VERY CAREFUL! </b>Using fd.copyfirmwarefromfilelzo on incorrect data will "incapacitate" your device and further remote upgrades will become impossible.
+'<br><br>
+'fd.copyfirmware
+'fd.copyfirmwarelzo,
+'fd.copyfirmwarefromfile
+#endif
+
+'--------------------------------------------------------------------
+syscall(384,"78.TDL") fd.cutfromtop(numsectors as dword) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Removed  a specified number of sectors from the beginning of a file opened "on" a currently selected file number (selection is made through fd.filenum). 
+'<br><br>
+'<b>Numsectors </b>-- Number of sectors to remove from the beginning of the file. Supplied value will be corrected downwards if exceeded the total number of sectors allocated to this file.
+'<br><br>
+'As a result of this method invocation, the pointer will be set to 0 if the file becomes empty, or 1 if the file still has some data in it.
+'<br><br>
+'<b>See also: </b> 
+'fd.setfilesize 
+
+'--------------------------------------------------------------------
+syscall(396,"66.TDL") fd.create(byref name_attr as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Creates a new file with the specified name and attributes.
+'<br><br>
+'<b>Name_attr </b>-- A string (1-56 characters),  must contain a file name and, optionally, attributes separated from the file name by a space. File names are case-sensitive.
+'<br><br>
+'Any character except space can be used in file names. This includes "/" and "\". This allows "subdirectory emulation".
+'<br><br>
+'When the file is created, one data sector is allocated to this file immediately.
+'<br><br>
+'<b>See also: </b> 
+'fd.rename, fd.delete, fd.getnumfiles, fd.maxstoredfiles
+
+'--------------------------------------------------------------------
+syscall(397,"66.TDL") fd.delete(byref name as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Deletes a file with the specified file name from the flash disk.
+'<br><br>
+'<b>Name </b>-- A string (1-56 characters) with the file name. All characters after the first space encountered (excluding leading spaces) will be ignored. File names are case-sensitive.
+'<br><br>
+'<b>See also: </b> 
+'fd.create, fd.rename, fd.getnumfiles, fd.maxstoredfiles
+
+'--------------------------------------------------------------------
+property fd.filenum
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (file #0 selected).</b><br><br>
+'Sets/returns the number of the currently selected file.
+'<br><br>
+'Several files can be opened (see fd.open) at the same time. Each file is said to be opened "on" a certain file number (the value of this property at the time of the file opening).
+'<br><br>
+'Although the file is opened by referring to its name, many other operations, such as fd.setdata or fd.close refer to the file number.
+    get = syscall(377,"63.TDL"+) as byte
+    set = syscall(378,"63.TDL"+) (num as byte)
+end property
+
+'--------------------------------------------------------------------
+property fd.fileopened
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no file is currently opened on this file number).</b><br><br>
+'Reports if any file is currently opened "on" the selected file number (selection is made through fd.filenum.
+'<br><br>
+'Use fd.open to open files.
+'<br><br>
+'<b>See also: </b>
+'fd.maxopenedfiles 
+    get = syscall(415,"63.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+property fd.filesize
+'<b>R/O PROPERTY (DWORD).</b><br><br>
+'Returns the size, in bytes, of the file opened "on" the currently selected file number (selection is made through fd.filenum). Returns zero if no file is currently opened.
+'<br><br>
+'<b>See also: </b>
+'fd.getdata, fd.setdata, fd.pointer, fd.setpointer
+    get = syscall(380,"63.TDL"+) as dword
+end property
+
+'--------------------------------------------------------------------
+enum pl_fd_find_modes 
+    PL_FD_FIND_EQUAL,         'PLATFORM CONSTANT. Find data that is equal to the substr.
+    PL_FD_FIND_NOT_EQUAL,     'PLATFORM CONSTANT. Find data that is not equal to the substr.
+    PL_FD_FIND_GREATER,       'PLATFORM CONSTANT. Find data with value greater than the value of the substr.
+    PL_FD_FIND_GREATER_EQUAL, 'PLATFORM CONSTANT. Find data with value greater than or equal to the value of the substr.
+    PL_FD_FIND_LESSER,        'PLATFORM CONSTANT. Find data with value less than the value of the substr.
+    PL_FD_FIND_LESSER_EQUAL   'PLATFORM CONSTANT. Find data with value less than or equal to the value of the substr.
+end enum
+
+syscall(385,"77.TDL") fd.find(frompos as dword,byref substr as string,instance as word,dir as forward_back,incr as word,mode as pl_fd_find_modes) as dword
+'<b>METHOD. </b><br><br>
+'Finds the Nth instance of data satisfying selected criteria in a file opened "on" a currently selected file number (selection is made through fd.filenum).
+'<br><br>
+'Returns a position (counting from one) at which the target data instance was discovered, or 0 if the target instance was not found.
+'<br><br>
+'<b>Frompos </b>-- Starting position in a file from which the search will be conducted. File positions are counted from 1. Will be corrected automatically if out of range.
+'<br><br>
+'<b>Substr </b>-- The string to search for.
+'<br><br>
+'<b>Instance </b>-- Instance (occurrence) number to find.
+'<br><br>
+'<b>Dir </b>-- Search direction (forward or back)
+'<br><br>
+'<b>Incr </b>-- Search position increment (or decrement for BACK searches).
+'<br><br>
+'<b>Mode </b>-- Search mode (equal, not equal, etc.).
+
+'--------------------------------------------------------------------
+syscall(388,"66.TDL") fd.flush() as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Saves back to the flash memory ("flushes") the changes made to the most recently edited file.
+'<br><br>
+'When any data sector of the flash disk is being altered, this is done through a RAM buffer. To improve efficiency and reduce sector wear, the data from the RAM buffer is written back to the flash
+'memory only when it becomes necessary to load the RAM buffer with the contents of another sector.
+'<br><br>
+'When the file is closed (see fd.close), RAM buffer "flushing" is done automatically.
+'However, if changes are made to any file and then no disk activity is performed, the buffer may keep the data in the RAM buffer indefinitely.
+'These changes will be lost if your device reboots. To prevent this, use fd.flush. 
+
+'--------------------------------------------------------------------
+syscall(373,"65.TDL") fd.format(totalsize as word, maxstoredfiles as byte) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Formats the flash memory to create a flash disk; no transaction journal sectors will be allocated.
+'Use fd.formatj (recommended) to create the disk that will support transaction.
+'<br><br>
+'<b>Totalsize </b>-- Desired number of sectors occupied by the disk in flash memory. Cannot exceed available space (fd.availableflashspace).
+'<br><br>
+'<b>Maxstoredfiles </b>-- Desired maximum number of files that the disk will allow to create. Cannot exceed 64.
+'<br><br>
+'After formatting the disk will be in the dismounted state and will need to be mounted (see fd.mount) before any disk-related activity can be successfully performed.
+'<b>See also: </b>
+'fd.formatj,
+'fd.mount,
+'fd.ready
+
+'--------------------------------------------------------------------
+syscall(315,"65.TDL") fd.formatj(totalsize as word, maxstoredfiles as byte, maxjournalsectors as byte) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Formats the flash memory to create a flash disk.
+'<br><br>
+'<b>Totalsize </b>-- Desired number of sectors occupied by the disk in flash memory. Cannot exceed available space (fd.availableflashspace).
+'<br><br>
+'<b>Maxstoredfiles </b>-- Desired maximum number of files that the disk will allow to create. Cannot exceed 64.
+'<br><br>
+'<b>Maxjournalsectors </b>-- Number of sectors to allocate for the transaction journal (suggested size: 50-100, definitely not less than 17). Setting to 0 or 1 disables disk transactions completely.
+'<br><br>
+'After formatting the disk will be in the dismounted state and will need to be mounted (see fd.mount) before any disk-related activity can be successfully performed.
+'<br><br>
+'<b>See also: </b>
+'fd.mount,
+'fd.ready
+
+'--------------------------------------------------------------------
+syscall(394,"66.TDL") fd.getattributes(byref name as string) as string
+'<b>METHOD. </b><br><br>
+'Returns the attributes string for a file with the specified file name. Affects the state of fd.laststatus.
+'<br><br>
+'<b>Name </b>-- A string (1-56 characters) with the file name. All characters after the first space encountered (excluding leading spaces) will be ignored. File names are case-sensitive.
+'<br><br>
+'File attributes can be set with fd.create or fd.setattributes methods.
+
+'--------------------------------------------------------------------
+syscall(406,"65.TDL") fd.getbuffer(offset as word, len as word) as string
+'<b>METHOD. </b><br><br>
+'Reads the specified number of bytes from the currently selected RAM buffer of the flash memory
+'(selection is made through the fd.buffernum property). 
+'<br><br>
+'<b>Offset </b>-- Starting offset in the buffer. Possible value range is 0-263 (the buffer stores 264 bytes of data, offset is counted from 0).
+'<br><br>
+'<b>Len </b>-- Number of bytes to read. The length of returned data will depend on one of three factors, whichever is smaller:
+'len argument, amount of data still available in the buffer counting from the offset position, and the capacity of receiving string variable.
+'<br><br>
+'<b>Returns </b>-- The string with the data from the buffer.
+'<br><br>
+'<b>See also: </b>
+'fd.buffernum,
+'fd.setbuffer,
+'fd.getsector,
+'fd.setsector,
+'fd.checksum,
+'fd.copyfirmware
+
+'--------------------------------------------------------------------
+syscall(386,"67.TDL") fd.getdata(maxinplen as byte) as string
+'<b>METHOD. </b><br><br>
+'Reads a specified number of bytes from the file opened "on" a currently selected file number (selection is made through fd.filenum). The data is read starting at the fd.pointer position.
+'<br><br>
+'<b>Maxinplen </b>-- Maximum number of bytes to read from the file. The length of returned data will depend on one of three factors, whichever is smaller:
+'maxinplen argument, amount of data still available in the file counting from the current pointer position, and the capacity of receiving string variable.
+'<br><br>
+'As a result of this method invocation, the pointer will be advanced forward by the number of bytes actually read from the file.
+'<br><br>
+'<b>See also: </b> 
+'fd.setdata, fd.setpointer, fd.filesize
+
+'--------------------------------------------------------------------
+syscall(375,"66.TDL") fd.getfreespace() as word
+'<b>METHOD. </b><br><br>
+'Returns the total number of free data sectors available on the flash disk. Affects the state of the fd.laststatus.
+'<br><br>
+'The disk must be mounted (see fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.capacity, fd.numservicesectors, fd.totalsize, fd.maxstoredfiles, fd.getnumfiles
+
+'--------------------------------------------------------------------
+syscall(393,"66.TDL") fd.getnextdirmember() as string
+'<b>METHOD. </b><br><br>
+'Returns the next filename (if any) found in the disk directory. An empty string will be returned if no more files are found.
+'Affects the state of fd.laststatus.
+'<br><br>
+'Each time you invoke this method, internal directory "pointer" is incremented by one.
+'<br><br>
+'To obtain the list of disk files, use fd.resetdirpointer first, then invoke fd.getnextdirmember for the fd.getnumfiles number of times, or until the empty string is returned.
+
+'--------------------------------------------------------------------
+syscall(390,"66.TDL") fd.getnumfiles() as byte
+'<b>METHOD. </b><br><br>
+'Returns the total number of files currently stored on the disk. Affects the state of the fd.laststatus.
+'<br><br>
+'The disk must be mounted (see fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.capacity, fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.maxstoredfiles
+
+'--------------------------------------------------------------------
+syscall(404,"65.TDL") fd.getsector(num as word) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Reads the entire 264 bytes from the specified sector into the currently selected RAM buffer of the flash memory (selection is made through the fd.buffernum property).
+'<br><br>
+'<b>Num </b>-- Logical number of the sector to read from (logical numbers are in reverse: reading from the logical sector 0 actually means reading from the last physical sector of the flash IC).
+'<br><br>
+'All file-based operations of the flash disk also load data into the RAM buffers.
+'Switch to the RAM buffer #0 <i>each time </i>before performing direct sector access with this or other related methods --
+'this will guarantee that you won't corrupt the files and/or the file system and cause disk dismounting (fd.ready becoming 0- NO).
+'<br><br>
+'This method always accesses the actual specified target sector and not its cached copy even if the disk transaction is in progress
+'(fd.transactionstarted= 1- YES) and the target sector has been cached already.
+'<br><br>
+'<b>See also: </b>
+'fd.buffernum,
+'fd.getbuffer,
+'fd.setbuffer,
+'fd.setsector,
+'fd.checksum,
+'fd.copyfirmware
+
+'--------------------------------------------------------------------
+property fd.laststatus
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_FD_STATUS_OK (completed successfully).</b><br><br>
+'Returns the execution result for the most recent disk-related method execution. See pl_fd_status_codes enum for the list of all possible status codes.
+'<br><br>
+'Some methods, such as fd.create, return execution status directly. For those, the fd.laststatus will contain the same status as the one directly returned.
+'<br><br>
+'Other methods return some other data. For example, fd.getdata returns the data requested (or an empty string if something went wrong).
+'The execution result for such methods can only be verified through this R/O property.
+'<br><br>
+'Note that some errors are fatal and the disk is dismounted (fd.ready is set to 0- NO) immediately upon the detection of any such fatal error.
+'<br><br>
+    get = syscall(414) as pl_fd_status_codes
+end property
+
+'--------------------------------------------------------------------
+property fd.maxopenedfiles
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the total number of files that can be simultaneously opened by your application.
+'<br><br>
+'The value of this property depends on the hardware (selected platform) and has nothing to do with the formatting of your flash disk.
+    get = syscall(376,"63.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+property fd.maxstoredfiles
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the total number of files that can be simultaneously stored on the currently existing flash disk.
+'<br><br>
+'This number cannot be changed unless the disk is reformatted (see fd.formatj).
+'<br><br>
+'The disk must be mounted (see  fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.capacity, fd.numservicesectors, fd.totalsize, fd.getfreespace, fd.getnumfiles
+    get = syscall(389,"63.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+syscall(412,"65.TDL") fd.mount() as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Mounts (prepares for use) the flash disk already existing in the flash memory. 
+'<br><br>
+'The flash disk will not be accessible unless it is mounted using this method.
+'The disk can only be mounted after the flash memory has been successfully formatted using the fd.formatj method.
+'The disk has to be mounted after every reboot of your device.
+'After the disk is mounted successfully, the fd.ready R/O property will read 1- YES. 
+'<br><br>
+'There is no way to explicitly dismount the disk, nor it is necessary.
+'The disk will be dismounted automatically if any fatal condition is detected.
+'<br><br>
+'This method also finishes the "transaction commit job" if it was started with the fd.transactioncommit method and wasn't completed properly due to the power failure or some other reason.
+
+'--------------------------------------------------------------------
+property fd.numservicesectors
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the total number of sectors occupied by the "housekeeping" data of the currently existing flash disk.
+'<br><br>
+'The disk must be mounted (see fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.capacity, fd.totalsize, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
+    get = syscall(410,"63.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+syscall(379,"66.TDL") fd.open(byref name as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Opens a file with a specified name "on" a currently selected file number (selection is made through fd.filenum).
+'<br><br>
+'<b>Name </b>-- A string (1-56 characters) with the file name. All characters after the first space encountered (excluding leading spaces) will be ignored. File names are case-sensitive.
+'<br><br>
+'You may reopen the same or another file "on" the same file number, but this can lead to the loss of (some) changes made to the previously opened file.
+'<br><br>
+'Always close (fd.close) the previously opened file first, or use fd.flush to save the most recent changes back to the disk.
+'<br><br>
+'You cannot open the same file "on" more than one file number.
+'<br><br>
+'<b>See also: </b>
+'fd.fileopened, fd.maxopenedfiles
+
+'--------------------------------------------------------------------
+property fd.pointer
+'<b>R/O PROPERTY (DWORD).</b><br><br>
+'Returns the pointer position for the file opened "on" the currently selected file number (selection is made through fd.filenum). Returns zero if no file is currently opened or the file is empty.
+'<br><br>
+'For the files of 0 size (see fd.filesize), the pointer will always be at 0. If the file has a non-zero size, the pointer will be between 1 and fd.filesize+1.
+'The first byte of the file is at position 1, the last one -- at position equal to fd.filesize. Fd.filesize+1 is the position at which new data can be appended to the file
+'(except for empty files where the pointer will be at 0 until you add some data).
+'<br><br>
+'Move the pointer with fd.setpointer. Fd.getdata and fd.setdata also move the pointer by the amount of bytes read or written.
+'Reducing the file size with fd.setfilesize or fd.cutfromtop may affect the pointer position.
+    get = syscall(381,"63.TDL"+) as dword
+end property
+
+'--------------------------------------------------------------------
+property fd.ready
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (the disk is not mounted and is not ready for use).</b><br><br>
+'Informs whether the flash disk is mounted and ready for use.
+'<br><br>
+'Use the fd.mount method to mount the disk.
+'<br><br>
+'<b>See also: </b> 
+'fd.formatj
+    get = syscall(411,"63.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+syscall(370,"66.TDL") fd.rename(byref old_name as string, byref new_name as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Renames a file specified by its name. 
+'<br><br>
+'<b>Old_name </b>-- A string (1-56 characters) with the name of the file to be renamed. All characters after the first space encountered (excluding leading spaces) will be ignored.
+'File names are case-sensitive.
+'<br><br>
+'<b>New_name </b>-- A string (1-56 characters) with the new name for the file. All characters after the first space encountered (excluding leading spaces) will be ignored.
+'<br><br>
+'Renaming the file preserves file attributes (see fd.getattributes, fd.setattributes).
+'<br><br>
+'<b>See also: </b>
+'fd.create, fd.delete, fd.getnumfiles, fd.maxstoredfiles
+
+'--------------------------------------------------------------------
+syscall(392,"63.TDL") fd.resetdirpointer()
+'<b>METHOD. </b><br><br>
+'Resets the directory pointer to zero.
+'<br><br>
+'Use this method before repeatedly invoking fd.getnextdirmember to obtain the list of files currently stored on the disk.
+'<br><br>
+'<b>See also: </b>
+'fd.getnumfiles
+
+'--------------------------------------------------------------------
+property fd.sector
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'Returns the physical sector number corresponding to the current position of the file pointer position (see fd.pointer).
+'<br><br>
+'Because the sectors belonging to a given file may be scattered around the flash disk, there is no simple way to figure out the number of the physical sector
+'corresponding to the current file pointer position (see fd.pointer).
+'<br><br>
+'This property exists purely for informational purposes. There is no real need for you to know where the fd. object stores your data.
+    get = syscall(383,"63.TDL"+) as dword
+end property
+
+'--------------------------------------------------------------------
+syscall(395,"66.TDL") fd.setattributes(byref name as string, byref attr as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets the attributes string for a file with the specified file name.
+'<br><br>
+'<b>Name </b>-- A string (1-56 characters) with the file name. All characters after the first space encountered (excluding leading spaces) will be ignored. File names are case-sensitive.
+'<br><br>
+'<b>Attr </b>-- A string with attributes to be set. Attributes length cannot exceed 56-length_of_the_file_name-1.
+'This "-1" accounts for the space character that separates the file name from the attributes.
+'<br><br>
+'<b>See also: </b>
+'fd.getattributes, fd.create
+
+'--------------------------------------------------------------------
+syscall(407,"65.TDL") fd.setbuffer(byref data as string, offset as word) as word
+'<b>METHOD. </b><br><br>
+'Writes a specified number of bytes into the currently selected RAM buffer of the flash memory (selection is made through the fd.buffernum property). 
+'<br><br>
+'<b>Data </b>-- A string with the data to be written to the buffer.
+'<br><br>
+'<b>Offset </b>-- Starting offset in the buffer. Possible value range is 0-263 (the buffer stores 264 bytes of data, offset is counted from 0).
+'<br><br>
+'<b>Returns </b>-- Actual number of bytes written.
+'<br><br>
+'The length of data actually written into the buffer may be limited if all supplied data can't fit between the offset position in the buffer and the end of the buffer.
+'<br><br>
+'All file-based operations of the flash disk also load data into the RAM buffers.
+'Switch to the RAM buffer #0 <i>each time </i>before performing direct sector access with this or other related methods --
+'this will guarantee that you won't corrupt the files and/or the file system and cause disk dismounting (fd.ready becoming 0- NO).
+'<br><br>
+'<b>See also: </b>
+'fd.buffernum,
+'fd.getbuffer,
+'fd.getsector,
+'fd.setsector,
+'fd.checksum,
+'fd.copyfirmware
+
+'--------------------------------------------------------------------
+syscall(387,"67.TDL") fd.setdata(byref data as string) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Writes the data string to a file opened "on" a currently selected file number (selection is made through fd.filenum). The data is written starting at the fd.pointer position.
+'<br><br>
+'<b>Data </b>-- A string containing the data to be written to the file. If the disk becomes full, then no data will be written (and not just the portion that could not fit).
+'<br><br>
+'As a result of this method invocation, the pointer will be advanced forward by the number of bytes written to the file.
+'<br><br>
+'If the pointer wasn't at the end of the file (fd.filesize+1 position) then some of the existing file data will be partially overwritten.
+'If the pointer moves past the current file size then the file size will be increased automatically.
+'<br><br>
+'<b>See also: </b> 
+'fd.getdata, fd.setpointer
+
+'--------------------------------------------------------------------
+syscall(413,"78.TDL") fd.setfilesize(newsize as dword) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets (reduces) the file size of a file opened "on" a currently selected file number (selection is made through fd.filenum.
+'<br><br>
+'<b>Newsize </b>-- Desired new file size in bytes. Supplied value will be corrected downwards if exceeded previous file size.
+'<br><br>
+'As a result of this method invocation, the pointer position may be corrected downwards. If the file becomes empty, the pointer will be set to zero.
+'If the file still has some data in it, and the pointer exceeds new fd.filesize+1, then pointer will be set to fd.filesize+1. 
+'<br><br>
+'<b>See also: </b> 
+'fd.cutfromtop
+
+'--------------------------------------------------------------------
+syscall(382,"67.TDL") fd.setpointer(pos as dword) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets the new pointer position for a file opened "on" a currently selected file number (selection is made through fd.filenum). 
+'<br><br>
+'For the files of 0 size (see fd.filesize), the pointer will always be at 0. If the file has a non-zero size, the pointer will be between 1 and fd.filesize+1.
+'The first byte of the file is at position 1, the last one -- at position equal to fd.filesize. Fd.filesize+1 is the position at which new data can be appended to the file
+'(except for empty files where the pointer will be at 0 until you add some data).
+'<br><br>
+'Fd.getdata and fd.setdata also move the pointer by the amount of bytes read or written.
+'Reducing the file size with fd.setfilesize or fd.cutfromtop may affect the pointer position.
+'<br><br>
+'<b>See also: </b>
+'fd.pointer
+
+'--------------------------------------------------------------------
+syscall(405,"65.TDL") fd.setsector(num as word) as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Writes the entire 264 bytes of the specified sector with the data from the currently selected RAM buffer of the flash memory
+'(selection is made through the fd.buffernum property). 
+'<br><br>
+'<b>Num </b>-- Logical number of the sector to write to (logical numbers are in reverse:
+'writing to the logical sector 0 actually means writing to the last physical sector of the flash IC).
+'Acceptable range is 0 - fd.availableflashspace-1. 
+'<br><br>
+'The data area of the flash memory may house a formatted flash disk.
+'Writing to the sector that belongs to the flash disk when the disk is mounted will automatically dismount the disk (set fd.ready= 0- NO)
+'and may render the disk unusable.
+'<br><br>
+'This method always accesses the specified target sector and not its cached copy even if the disk transaction is in progress
+'(fd.transactionstarted= 1- YES) and the target sector has been cached already.
+'<br><br>
+'<b>See also: </b>
+'fd.buffernum,
+'fd.getbuffer,
+'fd.setbuffer,
+'fd.getsector,
+'fd.checksum,
+'fd.copyfirmware
+
+'--------------------------------------------------------------------
+property fd.totalsize
+'<b>R/O PROPERTY (WORD).</b><br><br>
+'Returns the total number of sectors occupied by the currently existing flash disk.
+'<br><br>
+'Actual usable capacity (fd.capacity) of the disk is less because the disk also needs a number of sectors for its "housekeeping" data (see fd.numservicesectors).
+'<br><br>
+'The disk must be mounted (see fd.mount) for this property to return a meaningful value.
+'<br><br>
+'<b>See also: </b>
+'fd.capacity, fd.numservicesectors, fd.getfreespace, fd.maxstoredfiles, fd.getnumfiles
+    get = syscall(421,"63.TDL"+) as word
+end property
+
+'--------------------------------------------------------------------
+property !fd.leveling
+    get = syscall(391,"63.TDL"+) as no_yes
+    set = syscall(424,"63.TDL"+) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+enum fd_error_data_codes 
+    FD_ERROR_NO_ADDITIONAL_ERROR_DATA,
+    FD_ERROR_MOUNT_BOOT_READ_ERROR,
+    FD_ERROR_MOUNT_BOOT_CS_ERROR,
+    FD_ERROR_MOUNT_BOOT_MARKER_INVALID,
+    FD_ERROR_MOUNT_BOOT_DATA_INVALID,
+    FD_ERROR_MOUNT_ENDBOOT_READ_ERROR,
+    FD_ERROR_MOUNT_ENDBOOT_CS_ERROR,
+    FD_ERROR_MOUNT_ENDBOOT_DATA_INVALID,
+    FD_ERROR_MOUNT_FRT_READ_ERROR,
+    FD_ERROR_MOUNT_FRT_CS_ERROR,
+    FD_ERROR_MOUNT_FRT_LOGICAL_NUMBER_OOR,
+    FD_ERROR_MOUNT_FRT_LOGICAL_NUMBER_DUPLICATION,
+    FD_ERROR_MOUNT_FRT_WRITE_ERROR_1,
+    FD_ERROR_MOUNT_FRT_WRITE_ERROR_2,
+    FD_ERROR_MOUNT_FRT_INVALID_ACTIVE_SECTOR_COUNT,
+    FD_ERROR_MOUNT_FRT_EMPTY_MAPPING_DETECTED,
+    FD_ERROR_MOUNT_FAT_READ_ERROR,
+    FD_ERROR_MOUNT_FAT_CS_ERROR,
+    FD_ERROR_MOUNT_FAT_LOGICAL_NUMBER_OOR,
+    FD_ERROR_FAT_LOGICAL_NUMBER_DUPLICATION,
+    FD_ERROR_MOUNT_FAT_WRITE_ERROR_1,
+    FD_ERROR_MOUNT_FAT_WRITE_ERROR_2,
+    FD_ERROR_MOUNT_FAT_INVALID_ACTIVE_SECTOR_COUNT,
+    FD_ERROR_MOUNT_FAT_EMPTY_MAPPING_DETECTED,
+    FD_ERROR_FORMAT_BOOT_WRITE_ERROR,
+    FD_ERROR_FORMAT_ENDBOOT_WRITE_ERROR,
+    FD_ERROR_FORMAT_FRT_WRITE_ERROR,
+    FD_ERROR_FORMAT_FAT_WRITE_ERROR,
+    FD_ERROR_RENAME_COMMON_PORTION_ERROR,
+    FD_ERROR_RENAME_FRT_READ_ERROR,
+    FD_ERROR_RENAME_FRT_CS_ERROR,
+    FD_ERROR_RENAME_FRT_WRITE_ERROR,
+    FD_ERROR_OPEN_COMMON_PORTION_ERROR,
+    FD_ERROR_OPEN_FRT_READ_ERROR,
+    FD_ERROR_OPEN_FRT_CS_ERROR,
+    FD_ERROR_OPEN_FRT_WRITE_ERROR,
+    FD_ERROR_FLUSH_DATASECTOR_WRITE_ERROR,
+    FD_ERROR_SETATTRIBUTES_COMMON_PORTION_ERROR,
+    FD_ERROR_SETATTRIBUTES_FRT_READ_ERROR,
+    FD_ERROR_SETATTRIBUTES_FRT_CS_ERROR,
+    FD_ERROR_SETATTRIBUTES_FRT_WRITE_ERROR,
+    FD_ERROR_DELETE_COMMON_PORTION_ERROR,
+    FD_ERROR_DELETE_FRT_READ_ERROR,
+    FD_ERROR_DELETE_FRT_CS_ERROR,
+    FD_ERROR_DELETE_FRT_WRITE_ERROR,
+    FD_ERROR_DELETE_ENTRY_SECTOR_INVALID,
+    FD_ERROR_DELETE_FAT_WRITE_ERROR_1,
+    FD_ERROR_DELETE_FAT_READ_ERROR,
+    FD_ERROR_DELETE_FAT_CS_ERROR,
+    FD_ERROR_DELETE_INVALID_FAT_CHAIN_1,
+    FD_ERROR_DELETE_INVALID_FAT_CHAIN_2,
+    FD_ERROR_DELETE_FAT_WRITE_ERROR_2,
+    FD_ERROR_CREATE_COMMON_PORTION_ERROR,
+    FD_ERROR_CREATE_FAT_READ_ERROR,
+    FD_ERROR_CREATE_FAT_CS_ERROR,
+    FD_ERROR_CREATE_FAT_WRITE_ERROR,
+    FD_ERROR_CREATE_DATASECTOR_WRITE_ERROR,
+    FD_ERROR_CREATE_FRT_READ_ERROR,
+    FD_ERROR_CREATE_FRT_CS_ERROR,
+    FD_ERROR_CREATE_FRT_WRITE_ERROR,
+    FD_ERROR_GETNUMFILES_FRT_READ_ERROR,
+    FD_ERROR_GETNUMFILES_FRT_CS_ERROR,
+    FD_ERROR_GETNEXTDIRMEMBER_FRT_READ_ERROR,
+    FD_ERROR_GETNEXTDIRMEMBER_FRT_CS_ERROR,
+    FD_ERROR_FREESPACE_FAT_READ_ERROR,
+    FD_ERROR_FREESPACE_FAT_CS_ERROR,
+    FD_ERROR_FREESPACE_FAT_INVALID_DATA,
+    FD_ERROR_FINDFREESECTOR_FAT_INVALID_DATA,
+    FD_ERROR_FINDFREESECTOR_FAT_READ_ERROR,
+    FD_ERROR_FINDFREESECTOR_FAT_CS_ERROR,
+    FD_ERROR_GETDATA_DATASECT_READ_ERROR_1,
+    FD_ERROR_GETDATA_DATASECT_CS_ERROR_1,
+    FD_ERROR_GETDATA_DATASECT_READ_ERROR_2,
+    FD_ERROR_GETDATA_DATASECT_CS_ERROR_2,
+    FD_ERROR_GETDATA_DATASECT_READ_ERROR_3,
+    FD_ERROR_GETDATA_DATASECT_CS_ERROR_3,
+    FD_ERROR_SETDATA_DATASECT_READ_ERROR_1,
+    FD_ERROR_SETDATA_DATASECT_CS_ERROR_1,
+    FD_ERROR_SETDATA_DATASECT_READ_ERROR_2,
+    FD_ERROR_SETDATA_DATASECT_CS_ERROR_2,
+    FD_ERROR_SETDATA_DATASECT_READ_ERROR_3,
+    FD_ERROR_SETDATA_DATASECT_CS_ERROR_3,
+    FD_ERROR_SETDATA_DATASECT_READ_ERROR_4,
+    FD_ERROR_SETDATA_DATASECT_CS_ERROR_4,
+    FD_ERROR_GNSOFC_READ_ERROR_1,
+    FD_ERROR_GNSOFC_CS_ERROR_1,
+    FD_ERROR_GNSOFC_CHAIN_ERROR_1,
+    FD_ERROR_GNSOFC_CHAIN_ERROR_2,
+    FD_ERROR_GNSOFC_READ_ERROR_2,
+    FD_ERROR_GNSOFC_CS_ERROR_2,
+    FD_ERROR_GNSOFC_READ_ERROR_3,
+    FD_ERROR_GNSOFC_CS_ERROR_3,
+    FD_ERROR_GNSOFC_READ_ERROR_4,
+    FD_ERROR_GNSOFC_CS_ERROR_4,
+    FD_ERROR_GNSOFC_WRITE_ERROR,
+    FD_ERROR_SAVE_FAT_SECTOR_WRITE_ERROR_1,
+    FD_ERROR_SAVE_FAT_SECTOR_WRITE_ERROR_2,
+    FD_ERROR_SAVE_FRT_SECTOR_WRITE_ERROR_1,
+    FD_ERROR_SAVE_FRT_SECTOR_WRITE_ERROR_2,
+    FD_ERROR_FIND_DATASECTOR_READ_ERROR_1,
+    FD_ERROR_FIND_DATASECTOR_CS_ERROR_1,
+    FD_ERROR_FIND_DATASECTOR_READ_ERROR_2,
+    FD_ERROR_FIND_DATASECTOR_CS_ERROR_2,
+    FD_ERROR_FIND_DATASECTOR_READ_ERROR_3,
+    FD_ERROR_FIND_DATASECTOR_CS_ERROR_3,
+    FD_ERROR_FIND_GNSOFC_READ_ERROR_1,
+    FD_ERROR_FIND_GNSOFC_CS_ERROR_1,
+    FD_ERROR_FIND_GNSOFC_CHAIN_ERROR,
+    FD_ERROR_MOUNT_JOURNAL_DATA_INVALID,
+    FD_ERROR_MOUNT_JOURNAL_COMMITTING_FAILED,
+    FD_ERROR_MOUNT_JOURNAL_COMMITTING_FAILED2
+end enum
+
+property !fd.errordata
+    get = syscall(458,"63.TDL"+) as fd_error_data_codes
+end property
+
+'--------------------------------------------------------------------
+property fd.transactioncapacityremaining
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0 (0 sectors).</b><br><br>
+'Returns the number of sectors that can still be changed in the cause of the current disk transaction.
+'<br><br>
+'At the beginning of the transaction (after fd.transactionstart) this property is at its maximum. This maximum is maxjournalsectors-1 or 16, whichever is smaller.
+'Maxjournalsectors is the argument of fd.formatj.
+'<br><br>
+'As the program performs disk write operations, the value of this property decreases. If no free journal memory left, the disk operation will return
+'PL_FD_STATUS_TRANSACTION_CAPACITY_EXCEEDED error (fatal).
+'<br><br>
+'<b>See also: </b>
+'fd.transactioncommit,fd.transactionstarted 
+    get = syscall(485,"63.TDL"+) as byte
+end property
+
+'--------------------------------------------------------------------
+syscall(316,"86.TDL") fd.transactioncommit() as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Commits a disk transaction that was previously started with the fd.transactionstart method.
+'<br><br>
+'At this point all changes to the disk data that were made in the cause of this transaction are written back to the disk. 
+'<br><br>
+'<b>See also: </b>
+'fd.transactionstarted, fd.transactioncapacityremaining
+
+'--------------------------------------------------------------------
+syscall(484,"86.TDL") fd.transactionstart() as pl_fd_status_codes
+'<b>METHOD. </b><br><br>
+'Starts a disk transaction.
+'<br><br>
+'The disk will only accept transactions if it was formatted with the fd.formatj method and the maxjournalsectors argument was >1.
+'<br><br>
+'All disk writes within the transaction are stored in the so called journal memory and are only
+'written to the disk when fd.transactioncommit is executed.
+'<br><br>
+'<b>See also: </b>
+'fd.transactionstarted, fd.transactioncapacityremaining
+
+'--------------------------------------------------------------------
+property fd.transactionstarted
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (transaction hasn't been started yet).</b><br><br>
+'Reports whether a disk transaction is currently in progress.
+'<br><br>
+'Use fd.transactionstart and fd.transactioncommit to start and finish disk transactions.
+'<br><br>
+'<b>See also: </b>
+'fd.transactioncapacityremaining
+    get = syscall(479,"63.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID=KLM601_32 or PLATFORM_ID=KLM106_32  'Keytroller
+syscall(722) fd.copymonitor(x1 as byte, x2 as byte, x3 as byte, x4 as byte, source_sector as word)
+#else
+syscall(722) fd.copymonitor(x1 as byte, x2 as byte, x3 as byte, x4 as byte)
+#endif
+
+#endif

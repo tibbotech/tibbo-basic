@@ -1,0 +1,98 @@
+include "global.tbh"
+
+
+
+sub boot()
+    
+    device_net_ip = "192.168.1.101"
+    device_net_mask = "255.255.255.0"
+    device_net_gateway = "192.168.1.1"
+    'Ethernet setup
+    '================================================================
+    net.ip=device_net_ip
+    net.netmask=device_net_mask
+    net.gatewayip=device_net_gateway
+    '-----------------------------------------------------------------
+current_interface = PL_SOCK_INTERFACE_NULL
+    dim f as byte
+    for f=0 to MAX_NUM_INTERFACES-1
+        interface_ready(f)=NO
+    next f
+
+    beep.divider = 11111
+
+    'HTTP server setup
+    '================================================================
+    dim http_server_count as byte
+    for http_server_count=0 to 3 'allocate sockets for the webserver
+        sock.num=sock_get("W" + str(http_server_count))
+        sock.connectiontout=120
+        sock.txbuffrq(10)
+        sock.varbuffrq(1)
+        sys.buffalloc()
+        sock.redir(PL_REDIR_SOCK0 + sock.num)
+        
+        sock.protocol=PL_SOCK_PROTOCOL_TCP
+        sock.httpportlist="80"
+        sock.allowedinterfaces="NET,WLN"
+        sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+    next http_server_count
+    'visit the device ip on a browser to see index.html being served
+    '-----------------------------------------------------------------
+
+    'Fd(flash disk) setup
+    '================================================================
+    if fd.mount<>PL_FD_STATUS_OK then
+        if fd.formatj(fd.availableflashspace/2,32,100)<>PL_FD_STATUS_OK then
+            sys.halt
+        end if
+    
+        if fd.mount<>PL_FD_STATUS_OK then
+            sys.halt
+        end if
+    end if
+    '-----------------------------------------------------------------
+
+    'Tables setup
+    '================================================================
+    if tbl_start()<>EN_TBL_STATUS_OK then
+        sys.halt
+    end if
+    '-----------------------------------------------------------------
+
+    tbl_web_start()
+    dim schema_changed as boolean = false
+    tbl_web_set("LOG",true)
+
+
+
+    if tbl_schema_check(TBL_DESCRIPTOR_FILE)<>EN_TBL_STATUS_OK then
+        schema_changed = YES
+    end if
+
+    if schema_changed= YES then
+        sys.debugprint("TBL> Schema changed, formatting flash")
+        if fd.formatj(fd.availableflashspace/2,32,100)<>PL_FD_STATUS_OK then
+            sys.halt
+        end if
+        if tbl_start()<>EN_TBL_STATUS_OK then
+            sys.halt
+        end if
+        if tbl_schema_check(TBL_DESCRIPTOR_FILE)<>EN_TBL_STATUS_OK then sys.halt
+    end if
+
+    
+    ' Set the timezone to UTC-12:00
+    APP_TIMEZONE="0"
+    datetime_tz_offset=APP_TIMEZONE
+
+    if net.linkstate<>PL_NET_LINKSTAT_NOLINK then
+        interface_set(PL_SOCK_INTERFACE_NET,YES)
+    end if
+
+' Set the timezone to UTC-12:00
+APP_TIMEZONE="0"
+
+    pat.play("B-B-B-",PL_PAT_CANINT)
+
+end sub

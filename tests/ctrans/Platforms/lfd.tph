@@ -1,0 +1,237 @@
+'**************************************************************************************************
+'       LFD (Linux flash disk) object
+'**************************************************************************************************
+
+object lfd
+'This is the Linux flash disk (lfd.) object, it allows you to access, create and delete files on the underlying Linux system.
+
+'--------------------------------------------------------------------
+enum pl_lfd_status_codes 
+    PL_LFD_STATUS_OK,             '<b>PLATFORM CONSTANT. </b><br><br>Completed successfully.
+    PL_LFD_STATUS_FAIL,           '<b>PLATFORM CONSTANT. </b><br><br>Failure.
+    PL_LFD_STATUS_DUPLICATE_NAME, '<b>PLATFORM CONSTANT. </b><br><br>File with this name already exists.
+    PL_LFD_STATUS_NOT_FOUND,      '<b>PLATFORM CONSTANT. </b><br><br>File not found.
+    PL_LFD_STATUS_NOT_OPENED      '<b>PLATFORM CONSTANT. </b><br><br>No file is currently opened "on" the current lfd.filenum.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_lfd_find_modes 
+    PL_LFD_FIND_EQUAL,         'PLATFORM CONSTANT. Find data that is equal to the substr.
+    PL_LFD_FIND_NOT_EQUAL,     'PLATFORM CONSTANT. Find data that is not equal to the substr.
+    PL_LFD_FIND_GREATER,       'PLATFORM CONSTANT. Find data with value greater than the value of the substr.
+    PL_LFD_FIND_GREATER_EQUAL, 'PLATFORM CONSTANT. Find data with value greater than or equal to the value of the substr.
+    PL_LFD_FIND_LESSER,        'PLATFORM CONSTANT. Find data with value less than the value of the substr.
+    PL_LFD_FIND_LESSER_EQUAL   'PLATFORM CONSTANT. Find data with value less than or equal to the value of the substr.
+end enum
+
+'--------------------------------------------------------------------
+property lfd.laststatus
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_LFD_STATUS_OK (completed successfully).</b><br><br>
+'Returns the execution result for the most recent disk-related method execution. See pl_lfd_status_codes enum for the list of all possible status codes.
+'<br><br>
+'Some methods, such as lfd.create, return execution status directly. For those, the lfd.laststatus will contain the same status as the one directly returned.
+'<br><br>
+'Other methods return some other data. For example, lfd.getdata returns the data requested (or an empty string if something went wrong).
+'The execution result for such methods can only be verified through this R/O property.
+'<br><br>
+    get = syscall(697) as pl_lfd_status_codes
+end property
+
+'--------------------------------------------------------------------
+property lfd.currentdir
+'<b>R/O PROPERTY (STRING)</b><br><br>
+'Returns the current directory.
+'<br><br>
+	get = syscall(698) as string
+end property
+
+'--------------------------------------------------------------------
+syscall(699) lfd.setcurrentdir(byref dir as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets the current directory.
+'<br><br>
+'If the directory does not yet exist, it will be created.
+
+'--------------------------------------------------------------------
+syscall(700) lfd.create(byref file as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Creates a new file with the specified name.
+'<br><br>
+'File names are case-sensitive.
+
+'--------------------------------------------------------------------
+syscall(701) lfd.delete(byref file as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Deletes a file with the specified file name.
+
+'--------------------------------------------------------------------
+syscall(702) lfd.rename(byref old_file as string, byref new_file as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Renames a file specified by its name. 
+'<br><br>
+'<b>Old_file </b>-- A string (1-255 characters) with the name of the file to be renamed.
+'<br><br>
+'<b>New_file </b>-- A string (1-255 characters) with the new name for the file.
+
+'--------------------------------------------------------------------
+property lfd.filenum
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (file #0 selected).</b><br><br>
+'Sets/returns the number of the currently selected file.
+'<br><br>
+'Several files can be opened (see lfd.open) at the same time. Each file is said to be opened "on" a certain file number (the value of this property at the time of the file opening).
+'<br><br>
+'Although the file is opened by referring to its name, many other operations, such as lfd.setdata or lfd.close refer to the file number.
+    get = syscall(703) as byte
+    set = syscall(704) (num as byte)
+end property
+
+'--------------------------------------------------------------------
+syscall(705) lfd.open(byref file as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Opens a file with a specified name "on" a currently selected file number (selection is made through lfd.filenum).
+'<br><br>
+'<b>File </b>-- A string (1-255 characters) with the file name. File names are case-sensitive.
+'<br><br>
+'You may reopen the same or another file "on" the same file number and the previously opened file will be closed.
+'<br><br>
+'Always close a file (lfd.close) once you are finished working with it.
+
+'--------------------------------------------------------------------
+syscall(706) lfd.close()
+'<b>METHOD. </b><br><br>
+'Closes the file opened "on" a currently selected file number (selection is made through lfd.filenum).
+
+'--------------------------------------------------------------------
+property lfd.fileopened
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no file is currently opened on this file number).</b><br><br>
+'Reports if any file is currently opened "on" the selected file number (selection is made through lfd.filenum.
+'<br><br>
+'Use lfd.open to open files.
+    get = syscall(707) as no_yes
+end property
+
+'--------------------------------------------------------------------
+property lfd.pointer
+'<b>R/O PROPERTY (DWORD).</b><br><br>
+'Returns the pointer position for the file opened "on" the currently selected file number (selection is made through lfd.filenum). Returns zero if no file is currently opened or the file is empty.
+'<br><br>
+'For the files of 0 size (see lfd.filesize), the pointer will always be at 0. If the file has a non-zero size, the pointer will be between 1 and lfd.filesize+1.
+'The first byte of the file is at position 1, the last one -- at position equal to lfd.filesize. Lfd.filesize+1 is the position at which new data can be appended to the file
+'(except for empty files where the pointer will be at 0 until you add some data).
+'<br><br>
+'Move the pointer with lfd.setpointer. Lfd.getdata and lfd.setdata also move the pointer by the amount of bytes read or written.
+'Reducing the file size with lfd.setfilesize may affect the pointer position.
+    get = syscall(708) as dword
+end property
+
+'--------------------------------------------------------------------
+syscall(709) lfd.setpointer(pos as dword) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets the new pointer position for a file opened "on" a currently selected file number (selection is made through lfd.filenum). 
+'<br><br>
+'For the files of 0 size (see lfd.filesize), the pointer will always be at 0. If the file has a non-zero size, the pointer will be between 1 and lfd.filesize+1.
+'The first byte of the file is at position 1, the last one -- at position equal to lfd.filesize. Lfd.filesize+1 is the position at which new data can be appended to the file
+'(except for empty files where the pointer will be at 0 until you add some data).
+'<br><br>
+'Fd.getdata and lfd.setdata also move the pointer by the amount of bytes read or written.
+'Reducing the file size with fd.setfilesize may affect the pointer position.
+
+'--------------------------------------------------------------------
+syscall(710) lfd.setdata(byref data as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Writes the data string to a file opened "on" a currently selected file number (selection is made through lfd.filenum).
+'The data is written starting at the lfd.pointer position.
+'<br><br>
+'<b>Data </b>-- A string containing the data to be written to the file.
+'<br><br>
+'As a result of this method invocation, the pointer will be advanced forward by the number of bytes written to the file.
+'<br><br>
+'If the pointer wasn't at the end of the file (lfd.filesize+1 position) then some of the existing file data will be partially overwritten.
+'If the pointer moves past the current file size then the file size will be increased automatically.
+
+'--------------------------------------------------------------------
+syscall(711) lfd.getdata(maxinplen as byte) as string
+'<b>METHOD. </b><br><br>
+'Reads a specified number of bytes from the file opened "on" a currently selected file number (selection is made through lfd.filenum). The data is read starting at the lfd.pointer position.
+'<br><br>
+'<b>Maxinplen </b>-- Maximum number of bytes to read from the file. The length of returned data will depend on one of three factors, whichever is smaller:
+'maxinplen argument, amount of data still available in the file counting from the current pointer position, and the capacity of receiving string variable.
+'<br><br>
+'As a result of this method invocation, the pointer will be advanced forward by the number of bytes actually read from the file.
+
+'--------------------------------------------------------------------
+property lfd.filesize
+'<b>R/O PROPERTY (DWORD).</b><br><br>
+'Returns the size, in bytes, of the file opened "on" the currently selected file number (selection is made through lfd.filenum). Returns zero if no file is currently opened.
+    get = syscall(712) as dword
+end property
+
+'--------------------------------------------------------------------
+syscall(713) lfd.setfilesize(newsize as dword) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Sets (reduces) the file size of a file opened "on" a currently selected file number (selection is made through lfd.filenum.
+'<br><br>
+'<b>Newsize </b>-- Desired new file size in bytes. Supplied value will be corrected downwards if exceeded previous file size.
+'<br><br>
+'As a result of this method invocation, the pointer position may be corrected downwards. If the file becomes empty, the pointer will be set to zero.
+'If the file still has some data in it, and the pointer exceeds new lfd.filesize+1, then pointer will be set to lfd.filesize+1. 
+
+'--------------------------------------------------------------------
+syscall(714) lfd.getnextdirmember() as string
+'<b>METHOD. </b><br><br>
+'Returns the next filename (if any) found in the current directory (can be changed with lfd.setcurrentdir). An empty string will be returned if no more files are found.
+'Affects the state of lfd.laststatus.
+'<br><br>
+'Each time you invoke this method, internal directory "pointer" is incremented by one.
+'<br><br>
+'To obtain the list of disk files, use lfd.resetdirpointer first, then invoke lfd.getnextdirmember until the empty string is returned.
+'<br><br>
+'When changing the current directory with lfd.setcurrentdir, the internal directory "pointer" is reset.
+
+'--------------------------------------------------------------------
+syscall(715) lfd.resetdirpointer() as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Resets the directory pointer to zero.
+'<br><br>
+'Use this method before repeatedly invoking lfd.getnextdirmember to obtain the list of files currently stored on the disk.
+
+
+'--------------------------------------------------------------------
+
+syscall(734) lfd.find(frompos as dword, byref substr as string,instance as word,dir as forward_back,incr as word,mode as pl_lfd_find_modes) as dword
+'<b>METHOD. </b><br><br>
+'Finds the Nth instance of data satisfying selected criteria in a file opened "on" a currently selected file number (selection is made through fd.filenum).
+'<br><br>
+'Returns a position (counting from one) at which the target data instance was discovered, or 0 if the target instance was not found.
+'<br><br>
+'<b>Frompos </b>-- Starting position in a file from which the search will be conducted. File positions are counted from 1. Will be corrected automatically if out of range.
+'<br><br>
+'<b>Substr </b>-- The string to search for.
+'<br><br>
+'<b>Instance </b>-- Instance (occurrence) number to find.
+'<br><br>
+'<b>Dir </b>-- Search direction (forward or back)
+'<br><br>
+'<b>Incr </b>-- Search position increment (or decrement for BACK searches).
+'<br><br>
+'<b>Mode </b>-- Search mode (equal, not equal, etc.).
+
+'--------------------------------------------------------------------
+
+syscall(735) lfd.getfreespace() as dword
+'<b>METHOD. </b><br><br>
+'Returns the available disk space for the current directory.
+
+'--------------------------------------------------------------------
+
+syscall(736) lfd.getnumfiles() as dword
+'<b>METHOD. </b><br><br>
+'Returns the total number of files currently stored in the current directory.
+
+'--------------------------------------------------------------------
+
+syscall(737) lfd.copyfile(byref src as string, byref dest as string) as pl_lfd_status_codes
+'<b>METHOD. </b><br><br>
+'Copy file. <br><br>
+'<b>src</b> - A string (up to 255 characters) with the full path to source file. <br><br>
+'<b>dest</b> - A string (up to 255 characters) with the full path including the name of the destination file.

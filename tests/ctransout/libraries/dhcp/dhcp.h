@@ -1,0 +1,77 @@
+//***********************************************************************************************************
+//			DHCP LIBRARY
+//			(Works with NET, WLN)
+//***********************************************************************************************************
+
+//1- debug output in console.
+//0- no debug output.
+#ifndef DHCP_DEBUG_PRINT
+	#define DHCP_DEBUG_PRINT 0
+#endif
+
+//The number of retries in a sibgle batch of retries
+#ifndef DHCP_MAX_RETRIES
+	#define DHCP_MAX_RETRIES 3
+#endif
+
+//Maximum waiting time (in seconds) for the DHCP server to reply
+#ifndef DHCP_WAIT_TIME
+	#define DHCP_WAIT_TIME 2
+#endif
+
+//Max delay (in seconds) between retries in a batch of retries (it is randomized between 1 and this constant for each retry)
+#ifndef DHCP_MAX_RETRY_DELAY
+	#define DHCP_MAX_RETRY_DELAY 10
+#endif
+
+//Delay (in seconds) between the batches of retries
+#ifndef DHCP_POST_FAIL_DELAY
+	#define DHCP_POST_FAIL_DELAY 180
+#endif
+
+//Max device (host) name length
+#ifndef DHCP_MAX_HOST_NAME_LEN
+	#define DHCP_MAX_HOST_NAME_LEN 0
+#endif
+
+//------------------------------------------------------------------------------
+enum en_dhcp_status_codes {
+	DHCP_STATUS_OK,//Success.
+	DHCP_STATUS_OUT_OF_SOCKETS,//No free sockets available for the library to operate.
+	DHCP_STATUS_INVALID_INTERFACE,//Unsupported network interface specified (use PL_SOCK_INTERFACE_NET or PL_SOCK_INTERFACE_WLN only).
+	DHCP_STATUS_INSUFFICIENT_BUFFER_SPACE,//Insufficient number of buffer pages available and the call to callback_dhcp_pre_buffrq() failed to cure the problem.
+	DHCP_STATUS_FAILURE//Interaction with the DHCP server failed (because there was no reply, the reply was unrecognized, invalid, etc.).
+};
+
+enum dhcp_info_elements {
+	DHCP_INFO_ELEMENT_REQUIRED_BUFFERS
+};
+
+//------------------------------------------------------------------------------
+string dhcp_get_info(dhcp_info_elements info_element, string *extra_data);
+en_dhcp_status_codes dhcp_start(pl_sock_interfaces interface, string *requested_ip, string *host_name);
+en_dhcp_status_codes dhcp_stop(pl_sock_interfaces interface);
+void dhcp_set_link_disconnect_behavior(pl_sock_interfaces interface, no_yes behavior);
+void dhcp_proc_timer();
+void dhcp_proc_data();
+
+void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string *ip, string *gateway_ip, string *netmask, unsigned long lease_time);
+//Callback procedure, informs of the successul procurement of configuration parameters from the DHCP server.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_dhcp_failure(pl_sock_interfaces interface, en_dhcp_status_codes failure_code);
+//Callback procedure, informs of the failure to procure configuration parameters from the DHCP server after DHCP_MAX_RETRIES.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_dhcp_pre_clear_ip(pl_sock_interfaces interface);
+//Callback procedure, informs of the fact that the IP address of the specified interface will be cleared to 0.0.0.0 and all socket connections
+//currently operating on this interface will be discarded.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_dhcp_pre_buffrq(unsigned char required_buff_pages);
+//Callback procedure, informs of the insufficient number of free buffer pages available for use by the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_dhcp_buff_released();
+//Callback procedure, informs of the release of buffer pages by the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
