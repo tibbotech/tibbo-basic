@@ -64,20 +64,21 @@ locked=no
 location=
 
 [file9]
-path=libraries/wln/wln.tbh
-type=header
+path=libraries/tables/tables_web.js.gz
+type=text
 format=
 condition=
 locked=no
 location=project
 
 [file10]
-path=libraries/wln/wln.tbs
+path=libraries/tables/tables_web.tbs
 type=basic
 format=
 condition=
 locked=no
 location=
+
 
 [file11]
 path=libraries/dhcp/dhcp.tbh
@@ -270,19 +271,3 @@ format=
 condition=
 locked=no
 location=project
-
-[file35]
-path=libraries/tables/tables_web.js.gz
-type=text
-format=
-condition=
-locked=no
-location=project
-
-[file36]
-path=libraries/tables/tables_web.tbs
-type=basic
-format=
-condition=
-locked=no
-location=

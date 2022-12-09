@@ -8,12 +8,12 @@ export interface TBDefine {
 
 export interface TBVariable {
     name: string,
-    value: string,
+    value?: string,
     dataType: string,
     length: string,
     location: TBRange,
     declaration?: TBRange,
-    comments: Array<CommonToken>,
+    comments?: Array<CommonToken>,
     parentScope?: TBScope,
     references: Array<TBRange>
 }
@@ -103,6 +103,7 @@ export interface TBFunction {
     location?: TBRange,
     declaration?: TBRange,
     comments?: Array<CommonToken>,
+    variables: Array<TBVariable>,
     references?: Array<TBRange>
 }
 
@@ -128,7 +129,7 @@ export interface TBType {
     name: string,
     members: Array<TBVariable>,
     location: TBRange,
-    comments: Array<CommonToken>,
+    comments: Array<CommonToken>,   
 }
 
 export interface TBEnumEntry {

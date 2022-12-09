@@ -333,7 +333,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                     default:
                         {
                             const name = item.children[0].start.text;
-                            const evalValue = this.getDefineValue(item.children[0].start.text);
+                            const evalValue = this.getDefineValue(item.children[2].start.text);
                             const definedValue = this.getDefineValue(name);
                             switch (item.op.type) {
                                 case TibboBasicPreprocessorParser.EQUAL:
