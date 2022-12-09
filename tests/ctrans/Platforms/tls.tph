@@ -107,5 +107,5 @@ property sock.tlscurrentnum
 '<b>R/O PROPERTY (BYTE), DEFAULT VALUE = 255 (not in use).</b><br><br>
 'Indicates which socket, if any, is using TLS encryption.<br><br>
 'Only a single socket can use TLS encryption at any given time. This read-only property returns 255 whenever TLS is not in use by any socket, or the number of the socket using the TLS at the moment.
-    get = syscall(877) as BYTE
+    get = syscall(877) as byte
 end property

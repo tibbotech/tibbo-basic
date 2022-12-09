@@ -273,8 +273,8 @@ public function tbl_start() as en_tbl_status_codes
 			exit function
 		end if
 		select case s
-		case "L": tbl_item.struct=EN_TBL_STRUCT_LIST
-		case "T": tbl_item.struct=EN_TBL_STRUCT_TABLE
+		case "L": tbl_item.structure=EN_TBL_STRUCT_LIST
+		case "T": tbl_item.structure=EN_TBL_STRUCT_TABLE
 		case else
 			#if TBL_DEBUG_PRINT
 				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): unknown table type'"+s+"', use 'T' or 'L' only.")
@@ -700,7 +700,7 @@ no_field_found:
 		
 		tbl_item.num_of_fields=num_fields
 		
-		if tbl_item.struct=EN_TBL_STRUCT_LIST then
+		if tbl_item.structure=EN_TBL_STRUCT_LIST then
 			k=2
 			while (TBL_MAX_RECORD_SIZE mod record_size)>0 and record_size<TBL_MAX_RECORD_SIZE+1 and record_size>0
 				if record_size>k then 
@@ -1363,7 +1363,7 @@ public function tbl_record_add(uid as string(32)) as en_tbl_status_codes
 	dim md5_val as dword
 	dim result as en_tbl_status_codes
 
-	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_TABLE then
+	if tbl_info(tbl_info_index).structure=EN_TBL_STRUCT_TABLE then
 		result=tbl_generate_uid(uid)
 		if result<>EN_TBL_STATUS_OK then
 			tbl_record_add=result
@@ -1377,7 +1377,7 @@ public function tbl_record_add(uid as string(32)) as en_tbl_status_codes
 	end if
 	
 	'find the first deleted record, if not found move the pointer to the end of file and set data
-	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+	if tbl_info(tbl_info_index).structure=EN_TBL_STRUCT_LIST then
 		'check if table is full
 		
 		dwtemp=tbl_info(tbl_info_index).rec_size
@@ -1631,7 +1631,7 @@ public function tbl_record_delete(byref rec_num as word) as en_tbl_status_codes
 	if fd.ready=NO then goto tbl_fail
 	
 	'examine if the record is deleted
-	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+	if tbl_info(tbl_info_index).structure=EN_TBL_STRUCT_LIST then
 		dptr=fd.find(1,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
 		if dptr=0 then goto tbl_deleted
 		fd.setpointer(dptr)
@@ -1726,7 +1726,7 @@ public function tbl_record_undelete(byref rec_num as word) as en_tbl_status_code
 	if fd.ready=NO then goto tbl_fail
 	
 	'examine if the record is deleted
-	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+	if tbl_info(tbl_info_index).structure=EN_TBL_STRUCT_LIST then
 		d=fd.filesize-tbl_info(tbl_info_index).rec_size+1
 		dptr=fd.find(d,TBL_DELETE_FLAG,1,BACK,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
 		if dptr=0 then goto tbl_ok
@@ -2230,7 +2230,7 @@ public function tbl_field_sg(byref field_name as string,byref field_value as str
 		case `F`:
 			dim tmp_f as float=0
 			strtobin(tmp_f,s,4)
-			field_value=ftostr(tmp_f,FTOSTR_MODE_AUTO,255)
+			field_value=fstr(tmp_f)
 			if tmp_f<p1 then goto tbl_invalid
 			if tmp_f>p2 then goto tbl_invalid
 		end select	
@@ -2668,7 +2668,7 @@ function tbl_adjust_size() as en_tbl_status_codes
 
 	if fd.ready=NO then goto tbl_fail
 
-	if tbl_info(tbl_info_index).struct<>EN_TBL_STRUCT_LIST then goto tbl_ok
+	if tbl_info(tbl_info_index).structure<>EN_TBL_STRUCT_LIST then goto tbl_ok
 	record_per_sector=256/tbl_info(tbl_info_index).rec_size
 	deleted_record=tbl_selected_all_rc-tbl_selected_active_rc
 	

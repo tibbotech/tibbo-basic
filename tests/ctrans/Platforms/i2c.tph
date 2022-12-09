@@ -70,7 +70,7 @@ syscall(889) i2c.stop
 'Sets the STOP condition on the currently selected I2C channel (selection is made through i2c.channel).
 
 '--------------------------------------------------------------------
-syscall(890) i2c.write(b as byte) as I2C_ACK_NACK
+syscall(890) i2c.write(b as byte) as i2c_ack_nack
 '<b>METHOD.</b><br><br>
 'Writes one byte to the currently selected I2C channel (selection is made through i2c.channel).<br><br>
 'Returns: An acknowledgment bit (enum i2c_ack_nack):<br>
@@ -78,7 +78,7 @@ syscall(890) i2c.write(b as byte) as I2C_ACK_NACK
 '1 - NACK: The data byte was not received successfully<br>
 
 '--------------------------------------------------------------------
-syscall(891) i2c.read(ack_bit as I2C_ACK_NACK) as byte
+syscall(891) i2c.read(ack_bit as i2c_ack_nack) as byte
 '<b>METHOD.</b><br><br>
 'Reads one byte from the currently selected I2C channel (selection is made through i2c.channel).
 'The parameter is the acknowledge bit to send to the target I2C peripheral after reading 8 bits of data(enum i2c_ack_nack):<br><br>
@@ -87,5 +87,5 @@ syscall(891) i2c.read(ack_bit as I2C_ACK_NACK) as byte
 property i2c.state
 '<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- I2C_IDLE.</b><br><br>
 'Returns the state (enum i2c_state) of the currently selected I2C channel (selection is made through i2c.channel).
-	    get = syscall(892) as I2C_STATE
+	    get = syscall(892) as i2c_state
 end property

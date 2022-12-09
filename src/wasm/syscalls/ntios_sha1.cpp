@@ -26,6 +26,7 @@ namespace sha1 {
     *********************************************************************
     * BASED ON RFC-1321: https://datatracker.ietf.org/doc/html/rfc1321
     *********************************************************************
+    */
     /* CONSTANTS */
     const U32 TB_NULL = 0x00;
     const U16 TB_STRLEN_LIMIT65K = 65535;

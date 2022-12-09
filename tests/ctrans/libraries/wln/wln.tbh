@@ -111,7 +111,7 @@ enum en_wln_status_codes
 	WLN_STATUS_DISASSOCIATION,				'Wi-Fi interface got disassociated from the target wireless network.
 	WLN_STATUS_UNEXPECTED_ERROR,			'Well, this is something... unexpected :).
 	WLN_STATUS_NOT_STARTED,					'The procedure couldn't be executed because the library hasn't been started (call wln_start() first).
-	WLN_STATUS_BUSY							'The procedure couldn't be executed because the library is busy. Try again after a short delay.
+	WLN_STATUS_BUSY,							'The procedure couldn't be executed because the library is busy. Try again after a short delay.
 	WLN_STATUS_AUTOCONNECT					'The wln module is in autoconnect mode and is handling all wireless functionality.  
 end enum
 

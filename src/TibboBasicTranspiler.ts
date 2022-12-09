@@ -4,7 +4,7 @@ import fs = require('fs');
 // import ini = require('ini');
 import TibboBasicErrorListener from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
-import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
+import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol, TBParameter } from './types';
 import { CommonToken } from 'antlr4/Token';
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { CommonTokenStream } from 'antlr4/CommonTokenStream';
@@ -23,25 +23,13 @@ interface TibboVariable {
     global: boolean,
 }
 
-interface TibboParameter {
-    name: string,
-    dataType: string,
-    byRef: boolean,
-}
-
-interface TibboFunction {
-    name: string,
-    returnType: string,
-    params: TibboParameter[],
-    returnValues: string[]
-}
-
 export default class TibboBasicTranspiler {
 
     output = '';
     lines: string[] = [];
-    currentLine: string = '';
-    functions: TibboFunction[] = [];
+    currentLine = '';
+    objects: { [name: string]: TBObject } = {};
+    functions: { [name: string]: TBFunction } = {};
     variables: { [name: string]: TibboVariable } = {};
     lineMappings: number[] = [];
 
@@ -87,7 +75,8 @@ export default class TibboBasicTranspiler {
                 const line = token.line - 1;
                 if (this.lines[line].indexOf("'") >= 0) {
 
-                    const res = this.lines[line].search(/\S|$/);
+                    // const res = this.lines[line].search(/\S|$/);
+                    const res = this.lines[line].indexOf("'");
                     this.lines[line] = this.lines[line].substr(0, res) + '//' + comment;
                 }
                 else {
@@ -174,7 +163,7 @@ class ParserListener extends TibboBasicParserListener {
     scopeStack: Array<TBScope> = [];
     currentParams: string[] = [];
     isDeclaration = false;
-    currentFunction: TibboFunction | undefined = undefined;
+    currentFunction: TBFunction | undefined = undefined;
     variables: TibboVariable[] = [];
     isGlobalVariable = false;
 
@@ -206,8 +195,9 @@ class ParserListener extends TibboBasicParserListener {
                 break;
             default:
                 if (valueType.indexOf('string') == 0) {
-                    valueType = valueType.replace('(', '<');
-                    valueType = valueType.replace(')', '>');
+                    valueType = 'string';
+                    // valueType = valueType.replace('(', '<');
+                    // valueType = valueType.replace(')', '>');
                 }
                 break;
 
@@ -239,7 +229,7 @@ class ParserListener extends TibboBasicParserListener {
     enterIncludeStmt(ctx: any) {
         let fileName = ctx.children[1].getText();
         const parts = fileName.split('.');
-        parts[1] = 'th"';
+        parts[1] = 'h"';
         fileName = parts.join('.');
         fileName = fileName.replace(/\\/g, path.sep);
         this.transpiler.addCode(`#include ${fileName}`, ctx.start.line);
@@ -249,22 +239,31 @@ class ParserListener extends TibboBasicParserListener {
     enterSubStmt(ctx: any) {
         this.transpiler.addCode(`void ${ctx.name.text}`, ctx.start.line);
         this.isDeclaration = false;
+        const name = ctx.name.text;
         this.currentFunction = {
-            name: ctx.name.text,
-            returnType: '',
-            params: [],
-            returnValues: []
+            name: name,
+            dataType: '',
+            parameters: [],
         };
+        if (this.transpiler.functions[name] === undefined) {
+            this.transpiler.functions[name] = this.currentFunction;
+        }
     }
 
     enterParamList(ctx: any) {
         this.currentParams = [];
+        if (this.currentFunction !== undefined) {
+            this.currentFunction.parameters = [];
+        }
     }
 
     enterParam(ctx: any) {
+        if (!ctx.valueType) {
+            return;
+        }
         const valueType = this.convertVariableType(ctx.valueType.valueType.getText());
         let paramName = ctx.name.text;
-        const param: TibboParameter = {
+        const param: TBParameter = {
             name: paramName,
             dataType: valueType,
             byRef: false
@@ -275,7 +274,7 @@ class ParserListener extends TibboBasicParserListener {
             param.byRef = true;
         }
         if (this.currentFunction !== undefined) {
-            this.currentFunction.params.push(param);
+            this.currentFunction.parameters.push(param);
         }
 
         this.currentParams.push(`${valueType} ${paramName}`);
@@ -284,8 +283,8 @@ class ParserListener extends TibboBasicParserListener {
     exitParamList(ctx: any) {
         if (!this.isDeclaration) {
             this.transpiler.addCode(`(${this.currentParams.join(', ')}) {`, ctx.start.line);
-            if (this.currentFunction && this.currentFunction.returnType !== '') {
-                this.transpiler.addCode(`\n${this.currentFunction.returnType} ${this.currentFunction.name};`, ctx.start.line);
+            if (this.currentFunction && this.currentFunction.dataType !== '') {
+                this.transpiler.addCode(`\n${this.currentFunction.dataType} ${this.currentFunction.name};`, ctx.start.line);
             }
         }
         else {
@@ -325,10 +324,12 @@ class ParserListener extends TibboBasicParserListener {
         this.transpiler.addCode(`${returnType} ${ctx.name.text}`, ctx.start.line);
         this.currentFunction = {
             name: name,
-            returnType: returnType,
-            params: [],
-            returnValues: []
+            dataType: returnType,
+            parameters: [],
         };
+        if (this.transpiler.functions[name] === undefined) {
+            this.transpiler.functions[name] = this.currentFunction;
+        }
     }
 
     exitFunctionStmt(ctx: any) {
@@ -341,13 +342,31 @@ class ParserListener extends TibboBasicParserListener {
 
     enterDeclareSubStmt(ctx: any) {
         this.isDeclaration = true;
-        this.transpiler.addCode(`void ${ctx.name.text}`, ctx.start.line);
+        const name = ctx.name.text;
+        this.transpiler.addCode(`void ${name}`, ctx.start.line);
+        this.currentFunction = {
+            name: name,
+            dataType: '',
+            parameters: [],
+        };
+        if (this.transpiler.functions[name] === undefined) {
+            this.transpiler.functions[name] = this.currentFunction;
+        }
     }
 
     enterDeclareFuncStmt(ctx: any) {
         this.isDeclaration = true;
+        const name = ctx.name.text;
         const returnType = this.convertVariableType(ctx.returnType.valueType.getText());
-        this.transpiler.addCode(`${returnType} ${ctx.name.text}`, ctx.start.line);
+        this.transpiler.addCode(`${returnType} ${name}`, ctx.start.line);
+        this.currentFunction = {
+            name: name,
+            dataType: returnType,
+            parameters: [],
+        };
+        if (this.transpiler.functions[name] === undefined) {
+            this.transpiler.functions[name] = this.currentFunction;
+        }
     }
 
     enterDeclareVariableStmt(ctx: any) {
@@ -473,10 +492,10 @@ class ParserListener extends TibboBasicParserListener {
                     default:
                         {
                             let expression = item.getText();
-                            if (this.currentFunction && this.currentFunction.params.length > 0) {
+                            if (this.currentFunction && this.currentFunction.parameters.length > 0) {
                                 if (item.parentCtx.ruleIndex != TibboBasicParser.RULE_postfixExpression) {
-                                    for (let i = 0; i < this.currentFunction.params.length; i++) {
-                                        if (this.currentFunction.params[i].byRef && expression == this.currentFunction.params[i].name) {
+                                    for (let i = 0; i < this.currentFunction.parameters.length; i++) {
+                                        if (this.currentFunction.parameters[i].byRef && expression == this.currentFunction.parameters[i].name) {
                                             expression = '*' + expression;
                                         }
                                     }
@@ -514,11 +533,40 @@ class ParserListener extends TibboBasicParserListener {
                     }
                     if (tmp.children[1].children && tmp.children[1].children[0].ruleIndex == TibboBasicParser.RULE_argList) {
                         const primarySymbol = tmp.children[0].getText();
-                        const args = tmp.children[1].children[0].children;
-                        if (args.length > 2) {
+                        const symbols = tmp.children[1].children[0].children;
+                        if (symbols.length > 2) {
+                            const func = this.transpiler.functions[primarySymbol];
+                            if (func) {
+                                result += `${primarySymbol}`;
+                                let count = 0;
+                                const tmpParams = [];
+                                for (let k = 0; k < symbols.length; k++) {
+                                    let prefix = '';
+                                    if ([',', '(', ')'].includes(symbols[k].getText())) {
+                                        continue;
+                                    }
+                                    if (func.parameters[count].byRef) {
+                                        prefix = '&';
+                                    }
+                                    if (this.currentFunction) {
+                                        for (let z = 0; z < this.currentFunction.parameters.length; z++) {
+                                            if (this.currentFunction.parameters[z].byRef
+                                                && symbols[k].getText() == this.currentFunction.parameters[z].name) {
+                                                prefix = '';
+                                            }
+                                        }
+
+                                    }
+                                    count++;
+                                    tmpParams.push(`${prefix}${symbols[k].getText()}`);
+                                }
+                                result += `(${tmpParams.join(',')})`;
+                                return result;
+                            }
+
                             const referencedVariable = this.findVariable(primarySymbol);
                             if (referencedVariable !== undefined) {
-                                result += `${primarySymbol}[${this.parseExpression(args[1], isAssignment)}]`;
+                                result += `${primarySymbol}[${this.parseExpression(symbols[1], isAssignment)}]`;
                                 continue;
                             }
                         }
@@ -649,7 +697,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterEnumerationStmt(ctx: any) {
-        this.transpiler.addCode(`enum ${ctx.children[1].getText().toLowerCase()} {`, ctx.start.line);
+        this.transpiler.addCode(`enum ${ctx.children[1].getText()} {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -697,7 +745,7 @@ class ParserListener extends TibboBasicParserListener {
     }
 
     enterTypeStmt(ctx: any) {
-        this.transpiler.addCode(`struct ${ctx.name.text.toLowerCase()} {`, ctx.start.line);
+        this.transpiler.addCode(`struct ${ctx.name.text} {`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
@@ -710,14 +758,179 @@ class ParserListener extends TibboBasicParserListener {
         const valueType = this.convertVariableType(ctx.valueType.valueType.getText());
         let name = ctx.children[0].getText();
         if (ctx.children.length > 2) {
-            name += `[${ctx.children[2]}]`;
+            name += `[${ctx.children[2].getText()}]`;
         }
         this.transpiler.addCode(`${valueType} ${name};`, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
 
     enterEnumerationStmt_Constant(ctx: any) {
-        this.transpiler.addCode(`${ctx.getText()}`, ctx.start.line);
+        let text = `${ctx.getText()}`;
+        if (text.indexOf(',') < 0) {
+            text += ',';
+        }
+        this.transpiler.addCode(text, ctx.start.line);
         this.transpiler.writeLine(ctx.start.line);
     }
+
+    enterObjectDeclaration(ctx: any) {
+        const name = ctx.children[1].symbol.text;
+        if (this.transpiler.objects[name] === undefined) {
+            this.transpiler.objects[name] = {
+                name: name,
+                location: {
+                    startToken: ctx.start,
+                    stopToken: ctx.start
+                },
+                properties: [],
+                events: [],
+                functions: [],
+                comments: []
+            };
+        }
+        this.transpiler.objects[name].location = {
+            startToken: ctx.start,
+            stopToken: ctx.start
+        };
+        // this.compiler.addCode(`const ${name} =  {}`, ctx.start.line);
+    }
+
+    enterPropertyDefineStmt(ctx: any) {
+        const objectName = ctx.object.text;
+        const propertyName = ctx.property.text;
+        if (this.transpiler.objects[objectName] != undefined) {
+            this.currentObject = objectName;
+            this.currentProperty = propertyName;
+            for (let i = 0; i < this.transpiler.objects[objectName].properties.length; i++) {
+                if (this.transpiler.objects[objectName].properties[i].name === propertyName) {
+                    return;
+                }
+            }
+            this.transpiler.objects[objectName].properties.push({
+                name: propertyName,
+                dataType: '',
+                location: {
+                    startToken: ctx.start,
+                    stopToken: ctx.start
+                },
+                comments: []
+            });
+        }
+        this.isDeclaration = true;
+    }
+
+    enterPropertyGetStmt(ctx: any) {
+        for (let i = 0; i < ctx.children.length; i++) {
+            const item = ctx.children[i];
+            if (item.ruleIndex === TibboBasicParser.RULE_asTypeClause) {
+                const objectName = item.parentCtx.parentCtx.parentCtx.object.text;
+                const propertyName = item.parentCtx.parentCtx.parentCtx.property.text;
+                let obj = this.transpiler.objects[objectName];
+                if (obj == undefined) {
+                    this.transpiler.objects[objectName] = {
+                        name: objectName,
+                        location: {
+                            startToken: ctx.start,
+                            stopToken: ctx.start
+                        },
+                        properties: [],
+                        events: [],
+                        functions: [],
+                        comments: []
+                    };
+                    obj = this.transpiler.objects[objectName];
+                }
+                for (let j = 0; j < obj.properties.length; j++) {
+                    if (obj.properties[j].name === propertyName) {
+                        obj.properties[j].dataType = this.convertVariableType(item.children[1].getText());
+                        obj.properties[j].get = {
+                            name: obj.properties[j].name,
+                            dataType: obj.properties[j].dataType,
+                            parameters: [],
+                            location: {
+                                startToken: ctx.start,
+                                stopToken: ctx.start
+                            },
+                            comments: [],
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    enterPropertySetStmt(ctx: any) {
+        const objectName = ctx.parentCtx.parentCtx.object.text;
+        const propertyName = ctx.parentCtx.parentCtx.property.text;
+        let obj = this.transpiler.objects[objectName];
+        if (obj == undefined) {
+            this.transpiler.objects[objectName] = {
+                name: objectName,
+                location: {
+                    startToken: ctx.start,
+                    stopToken: ctx.start
+                },
+                properties: [],
+                events: [],
+                functions: [],
+                comments: []
+            };
+            obj = this.transpiler.objects[objectName];
+        }
+        for (let j = 0; j < obj.properties.length; j++) {
+            if (obj.properties[j].name === propertyName) {
+                obj.properties[j].set = {
+                    name: obj.properties[j].name,
+                    dataType: obj.properties[j].dataType,
+                    parameters: [],
+                    location: {
+                        startToken: ctx.start,
+                        stopToken: ctx.start
+                    },
+                    comments: [],
+                };
+            }
+        }
+    }
+
+    exitPropertyDefineStmt(ctx: any) {
+        // 
+    }
+
+    enterSyscallDeclarationInner(ctx: any) {
+        this.isDeclaration = false;
+        if (ctx.object != null) {
+            const objectName = ctx.object.text;
+            const functionName = ctx.property.text;
+            let dataType = '';
+            for (let i = 0; i < ctx.children.length; i++) {
+                if (ctx.children[i].ruleIndex === TibboBasicParser.RULE_asTypeClause) {
+                    dataType = this.convertVariableType(ctx.children[i].children[1].getText());
+                }
+            }
+            if (this.transpiler.objects[objectName] != undefined) {
+                this.currentFunction = {
+                    name: `${functionName}`,
+                    location: {
+                        startToken: ctx.start,
+                        stopToken: ctx.start
+                    },
+                    dataType: dataType,
+                    parameters: [],
+                    comments: [],
+                };
+                this.transpiler.objects[objectName].functions.push(this.currentFunction);
+                this.transpiler.addCode(`${objectName}.${functionName} = function`, ctx.start.line);
+            }
+        }
+        else {
+            //non object syscall
+
+        }
+    }
+
+    exitSyscallDeclarationInner(ctx: any) {
+        this.currentFunction = undefined;
+    }
+
 }

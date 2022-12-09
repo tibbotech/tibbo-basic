@@ -33,11 +33,7 @@ struct md5_ctx {
     U8 buffer[64];
 };
 
-/* MACROS */
 
-/* CONSTANTS */
-
-/* VARIABLES */
 extern md5_ctx md5_ctx_bckup;
 extern const char *bckup_hash_ptr;
 extern U32 bckup_str_len;

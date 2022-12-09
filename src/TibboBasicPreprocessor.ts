@@ -189,6 +189,9 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                 return;
             }
             this.preprocessor.parseFile(path.dirname(this.filePath), filePath, true);
+            if (path.extname(filePath) == '.tbh') {
+                this.preprocessor.parseFile(path.dirname(this.filePath), filePath.replace('.tbh', '.tbs'), true);
+            }
         }
     }
 

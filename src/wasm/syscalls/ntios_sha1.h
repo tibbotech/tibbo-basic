@@ -30,11 +30,6 @@ union block_union{
     U32 len_arr[16];
 };
 
-/* MACROS */
-
-/* CONSTANTS */
-
-/* VARIABLES */
 extern sha1_ctx sha1_ctx_bckup;
 extern const char *bckup_hash_ptr;
 extern U32 bckup_str_len;

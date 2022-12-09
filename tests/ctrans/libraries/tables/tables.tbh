@@ -124,7 +124,7 @@ type tbl_type
 	table_name as string(TBL_MAX_TABLE_NAME_LEN)
 	maxrecs	as word
 	numkeyf	as byte
-	struct as en_tbl_struct
+	structure as en_tbl_struct
 	rec_size as byte
 	field_num_offset as word
 	num_of_fields as byte

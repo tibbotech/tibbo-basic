@@ -34,7 +34,7 @@ current_interface = PL_SOCK_INTERFACE_NULL
         
         sock.protocol=PL_SOCK_PROTOCOL_TCP
         sock.httpportlist="80"
-        sock.allowedinterfaces="NET,WLN"
+        sock.allowedinterfaces="NET"
         sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
     next http_server_count
     'visit the device ip on a browser to see index.html being served

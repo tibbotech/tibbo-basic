@@ -25,7 +25,7 @@ namespace md5 {
     *********************************************************************
     * BASED ON RFC-1321: https://datatracker.ietf.org/doc/html/rfc1321
     *********************************************************************
-    /* CONSTANTS */
+    */
     const U16 TB_STRLEN_LIMIT65K = 65535;
     const U8 TB_HASH_LIMIT_16 = 16;
     const char *const TB_EMPTYSTRING = "";

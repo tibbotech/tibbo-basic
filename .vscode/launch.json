@@ -85,6 +85,22 @@
 			"sourceMaps": true,
 			"cwd": "${workspaceRoot}",
 		},
+		{
+			"name": "TranspileTest",
+			"type": "node",
+			"request": "launch",
+			"args": [
+				"${workspaceFolder}/tests/ctranspile.ts"
+			],
+			"runtimeArgs": [
+				"--nolazy",
+				"-r",
+				"ts-node/register"
+			],
+			"sourceMaps": true,
+			"cwd": "${workspaceRoot}",
+			"protocol": "inspector"
+		},
 	],
 	"compounds": [
 		{

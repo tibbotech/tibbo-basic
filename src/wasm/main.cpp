@@ -2,16 +2,11 @@
 #include <sstream>
 #include <stdio.h>
 #include <emscripten.h>
-#include "syscalls/ntios_strman.h"
-#include "syscalls/ntios_conv.h"
-#include "Sys/ntios_sys.h"
-
-using namespace std;
-using namespace ntios::conv;
+#include "base/ntios_includes.h"
 
 int counter = 0;
 
-ntios::syst::SYS sys;
+
 
 void on_sys_timer()
 {

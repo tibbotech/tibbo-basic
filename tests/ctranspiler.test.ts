@@ -2,6 +2,7 @@ import path = require('path');
 import TibboBasicTranspiler from '../src/TibboBasicTranspiler';
 import fs = require('fs');
 import ini = require('ini');
+import TibboBasicProjectTranspiler from '../src/TibboBasicProjectTranspiler';
 import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
 
 const supportedFileTypes = ['.tbs', '.tbh', '.tph', '.xtxt'];
@@ -58,17 +59,29 @@ test('C transpiler test', async () => {
         // console.log(outputcode);
 
 
-        const transpiler = new TibboBasicTranspiler();
-        for (let i = 0; i < files.length; i++) {
-            const filePath = files[i].name;
-            const contents = fs.readFileSync(path.join(workspaceRoot, filePath), 'utf-8');
-            const output = transpiler.parseFile(contents);
-            let outputExtension = '.cpp';
-            if (path.extname(filePath) == '.tbh') {
-                outputExtension = '.h';
-            }
-            const newFileName = filePath.substr(0, filePath.length - 4) + outputExtension;
-            const newFilePath = path.join(__dirname, 'ctransout', newFileName);
+
+        // const transpiler = new TibboBasicTranspiler();
+        // for (let i = 0; i < files.length; i++) {
+        //     const filePath = files[i].name;
+        //     const contents = fs.readFileSync(path.join(workspaceRoot, filePath), 'utf-8');
+        //     const output = transpiler.parseFile(contents);
+        //     let outputExtension = '.cpp';
+        //     if (path.extname(filePath) == '.tbh') {
+        //         outputExtension = '.h';
+        //     }
+        //     const newFileName = filePath.substr(0, filePath.length - 4) + outputExtension;
+        //     const newFilePath = path.join(__dirname, 'ctransout', newFileName);
+        //     if (!fs.existsSync(newFilePath)) {
+        //         fs.mkdirSync(path.dirname(newFilePath), { recursive: true });
+        //     }
+        //     fs.writeFileSync(newFilePath, output);
+        // }
+
+        const projectTranspiler = new TibboBasicProjectTranspiler();
+        const output = projectTranspiler.transpile(files);
+        for (let i = 0; i < output.length; i++) {
+            const filePath = output[i].name;
+            const newFilePath = path.join('/Users/jimmyhu/Projects/ntios/webasm/app', filePath);
             if (!fs.existsSync(newFilePath)) {
                 fs.mkdirSync(path.dirname(newFilePath), { recursive: true });
             }

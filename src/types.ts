@@ -20,26 +20,17 @@ export interface TBVariable {
 
 export interface TBParameter {
     name: string,
-    byref: boolean,
+    byRef: boolean,
     dataType: string
 }
 
 export interface TBObject {
     name: string,
     properties: Array<TBObjectProperty>,
-    functions: Array<TBObjectFunction>,
+    functions: Array<TBFunction>,
     location: TBRange,
     comments: Array<CommonToken>,
-    events: Array<TBEvent>
-}
-
-export interface TBObjectFunction {
-    name: string,
-    syscall?: TBSyscall,
-    parameters: Array<TBParameter>,
-    dataType: string,
-    location: TBRange,
-    comments: Array<CommonToken>,
+    events: Array<TBEvent>,
 }
 
 export interface TBObjectProperty {
@@ -107,11 +98,12 @@ export interface TBEnum {
 export interface TBFunction {
     name: string,
     parameters: Array<TBParameter>,
+    syscall?: TBSyscall,
     dataType?: string,
     location?: TBRange,
     declaration?: TBRange,
-    comments: Array<CommonToken>,
-    references: Array<TBRange>
+    comments?: Array<CommonToken>,
+    references?: Array<TBRange>
 }
 
 export interface TBConst {
