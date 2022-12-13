@@ -1012,6 +1012,7 @@ class ParserListener extends TibboBasicParserListener {
                         stopToken: ctx.start
                     },
                     parameters: [],
+                    variables: [],
                     dataType: '',
                     comments: []
                 });

@@ -40,7 +40,7 @@ import ini = require('ini');
 import TibboBasicPreprocessor from './TibboBasicPreprocessor';
 import TibboBasicProjectParser from './TibboBasicProjectParser';
 import { CommonToken } from 'antlr4';
-import { TBVariable, TBParameter, TBObject, TBObjectFunction, TBObjectProperty, TBSymbolType, TBRange } from './types';
+import { TBVariable, TBParameter, TBObject, TBObjectProperty, TBSymbolType, TBRange, TBFunction } from './types';
 // import TurndownService = require('turndown');
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { TextDocument, Position } from 'vscode-languageserver-textdocument';
@@ -1046,7 +1046,7 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                             if (methodParams.length > 0) {
                                 for (let i = 0; i < methodParams.length; i++) {
                                     const param = methodParams[i];
-                                    const str = `${param.byref ? 'byref ' : ''}${param.name} as ${param.dataType}`;
+                                    const str = `${param.byRef ? 'byref ' : ''}${param.name} as ${param.dataType}`;
                                     info.label += str;
                                     info.parameters.push({
                                         label: [strIndex, strIndex + str.length],
@@ -1555,7 +1555,7 @@ function getObjectAtToken(token: any): TBObject | undefined {
     return undefined;
 }
 
-function getObjectFunction(obj: TBObject, functionName: string): TBObjectFunction | undefined {
+function getObjectFunction(obj: TBObject, functionName: string): TBFunction | undefined {
     for (let i = 0; i < obj.functions.length; i++) {
         if (obj.functions[i].name == functionName) {
             return obj.functions[i];

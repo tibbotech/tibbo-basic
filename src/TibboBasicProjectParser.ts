@@ -428,6 +428,7 @@ class ParserListener extends TibboBasicParserListener {
                         stopToken: ctx.start
                     },
                     parameters: [],
+                    variables: [],
                     dataType: '',
                     comments: []
                 });
@@ -633,7 +634,7 @@ class ParserListener extends TibboBasicParserListener {
         const param = {
             name: ctx.name.text,
             dataType: valueType,
-            byref: ctx.byref != null
+            byRef: ctx.byref != null
         };
         this.parser.addVariable(variable);
         if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_subStmt) {
@@ -819,6 +820,7 @@ class ParserListener extends TibboBasicParserListener {
                     name: name,
                     parameters: [],
                     comments: [],
+                    variables: [],
                     references: []
                 };
             }

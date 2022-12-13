@@ -1,15 +1,20 @@
 {
 	"compilerOptions": {
+		"declaration": true,
 		"target": "es2019",
 		"lib": ["ES2019"],
 		"module": "commonjs",
         "moduleResolution": "node",
+		"preserveConstEnums": true,
 		"sourceMap": true,
 		"allowJs": true,
 		"strict": false,
 		"outDir": "lib",
 		"rootDir": "src",
-		"noImplicitAny": false
+		"noImplicitAny": false,
+		"typeRoots": [
+            "./node_modules/@types"
+        ]
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules"]
