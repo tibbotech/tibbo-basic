@@ -2,8 +2,8 @@ import path = require('path');
 import TibboBasicTranspiler from '../src/TibboBasicTranspiler';
 import fs = require('fs');
 import ini = require('ini');
-import TibboBasicProjectTranspiler from '../src/TibboBasicProjectTranspiler';
-import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
+import { TibboBasicProjectTranspiler } from '../src/TibboBasicProjectTranspiler';
+import { TibboBasicPreprocessor } from '../src/TibboBasicPreprocessor';
 
 const supportedFileTypes = ['.tbs', '.tbh', '.tph', '.xtxt'];
 try {

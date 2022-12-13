@@ -28,7 +28,7 @@ const OBJ_NAMESPACES = {
 };
 
 
-export default class TibboBasicProjectTranspiler {
+export class TibboBasicProjectTranspiler {
 
     output = '';
     lines: string[] = [];

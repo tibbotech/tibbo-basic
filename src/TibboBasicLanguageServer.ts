@@ -37,7 +37,7 @@ import TibboBasicDocumentFormatter from './TibboBasicDocumentFormatter';
 import fs = require('fs');
 import path = require('path');
 import ini = require('ini');
-import TibboBasicPreprocessor from './TibboBasicPreprocessor';
+import { TibboBasicPreprocessor } from './TibboBasicPreprocessor';
 import TibboBasicProjectParser from './TibboBasicProjectParser';
 import { CommonToken } from 'antlr4';
 import { TBVariable, TBParameter, TBObject, TBObjectProperty, TBSymbolType, TBRange, TBFunction } from './types';

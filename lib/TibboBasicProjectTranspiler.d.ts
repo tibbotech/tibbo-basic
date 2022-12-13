@@ -1,5 +1,5 @@
 import { TBObject, TBFunction, TBConst, TBVariable, TBSyscall, TBType, TBEvent } from './types';
-export default class TibboBasicProjectTranspiler {
+export declare class TibboBasicProjectTranspiler {
     output: string;
     lines: string[];
     currentLine: string;

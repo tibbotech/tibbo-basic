@@ -2,7 +2,7 @@ import { TBDefine } from './types';
 import { TerminalNodeImpl } from 'antlr4/tree/Tree';
 import { InputStream, ParserRuleContext } from 'antlr4';
 declare const TibboBasicPreprocessorParserListener: any;
-export default class TibboBasicPreprocessor {
+export declare class TibboBasicPreprocessor {
     projectPath: string;
     platformType: string;
     platformsPath: string;

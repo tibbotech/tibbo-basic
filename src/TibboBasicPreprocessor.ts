@@ -14,7 +14,7 @@ const TibboBasicPreprocessorParser = require('../language/TibboBasic/lib/TibboBa
 const TibboBasicPreprocessorParserListener = require('../language/TibboBasic/lib/TibboBasicPreprocessorParserListener').TibboBasicPreprocessorParserListener;
 
 
-export default class TibboBasicPreprocessor {
+export class TibboBasicPreprocessor {
 
     projectPath: string;
     platformType: string;

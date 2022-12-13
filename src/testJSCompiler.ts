@@ -3,7 +3,7 @@ import TibboBasicTranspiler from './TibboBasicTranspiler';
 import fs = require('fs');
 import TibboBasicJavascriptCompiler from './TibboBasicJavascriptCompiler';
 import ini = require('ini');
-import TibboBasicPreprocessor from './TibboBasicPreprocessor';
+import { TibboBasicPreprocessor } from './TibboBasicPreprocessor';
 import { Worker } from 'worker_threads';
 
 const supportedFileTypes = ['.tbs', '.tbh', '.tph', '.xtxt'];
