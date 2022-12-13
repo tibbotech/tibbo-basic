@@ -22,6 +22,44 @@ function datetime_mins_to_timestamp(mins as word) as dword
     td_local_to_gmt(datetime_days,datetime_minutes,APP_TIMEZONE,PL_OFF)
     datetime_mins_to_timestamp=datetime_to_timestamp(datetime_days,datetime_minutes,0)
 end function
+
+
+#if WLN_AVAILABLE
+sub callback_wln_failure(wln_state as en_wln_status_codes)
+    
+end sub
+#endif
+        
+
+sub callback_wln_ok()
+    
+end sub
+
+
+sub callback_wln_starting_association()
+    
+end sub
+        
+
+sub callback_wln_pre_buffrq(required_buff_pages as byte)
+    
+end sub
+        
+
+sub callback_wln_mkey_progress_update(progress as byte)
+    
+end sub
+        
+
+sub callback_wln_rescan_result(current_rssi as byte, scan_rssi as byte, different_ap as no_yes)
+    
+end sub
+        
+
+sub callback_wln_rescan_for_better_ap()
+    
+end sub
+
             
 
 sub callback_dhcp_ok(renew as no_yes, interface as pl_sock_interfaces, byref ip as string, byref gateway_ip as string, byref netmask as string, lease_time as dword)
@@ -43,6 +81,7 @@ sub callback_dhcp_pre_buffrq(required_buff_pages as byte)
     
 end sub
         
+
 sub callback_dhcp_buff_released()
     
 end sub
@@ -58,7 +97,17 @@ sub interface_set(interface as pl_sock_interfaces, state as no_yes)
     if interface_ready(PL_SOCK_INTERFACE_NET) = yes then
         best_interface = PL_SOCK_INTERFACE_NET
     else
-        
+        #IF WLN_AVAILABLE
+            
+            if interface_ready(PL_SOCK_INTERFACE_WLN) = yes then
+                best_interface = PL_SOCK_INTERFACE_WLN
+            end if
+        #ENDIF
+        #IF CELLULAR_AVAILABLE
+            if interface_ready(PL_SOCK_INTERFACE_PPP) = yes then
+                best_interface = PL_SOCK_INTERFACE_PPP
+            end if
+        #ENDIF
     end if
     
     change_current_interface(best_interface)

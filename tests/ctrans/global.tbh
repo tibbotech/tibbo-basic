@@ -25,6 +25,7 @@ includepp "tables.xtxt"
 
 include "libraries/sock/sock.tbh"
 include "libraries/time/time.tbh"
+include "libraries/wln/wln.tbh"
 include "libraries/dhcp/dhcp.tbh"
 include "libraries/time/datetime.tbh"
 include "libraries/utils/utils.tbh"

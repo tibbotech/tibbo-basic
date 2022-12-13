@@ -99,7 +99,7 @@ dim wln_key as string(32)
 	dim wln_ap_name as string(32)
 	dim wln_scan_and_assoc_in_prog as no_yes
 	dim wln_init_flag as word
-	dim wln_associated as pl_wln_check_association_retval
+	dim wln_associated as pl_wln_association_states
 	
 #if GA1000
 	#if WLN_WPA
@@ -327,7 +327,7 @@ public function wln_change(byref ap_name as string,security_mode as pl_wln_secur
 	wln_ap_name=ap_name
 	wln_security_mode=security_mode
 	wln_key=key
-	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+	wln_associated=PL_WLN_NOT_ASSOCIATED
 
 	if wln.enabled=NO then
 		wln_change=WLN_STATUS_NOT_STARTED
@@ -347,7 +347,7 @@ public function wln_change(byref ap_name as string,security_mode as pl_wln_secur
 
 	if wln_prepare_security(security_mode,key)<>WLN_STATUS_OK then goto wln_change_error
 
-	wln.disassociate
+	wln.disassociate()
 	exit function
 
 wln_change_error:
@@ -387,7 +387,7 @@ public sub wln_stop()
 	wend
 
 	wln_scan_and_assoc_in_prog=NO
-	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+	wln_associated=PL_WLN_NOT_ASSOCIATED
 	wln.disable()
 	while wln.enabled=YES
 	wend	 
@@ -523,7 +523,7 @@ sub wln_update_rssi()
 end sub
 
 '----------------------------------------------------------------------------
-function wln_check_association() as pl_wln_check_association_retval
+function wln_check_association() as pl_wln_association_states
 	wln_check_association=wln_associated
 end function
 
@@ -551,7 +551,7 @@ public sub wln_proc_timer()
 		end if
 	end if
 
-	if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
+	if wln_associated=PL_WLN_ASSOCIATED then
 		if wln.task=PL_WLN_TASK_IDLE then
 			if wln_rescan_requested<>NO then
 				wln_rescan()
@@ -563,7 +563,7 @@ public sub wln_proc_timer()
 		end if
 	end if
 
-	if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
+	if wln_associated=PL_WLN_ASSOCIATED then
 		#if WLN_KEEP_ALIVE
 			if wln_keep_alive_tmr>0 then
 				wln_keep_alive_tmr=wln_keep_alive_tmr-1
@@ -751,7 +751,7 @@ public sub wln_proc_data()
 						wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,wpakey,PL_WLN_WPA_CAST_MULTICAST) ''<<<<<<<<<<<@@@@@	
 					end if
 					
-					wln_associated=WLN_ASSOCIATION_RETVAL_YES
+					wln_associated=PL_WLN_ASSOCIATED
 					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
 					callback_wln_ok()
 					#if WLN_KEEP_ALIVE=1
@@ -815,7 +815,7 @@ public sub wln_proc_data()
 				wln_wpa_supplicant_send_2_of_2(key_info,ver,replay_counter,wln_mic_key)
 
 					if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
-					wln_associated=WLN_ASSOCIATION_RETVAL_YES
+					wln_associated=PL_WLN_ASSOCIATED
 					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
 					callback_wln_ok()
 				end if
@@ -931,7 +931,7 @@ public sub wln_proc_task_complete(completed_task as pl_wln_tasks)
 			wln_debugprint("ASSOCIATE with "+wln_ap_name+" (bssid: "+wln.scanresultbssid+", ch: "+str(wln.scanresultchannel)+")")
 		#endif
 
-		wln_associated=WLN_ASSOCIATION_RETVAL_INPROG
+		wln_associated=PL_WLN_ASSOCIATION_INPROG
 		callback_wln_starting_association()
 		if wln.associate(wln.scanresultbssid,wln_ap_name,wln.scanresultchannel,wln.scanresultbssmode)<>ACCEPTED then
 			wln_result=WLN_STATUS_UNEXPECTED_ERROR
@@ -957,7 +957,7 @@ public sub wln_proc_task_complete(completed_task as pl_wln_tasks)
 					    wln_debugprint("---ASSOCIATED(WPA1 or WPA2)---")
 #endif                     
                         'WA2000 is already associated at this stage. The wln_associated value is set after wpa for GA1000
-                        wln_associated=WLN_ASSOCIATION_RETVAL_YES 
+                        wln_associated=PL_WLN_ASSOCIATED 
 					    callback_wln_ok() 
                     end if 
 					goto finish
@@ -971,7 +971,7 @@ public sub wln_proc_task_complete(completed_task as pl_wln_tasks)
 			#if WLN_DEBUG_PRINT
 				wln_debugprint("---ASSOCIATED(WEP64, WEP128, or no security)---")
 			#endif
-			wln_associated=WLN_ASSOCIATION_RETVAL_YES
+			wln_associated=PL_WLN_ASSOCIATED
 			wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
 			callback_wln_ok()
 			goto finish
@@ -994,7 +994,7 @@ finish:
 		#if WLN_DEBUG_PRINT
 			wln_debug_print_status(wln_result)
 		#endif
-		wln_associated=WLN_ASSOCIATION_RETVAL_NO
+		wln_associated=PL_WLN_NOT_ASSOCIATED
 		callback_wln_failure(wln_result)
 	end if
 end sub
@@ -1012,8 +1012,8 @@ public sub wln_proc_event(wln_event as pl_wln_events)
 			wln_debug_print_status(WLN_STATUS_DISASSOCIATION)
 		#endif
 
-		if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
-			wln_associated=WLN_ASSOCIATION_RETVAL_NO
+		if wln_associated=PL_WLN_ASSOCIATED then
+			wln_associated=PL_WLN_NOT_ASSOCIATED
 			callback_wln_failure(WLN_STATUS_DISASSOCIATION)
 		else
 			callback_wln_failure(WLN_STATUS_ASSOCIATION_FAILURE) 'means we've been kicked out during WPA handshake
@@ -1031,7 +1031,7 @@ public sub wln_check_for_better_ap(rssi_lvl as byte)
 	dim ongoing_connection as no_yes
 	
 	sock_backup=sock.num
-	if wln_check_association()<>WLN_ASSOCIATION_RETVAL_YES then
+	if wln_check_association()<>PL_WLN_ASSOCIATED then
 		wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
 	else
 		'when we are associated...
@@ -1812,7 +1812,7 @@ sub wln_init()
 'upload the firmware for wifi module and setup WEP
 	
 	wln_scan_and_assoc_in_prog=NO
-	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+	wln_associated=PL_WLN_NOT_ASSOCIATED
 	wln_rescan_in_prog=NO
 	wln_rescan_requested=NO
 	wln_updaterssi_requested=NO

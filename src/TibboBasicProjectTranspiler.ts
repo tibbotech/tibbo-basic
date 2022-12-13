@@ -110,7 +110,7 @@ ${contents}
 #include "base/ntios_base.h"
 #include "base/ntios_config.h"
 #include "base/ntios_property.h"
-#include "threads/ntios_includes.h"
+#include "io/ntios_io_map.h"
 
 /* NAMESPACES */
 namespace ntios {
@@ -122,7 +122,7 @@ namespace ${namespace} {
 #include <emscripten.h>
 #include "${name}/ntios_${name}.h"
 
-ntios::${namespace}::${name.toUpperCase()} ${name};
+
 
 namespace ntios {
 namespace ${namespace} {
@@ -252,7 +252,7 @@ project(ntios_app VERSION 0.1.0)
 message("---------------Configuring ntios app start---------------")
 
 
-include_directories(\${CMAKE_SOURCE_DIR}/ 
+include_directories(
                     \${CMAKE_SOURCE_DIR}/ntios/webasm/app/
                     \${CMAKE_SOURCE_DIR}/ntios/webasm/
                     \${CMAKE_SOURCE_DIR}/ntios/xpat/)

@@ -73,6 +73,7 @@ enum pl_wln_association_states
     PL_WLN_NOT_ASSOCIATED,      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is idle.
     PL_WLN_ASSOCIATED,      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is associated with a wireless network.
     PL_WLN_OWN_NETWORK      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is running its own ad-hoc network.   
+    PL_WLN_ASSOCIATION_INPROG
 end enum
 
 property wln.associationstate

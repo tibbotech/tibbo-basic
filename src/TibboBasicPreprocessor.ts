@@ -243,7 +243,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                 if (this.currentBlock == undefined || (this.currentBlock
                     && this.currentBlock.shouldEvaluate)) {
                     if (this.currentBlock) {
-                        if (this.currentBlock.evaluationResults[0]) {
+                        if (this.currentBlock.evaluationResults[this.currentBlock.evaluationResults.length - 1]) {
                             shouldEvaluate = true;
                         }
                     }

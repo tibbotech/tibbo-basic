@@ -124,7 +124,7 @@ declare function wln_get_info(info_element as wln_info_elements, byref extra_dat
 declare function wln_start(byref ap_name as string, security_mode as pl_wln_security_modes, byref key as string, domain as pl_wln_domains, active_scan as no_yes, scanfilter as pl_wln_scan_filter) as en_wln_status_codes
 declare function wln_change(byref ap_name as string,security_mode as pl_wln_security_modes,byref key as string) as en_wln_status_codes
 declare sub wln_stop()
-declare function wln_check_association() as pl_wln_check_association_retval
+declare function wln_check_association() as pl_wln_association_states
 declare sub wln_proc_timer()
 
 declare sub wln_proc_event(wln_event as pl_wln_events)
