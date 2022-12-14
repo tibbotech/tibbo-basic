@@ -1,7 +1,7 @@
 import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
+import { TibboBasicTranspiler } from './TibboBasicTranspiler';
 import fs = require('fs');
-import TibboBasicJavascriptCompiler from './TibboBasicJavascriptCompiler';
+import { TibboBasicJavascriptCompiler } from './TibboBasicJavascriptCompiler';
 import ini = require('ini');
 import { TibboBasicPreprocessor } from './TibboBasicPreprocessor';
 import { Worker } from 'worker_threads';

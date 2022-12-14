@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
+import { TibboBasicTranspiler } from './TibboBasicTranspiler';
 import fs = require('fs');
 const { resolve } = require('path');
 const { readdir } = require('fs').promises;

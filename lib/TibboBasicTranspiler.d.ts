@@ -1,5 +1,5 @@
 import { TBObject, TBFunction, TBVariable } from './types';
-export default class TibboBasicTranspiler {
+export declare class TibboBasicTranspiler {
     output: string;
     lines: string[];
     currentLine: string;

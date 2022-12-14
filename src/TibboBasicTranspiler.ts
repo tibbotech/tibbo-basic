@@ -3,7 +3,7 @@ import fs = require('fs');
 
 // import path = require('path');
 // import ini = require('ini');
-import TibboBasicErrorListener from './TibboBasicErrorListener';
+import { TibboBasicErrorListener } from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
 import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol, TBParameter } from './types';
 import { CommonToken } from 'antlr4/Token';
@@ -18,7 +18,7 @@ const TibboBasicParser = require('../language/TibboBasic/lib/TibboBasicParser').
 const TibboBasicParserListener = require('../language/TibboBasic/lib/TibboBasicParserListener').TibboBasicParserListener;
 const syscalls = require('../language/TibboBasic/syscalls.json');
 
-export default class TibboBasicTranspiler {
+export class TibboBasicTranspiler {
 
     output = '';
     lines: string[] = [];
@@ -307,7 +307,7 @@ class ParserListener extends TibboBasicParserListener {
                 if (hasAssignment) {
                     valueType = 'string&';
                 }
-                
+
             }
         }
         if (this.currentFunction !== undefined) {

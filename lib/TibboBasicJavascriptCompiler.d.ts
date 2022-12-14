@@ -18,7 +18,7 @@ interface TibboConstant {
     value: string;
     index: number;
 }
-export default class TibboBasicJavascriptCompiler {
+export declare class TibboBasicJavascriptCompiler {
     output: string;
     lines: string[];
     currentLine: string;

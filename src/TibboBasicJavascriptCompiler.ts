@@ -2,7 +2,7 @@
 import fs = require('fs');
 // import path = require('path');
 // import ini = require('ini');
-import TibboBasicErrorListener from './TibboBasicErrorListener';
+import { TibboBasicErrorListener } from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
 import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
 import { CommonToken } from 'antlr4/Token';
@@ -40,7 +40,7 @@ interface TibboConstant {
 }
 
 
-export default class TibboBasicJavascriptCompiler {
+export class TibboBasicJavascriptCompiler {
 
     output = '';
     lines: string[] = [];
@@ -100,8 +100,8 @@ romfile.files['${files[i].name}'] = \`${lines.join('')}\`;`;
         const tios = fs.readFileSync(path.join(__dirname, 'tios.js'), 'utf-8');
         output = tios + output;
 
-        
-        
+
+
 
         output += `
 startSimulator(app);
@@ -546,7 +546,7 @@ class ParserListener extends TibboBasicParserListener {
                     if (this.compiler.constants[dataSize] !== undefined) {
                         size = parseInt(this.compiler.constants[dataSize].value);
                     }
-                } catch(ex) {
+                } catch (ex) {
                     // 
                 }
                 for (let i = 0; i < size; i++) {
@@ -554,7 +554,7 @@ class ParserListener extends TibboBasicParserListener {
                 }
                 initCode += ` = [${tmp.join(',')}]`;
             }
-            
+
         }
 
         // this.compiler.addCode(`${this.isGlobalVariable ? 'extern ' : ''}${dataType} ${variableList}${initCode};`, ctx.start.line);

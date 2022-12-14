@@ -2,7 +2,7 @@ import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, 
 import { CommonToken } from 'antlr4/Token';
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { CommonTokenStream } from 'antlr4/CommonTokenStream';
-export default class TibboBasicProjectParser {
+export declare class TibboBasicProjectParser {
     objects: {
         [name: string]: TBObject;
     };

@@ -2,7 +2,7 @@
 import fs = require('fs');
 // import path = require('path');
 // import ini = require('ini');
-import TibboBasicErrorListener from './TibboBasicErrorListener';
+import { TibboBasicErrorListener } from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
 import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
 import { CommonToken } from 'antlr4/Token';
@@ -14,7 +14,7 @@ const TibboBasicLexer = require('../language/TibboBasic/lib/TibboBasicLexer').Ti
 const TibboBasicParser = require('../language/TibboBasic/lib/TibboBasicParser').TibboBasicParser;
 const TibboBasicParserListener = require('../language/TibboBasic/lib/TibboBasicParserListener').TibboBasicParserListener;
 
-export default class TibboBasicProjectParser {
+export class TibboBasicProjectParser {
 
     objects: { [name: string]: TBObject } = {};
     syscalls: { [name: string]: TBSyscall } = {};
@@ -647,7 +647,7 @@ class ParserListener extends TibboBasicParserListener {
             const objName = ctx.parentCtx.parentCtx.object;
             if (objName) {
                 const obj = this.parser.objects[ctx.parentCtx.parentCtx.children[0].symbol.text];
-                const prop = ctx.parentCtx.parentCtx.children[2].symbol.text;
+                const prop = ctx.parentCtx.parentCtx.children[2].symbol.text;                
                 for (let i = 0; i < obj.functions.length; i++) {
                     if (obj.functions[i].name == prop) {
                         obj.functions[i].parameters.push(param);

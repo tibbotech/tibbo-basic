@@ -1,9 +1,9 @@
 import path = require('path');
-import TibboBasicTranspiler from '../src/TibboBasicTranspiler';
+import { TibboBasicTranspiler } from '../src/TibboBasicTranspiler';
 import fs = require('fs');
 import ini = require('ini');
-import TibboBasicProjectTranspiler from '../src/TibboBasicProjectTranspiler';
-import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
+import { TibboBasicProjectTranspiler } from '../src/TibboBasicProjectTranspiler';
+import { TibboBasicPreprocessor } from '../src/TibboBasicPreprocessor';
 
 const supportedFileTypes = ['.tbs', '.tbh', '.tph', '.xtxt'];
 test('C transpiler test', async () => {
@@ -21,18 +21,12 @@ test('C transpiler test', async () => {
         const preprocessor = new TibboBasicPreprocessor(workspaceRoot, PLATFORMS_PATH);
         const files: any[] = [];
         preprocessor.parsePlatforms();
-        // for (let i = 0; i < preprocessor.filePriorities.length; i++) {
-        //     const priority = preprocessor.filePriorities[i];
-        //     const file = preprocessor.files[priority];
-        //     if (file) {
-        //         files.push(file);
-        //     }
-        // }
+
         for (let i = 1; i < max; i++) {
             const entryName = 'file' + i.toString();
             if (tpr[entryName] != undefined) {
                 const originalFilePath = tpr[entryName]['path'].split('\\').join(path.sep);
-                let filePath = originalFilePath;
+                const filePath = originalFilePath;
 
                 const ext = path.extname(filePath);
                 if (!supportedFileTypes.includes(ext)) {
@@ -42,18 +36,49 @@ test('C transpiler test', async () => {
                 if (tpr[entryName]['location'] == 'commonlib') {
                     directory = PLATFORMS_PATH;
                 }
-                filePath = preprocessor.parseFile(directory, originalFilePath, false);
+                preprocessor.parseFile(directory, originalFilePath, false);
 
-                const fileContents = preprocessor.files[filePath];
-                files.push({
-                    name: originalFilePath,
-                    contents: fileContents
-                });
-            }
-            else {
-                break;
             }
         }
+
+        for (let i = 0; i < preprocessor.filePriorities.length; i++) {
+            const priority = preprocessor.filePriorities[i];
+            const file = preprocessor.files[priority];
+            if (file) {
+                const fileName = priority.substring(workspaceRoot.length + 1);
+                files.push({
+                    name: fileName,
+                    contents: file,
+                });
+            }
+        }
+
+        // for (let i = 1; i < max; i++) {
+        //     const entryName = 'file' + i.toString();
+        //     if (tpr[entryName] != undefined) {
+        //         const originalFilePath = tpr[entryName]['path'].split('\\').join(path.sep);
+        //         let filePath = originalFilePath;
+
+        //         const ext = path.extname(filePath);
+        //         if (!supportedFileTypes.includes(ext)) {
+        //             continue;
+        //         }
+        //         let directory = dirName;
+        //         if (tpr[entryName]['location'] == 'commonlib') {
+        //             directory = PLATFORMS_PATH;
+        //         }
+        //         filePath = preprocessor.parseFile(directory, originalFilePath, false);
+
+        //         const fileContents = preprocessor.files[filePath];
+        //         files.push({
+        //             name: originalFilePath,
+        //             contents: fileContents
+        //         });
+        //     }
+        //     else {
+        //         break;
+        //     }
+        // }
         // const inputcode = fs.readFileSync(path.join(__dirname, '..', 'testgoto.js'), 'utf-8');
         // const outputcode = gotojs(inputcode);
         // console.log(outputcode);
@@ -81,12 +106,20 @@ test('C transpiler test', async () => {
         const output = projectTranspiler.transpile(files);
         for (let i = 0; i < output.length; i++) {
             const filePath = output[i].name;
-            const newFilePath = path.join('/Users/jimmyhu/Projects/ntios/webasm/app', filePath);
+            const contents = output[i].contents;
+            let newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/webasm/app', filePath);
+            if (filePath.indexOf('ntios_') > -1 || filePath.indexOf('/CMakeLists.txt') > -1) {
+                newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/webasm', filePath);
+                if (path.extname(filePath) === '.h') {
+                    newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/xpat', filePath);
+                }
+            }
             if (!fs.existsSync(newFilePath)) {
                 fs.mkdirSync(path.dirname(newFilePath), { recursive: true });
             }
-            fs.writeFileSync(newFilePath, output);
+            fs.writeFileSync(newFilePath, contents);
         }
+        console.log('transpile completed');
     }
     catch (ex) {
         console.log(ex);

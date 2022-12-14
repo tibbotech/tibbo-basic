@@ -2,11 +2,12 @@
 import fs = require('fs');
 import path = require('path');
 import ini = require('ini');
-import TibboBasicErrorListener from './TibboBasicErrorListener';
+import { TibboBasicErrorListener } from './TibboBasicErrorListener';
 import { TBDefine } from './types';
 // import { ParserRuleContext } from 'antlr4';
 import { TerminalNodeImpl } from 'antlr4/tree/Tree';
 import { InputStream, ParserRuleContext } from 'antlr4';
+import { getHeapStatistics } from 'v8';
 
 const antlr4 = require('antlr4');
 const TibboBasicPreprocessorLexer = require('../language/TibboBasic/lib/TibboBasicPreprocessorLexer').TibboBasicPreprocessorLexer;
@@ -281,8 +282,12 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                             }
                         }
                     }
-                    if (!(this.currentBlock.parentBlock && this.currentBlock.parentBlock.evaluationResults[0])) {
-                        found = true;
+                    if (!(this.currentBlock.parentBlock)) {
+                        for (let i = 0; i < this.currentBlock.evaluationResults.length; i++) {
+                            if (this.currentBlock.evaluationResults[i]) {
+                                found = true;
+                            }
+                        }
                     }
                     if (!found) {
                         this.addCode(ctx);
@@ -332,9 +337,10 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                         break;
                     default:
                         {
-                            const name = item.children[0].start.text;
-                            const evalValue = this.getDefineValue(item.children[2].start.text);
-                            const definedValue = this.getDefineValue(name);
+                            const name1 = item.children[0].start.text;
+                            const name2 = item.children[2].start.text;
+                            const evalValue = this.getDefineValue(name1);
+                            const definedValue = this.getDefineValue(name2);
                             switch (item.op.type) {
                                 case TibboBasicPreprocessorParser.EQUAL:
                                     result = evalValue == definedValue;

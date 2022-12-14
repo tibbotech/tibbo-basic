@@ -6,7 +6,7 @@ declare const antlr4: any;
  *
  * @returns {object}
  */
-export default class TibboBasicErrorListener extends antlr4.error.ErrorListener {
+export declare class TibboBasicErrorListener extends antlr4.error.ErrorListener {
     errors: Array<TBSyntaxError>;
     /**
      * Checks syntax error

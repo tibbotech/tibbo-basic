@@ -1,15 +1,16 @@
-import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
+import { TibboBasicPreprocessor } from '../src/TibboBasicPreprocessor';
 const fs = require('fs');
 const path = require('path');
-import TibboBasicErrorListener from '../src/TibboBasicErrorListener';
+import { TibboBasicErrorListener } from '../src/TibboBasicErrorListener';
 const antlr4 = require('antlr4');
 const TibboBasicPreprocessorLexer = require('../language/TibboBasic/lib/TibboBasicPreprocessorLexer').TibboBasicPreprocessorLexer;
 const TibboBasicPreprocessorParser = require('../language/TibboBasic/lib/TibboBasicPreprocessorParser').TibboBasicPreprocessorParser;
 import { PreprocessorListener } from '../src/TibboBasicPreprocessor';
 
 
-const PLATFORMS_PATH = path.join(__dirname, 'Platforms');
-const preprocessor: TibboBasicPreprocessor = new TibboBasicPreprocessor(__dirname, PLATFORMS_PATH);
+const projectTestPath = path.join(__dirname, 'parserTests');
+const PLATFORMS_PATH = path.join(projectTestPath, 'Platforms');
+const preprocessor: TibboBasicPreprocessor = new TibboBasicPreprocessor(projectTestPath, PLATFORMS_PATH);
 const extensions = ['.tph', '.tbs', '.tbh'];
 
 function getDirTests(dir: string) {
@@ -43,10 +44,10 @@ function getDirTests(dir: string) {
             try {
                 antlr4.tree.ParseTreeWalker.DEFAULT.walk(tmpPreprocessor, tree);
             }
-            catch(ex) {
+            catch (ex) {
                 console.log(tmpPath);
             }
-            
+
             expect(errorListener.errors.length).toBe(0);
         });
     }

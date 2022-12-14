@@ -12,7 +12,7 @@ const antlr4 = require('antlr4');
  */
 
 
-export default class TibboBasicErrorListener extends antlr4.error.ErrorListener {
+export class TibboBasicErrorListener extends antlr4.error.ErrorListener {
 
 	errors: Array<TBSyntaxError> = [];
 

@@ -35,7 +35,7 @@ const blockEnd = [
 
 
 
-export default class TibboBasicDocumentFormatter {
+export class TibboBasicDocumentFormatter {
 	public formatDocument(document: TextDocument, formatParams: DocumentFormattingParams):
 		Thenable<TextEdit[]> {
 			const edits: TextEdit[] = [];

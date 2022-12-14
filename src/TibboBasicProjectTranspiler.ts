@@ -2,14 +2,14 @@
 import fs = require('fs');
 // import path = require('path');
 // import ini = require('ini');
-import TibboBasicErrorListener from './TibboBasicErrorListener';
+import { TibboBasicErrorListener } from './TibboBasicErrorListener';
 // import { CommonToken } from 'antlr4/Token';
 import { TBObject, TBEnum, TBFunction, TBConst, TBVariable, TBScope, TBSyscall, TBType, TBSyntaxError, TBEvent, TBRange, TBSymbol } from './types';
 import { CommonToken } from 'antlr4/Token';
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { CommonTokenStream } from 'antlr4/CommonTokenStream';
 import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
+import { TibboBasicTranspiler } from './TibboBasicTranspiler';
 
 const antlr4 = require('antlr4');
 const TibboBasicLexer = require('../language/TibboBasic/lib/TibboBasicLexer').TibboBasicLexer;
@@ -56,7 +56,7 @@ export class TibboBasicProjectTranspiler {
             }
 
             filePath = filePath.substr(0, filePath.length - path.extname(filePath).length) + outputExtension;
-            
+
             if (outputExtension === '.cpp' && ['.tbs', 'tbh'].includes(originalExt)) {
                 sourceFiles.push(`\${CMAKE_CURRENT_SOURCE_DIR}/${filePath}`);
             }

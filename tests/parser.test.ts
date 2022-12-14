@@ -1,30 +1,32 @@
 
-import TibboBasicPreprocessor from '../src/TibboBasicPreprocessor';
-import TibboBasicProjectParser from '../src/TibboBasicProjectParser';
+import { TibboBasicPreprocessor } from '../src/TibboBasicPreprocessor';
+import { TibboBasicProjectParser } from '../src/TibboBasicProjectParser';
 const fs = require('fs');
 const path = require('path');
 const ini = require('ini');
 
-const PLATFORMS_PATH = path.join(__dirname, 'Platforms');
+const projectTestPath = path.join(__dirname, 'parserTests');
+const PLATFORMS_PATH = path.join(projectTestPath, 'Platforms');
 const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
 
 
-const platformPreprocessor = new TibboBasicPreprocessor(path.join(__dirname), PLATFORMS_PATH);
+const platformPreprocessor = new TibboBasicPreprocessor(projectTestPath, PLATFORMS_PATH);
 const platformProjectParser = new TibboBasicProjectParser();
-const preprocessor = new TibboBasicPreprocessor(__dirname, PLATFORMS_PATH);
+const preprocessor = new TibboBasicPreprocessor(projectTestPath, PLATFORMS_PATH);
 const projectParser = new TibboBasicProjectParser();
 let tprPath = '';
 platformPreprocessor.parsePlatforms();
-fs.readdirSync(__dirname).forEach(file => {
+fs.readdirSync(projectTestPath).forEach(file => {
     const ext = path.extname(file);
     if (ext == '.tpr') {
-        tprPath = path.join(__dirname, file);
+        tprPath = path.join(projectTestPath, file);
     }
 });
 const tpr = ini.parse(fs.readFileSync(tprPath, 'utf-8'));
 const max = 999;
 const dirName = path.dirname(tprPath);
-for (const filePath in platformPreprocessor.files) {
+for (let i = 0; i < platformPreprocessor.filePriorities.length; i++) {
+    const filePath = platformPreprocessor.filePriorities[i];
     test('Parser Test ' + filePath, () => {
         const fileContents = platformPreprocessor.files[filePath];
         platformProjectParser.parseFile(filePath, fileContents);

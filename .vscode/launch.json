@@ -86,21 +86,37 @@
 			"cwd": "${workspaceRoot}",
 		},
 		{
-			"name": "TranspileTest",
-			"type": "node",
-			"request": "launch",
-			"args": [
-				"${workspaceFolder}/tests/ctranspile.ts"
-			],
-			"runtimeArgs": [
-				"--nolazy",
-				"-r",
-				"ts-node/register"
-			],
-			"sourceMaps": true,
-			"cwd": "${workspaceRoot}",
-			"protocol": "inspector"
-		},
+            "type": "node",
+            "request": "launch",
+            "name": "Transpile Test",
+            "program": "${workspaceFolder}/node_modules/.bin/jest",
+            "args": [
+				"/tests/ctranspiler.test.ts",
+                "--runInBand" //for debug
+            ],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "disableOptimisticBPs": true,
+            "windows": {
+                "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+            }
+        },
+		{
+            "type": "node",
+            "request": "launch",
+            "name": "Test Parser",
+            "program": "${workspaceFolder}/node_modules/.bin/jest",
+            "args": [
+                "tests/parser.test.ts",
+                "--runInBand" //for debug
+            ],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "disableOptimisticBPs": true,
+            "windows": {
+                "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+            }
+        },
 	],
 	"compounds": [
 		{
