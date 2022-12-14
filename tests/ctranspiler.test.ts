@@ -104,21 +104,25 @@ test('C transpiler test', async () => {
 
         const projectTranspiler = new TibboBasicProjectTranspiler();
         const output = projectTranspiler.transpile(files);
-        for (let i = 0; i < output.length; i++) {
-            const filePath = output[i].name;
-            const contents = output[i].contents;
-            let newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/webasm/app', filePath);
-            if (filePath.indexOf('ntios_') > -1 || filePath.indexOf('/CMakeLists.txt') > -1) {
-                newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/webasm', filePath);
-                if (path.extname(filePath) === '.h') {
-                    newFilePath = path.join('/Users/jimmyhu/Projects/ntios/ntios/xpat', filePath);
+        const outputBase = 'Users/jimmyhu/Projects/ntios/ntios';
+        if (fs.existsSync(outputBase)) {
+            for (let i = 0; i < output.length; i++) {
+                const filePath = output[i].name;
+                const contents = output[i].contents;
+                let newFilePath = path.join(outputBase, 'webasm', 'app', filePath);
+                if (filePath.indexOf('ntios_') > -1 || filePath.indexOf('/CMakeLists.txt') > -1) {
+                    newFilePath = path.join(outputBase, 'webasm', filePath);
+                    if (path.extname(filePath) === '.h') {
+                        newFilePath = path.join(outputBase, 'xpat', filePath);
+                    }
                 }
+                if (!fs.existsSync(newFilePath)) {
+                    fs.mkdirSync(path.dirname(newFilePath), { recursive: true });
+                }
+                fs.writeFileSync(newFilePath, contents);
             }
-            if (!fs.existsSync(newFilePath)) {
-                fs.mkdirSync(path.dirname(newFilePath), { recursive: true });
-            }
-            fs.writeFileSync(newFilePath, contents);
         }
+
         console.log('transpile completed');
     }
     catch (ex) {
