@@ -1,5 +1,5 @@
 {
-    "name": "@tibbo/tibbo-basic",
+    "name": "tibbo-basic",
     "displayName": "Tibbo Basic Language",
     "description": "Tibbo Basic Language Support",
     "author": {
@@ -7,13 +7,19 @@
         "email": "jimmy.hu@tibbo.com"
     },
     "license": "MIT",
-    "version": "1.0.16",
+    "version": "1.1.1",
     "repository": {
         "type": "git",
         "url": "https://github.com/tibbotech/tibbo-basic.git"
     },
+    "bugs": {
+        "url": "https://github.com/tibbotech/tibbo-basic/issues",
+        "email": "jimmy.hu@tibbo.com"
+    },
     "publisher": "tibbotech",
-    "categories": [],
+    "categories": [
+        "Programming Languages"
+    ],
     "keywords": [
         "tibbo-basic"
     ],
@@ -22,10 +28,11 @@
     },
     "activationEvents": [
         "onLanguage:tibbo-basic",
-        "workspaceContains:*.tpr"
+        "workspaceContains:*.tpr",
+        "workspaceContains:*.tbs"
     ],
     "icon": "images/icon.png",
-    "main": "./server/lib/index.js",
+    "main": "./client/out/extension.js",
     "scripts": {
         "compile": "tsc -b",
         "build": "tsc -b",

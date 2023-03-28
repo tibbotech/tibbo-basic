@@ -31,32 +31,5 @@
         "ts-loader": "^7.0.5",
         "typescript": "^3.9.3",
         "vsce": "1.74.0"
-    },
-    "activationEvents": [
-        "onLanguage:tibbo-basic"
-    ],
-    "contributes": {
-        "languages": [
-            {
-                "id": "tibbo-basic",
-                "aliases": [
-                    "Tibbo Basic"
-                ],
-                "extensions": [
-                    ".tbs",
-                    ".tbh",
-                    ".tph",
-                    ".tpr"
-                ],
-                "configuration": "./out/tibbo-basic-language-configuration.json"
-            }
-        ],
-        "grammars": [
-            {
-                "language": "tibbo-basic",
-                "scopeName": "source.tibbo-basic",
-                "path": "./out/tibbo-basic.tmLanguage.json"
-            }
-        ]
     }
 }
