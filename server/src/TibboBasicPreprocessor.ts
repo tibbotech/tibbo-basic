@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import fs = require('fs');
 import path = require('path');
 import ini = require('ini');
@@ -6,6 +7,7 @@ import { TBDefine } from './types';
 // import { ParserRuleContext } from 'antlr4';
 import { TerminalNodeImpl } from 'antlr4/tree/Tree';
 import { InputStream, ParserRuleContext } from 'antlr4';
+import { getHeapStatistics } from 'v8';
 
 const antlr4 = require('antlr4');
 const TibboBasicPreprocessorLexer = require('../language/TibboBasic/lib/TibboBasicPreprocessorLexer').TibboBasicPreprocessorLexer;
@@ -136,7 +138,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         this.currentBlock = undefined;
     }
 
-    enterCodeLine(ctx) {
+    enterCodeLine(ctx: any) {
         if (this.currentBlock != undefined) {
             if (this.currentBlock.shouldEvaluate) {
                 if (this.getCurrentStack()) {
@@ -154,7 +156,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    enterPreprocessorDefine(ctx) {
+    enterPreprocessorDefine(ctx: any) {
         if (this.getCurrentStack()) {
             const name = ctx.children[2].symbol.text;
             if (ctx.children.length == 4) {//define has value
@@ -175,7 +177,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    enterPreprocessorInclude(ctx) {
+    enterPreprocessorInclude(ctx: any) {
         if (this.getCurrentStack()) {
             const symbol = ctx.children[1].symbol.text;
             let filePath = symbol.substring(1, symbol.length - 1);
@@ -188,14 +190,17 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                 return;
             }
             this.preprocessor.parseFile(path.dirname(this.filePath), filePath, true);
+            if (path.extname(filePath) == '.tbh') {
+                this.preprocessor.parseFile(path.dirname(this.filePath), filePath.replace('.tbh', '.tbs'), true);
+            }
         }
     }
 
-    enterPreprocessorDef(ctx) {
+    enterPreprocessorDef(ctx: any) {
         if (this.currentBlock == undefined || this.currentBlock && this.currentBlock.shouldEvaluate) {
             this.addBlock(ctx);
             const type = ctx.children[1].symbol.type;
-            const name = ctx.children[2].symbol.text
+            const name = ctx.children[2].symbol.text;
             switch (type) {
                 case TibboBasicPreprocessorParser.IFDEF:
                     this.addEvaluationResult(this.preprocessor.defines[name] != undefined, ctx);
@@ -212,7 +217,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    enterPreprocessorUndef(ctx) {
+    enterPreprocessorUndef(ctx: any) {
         if (this.getCurrentStack()) {
             const name = ctx.children[1].symbol.text;
             this.defines[name] = undefined;
@@ -220,7 +225,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    enterPreprocessorEndConditional(ctx) {
+    enterPreprocessorEndConditional(ctx: any) {
         if (this.currentBlock != undefined) {
             if (this.currentBlock.shouldEvaluate) {
                 this.addCode(ctx);
@@ -232,14 +237,14 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    enterPreprocessorConditional(ctx) {
+    enterPreprocessorConditional(ctx: any) {
         let shouldEvaluate = false;
         switch (ctx.children[1].symbol.type) {
             case TibboBasicPreprocessorParser.IF:
                 if (this.currentBlock == undefined || (this.currentBlock
                     && this.currentBlock.shouldEvaluate)) {
                     if (this.currentBlock) {
-                        if (this.currentBlock.evaluationResults[0]) {
+                        if (this.currentBlock.evaluationResults[this.currentBlock.evaluationResults.length - 1]) {
                             shouldEvaluate = true;
                         }
                     }
@@ -277,6 +282,13 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                             }
                         }
                     }
+                    if (this.currentBlock && !(this.currentBlock.parentBlock)) {
+                        for (let i = 0; i < this.currentBlock.evaluationResults.length; i++) {
+                            if (this.currentBlock.evaluationResults[i]) {
+                                found = true;
+                            }
+                        }
+                    }
                     if (!found) {
                         this.addCode(ctx);
                         this.addEvaluationResult(true, ctx);
@@ -295,7 +307,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    evaluateStatement(ctx): boolean {
+    evaluateStatement(ctx: any): boolean {
         let result = true;
         let evalString = '';
         for (let i = 0; i < ctx.children.length; i++) {
@@ -306,7 +318,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         return result;
     }
 
-    evaluate(items) {
+    evaluate(items: any[]): boolean {
         let result = false;
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
@@ -325,9 +337,10 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
                         break;
                     default:
                         {
-                            const name = item.children[0].start.text;
-                            const evalValue = this.getDefineValue(item.children[2].start.text)
-                            const definedValue = this.getDefineValue(name);
+                            const name1 = item.children[0].start.text;
+                            const name2 = item.children[2].start.text;
+                            const evalValue = this.getDefineValue(name1);
+                            const definedValue = this.getDefineValue(name2);
                             switch (item.op.type) {
                                 case TibboBasicPreprocessorParser.EQUAL:
                                     result = evalValue == definedValue;
@@ -356,7 +369,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         return result;
     }
 
-    getItemStatement(item) {
+    getItemStatement(item: any) {
         let evalString = '';
         if (item.children) {
             for (let i = 0; i < item.children.length; i++) {
@@ -406,7 +419,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         if (this.preprocessor.defines[name] != undefined) {
             const define = this.preprocessor.defines[name];
             if (define.value != '') {
-                const nestedDefineValue = this.getDefineValue(define.value);
+                const nestedDefineValue: any = this.getDefineValue(define.value);
                 if (nestedDefineValue != name) {
                     return nestedDefineValue;
                 }
@@ -448,11 +461,11 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         }
     }
 
-    replaceRange(s, start, end, substitute) {
+    replaceRange(s: any, start: number, end: number, substitute: string) {
         return s.substring(0, start) + substitute + s.substring(end + 1);
     }
 
-    addBlock(ctx) {
+    addBlock(ctx: any) {
         let shouldEvaluate = false;
         if (this.currentBlock == undefined) {
             shouldEvaluate = true;

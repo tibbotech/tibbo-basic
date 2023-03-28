@@ -106,8 +106,8 @@ jumpStmt
 goToStmt : GOTO IDENTIFIER;
 
 ifThenElseStmt
-    : IF expression THEN (statement | jumpStmt) (ELSE (statement | jumpStmt))? NEWLINE # inlineIfThenElse
-    | IF expression THEN NEWLINE+ block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
+    : IF expression THEN statement (ELSE statement)? NEWLINE # inlineIfThenElse
+    | IF expression THEN NEWLINE* block (ELSEIF ifConditionStmt THEN block)* (ELSE block)? END_IF # blockIfThenElse
     ;
 
 ifConditionStmt : expression;
@@ -190,23 +190,8 @@ typeStmtElement:
 
 // operator precedence is represented by rule order
 
-//assignment: IDENTIFIER EQ expression;
-
-//expression
-//    : ('-' | NOT) expression
-//    | expression op=(MULT | DIV | MOD) expression
-//    | expression op=(PLUS | MINUS) expression
-//    | expression op=(LEQ | GEQ | LT | GT) expression
-//    | expression op=(NEQ | EQ) expression
-//    | expression op=(SHL | SHR | NOT | AND | XOR | OR) expression
-//    | literal
-//    | literal argList
-//    | LPAREN expression RPAREN
-//    ;
-
-
 expression
-    : unaryExpression
+    : unaryExpression NEWLINE*
     | expression op=(MULT | DIV | MOD) expression
     | expression op=(PLUS | MINUS) expression
     | expression op=(LEQ | GEQ | LT | GT) expression
