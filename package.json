@@ -34,6 +34,7 @@
     "icon": "images/icon.png",
     "main": "./client/out/extension.js",
     "scripts": {
+        "postinstall": "cd server && npm install",
         "compile": "tsc -b",
         "build": "tsc -b",
         "watch": "tsc -b -w",
