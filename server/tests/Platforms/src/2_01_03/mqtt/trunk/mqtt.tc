@@ -49,7 +49,7 @@ string<23> mqtt_pw;
 #endif
 
 //-------------------------------------------------------------
-void mqtt_start();
+void mqtt_start() {
 //API procedure, starts the MQTT library.
 //MUST be called first, before any other procedure in this library is used.
 

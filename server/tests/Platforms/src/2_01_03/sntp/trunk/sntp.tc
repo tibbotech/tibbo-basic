@@ -87,7 +87,7 @@ unsigned char sntp_retry_ctr;
 unsigned char sntp_reply_timer;
 
 //==============================================================================
-void sntp_init();
+void sntp_init() {
 //Initialize the sock for SNTP connection
 
 	sntp_phase = SNTP_PHASE_IDLE;

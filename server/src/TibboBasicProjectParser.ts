@@ -646,10 +646,12 @@ class ParserListener extends TibboBasicParserListener {
             if (objName) {
                 const obj = this.parser.objects[ctx.parentCtx.parentCtx.children[0].symbol.text];
                 const prop = ctx.parentCtx.parentCtx.children[2].symbol.text;
-                for (let i = 0; i < obj.functions.length; i++) {
-                    if (obj.functions[i].name == prop) {
-                        obj.functions[i].parameters.push(param);
-                        break;
+                if (obj) {
+                    for (let i = 0; i < obj.functions.length; i++) {
+                        if (obj.functions[i].name == prop) {
+                            obj.functions[i].parameters.push(param);
+                            break;
+                        }
                     }
                 }
             }

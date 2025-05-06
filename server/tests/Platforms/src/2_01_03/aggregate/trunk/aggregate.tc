@@ -170,7 +170,7 @@ void agg_convert_disk_data(string *data_string);
 #endif
 
 //================================================================================
-void agg_record_encode(string *encode_string, string *field_value);
+void agg_record_encode(string *encode_string, string *field_value) {
 	unsigned char l;
 	string stemp;
 

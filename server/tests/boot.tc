@@ -6,7 +6,7 @@ struct foo_struct {//structure with two members, and both are arrays
 	string s;
 };
 
-void boot();
+void boot() {
 
     unsigned char f;
     for (f=0; f <= MAX_NUM_INTERFACES-1; f++) {
