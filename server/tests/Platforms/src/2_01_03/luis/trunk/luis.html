@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="./web/bootstrap.min.css" />
+
+    <style>
+		html {
+			-ms-touch-action: manipulation;
+			touch-action: manipulation;
+		}
+
+        body {
+            background-color: #f8f9fa !important;
+        }
+		#logo {
+            height: 40px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 50%;
+            width: auto;
+            margin-top: 3px;
+		}
+		.nav {
+			flex-wrap: nowrap !important;
+		}
+
+		@media (max-width: 991.98px) {
+
+			.bd-navbar .navbar-nav-scroll {
+				max-width: 100%;
+				height: 2.5rem;
+				margin-top: .25rem;
+				overflow: hidden
+			}
+
+			.bd-navbar .navbar-nav-scroll .navbar-nav {
+				padding-bottom: 2rem;
+				overflow-x: auto;
+				white-space: nowrap;
+				-webkit-overflow-scrolling: touch
+			}
+
+            .navbar-brand {
+                margin-right: 0 !important;
+            }
+		}
+    </style>
+    <title>Settings Configurator</title>
+</head>
+<body>
+    <div id="settings-container">
+	</div>
+    <br/>
+    <script src="./web/jquery-3.3.1.slim.min.js"></script>
+    <script src="./web/popper.min.js"></script>
+    <script src="./web/bootstrap.min.js"></script>
+    <script src="./web/jquery.mask.min.js"></script>
+    <script src="./web/settings.js"></script>
+    <script>
+        var sdf = `
+        ####
+        `;
+        var settings = new Settings(sdf, $('#settings-container'));
+        settings.init();
+		setTimeout(function () {
+			settings.refreshSettings();
+		}, 500);
+    </script>
+</body>
+</html>

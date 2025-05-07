@@ -1,0 +1,1101 @@
+//***********************************************************************************************************
+//		PPPOE LIBRARY
+//***********************************************************************************************************
+
+#include "global.th"
+
+//--------------------------------------------------------------------
+#define PPPOE_STAMP "PPPoE> "
+#define PPPOE_CR_LF chr(13)+chr(10)
+#define PPPOE_SOCK_GET_SIGNATURE "PPE"
+#define PPPOE_INIT_SIGNATURE 0x46AF
+#define PPPOE_BUFFER_PAGES 2
+#define PPPOE_MAX_REPLY_WAIT_TIME 6
+#define PPPOE_MAX_RETRIES 3
+
+//--------------------------------------------------------------------
+enum pppoe_phases {
+	PPPOE_IDLE,
+	PPPOE_DISCOVERY,
+	PPPOE_SELECTION,
+	PPPOE_SESSION,
+	PPPOE_TERMINATION,
+	PPPOE_TERMINATION_AND_STOP
+};
+
+enum pppoe_sock_modes {
+	PPPOE_SOCK_MODE_NONE,
+	PPPOE_SOCK_MODE_PADI_PADO,
+	PPPOE_SOCK_MODE_PADR_PADS_PADT,
+	PPPOE_SOCK_MODE_SESSION
+};
+
+//--------------------------------------------------------------------
+void pppoe_send_padi();
+void pppoe_send_padr();
+void pppoe_send_padt();
+void pppoe_add_tag(string *packet_str, unsigned int tag_code, string *tag_data);
+ok_ng pppoe_get_verify_tag(string *packet_str, unsigned int tag_code, string *tag_data);
+void pppoe_send_lcp();
+void pppoe_send_reply(string *packet_str);
+void pppoe_send_auth();
+void pppoe_send_ip(string *ip);
+void pppoe_send_echo();
+void pppoe_lcp_add_tag(string *packet_str, unsigned char tag_code, string *tag_data);
+ok_ng pppoe_lcp_get_verify_tag(string *packet_str, unsigned char tag_code, string *tag_data);
+void pppoe_set_phase(pppoe_phases phase);
+void pppoe_reset_vars();
+void pppoe_close_sock();
+void pppoe_open_sock(pppoe_sock_modes sock_mode);
+void pppoe_init();
+void pppoe_debugprint_packet(unsigned char mode, string *packet_str, no_yes it_is_tx);
+void pppoe_debugprint(string *print_data);
+
+//--------------------------------------------------------------------
+unsigned int pppoe_init_flag;
+unsigned char pppoe_socket;
+pppoe_phases pppoe_phase;
+unsigned char pppoe_tout_ctr;
+unsigned char pppoe_retry_ctr;
+string<32> pppoe_ac_name;
+string<32> pppoe_serv_name;
+string<32> pppoe_ac_cookie;
+pppoe_sock_modes pppoe_curr_sock_mode;
+string<6> pppoe_ac_mac;
+unsigned int pppoe_session_id;
+string<6> pppoe_host_uniq;
+unsigned char pppoe_lcp_id;
+string<4> pppoe_magic;
+no_yes pppoe_ac_lcp_ok, pppoe_dev_lcp_ok, pppoe_dev_auth_ok, pppoe_dev_ip_configured, pppoe_ac_ip_configured;
+no_yes pppoe_success_reported;
+string<32> pppoe_login, pppoe_password;
+string<4> pppoe_dev_ip;
+
+//====================================================================
+string pppoe_get_info(pppoe_info_elements info_element, string *extra_data) {
+string pppoe_get_info;
+//Returns library-specific information for the requested info element
+
+	pppoe_get_info = "";
+	switch (info_element) {
+	case PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS:
+
+		pppoe_get_info = str(PPPOE_BUFFER_PAGES);
+		break;
+
+	}
+	return pppoe_get_info;
+}
+
+//--------------------------------------------------------------------
+en_pppoe_status_codes pppoe_start(string *login, string *password) {
+en_pppoe_status_codes pppoe_start;
+	unsigned char x;
+
+	if (pppoe_init_flag != PPPOE_INIT_SIGNATURE) {
+		pppoe_init();
+		pppoe_init_flag = PPPOE_INIT_SIGNATURE;
+	}
+
+	pppoe_start = PPPOE_STATUS_OK;
+
+	//is this process already going?
+	if (pppoe_phase != PPPOE_IDLE) {
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("PPPoE already started");
+		#endif
+		return pppoe_start;
+	}
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("---START---");
+	#endif
+
+	pppoe_login = *login;
+	pppoe_password = *password;
+
+	//prepare the socket for PPPoE/LCP/etc. comms
+	pppoe_socket = sock_get(PPPOE_SOCK_GET_SIGNATURE);
+	if (pppoe_socket>=sock.numofsock) {
+		pppoe_start = PPPOE_STATUS_OUT_OF_SOCKETS;
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("ERROR: out of sockets");
+		#endif
+		return pppoe_start;
+	}
+
+	//check buffer space
+	x = val(pppoe_get_info(PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS,""));
+	if (x>sys.freebuffpages) {
+		callback_pppoe_pre_buffrq(x-sys.freebuffpages);
+
+		if (x>sys.freebuffpages) {
+			pppoe_start = PPPOE_STATUS_INSUFFICIENT_BUFFER_SPACE;
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("ERROR: insufficient buffer space");
+			#endif
+			return pppoe_start;
+		}
+	}
+
+	//setup the socket (the part that is always the same)
+	sock.num = pppoe_socket;
+	sock.rxbuffrq(1);
+	sock.txbuffrq(1);
+	sys.buffalloc();
+	sock.protocol = PL_SOCK_PROTOCOL_RAW;
+	sock.targetinterface = PL_SOCK_INTERFACE_NET;
+	sock.allowedinterfaces = "NET";
+	sock.inconmode = PL_SOCK_INCONMODE_NONE;
+	sock.reconmode = PL_SOCK_RECONMODE_3;
+
+	//reset variables
+	pppoe_curr_sock_mode = PPPOE_SOCK_MODE_NONE;
+	pppoe_set_phase(PPPOE_DISCOVERY);
+	pppoe_host_uniq = ddval(net.mac);
+	pppoe_magic = right(ddval(net.mac),4);
+	return pppoe_start;
+}
+
+//--------------------------------------------------------------------
+void pppoe_stop() {
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("---STOP---");
+	#endif
+	if (pppoe_phase == PPPOE_SELECTION || pppoe_phase == PPPOE_SESSION) {
+		pppoe_set_phase(PPPOE_TERMINATION_AND_STOP);
+	} else {
+		pppoe_set_phase(PPPOE_IDLE);
+		callback_pppoe_failure(PPPOE_STOPPED);
+	}
+}
+
+//--------------------------------------------------------------------
+void pppoe_proc_data() {
+//Call this from the on_sock_data_arrival() event
+	string rx_data;
+	unsigned int proto;
+	unsigned char code;
+	string<2> s;
+
+	if (pppoe_init_flag != PPPOE_INIT_SIGNATURE || sock.num != pppoe_socket) {
+		return;
+	}
+
+	rx_data = sock.getdata(255);
+
+	if (pppoe_phase == PPPOE_IDLE) { return;}
+	if (asc(mid(rx_data,1,1)) != 0x11) { return;}//ver and type must be &h11
+
+	#if PPPOE_DEBUG_PRINT
+		switch (sock.remoteport) {
+		case 34915:
+pppoe_debugprint_packet(0,rx_data,NO);
+		break;
+		case 34916:
+pppoe_debugprint_packet(1,rx_data,NO);
+		break;
+		default:pppoe_debugprint("Stray packet RXed and discarted");break;
+		}
+	#endif
+
+	switch (pppoe_phase) {
+	case PPPOE_DISCOVERY:
+//----------------------------------------------------------
+		if (sock.remoteport != 34915) { goto wrong_packet;}//protocol # must be correct
+		if (asc(mid(rx_data,2,1)) != 0x07) { goto wrong_packet;}//we expect an offer	
+		pppoe_ac_mac = ddval(sock.remotemac);//now we know who we are talking to
+
+		#if PPPOE_DEBUG_PRINT
+			pppoe_debugprint("AC MAC= "+ddstr(pppoe_ac_mac));
+		#endif
+
+		if (pppoe_get_verify_tag(rx_data,0x0101,pppoe_serv_name) == NG) { goto wrong_packet;}//get service-name
+		if (pppoe_get_verify_tag(rx_data,0x0103,pppoe_host_uniq) == NG) { goto wrong_packet;}//get host-uniq
+		if (pppoe_get_verify_tag(rx_data,0x0102,pppoe_ac_name) == NG) { goto wrong_packet;}//get AC-name
+		if (pppoe_get_verify_tag(rx_data,0x0104,pppoe_ac_cookie) == NG) { goto wrong_packet;}//get AC-cookie
+		pppoe_set_phase(PPPOE_SELECTION);
+		break;
+
+	case PPPOE_SELECTION:
+//----------------------------------------------------------
+		if (sock.remoteport != 34915) { goto wrong_packet;}//protocol # must be correct
+		if (ddval(sock.remotemac) != pppoe_ac_mac) { goto wrong_packet;}//confirmation must come from the selected AC
+		if (asc(mid(rx_data,2,1)) != 0x65) { goto wrong_packet;}//we expect confirmation	
+
+		pppoe_session_id = asc(mid(rx_data,3,1))*256+asc(mid(rx_data,4,1));//we get session ID
+		if (pppoe_session_id == 0) { goto wrong_packet;}//session ID can't be 0
+		if (pppoe_get_verify_tag(rx_data,0x0101,pppoe_serv_name) == NG) { goto wrong_packet;}//verify service-name
+		if (pppoe_get_verify_tag(rx_data,0x0103,pppoe_host_uniq) == NG) { goto wrong_packet;}//verify host-uniq
+		pppoe_set_phase(PPPOE_SESSION);
+		break;
+
+	case PPPOE_SESSION:
+//------------------------------------------------------------
+		if (sock.remoteport != 34916) { goto wrong_packet;}//protocol # must be correct
+		proto = asc(mid(rx_data,7,1))*256+asc(mid(rx_data,8,1));//we support LCP (C021), IPCONF (8021), PAP (C023)
+		if (proto != 0xC021 && proto != 0x8021 && proto != 0xC023) { goto wrong_packet;}//reject if some other protocol
+
+		code = asc(mid(rx_data,9,1));//everything depends on the code
+		switch (code) {
+		case 1:
+//----- CONFIGURE-REQUEST -----
+			switch (proto) {
+			case 0xC021:
+
+				//we specifically look for confirmation that PAP protocol can be used
+				if (pppoe_lcp_get_verify_tag(rx_data,0x03,s) == NG) {
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("ERROR: AC did not provide 'Authentication-Protocol' tag");
+					#endif
+					goto failure;
+				}
+
+				if (asc(mid(s,1,1))*256+asc(mid(s,2,1)) != 0xC023) {
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("ERROR: AC provided some other authentication protocol (not PAP)");
+					#endif
+					goto failure;
+				}
+
+				insert(rx_data,9,chr(2));//replace "conf-req" with "conf-ack" and send it back
+				pppoe_send_reply(rx_data);
+				pppoe_ac_lcp_ok = YES;
+				goto can_start_auth;
+				break;
+
+			case 0x8021:
+
+				insert(rx_data,9,chr(2));//replace "conf-req" with "conf-ack" and send it back
+				pppoe_send_reply(rx_data);
+				pppoe_ac_ip_configured = YES;
+				if (pppoe_dev_ip_configured == YES) { pppoe_tout_ctr = 0;}
+				break;//this way timer event will happen soon
+
+			}
+			break;
+
+		case 2:
+//----- CONFIGURE-ACK -----
+			switch (proto) {
+			case 0xC021:
+
+				pppoe_dev_lcp_ok = YES;
+can_start_auth: if (pppoe_dev_lcp_ok == YES && pppoe_ac_lcp_ok == YES) {
+					#if PPPOE_DEBUG_PRINT
+						pppoe_debugprint("LCP configuration complete, can proceed to authentication");
+					#endif
+					pppoe_tout_ctr = 0;
+					pppoe_retry_ctr = PPPOE_MAX_RETRIES;
+				}
+				break;
+
+			case 0xC023:
+
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("Authentication complete, can proceed to IP configuration");
+				#endif
+				pppoe_dev_auth_ok = YES;
+				pppoe_tout_ctr = 0;
+				pppoe_retry_ctr = PPPOE_MAX_RETRIES;
+				break;
+
+			default:
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("Configuration complete. Device IP= "+ddstr(pppoe_dev_ip));
+				#endif
+				pppoe_dev_ip_configured = YES;
+				if (pppoe_ac_ip_configured == YES) { pppoe_tout_ctr = 0;}break;//this way timer event will happen soon
+
+			}
+			break;
+
+		case 3:
+//----- CONFIGURE-NAK -----
+			switch (proto) {
+			case 0xC021:
+
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("ERROR: LCP configuration failed (NAK from AC)");
+				#endif
+				goto failure;
+				break;
+
+			case 0xC023:
+
+				#if PPPOE_DEBUG_PRINT
+					pppoe_debugprint("ERROR: Authentication failed (NAK from AC)");
+				#endif
+				goto failure;
+				break;
+
+			case 0x8021:
+
+				//we requested IP 0.0.0.0 and expect that it will be rejected
+				pppoe_dev_ip = mid(rx_data,15,4);
+				pppoe_tout_ctr = 0;//now will resend our request with proper IP
+				pppoe_retry_ctr = PPPOE_MAX_RETRIES;
+				break;
+
+			}
+			break;
+
+		case 4:
+//----- CONFIGURE-REJECT -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC rejected our configuration request");
+			#endif
+			goto failure;
+			break;
+
+		case 5:
+//----- TERMINATE-REQUEST -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC requested link termination");
+			#endif
+			goto failure;
+			break;
+
+		case 7:
+case 8:
+//----- CODE-REJECT and PROTOCOL-REJECT -----
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("AC rejected our configuration request");
+			#endif
+			goto failure;
+			break;
+
+		case 9:
+//----- ECHO-REQUST -----
+			insert(rx_data,9,chr(2));//replace "conf-req" with "conf-ack" and send it back
+			pppoe_send_reply(rx_data);
+			pppoe_ac_lcp_ok = YES;
+			break;
+
+		case 10:
+//----- ECHO-REPLY -----
+			pppoe_retry_ctr = PPPOE_MAX_RETRIES;
+			break;
+
+		}
+		break;
+	}
+return;
+
+wrong_packet: //---------------------------------------------------------------
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("ERROR: Packet rejected (did not pass all acceptance criteria)");
+	#endif
+	return;
+
+failure: //--------------------------------------------------------------------
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint("ERROR: Something went wrong, details possibly printed above)");
+		pppoe_debugprint("---FAILURE---");
+	#endif
+	pppoe_set_phase(PPPOE_TERMINATION);
+}
+
+//--------------------------------------------------------------------
+void pppoe_proc_timer() {
+//Call this from the on_sys_timer() event (running at default 0.5 sec intervals).
+
+	if (pppoe_init_flag != PPPOE_INIT_SIGNATURE || pppoe_phase == PPPOE_IDLE) {
+		return;
+	}
+
+	if (pppoe_tout_ctr == 0) {
+		if (pppoe_retry_ctr == 0) {
+			//no more retry attempts
+			#if PPPOE_DEBUG_PRINT
+				pppoe_debugprint("ERROR: timeout while waiting for the reply from the AC");
+			#endif
+			if (pppoe_phase == PPPOE_SELECTION || pppoe_phase == PPPOE_SESSION) {
+				pppoe_set_phase(PPPOE_TERMINATION);
+			} else {
+				callback_pppoe_failure(PPPOE_TIMEOUT);
+				pppoe_set_phase(PPPOE_DISCOVERY);
+			}
+	} else {
+			switch (pppoe_phase) {
+			case PPPOE_DISCOVERY:
+
+				pppoe_reset_vars();
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADI_PADO);
+				pppoe_send_padi();
+				break;
+
+			case PPPOE_SELECTION:
+
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADR_PADS_PADT);
+				pppoe_send_padr();
+				break;
+
+			case PPPOE_SESSION:
+
+				if (pppoe_dev_lcp_ok == NO || pppoe_ac_lcp_ok == NO) {
+					pppoe_open_sock(PPPOE_SOCK_MODE_SESSION);
+					pppoe_send_lcp();
+				} else if (pppoe_dev_auth_ok == NO) {
+					pppoe_send_auth();
+				} else if (pppoe_dev_ip_configured == NO) {
+					pppoe_send_ip(pppoe_dev_ip);
+				} else if (pppoe_ac_ip_configured == NO) {
+					//no need to do anything
+				} else {
+					//we are in the established session
+					if (pppoe_success_reported == NO) {
+						pppoe_success_reported = YES;
+						pppoe.acmac = ddstr(pppoe_ac_mac);
+						pppoe.ip = ddstr(pppoe_dev_ip);
+						pppoe.sessionid = pppoe_session_id;
+						callback_pppoe_ok();
+					}
+					pppoe_send_echo();
+				}
+				break;
+
+			case PPPOE_TERMINATION:
+case PPPOE_TERMINATION_AND_STOP:
+
+				pppoe_open_sock(PPPOE_SOCK_MODE_PADR_PADS_PADT);
+				pppoe_send_padt();
+				if (pppoe_phase == PPPOE_TERMINATION) {
+					callback_pppoe_failure(PPPOE_CONFIGURATION_ERROR);
+					pppoe_set_phase(PPPOE_DISCOVERY);
+				} else {
+					pppoe_set_phase(PPPOE_IDLE);
+					callback_pppoe_failure(PPPOE_STOPPED);
+				}
+				break;
+			}
+			pppoe_tout_ctr = PPPOE_MAX_REPLY_WAIT_TIME;
+			pppoe_retry_ctr = pppoe_retry_ctr-1;
+		}
+	} else {
+		pppoe_tout_ctr = pppoe_tout_ctr-1;
+	}
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_padi() {
+	//form and send PADI (PPPoE Active Discovery Initiation)
+
+	string s;
+
+	//we start from the payload
+	s = "";
+	pppoe_add_tag(s,0x0101,pppoe_serv_name);
+	pppoe_add_tag(s,0x0103,pppoe_host_uniq);
+
+	//put header fields in front:
+	//&h11 -- fixed ver/type fields (4 bits each)
+	//&h09 -- code: active discovery initiation (1 byte)
+	//0 and 0 -- session ID (2 bytes)
+	//0 and chr(len(s)) -- payload length (2 bytes)
+	s = chr(0x11)+chr(0x09)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_padr() {
+	//form and send PADR (PPPoE Active Discovery Request)
+
+	string s;
+
+	//we start from the payload
+	s = "";
+	pppoe_add_tag(s,0x0101,pppoe_serv_name);
+	pppoe_add_tag(s,0x0103,pppoe_host_uniq);
+	pppoe_add_tag(s,0x0104,pppoe_ac_cookie);
+
+	//put header fields in front:
+	//&h11 -- fixed ver/type fields (4 bits each)
+	//&h19 -- code: active discovery request (1 byte)
+	//0 and 0 -- session ID (2 bytes)
+	//0 and chr(len(s)) -- payload length (2 bytes)
+	s = chr(0x11)+chr(0x19)+chr(0)+chr(0)+chr(0)+chr(len(s))+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_padt() {
+	//form and send PADT (PPPoE Active Discovery Termination)
+
+	string s;
+
+	//we start from the payload (which is empty)
+	s = "";
+
+	//put header fields in front:
+	//&h11 -- fixed ver/type fields (4 bits each)
+	//&hA7 -- code: active discovery termination (1 byte)
+	//session ID (2 bytes)
+	//0 and chr(len(s)) -- payload length (2 bytes)
+	s = chr(0x11)+chr(0xA7)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(len(s))+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(0,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+}
+
+//--------------------------------------------------------------------
+void pppoe_add_tag(string *packet_str, unsigned int tag_code, string *tag_data) {
+	*packet_str = *packet_str+chr(tag_code/256);
+	*packet_str = *packet_str+chr(tag_code & 0xFF);
+	*packet_str = *packet_str+chr(0);
+	*packet_str = *packet_str+chr(len(*tag_data));
+	*packet_str = *packet_str+*tag_data;
+}
+
+//--------------------------------------------------------------------
+ok_ng pppoe_get_verify_tag(string *packet_str, unsigned int tag_code, string *tag_data) {
+ok_ng pppoe_get_verify_tag;
+	string<32> s;
+	unsigned char ptr, payload_len;
+	unsigned int tag_type, tag_len;
+
+	pppoe_get_verify_tag = OK;
+	payload_len = asc(mid(*packet_str,5,1))*256+asc(mid(*packet_str,6,1));
+	ptr = 0;
+	while (ptr<payload_len) {
+		//take one tag
+		tag_type = asc(mid(*packet_str,7+ptr,1))*256+asc(mid(*packet_str,7+ptr+1,1));
+		tag_len = asc(mid(*packet_str,7+ptr+2,1))*256+asc(mid(*packet_str,7+ptr+3,1));
+		if (tag_type == tag_code) {
+			//this is the tag we've been looking for
+			s = mid(*packet_str,7+ptr+4,tag_len);
+			if (*tag_data == "") {
+				*tag_data = s;//memorize tag contents
+			} else {
+				//compare tag contents
+				if (s != *tag_data) {
+					pppoe_get_verify_tag = NG;//tag does not match previously received data
+				}
+			}
+			return pppoe_get_verify_tag;
+		} else {
+			ptr = ptr+4+tag_len;//some other tag
+		}
+	}
+	pppoe_get_verify_tag = NG;
+	return pppoe_get_verify_tag;//tag not found
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_lcp() {
+	string s;
+
+	//we start from the payload
+	s = "";
+	pppoe_lcp_add_tag(s,0x05,right(pppoe_magic,4));
+
+	//put header fields in front:
+	//&h01 -- configure-request
+	//LCP ID (1 byte)
+	//LCP length (2 bytes)
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+
+	pppoe_lcp_id = pppoe_lcp_id+1;
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_reply(string *packet_str) {
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,*packet_str,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(*packet_str);
+	sock.send();
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_auth() {
+	string s;
+
+	//we start from the payload
+	s = chr(len(pppoe_login))+pppoe_login+chr(len(pppoe_password))+pppoe_password;
+
+	//put header fields in front:
+	//&h01 -- configure-request
+	//LCP ID (1 byte)
+	//LCP length (2 bytes)
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x23)+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+
+	pppoe_lcp_id = pppoe_lcp_id+1;
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_ip(string *ip) {
+	string s;
+
+	//we start from the payload
+	s = ddval("3.6")+*ip;//we start from invalid IP 0.0.0.0 on purpose
+
+	//put header fields in front:
+	//&h01 -- configure-request
+	//LCP ID (1 byte)
+	//LCP length (2 bytes)
+	s = chr(0x01)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0x80)+chr(0x21)+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+
+	pppoe_lcp_id = pppoe_lcp_id+1;
+}
+
+//--------------------------------------------------------------------
+void pppoe_send_echo() {
+	string s;
+
+	s = pppoe_magic;//we start from invalid IP 0.0.0.0 on purpose
+
+	//put header fields in front:
+	//&h01 -- configure-request
+	//LCP ID (1 byte)
+	//LCP length (2 bytes)
+	s = chr(0x09)+chr(pppoe_lcp_id)+chr(0)+chr(4+len(s))+s;
+
+	s = chr(0x11)+chr(0)+chr(pppoe_session_id/256)+chr(pppoe_session_id & 0xFF)+chr(0)+chr(6+len(s))+chr(0xC0)+chr(0x21)+s;
+
+	#if PPPOE_DEBUG_PRINT
+		pppoe_debugprint_packet(1,s,YES);
+	#endif
+
+	sock.num = pppoe_socket;
+	sock.setdata(s);
+	sock.send();
+
+	pppoe_lcp_id = pppoe_lcp_id+1;
+}
+
+//--------------------------------------------------------------------
+void pppoe_lcp_add_tag(string *packet_str, unsigned char tag_code, string *tag_data) {
+	*packet_str = *packet_str+chr(tag_code);
+	*packet_str = *packet_str+chr(2+len(*tag_data));
+	*packet_str = *packet_str+*tag_data;
+}
+
+//--------------------------------------------------------------------
+ok_ng pppoe_lcp_get_verify_tag(string *packet_str, unsigned char tag_code, string *tag_data) {
+ok_ng pppoe_lcp_get_verify_tag;
+	string<32> s;
+	unsigned char ptr, payload_len;
+	unsigned char tag_type, tag_len;
+
+	pppoe_lcp_get_verify_tag = OK;
+	payload_len = asc(mid(*packet_str,11,1))*256+asc(mid(*packet_str,12,1));
+	if (payload_len>4) {
+		payload_len = payload_len-4;//LCP length includes len field, code, and ID
+	} else {
+		pppoe_lcp_get_verify_tag = OK;
+		return pppoe_lcp_get_verify_tag;
+	}
+	ptr = 0;
+	while (ptr<payload_len) {
+		//take one tag
+		tag_type = asc(mid(*packet_str,13+ptr,1));
+		tag_len = asc(mid(*packet_str,13+ptr+1,1));
+		if (tag_type == tag_code) {
+			//this is the tag we've been looking for
+			s = mid(*packet_str,13+ptr+2,tag_len-2);
+			if (*tag_data == "") {
+				*tag_data = s;//memorize tag contents
+			} else {
+				//compare tag contents
+				if (s != *tag_data) {
+					pppoe_lcp_get_verify_tag = NG;//tag does not match previously received data
+				}
+			}
+			return pppoe_lcp_get_verify_tag;
+		} else {
+			ptr = ptr+tag_len;//some other tag
+		}
+	}
+	pppoe_lcp_get_verify_tag = NG;
+	return pppoe_lcp_get_verify_tag;//tag not found
+}
+
+//--------------------------------------------------------------------
+void pppoe_set_phase(pppoe_phases phase) {
+
+	#if PPPOE_DEBUG_PRINT
+		string<50> s;
+
+		switch (phase) {
+		case PPPOE_IDLE:
+s = "IDLE";
+		break;
+		case PPPOE_DISCOVERY:
+s = "PADI/PADO (initiation and offer)";
+		break;
+		case PPPOE_SELECTION:
+s = "PADR/PADS (request and confirmation)";
+		break;
+		case PPPOE_SESSION:
+s = "SESSION (including LCP, etc.)";
+		break;
+		case PPPOE_TERMINATION:
+s = "PADT (termination)";
+		break;
+		case PPPOE_TERMINATION_AND_STOP:
+s = "PADT (termination + go into IDLE state)";
+		break;
+		}
+		s = "PHASE: "+str(phase)+"-"+s;
+		pppoe_debugprint(s);
+	#endif
+
+	pppoe_close_sock();
+	pppoe_phase = phase;
+	pppoe_retry_ctr = PPPOE_MAX_RETRIES;
+	pppoe_tout_ctr = 0;//this way we will do something right on next timer event
+}
+
+//--------------------------------------------------------------------
+void pppoe_reset_vars() {
+	pppoe_ac_name = "";
+	pppoe_serv_name = "";
+	pppoe_ac_cookie = "";
+	pppoe_ac_lcp_ok = NO;
+	pppoe_dev_lcp_ok = NO;
+	pppoe_dev_auth_ok = NO;
+	pppoe_dev_ip = ddval("0.0.0.0");
+	pppoe_dev_ip_configured = NO;
+	pppoe_ac_ip_configured = NO;
+	pppoe_success_reported = NO;
+}
+
+//--------------------------------------------------------------------
+void pppoe_close_sock() {
+	unsigned int i;
+
+	sock.num = pppoe_socket;
+	if (sock.statesimple != PL_SSTS_CLOSED) {
+		sock.discard();
+		i = sys.timercount;
+		while (sock.statesimple != PL_SSTS_EST && sys.timercount-i<3 && sys.timercount>=i) {
+		}
+		pppoe_curr_sock_mode = PPPOE_SOCK_MODE_NONE;
+	}
+}
+
+//--------------------------------------------------------------------
+void pppoe_open_sock(pppoe_sock_modes sock_mode) {
+	unsigned int i;
+
+	sock.num = pppoe_socket;
+	if (sock_mode != pppoe_curr_sock_mode) {
+		pppoe_curr_sock_mode = sock_mode;
+
+		switch (pppoe_curr_sock_mode) {
+		case PPPOE_SOCK_MODE_PADI_PADO:
+
+			sock.targetbcast = YES;
+			sock.targetport = 34915;
+			sock.outport = sock.targetport;
+			sock.localportlist = str(sock.targetport);
+			break;
+
+		case PPPOE_SOCK_MODE_PADR_PADS_PADT:
+
+			sock.targetbcast = NO;
+			sock.targetmac = ddstr(pppoe_ac_mac);
+			sock.targetport = 34915;
+			sock.outport = sock.targetport;
+			sock.localportlist = str(sock.targetport);
+			break;
+
+		case PPPOE_SOCK_MODE_SESSION:
+
+			sock.targetbcast = YES;
+			sock.targetport = 34916;
+			sock.outport = sock.targetport;
+			sock.localportlist = str(sock.targetport);
+			break;
+
+		}
+	}
+
+	sock.connect();
+	i = sys.timercount;
+	while (sock.statesimple != PL_SSTS_EST && sys.timercount-i<3 && sys.timercount>=i) {
+		doevents;//very important
+	}
+}
+
+//--------------------------------------------------------------------
+void pppoe_init() {
+	pppoe_phase = PPPOE_IDLE;
+}
+
+//--------------------------------------------------------------------
+#if PPPOE_DEBUG_PRINT
+void pppoe_debugprint_packet(unsigned char mode, string *packet_str, no_yes it_is_tx) {
+//Set mode=0 for pure PPPoE, other -- for LCP, etc.
+
+	string s;
+	unsigned char ptr, payload_len, code;
+	unsigned int tag_type, tag_len, proto;
+
+	if (it_is_tx == NO) {
+		s = "Rx ";
+	} else {
+		s = "Tx ";
+	}
+
+	if (mode == 0) {
+		//This is pure PPPoE
+
+		s = s+"PPPoE ";
+
+		switch (asc(mid(*packet_str,2,1))) {
+		case 0x09:
+s = s+"PADI (";
+		break;
+		case 0x07:
+s = s+"PADO (";
+		break;
+		case 0x19:
+s = s+"PADR (";
+		break;
+		case 0x65:
+s = s+"PADS (";
+		break;
+		case 0xA7:
+s = s+"PADT (";
+		break;
+		default:s = s+"???? (";break;
+		}
+
+		s = s+"Session ID: "+str(asc(mid(*packet_str,3,1))*256+asc(mid(*packet_str,4,1)))+"; ";
+		s = s+"Length: "+str(asc(mid(*packet_str,5,1))*256+asc(mid(*packet_str,6,1)))+")";
+		pppoe_debugprint(s);
+
+		payload_len = asc(mid(*packet_str,5,1))*256+asc(mid(*packet_str,6,1));
+		ptr = 0;
+		while (ptr<payload_len) {
+			//take one tag
+			tag_type = asc(mid(*packet_str,7+ptr,1))*256+asc(mid(*packet_str,7+ptr+1,1));
+			tag_len = asc(mid(*packet_str,7+ptr+2,1))*256+asc(mid(*packet_str,7+ptr+3,1));
+			s = mid(*packet_str,7+ptr+4,tag_len);
+
+			switch (tag_type) {
+			case 0x0000:
+pppoe_debugprint("...End-Of-List");
+			break;
+			case 0x0101:
+pppoe_debugprint("...Service-Name: "+str(tag_len)+": "+s);
+			break;
+			case 0x0102:
+pppoe_debugprint("...AC-Name: "+str(tag_len)+": "+s);
+			break;
+			case 0x0103:
+pppoe_debugprint("...Host-Uniq: "+str(tag_len)+": "+ddstr(s));
+			break;
+			case 0x0104:
+pppoe_debugprint("...AC-Cookie: "+str(tag_len)+": "+ddstr(s));
+			break;
+			case 0x0105:
+pppoe_debugprint("...Vendor-Specific: "+str(tag_len)+": "+ddstr(s));
+			break;
+			case 0x0110:
+pppoe_debugprint("...Relay-Session-Id: "+str(tag_len)+": "+ddstr(s));
+			break;
+			case 0x0201:
+pppoe_debugprint("...Service-Name-Error");
+			break;
+			case 0x0202:
+pppoe_debugprint("...AC-System-Error");
+			break;
+			case 0x0203:
+pppoe_debugprint("...Generic Error");
+			break;
+			default:pppoe_debugprint("...Unknown tag "+str(tag_type)+": "+str(tag_len)+": "+ddstr(s));break;
+			}
+			ptr = ptr+4+tag_len;
+		}
+	} else {
+		//This is LCP, etc.
+
+		proto = asc(mid(*packet_str,7,1))*256+asc(mid(*packet_str,8,1));
+		switch (proto) {
+		case 0xC021:
+s = s+"LCP ";
+		break;
+		case 0x8021:
+s = s+" IP ";
+		break;
+		case 0xC023:
+s = s+"PAP ";
+		break;
+		default:s = s+"Unknown proto "+str(proto)+" ";break;
+		}
+
+		code = asc(mid(*packet_str,9,1));
+		switch (code) {
+		case 1:
+s = s+"CONF-REQ (";
+		break;
+		case 2:
+s = s+"CONF-ACK (";
+		break;
+		case 3:
+s = s+"CONF-NAK (";
+		break;
+		case 4:
+s = s+"CONF-REJ (";
+		break;
+		case 5:
+s = s+"TERM-REQ (";
+		break;
+		case 6:
+s = s+"TERM-ACK (";
+		break;
+		case 7:
+s = s+"CODE-REJ (";
+		break;
+		case 8:
+s = s+"PROT-REJ (";
+		break;
+		case 9:
+s = s+"ECHO-REQ (";
+		break;
+		case 10:
+s = s+"ECHO-REP (";
+		break;
+		default:s = s+"UNKN "+str(code)+" (";break;
+		}
+
+		s = s+"Session ID: "+str(asc(mid(*packet_str,3,1))*256+asc(mid(*packet_str,4,1)))+"; ";
+		s = s+"Message ID: "+str(asc(mid(*packet_str,10,1)))+"; ";
+		s = s+"Length: "+str(asc(mid(*packet_str,5,1))*256+asc(mid(*packet_str,6,1)))+")";
+
+		pppoe_debugprint(s);
+
+		payload_len = asc(mid(*packet_str,11,1))*256+asc(mid(*packet_str,12,1));
+		if (payload_len>4) {
+			payload_len = payload_len-4;//LCP length includes len field, code, and ID
+		} else {
+			payload_len = 0;
+			return;
+		}
+		ptr = 0;
+		switch (proto) {
+		case 0xC023:
+
+			if (code == 1) {
+				tag_len = asc(mid(*packet_str,13+ptr,1));
+				s = mid(*packet_str,13+ptr+1,tag_len);
+				pppoe_debugprint("...Login: "+str(tag_len)+": "+s);
+				ptr = ptr+tag_len+1;
+				tag_len = asc(mid(*packet_str,13+ptr,1));
+				s = mid(*packet_str,13+ptr+1,tag_len);
+				pppoe_debugprint("...Password: "+str(tag_len)+": "+s);
+			}
+			break;
+		case 0x8021:
+
+			tag_len = asc(mid(*packet_str,13+ptr+1,1));
+			s = mid(*packet_str,13+ptr+2,tag_len-2);
+			pppoe_debugprint("...IP: "+str(tag_len-2)+": "+ddstr(s));
+			break;
+
+		default:
+			switch (code) {
+			case 9:
+case 10:
+
+			break;
+					//---
+
+			default:
+				while (ptr<payload_len) {
+					//take one tag
+					tag_type = asc(mid(*packet_str,13+ptr,1));
+					tag_len = asc(mid(*packet_str,13+ptr+1,1))-2;
+					s = mid(*packet_str,13+ptr+2,tag_len);
+					switch (tag_type) {
+					case 0x01:
+pppoe_debugprint("...Maximum-Receive-Unit: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))));
+					break;
+					case 0x03:
+pppoe_debugprint("...Authentication-Protocol: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))));
+					break;
+					case 0x04:
+pppoe_debugprint("...Quality-Protocol: "+str(tag_len)+": "+hex(asc(mid(s,1,1))*256+asc(mid(s,2,1))));
+					break;
+					case 0x05:
+pppoe_debugprint("...Magic-Number: "+str(tag_len)+": "+ddstr(s));
+					break;
+					case 0x07:
+pppoe_debugprint("...Protocol-Field-Compression: "+str(tag_len)+": "+ddstr(s));
+					break;
+					case 0x08:
+pppoe_debugprint("...Address-And-Control-Field-Compression: "+str(tag_len)+": "+ddstr(s));
+					break;
+					default:pppoe_debugprint("...Unknown tag "+str(tag_type)+": "+str(tag_len)+": "+ddstr(s));break;
+					}
+					ptr = ptr+tag_len+2;//some other tag
+				}break;
+			}break;
+		}
+	}
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if PPPOE_DEBUG_PRINT
+void pppoe_debugprint(string *print_data) {
+
+	sys.debugprint(PPPOE_STAMP+*print_data+PPPOE_CR_LF);
+}
+#endif
+
+

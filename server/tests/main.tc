@@ -1,0 +1,46 @@
+#include "global.th"
+
+
+
+no_yes interface_ready[MAX_NUM_INTERFACES];
+
+
+void on_sys_init() {
+    boot();
+
+    if (len(s) == 1 && f == 3) {
+        f = f & 0x01;
+    }
+
+    if (len(s) == 1) { s = "0"+s;}
+    if (sock.statesimple == PL_SSTS_EST) { return;}
+    if (io.lineget(pin_miso) == HIGH) { goto wait_alarm;}
+
+    if (f == 255) { f = 3;}
+
+    if (f == 255) {
+        // could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
+        goto register_normal_slot;
+    }
+
+wait_alarm: 
+    sys.debugprint("a");
+}
+
+void on_sys_timer() {
+    dhcp_proc_timer();
+
+}
+
+void on_sock_data_arrival() {
+    dhcp_proc_data();
+
+}
+
+unsigned char test() {
+unsigned char test;
+//testing comments in function
+    test = 3;
+    test = test & 0xF0;
+    return test;
+}

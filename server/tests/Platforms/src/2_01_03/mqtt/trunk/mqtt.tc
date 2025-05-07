@@ -1,0 +1,460 @@
+#include "global.th"
+
+//http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html
+//https://www.hivemq.com/blog/mqtt-essentials-part-6-mqtt-quality-of-service-levels/
+
+#define MQTT_INIT_SIGNATURE 0x1688
+#define MQTT_STAMP "MQTT> "
+#define MQTT_CR_LF chr(13)+chr(10)
+
+//Message Types
+#define CONNECT 0x10
+#define CONNACK 0x20
+#define PUBLISH 0x30
+#define PUBACK 0x40
+#define PUBREC 0x50
+#define PUBREL 0x60
+#define PUBCOMP 0x70
+#define SUBSCRIBE 0x80
+#define SUBACK 0x90
+#define UNSUBSCRIBE 0xA0
+#define UNSUBACK 0xB0
+#define PINGREQ 0xC0
+#define PINGRESP 0xD0
+#define DISCONNECT 0xE0
+
+//mqtt protocol string
+#define MQTT_LEVEL 0x04
+#define MQTT_PROTOCOL "MQTT"
+#define MQTT_CLIENT_ID MQTT_APP_CLIENT_ID
+
+enum mqtt_state {
+	ms_idle=0,
+	ms_connected=1
+};
+
+unsigned int mqtt_init_flag;
+unsigned int mqtt_packet_identifier;
+unsigned char mqtt_sock_num;
+mqtt_state mqtt_cur_state;
+unsigned int mqtt_keep_alive_timer;
+unsigned int mqtt_timer_record;
+unsigned int mqtt_server_port;
+string<15> mqtt_server_ip;
+string<30> mqtt_user;
+string<23> mqtt_pw;
+
+#if MQTT_DEBUG_PRINT == 1
+	void mqtt_debug_print(string data);
+#endif
+
+//-------------------------------------------------------------
+void mqtt_start() {
+//API procedure, starts the MQTT library.
+//MUST be called first, before any other procedure in this library is used.
+
+	if (mqtt_init_flag == MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("MQTT library already initialized.");
+		#endif
+		return;
+	}
+
+	#if MQTT_DEBUG_PRINT == 1
+		mqtt_debug_print("---START---");
+	#endif
+
+	mqtt_init_flag = MQTT_INIT_SIGNATURE;
+	mqtt_cur_state = ms_idle;
+	mqtt_keep_alive_timer = 0;
+	mqtt_packet_identifier = 0;
+	mqtt_sock_num = sock_get("MQTT");
+	sock.num = mqtt_sock_num;
+	sock.protocol = PL_SOCK_PROTOCOL_TCP;
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT;
+	//sock.splittcppackets=YES
+	sock.gendataarrivalevent = YES;
+	sock.reconmode = PL_SOCK_RECONMODE_3;
+	sock.connectiontout = 0;
+	if (sys.freebuffpages<MQTT_RX_BUFF+MQTT_TX_BUFF) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("Insufficient buffer memory.");
+		#endif
+		return;
+	}
+	sock.rxbuffrq(MQTT_RX_BUFF);
+	sock.txbuffrq(MQTT_TX_BUFF);
+	sys.buffalloc();
+}
+
+string<2> mqtt_build_remaining_length(unsigned char size) {
+string<2> mqtt_build_remaining_length;
+	mqtt_build_remaining_length = "";
+	do {
+		unsigned char encodedByte = size % 128;
+		size = size/128;
+		if ((size>0)) { encodedByte = encodedByte | 128;}
+		mqtt_build_remaining_length = mqtt_build_remaining_length+chr(encodedByte);
+	} while ((size>0));
+	return mqtt_build_remaining_length;
+}
+
+string<2> mqtt_get_packet_identifier() {
+string<2> mqtt_get_packet_identifier;
+	mqtt_packet_identifier = (mqtt_packet_identifier % 65535)+1;
+	mqtt_get_packet_identifier = chr(mqtt_packet_identifier/256)+chr(mqtt_packet_identifier % 256);
+	return mqtt_get_packet_identifier;
+}
+
+pl_sock_state_simple mqtt_call_connect() {
+pl_sock_state_simple mqtt_call_connect;
+
+	#if PLATFORM_TYPE_32
+		unsigned int t_counter = 18000;//about 100ms
+	#else
+		unsigned int t_counter = 500;//about 100ms
+	#endif
+
+	sock.num = mqtt_sock_num;
+	sock.targetip = mqtt_server_ip;
+	sock.targetport = mqtt_server_port;
+	sock.connect();
+
+	do {
+		mqtt_call_connect = sock.statesimple;
+		t_counter = t_counter-1;
+	} while ((mqtt_call_connect != sock.statesimple) && (t_counter>0));
+	return mqtt_call_connect;
+}
+
+void mqtt_send_login() {
+	string buf;
+
+	if (((mqtt_user == "") || (mqtt_pw == ""))) {
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0x02)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID;
+	} else {
+		buf = chr(0x0)+chr(len(MQTT_PROTOCOL))+MQTT_PROTOCOL+chr(MQTT_LEVEL)+chr(0xc2)+chr(0)+chr(0x3c)+chr(0)+chr(len(MQTT_CLIENT_ID))+MQTT_CLIENT_ID+chr(0)+chr(len(mqtt_user))+mqtt_user+chr(0)+chr(len(mqtt_pw))+mqtt_pw;
+	}
+	buf = chr(CONNECT)+mqtt_build_remaining_length(len(buf))+buf;
+
+	sock.setdata(buf);
+	sock.send();
+}
+
+ok_ng mqtt_connect(string *dst_ip, unsigned int dst_port, string *user, string *password, unsigned char keep_alive) {
+ok_ng mqtt_connect;
+//API function, instructs the library to connect to the MQTT server (broker).<br><br>
+//<b>dst_ip</b>- the IP address of the MQTT server,<br>
+//<b>dst_port</b>- target port on the MATT server,<br>
+//<b>user</b> and <b>password</b>- MQTT server login credentials,<br>
+//<b>keep_alive</b>- the interval, in seconds, at which the server will ping this device.<br><br>
+//Returns OK if executed successfully.
+
+	mqtt_connect = NG;
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return mqtt_connect;
+	}
+
+	mqtt_server_port = dst_port;
+	mqtt_server_ip = *dst_ip;
+	mqtt_user = *user;
+	mqtt_pw = *password;
+
+	mqtt_keep_alive_timer = keep_alive*2;// half second * 2
+
+	if ((mqtt_call_connect() == PL_SSTS_EST)) {
+		mqtt_send_login();
+		mqtt_connect = OK;
+	}
+
+return mqtt_connect;
+}
+
+ok_ng mqtt_reconnect() {
+ok_ng mqtt_reconnect;
+//API function, instructs the library to reconnect to the MQTT server (broker) using connection parameters previously supplied with mqtt_connect().<br>
+//Returns OK if executed successfully.
+
+	mqtt_reconnect = NG;
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return mqtt_reconnect;
+	}
+
+	sock.num = mqtt_sock_num;
+
+	if ((sock.statesimple == PL_SSTS_CLOSED)) {
+		sock.close();
+		mqtt_call_connect();
+	}
+
+	if ((sock.statesimple == PL_SSTS_EST)) {
+		mqtt_send_login();
+		mqtt_reconnect = OK;
+	}
+
+return mqtt_reconnect;
+}
+
+void mqtt_disconnect() {
+//API procedure, disconnects the device from the MQTT server (broker).	
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return;
+	}
+	if (mqtt_cur_state != ms_connected) { return;}
+	unsigned char current_sock = sock.num;
+
+	string buf = chr(DISCONNECT)+chr(0);
+
+	sock.num = mqtt_sock_num;
+	sock.setdata(buf);
+	sock.send();
+
+	sock.num = current_sock;
+}
+
+void mqtt_publish(string *topic, string *data, en_qos_choices qos) {
+//API procedure, publishes a <b>topic</b> and its <b>data</b> to the MQTT server (broker).
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return;
+	}
+	if (mqtt_cur_state != ms_connected) { return;}
+
+	string buf;
+	unsigned char remaining_length;
+	unsigned char current_sock = sock.num;
+
+	#if MQTT_DEBUG_PRINT == 1
+		mqtt_debug_print("Publishing: topic="+*topic+", data="+*data);
+	#endif
+
+	if ((qos == QOS_AT_MOST_ONCE)) {
+		buf = chr(0)+chr(len(*topic))+*topic+*data;
+	} else {
+		buf = chr(0)+chr(len(*topic))+*topic+mqtt_get_packet_identifier()+*data;
+	}
+
+	buf = chr(PUBLISH+1+(qos*2))+mqtt_build_remaining_length(len(buf))+buf;
+
+	sock.num = mqtt_sock_num;
+	sock.setdata(buf);
+	sock.send();
+
+	sock.num = current_sock;
+}
+
+void mqtt_sub(string *topic, en_qos_choices qos) {
+//API procedure, subscribes the device to the specified topic on the MQTT server (broker).<br><br>
+//<b>topic</b>- the topic to subscribe to,<br>
+//<b>qos</b>- requested quality of service, according to the en_qos_choices enum.
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return;
+	}
+	if (mqtt_cur_state != ms_connected) { return;}
+
+	string buf;
+	unsigned char current_sock = sock.num;
+
+	#if MQTT_DEBUG_PRINT == 1
+		mqtt_debug_print("Subscribing to: data="+*topic);
+	#endif
+
+	buf = mqtt_get_packet_identifier()+chr(0)+chr(len(*topic))+*topic+chr(qos);
+	buf = chr(SUBSCRIBE+2)+mqtt_build_remaining_length(len(buf))+buf;
+
+	sock.num = mqtt_sock_num;
+	sock.setdata(buf);
+	sock.send();
+
+	sock.num = current_sock;
+}
+
+void mqtt_unsub(string *topic) {
+//API procedure, unsubscribes the device from the specified topic.<br><br>
+//<b>topic</b>- message to unsubscribe from.
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) {
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("ERROR: mqtt_start() wasn't called.");
+		#endif
+		return;
+	}
+	if (mqtt_cur_state != ms_connected) { return;}
+
+	string buf;
+	unsigned char current_sock = sock.num;
+
+	#if MQTT_DEBUG_PRINT == 1
+		mqtt_debug_print("Unsubscribing from: data="+*topic);
+	#endif
+
+	buf = mqtt_get_packet_identifier()+chr(0)+chr(len(*topic))+*topic;
+	buf = chr(UNSUBSCRIBE+2)+mqtt_build_remaining_length(len(buf))+buf;
+
+	sock.num = mqtt_sock_num;
+	sock.setdata(buf);
+	sock.send();
+
+	sock.num = current_sock;
+}
+
+void mqtt_proc_timer() {
+//Event procedure, call it from the on_sys_timer() event handler.
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) { return;}
+	sock.num = mqtt_sock_num;
+	if (mqtt_cur_state == ms_connected) {
+		mqtt_timer_record = mqtt_timer_record+1;
+		if (mqtt_timer_record>=mqtt_keep_alive_timer) {
+			sock.num = mqtt_sock_num;
+			if (sock.rxlen == 0) {
+				#if MQTT_DEBUG_PRINT == 1
+					mqtt_debug_print("Ping.");
+				#endif
+
+				sock.setdata(chr(PINGREQ)+chr(0));
+				sock.send();
+				mqtt_timer_record = 0;
+			}
+		}
+	}
+	if (sock.statesimple != PL_SSTS_EST) {
+		mqtt_cur_state = ms_idle;
+		#if MQTT_DEBUG_PRINT == 1
+			mqtt_debug_print("Lost server connection.");
+		#endif
+		callback_mqtt_connect_lost();
+	}
+}
+
+void mqtt_proc_data() {
+//Event procedure, call it from the on_sock_data_arrival event handler.
+
+	if (mqtt_init_flag != MQTT_INIT_SIGNATURE) { return;}
+	if (sock.num != mqtt_sock_num) { return;}
+
+	unsigned char pos = 2;
+	string buf = sock.peekdata(2);
+
+	if ((len(buf)<2)) {
+		return;
+	}
+
+	//total sequence length
+	unsigned int length = asc(right(buf,1));
+	if ((length>127)) { pos = pos+1;}
+
+	if ((length+pos<=sock.rxlen)) {
+		buf = sock.getdata(length+pos);
+	} else {
+		return;
+	}
+
+	unsigned char head = asc(left(buf,1));
+	en_qos_choices qos = (head && 0x06) >> 1;
+	head = (head & 0xF0);
+
+	buf = right(buf,length);
+
+	switch ((head)) {
+
+		case CONNACK:
+
+							mqtt_debug_print("Connected to server.");
+						#endif
+						mqtt_timer_record = 0;
+						mqtt_cur_state = ms_connected;
+						callback_mqtt_connect_ok();
+						break;
+
+		case PUBLISH:
+length = asc(mid(buf,1,1))*256+asc(mid(buf,2,1));
+						#if MQTT_DEBUG_PRINT == 1
+							mqtt_debug_print("Notification: topic="+mid(buf,3,length)+", data="+right(buf,len(buf)-length-2-((qos != QOS_AT_MOST_ONCE)*2)));
+						#endif
+						callback_mqtt_notif(mid(buf,3,length),right(buf,len(buf)-length-2-((qos != QOS_AT_MOST_ONCE)*2)));
+						if ((qos == QOS_AT_LEAST_ONCE)) {
+							buf = chr(PUBACK)+chr(2)+mid(buf,length+3,2);
+							sock.setdata(buf);
+							sock.send();
+						} else if ((qos == QOS_EXACTLY_ONCE)) {
+							buf = chr(PUBREC)+chr(2)+mid(buf,length+3,2);
+							sock.setdata(buf);
+							sock.send();
+						}
+						break;
+
+		case PUBACK:
+
+							mqtt_debug_print("Publish ack.");
+							break;
+						#endif
+
+		case PUBREC:
+
+							mqtt_debug_print("Publish rec.");
+						#endif
+						buf = chr(PUBREL+2)+chr(2)+buf;
+						sock.setdata(buf);
+						sock.send();
+						break;
+
+		case PUBREL:
+
+							mqtt_debug_print("Publish rel.");
+						#endif
+						buf = chr(PUBCOMP)+chr(2)+buf;
+						sock.setdata(buf);
+						sock.send();
+						break;
+
+		case PUBCOMP:
+
+							mqtt_debug_print("Publish comp.");
+							break;
+						#endif
+
+		case SUBACK:
+
+							mqtt_debug_print("Subscribe ack.");
+						#endif
+						callback_mqtt_sub_ok();
+						break;
+
+		case UNSUBACK:
+
+							mqtt_debug_print("Unsubscribe ack.");
+							break;
+						#endif
+
+		case PINGRESP:
+
+							mqtt_debug_print("Ping response.");
+							break;
+						#endif
+	}
+
+}
+
+#if MQTT_DEBUG_PRINT == 1
+void mqtt_debug_print(string data) {
+	sys.debugprint(MQTT_STAMP+data+MQTT_CR_LF);
+}
+#endif

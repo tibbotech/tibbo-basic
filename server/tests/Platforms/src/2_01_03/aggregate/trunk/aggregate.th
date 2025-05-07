@@ -1,0 +1,204 @@
+//***********************************************************************************************************
+//			AGGREGATE AGENT LIBRARY
+//***********************************************************************************************************
+
+#ifndef AGG_DEBUG_PRINT
+	#define AGG_DEBUG_PRINT 0
+#endif
+
+#ifndef AGG_LOGIN_CONTROL
+	#define AGG_LOGIN_CONTROL 0
+#endif
+
+#ifndef AGG_TABLE_CONTROL
+	#define AGG_TABLE_CONTROL 0
+#endif
+
+#ifndef AGG_SETTING_CONTROL
+	#define AGG_SETTING_CONTROL 0
+#endif
+
+#ifndef AGG_DESCRIPTOR_FILE
+	#define AGG_DESCRIPTOR_FILE "aggregate.txt"
+#endif
+
+#ifndef AGG_MAX_CONTEXT_NAME_LEN 
+	#define AGG_MAX_CONTEXT_NAME_LEN 4		
+#endif
+
+#ifndef AGG_MAX_SCRIPT_LINE_NAME_LEN 
+	#define AGG_MAX_SCRIPT_LINE_NAME_LEN 12
+#endif
+
+#ifndef AGG_MAX_NUM_ENTITY_TYPES
+	#define AGG_MAX_NUM_ENTITY_TYPES 2
+#endif
+
+#ifndef AGG_MAX_NUM_SCRIPT_LINES
+	#define AGG_MAX_NUM_SCRIPT_LINES 0
+#endif
+
+#ifndef AGG_TEMP_TABLE_NAME
+	#define AGG_TEMP_TABLE_NAME "Tmp"
+#endif
+
+#ifndef AGG_MAX_RECONNECTION_DELAY
+	#define AGG_MAX_RECONNECTION_DELAY 15
+#endif
+
+#ifndef AGG_MAX_FUNCTION_NAME_LEN
+	#define AGG_MAX_FUNCTION_NAME_LEN 12
+#endif
+
+#ifndef AGG_MULTI_CONTEXT
+	#define AGG_MULTI_CONTEXT 0
+#endif
+
+#ifndef AGG_SEND_WAIT_TIME
+	#define AGG_SEND_WAIT_TIME 0
+#endif
+
+#ifndef AGG_MAX_NUM_STORED_EVENTS
+	#define AGG_MAX_NUM_STORED_EVENTS 0
+#endif
+
+#ifndef AGG_STORED_EVENT_LVL_FIELD
+	#define AGG_STORED_EVENT_LVL_FIELD "AEL"
+#endif
+
+#ifndef AGG_REMOTE_FIRMWARE_UPLOAD
+	#define AGG_REMOTE_FIRMWARE_UPLOAD 1
+#endif
+
+#ifndef AGG_CUSTOM_RTC
+	#define AGG_CUSTOM_RTC 0	'0:standard RTC, 1:external RTC, 2:no RTC
+#endif
+
+#ifndef AGG_KEEPALIVE_TMR_CTR
+	#define AGG_KEEPALIVE_TMR_CTR 20
+#endif
+
+#define AGG_FIRMWARE_FILENAME "firmware.bin"
+
+//------------------------------------------------------------------------------
+enum en_agg_rdwr {
+	EN_AGG_GET,
+	EN_AGG_SET
+};
+
+enum en_agg_status_codes {
+	EN_AGG_STATUS_OK,
+	EN_AGG_STATUS_NOT_STARTED,
+	EN_AGG_STATUS_WRONG_DESCRIPTOR,
+	EN_AGG_STATUS_OUT_OF_SOCKETS,
+	EN_AGG_STATUS_INVALID_INTERFACE,
+	EN_AGG_STATUS_INSUFFICIENT_BUFFER_SPACE,
+	EN_AGG_STATUS_CONNECTION_LOST,
+	EN_AGG_STATUS_UNABLE_TO_CONNECT,
+	EN_AGG_STATUS_SETTING_ERROR,
+	EN_AGG_STATUS_TABLE_ERROR,
+	EN_AGG_STATUS_FUNCTION_ERROR,
+	EN_AGG_STATUS_ITEM_NOT_FOUND
+};
+
+enum en_agg_link_states {
+	EN_AGG_LINK_STATE_IDLE,
+	EN_AGG_LINK_STATE_CONNECTING,
+	EN_AGG_LINK_STATE_SYNCRONIZING,
+	EN_AGG_LINK_STATE_DISCONNECTED,
+	EN_AGG_LINK_STATE_ESTABLISHED
+};
+
+enum en_agg_event_levels {
+	EN_AGG_EVENT_LEVEL_NONE,
+	EN_AGG_EVENT_LEVEL_NOTICE,
+	EN_AGG_EVENT_LEVEL_INFO,
+	EN_AGG_EVENT_LEVEL_WARNING,
+	EN_AGG_EVENT_LEVEL_ERROR,
+	EN_AGG_EVENT_LEVEL_FATAL,
+	EN_AGG_EVENT_LEVEL_USE_DEFAULT
+};
+
+//------------------------------------------------------------------------------
+en_agg_status_codes agg_start(pl_sock_interfaces interface, string *onwer_name, string *device_name, string *password, string *agg_server_ip, unsigned int agg_server_port, unsigned int agg_server_tout, no_yes auto_reg);
+void agg_stop();
+void agg_fire_instant_event(string *context_name, string *event_name, string *event_string, en_agg_event_levels event_level);
+void agg_get_connection_state(en_agg_link_states *link_state, pl_sock_state_simple *sock_state);
+
+void agg_proc_timer();
+void agg_proc_data();
+void agg_proc_sock_event(pl_sock_state sock_state, pl_sock_state_simple sock_state_simple);
+string agg_record_decode(string *encode_string, unsigned char field_index);
+void agg_record_encode(string *encode_string, string *field_value);
+void agg_keep_alive();
+
+ok_ng callback_agg_external_data_source(string *source_type, string *parameter1, string *parameter2, string *parameter3, en_agg_rdwr rw);
+//Callback procedure, to allow the possibility of reading and writing to a user defined data structure which is not part of our libraries.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+ok_ng callback_agg_external_data_modtime_sg(string *source_type, string *item_name, string *date_time, en_agg_rdwr op);
+//Callback procedure, to allow the possibility of reading and writing to the modtime of a user defined data structure.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+string callback_agg_get_firmware_version();
+//Callback procedure, reads firmware version, firmware version could be used by multiple modules, therefore should not be included in the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_agg_pre_buffrq(unsigned char required_buff_pages);
+//Callback procedure, informs of the insufficient number of free buffer pages available for use by the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_agg_buff_released();
+//Callback procedure, informs of the release of buffer pages by the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_agg_error(en_agg_status_codes failure_code, string *error_item);
+//Callback procedure, informs of the error happened during AggreGate related operations.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+ok_ng callback_agg_device_function(string *function_name, string *context_name, string *function_input, string *function_output);
+//Callback procedure, calls user defined operations, allows users to expend the functions that can be called from AggreGate Server.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_agg_synchronized();
+//Callback procedure, informs of the success of data synchronization with AggreGate Server.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+#if AGG_CUSTOM_RTC == 1
+	void callback_agg_rtc_sg(unsigned int *wdaycount, unsigned int *wmincount, unsigned char *bsec, unsigned int *wmilsec, en_agg_rdwr op);
+	//Callback procedure, reads and sets external RTC, instead of using the onboard RTC IC
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+#endif
+
+#if AGG_SETTING_CONTROL
+	en_stg_status_codes callback_agg_setting_saved(string *setting_name, unsigned char index, string *setting_val);
+	//Callback procedure, informs settings has been modified by AggreGate Server
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+	void callback_agg_setting_error(string *setting_name, en_stg_status_codes error_code);
+	//Callback procedure, informs of errors happened during accessing settings by AggreGate Server.
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+	ok_ng callback_agg_convert_setting(string *setting_name, unsigned char index, string *setting_value, en_agg_rdwr op);
+	//Callback procedure, allows settings to be converted, in the case that settings stored in device and on AggreGate Server are in different format.
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+#endif
+
+#if AGG_TABLE_CONTROL
+	void agg_proc_stored_events();
+	void agg_proc_data_sent();
+	void agg_stored_event_added(string *event_name);
+
+	void callback_agg_table_error(string *table_name, en_tbl_status_codes error_code);
+	//Callback procedure, informs of errors happened during accessing tables by AggreGate Server.
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+	void callback_agg_convert_table_field(string *table_name, string *field_name, string *field_value, en_agg_rdwr op);
+	//Callback procedure, allows table fields to be converted, in the case that table fields stored in device and on AggreGate Server are in different format.
+	//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+#endif
+
+#if AGG_REMOTE_FIRMWARE_UPLOAD
+	void callback_agg_firmware_upload_progress(unsigned long total_size, unsigned long remain_size);
+#endif 

@@ -1,0 +1,15 @@
+//DEFINES-------------------------------------------------------------
+#define DHCP_DEBUG_PRINT 1
+#define WLN_AVAILABLE 0
+#define SIGNAL_STRENGTH_INDICATION 1
+#define MAX_NUM_INTERFACES 4
+#define DEVICE_NET_IP "192.168.1.137"
+#define DEVICE_NET_MASK "255.255.255.0"
+#define DEVICE_NET_GATEWAY "192.168.1.1"
+//INCLUDES------------------------------------------------------------
+#include "dhcp/trunk/dhcp.th"
+#include "sock/trunk/sock.th"
+//DECLARATIONS--------------------------------------------------------
+extern no_yes interface_ready[MAX_NUM_INTERFACES];
+void close_interface_sockets(pl_sock_interfaces interface);
+void boot();

@@ -1,0 +1,1844 @@
+'***********************************************************************************************************
+'			SETTINGS LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"  
+
+'--------------------------------------------------------------------------------
+const STG_STAMP="STG> "
+const STG_CR_LF=chr(13)+chr(10)
+const STG_FIELD_SEPARATOR=9
+const STG_END_OF_LINE=13
+const STG_TIMESTAMP_LENGTH=7
+const STG_INIT_SIGNATURE=&hB5A2
+
+'--------------------------------------------------------------------------------
+type en_sdr_type
+	name as string(STG_MAX_SETTING_NAME_LEN) 'name
+	storage as byte
+	stype as byte
+	members as byte
+	p1 as word
+	p2 as word
+	ini as byte
+	memaddr as word
+	romaddr_def as word
+	member_size as byte
+	setting_size as byte
+end type
+
+'--------------------------------------------------------------------------------
+declare function stg_sg_internal(byref stg_name_or_num as string,index as byte,byref stg_value as string,op as en_stg_rdwr,read_backup as no_yes) as en_stg_status_codes
+declare function stg_set_ts_internal(byref stg_name_or_num as string,read_backup as no_yes) as en_stg_status_codes
+declare function stg_load_setting_data(byref stg_name_or_num as string,byref num as byte,byref stg_str as string,read_backup as no_yes) as en_stg_status_codes
+declare function stg_ramarr_getdata(startaddr as word,len as byte) as string
+declare function stg_ramarr_setdata(byref datatoset as string,startaddr as word) as byte
+declare function stg_get_descriptor_field(line_end_pos as word, byref field_start_pos as word) as string
+declare sub stg_process_esc_seq(byref s as string)
+declare sub stg_debug_print_error(byref debug_str as string,stg_sg_internal as en_stg_status_codes)
+declare sub stg_debugprint(byref print_data as string)
+
+'--------------------------------------------------------------------------------
+#if STG_TIMESTAMP<>0
+public dim stg_timestamp as struct_stg_timestamp
+#endif
+
+public dim stg_sdr(STG_MAX_NUM_SETTINGS) as en_sdr_type
+public dim stg_num_settings as byte
+
+#if STG_STORAGE_MEMORY<>0
+	public dim stg_filenum as byte
+	dim suspend_flushing as no_yes
+#endif
+
+#if STG_RAM_TYPE=0
+	dim stg_ram_array(STG_RAM_ARRAY_SIZE) as byte
+#endif
+
+dim stg_init_flag as word
+
+'================================================================================
+public function stg_start() as en_stg_status_codes
+'API procedure, starts the STG library, parses the descriptor file, restores all volatile (RAM) settings
+'to default values by calling stg_restore_multiple(EN_STG_INIT_MODE_RAM_ONLY).
+'MUST be called first, before any other procedure in this library is used.
+
+	dim stg_sdr_member as byte
+	dim max_stg_name_len as byte
+	dim len_of_str_rep,max_len_of_str_rep as word
+	dim s as string
+	dim i,j,c,line_end,nvmem_offset_ctr,ramarr_offset_ctr as word
+	dim f,x as byte
+	dim field_start_pos as word
+	dim l as long
+	dim pos as byte
+	#if STG_STORAGE_MEMORY
+		dim fd_status as pl_fd_status_codes
+		dim newfile as no_yes
+	#endif
+	
+	stg_start=EN_STG_STATUS_OK
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("---START---")
+	#endif
+
+	if STG_MAX_NUM_SETTINGS=0 or STG_MAX_NUM_SETTINGS>255 then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: STG_MAX_NUM_SETTINGS must be between 1 and 255, you now have '#STG_MAX_NUM_SETTINGS "+str(STG_MAX_NUM_SETTINGS)+"'.")
+		#endif
+		stg_num_settings=0 'STG_MAX_NUM_SETTINGS must be between 1 and 255.
+		stg_start=EN_STG_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if STG_MAX_SETTING_NAME_LEN=0 or STG_MAX_SETTING_NAME_LEN>255 then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: STG_MAX_SETTING_NAME_LEN must be between 1 and 255, you now have 'STG_MAX_SETTING_NAME_LEN "+str(STG_MAX_SETTING_NAME_LEN)+"'.")
+		#endif
+		stg_num_settings=0 'STG_MAX_SETTING_NAME_LEN must be between 1 and 255.
+		stg_start=EN_STG_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	#if STG_TIMESTAMP
+		if STG_MAX_SETTING_VALUE_LEN=0 or STG_MAX_SETTING_VALUE_LEN>246 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: STG_MAX_SETTING_VALUE_LEN must be between 1 and 246, you now have '"+str(STG_MAX_SETTING_VALUE_LEN)+"'.")
+			#endif
+			stg_num_settings=0 'STG_MAX_SETTING_VALUE_LEN must be between 1 and 246.
+			stg_start=EN_STG_STATUS_WRONG_DEFINE
+			exit function
+		end if
+	#else
+		if STG_MAX_SETTING_VALUE_LEN=0 or STG_MAX_SETTING_VALUE_LEN>253 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: STG_MAX_SETTING_VALUE_LEN must be between 1 and 253, it is now 'STG_MAX_SETTING_VALUE_LEN "+str(STG_MAX_SETTING_VALUE_LEN)+"'.")
+			#endif
+			stg_num_settings=0 'STG_MAX_SETTING_VALUE_LEN must be between 1 and 253.
+			stg_start=EN_STG_STATUS_WRONG_DEFINE
+			exit function
+		end if
+	#endif
+
+	#if STG_STORAGE_MEMORY
+		if fd.ready=NO then
+			if fd.mount<>PL_FD_STATUS_OK then
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: the flash disk is not formatted or malfunctioned.")
+				#endif
+				stg_start=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+		end if
+		
+		suspend_flushing=NO
+		
+		stg_filenum=filenum_get("STG")
+		if stg_filenum>=fd.maxopenedfiles then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: out of file numbers")
+			#endif
+			stg_start=EN_STG_STATUS_OUT_OF_FILE_NUMBERS
+			exit function
+		end if
+		
+		newfile=NO
+		fd.filenum=stg_filenum
+		fd_status=fd.open(STG_FILENAME)
+		select case fd_status
+		case PL_FD_STATUS_NOT_FOUND
+			'need to create this file
+			fd_status=fd.create(STG_FILENAME)
+			if fd_status<>PL_FD_STATUS_OK then
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: could not create the file")
+				#endif
+				stg_start=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+			newfile=YES
+			fd_status=fd.open(STG_FILENAME)
+			if fd_status<>PL_FD_STATUS_OK then
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: could not open the file")
+				#endif
+				stg_start=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+
+		case PL_FD_STATUS_OK
+			'all is good -- just reset the file size to 0
+		
+		case else
+			'some other problem
+			#if STG_DEBUG_PRINT
+				stg_debugprint("DISK ERROR")
+			#endif
+			stg_start=EN_STG_STATUS_FAILURE
+			exit function
+		end select
+	#endif
+
+	stg_num_settings=0 'will count all settings in the descriptor file
+	stg_sdr_member=0 'will select stg_sdr array member (follows stg_num_settings but is limited by array size)
+	max_stg_name_len=0 'will keep the longest setting name encountered
+	max_len_of_str_rep=0 'will keep the largest string length required to represent setting value
+	nvmem_offset_ctr=1 'will count offset in the NV MEM (addresses start from 1).
+	ramarr_offset_ctr=0 'will count offset in the RAM array (addresses start from 0).
+
+	romfile.open(STG_DESCRIPTOR_FILE)				'this file is a setting descriptor table
+	if romfile.size=0 then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: '"+STG_DESCRIPTOR_FILE+"' is not in your project or file is empty.")
+		#endif
+		stg_num_settings=0 'setting descriptor file is not in your project (or file is empty)
+		stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+		exit function
+	end if
+	
+	i=romfile.find(romfile.pointer,">>",1)
+	while i<>0
+		'we are now at the ">>" pointing at the beginning of one setting descriptor line
+		romfile.pointer=i+2
+		
+		'find the end of this setting descriptor line (or the end of file)
+		line_end=romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1)
+		if line_end=0 then
+			line_end=romfile.size+1
+		end if
+		
+		'extract setting name
+		s=stg_get_descriptor_field(line_end,field_start_pos)			
+		if s="" then
+			'missing setting name field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting #"+str(stg_sdr_member)+"): missing setting name field (settings are counted from 0).")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if len(s)>STG_MAX_SETTING_NAME_LEN then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+s+"'): this setting's name length is "+str(len(s))+", while you have 'STG_MAX_SETTING_NAME_LEN "+str(STG_MAX_SETTING_NAME_LEN)+"'.")
+			#endif
+			stg_num_settings=0 'you need to increase STG_MAX_SETTING_NAME_LEN!
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		stg_sdr(stg_sdr_member).name=s
+		if len(s)>max_stg_name_len then
+			max_stg_name_len=len(s)
+		end if
+
+		'extract storage type (non-volatile or RAM)
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing storage type field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing storage type field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if len(s)<>1 or (asc(s)<>`E` and asc(s)<>`R`) then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): unknown storage type '"+s+"', use 'E' or 'R' only.")
+			#endif
+			stg_num_settings=0 'unknown storage type; use "E" for non-volatile (EEPROM/FD) or "R" for volatile (RAM); capital letters only!
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		stg_sdr(stg_sdr_member).storage=asc(s)
+		
+		'extract setting type
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing setting type field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing setting type field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+
+		if len(s)<>1 then goto unknown_setting_type
+		select case asc(s)
+		case `B`
+		case `W`
+		case `S`
+		case `D`
+		case else
+unknown_setting_type:
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): unknown setting type '"+s+"', use 'B', 'W', 'S' or 'D' only.")
+			#endif
+			stg_num_settings=0 'unknown setting type; use "B" for byte, "W" for word, "S" for string, "D" for dot-decimal string; capital letters only!
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end select
+		stg_sdr(stg_sdr_member).stype=asc(s)
+
+		'extract the number of members
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing number of members field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing number of members field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if val(s)=0 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): the number of members can't be 0, each setting must have at least one member.")
+			#endif
+			stg_num_settings=0	'the number of members can't be 0, each setting must have at least one member
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		if val(s)>254 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): the number of members is "+s+", while it can't exceed 254.")
+			#endif
+			stg_num_settings=0	'max number of members can't exceed 254, 255 is a special value- see stg_sg_internal()
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		stg_sdr(stg_sdr_member).members=val(s)
+		
+		'extract P1
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing p1 parameter field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing P1 parameter field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		select case stg_sdr(stg_sdr_member).stype
+		case `B`:
+			if val(s)>255 then goto p1_too_large
+
+		case `W`:
+			if lval(s)>65535 then goto p1_too_large
+
+		case `S`:
+			if val(s)>254 then goto p1_too_large
+		case `D`:
+			if val(s)>63 then
+p1_too_large:
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): minimum value (P1 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s)
+				#endif
+				stg_num_settings=0
+				stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+		end select
+		stg_sdr(stg_sdr_member).p1=val(s)
+
+		'extract P2
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing P2 parameter field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing P2 parameter field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if val(s)=0 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): maximum value (P2 param) can't be zero!")
+			#endif
+			'maximum value (P2 param) can't be zero
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		select case stg_sdr(stg_sdr_member).stype
+		case `B`:
+			if val(s)>255 then goto p2_too_large
+
+		case `W`:
+			if lval(s)>65535 then goto p2_too_large
+
+		case `S`:
+			if val(s)>254 then goto p2_too_large
+		
+		case `D`:
+			if val(s)>63 then
+p2_too_large:
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): maximum value (P2 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s)
+				#endif
+				'maximum value (P2 param) for byte, string, and dot-decimal settings can't exceed 255
+				stg_num_settings=0
+				stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+		end select
+		stg_sdr(stg_sdr_member).p2=val(s)
+
+		if stg_sdr(stg_sdr_member).p2<stg_sdr(stg_sdr_member).p1 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): P2 parameter (now "+str(stg_sdr(stg_sdr_member).p2)+") cannot be smaller than P1 parameter (now "+str(stg_sdr(stg_sdr_member).p1)+").")
+			#endif
+			stg_num_settings=0	'P2 parameter cannot be smaller than P1 parameter
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+
+		'calculate how much space this setting will need in memory
+		select case stg_sdr(stg_sdr_member).stype
+		case `B`:
+			j=1
+			len_of_str_rep=3
+		case `W`:
+			j=2
+			len_of_str_rep=5
+		case `S`:
+			j=stg_sdr(stg_sdr_member).p2+1
+			len_of_str_rep=stg_sdr(stg_sdr_member).p2
+		case `D`
+			j=stg_sdr(stg_sdr_member).p2+1
+			len_of_str_rep=stg_sdr(stg_sdr_member).p2*4
+			if len_of_str_rep>0 then
+				len_of_str_rep=len_of_str_rep-1
+			end if
+		end select
+		
+		if len_of_str_rep>STG_MAX_SETTING_VALUE_LEN then
+			#if STG_DEBUG_PRINT			
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): this setting would occupy up to "+str(len_of_str_rep)+" chars in string form, while you have 'STG_MAX_SETTING_VALUE_LEN "+str(STG_MAX_SETTING_VALUE_LEN)+"'.")
+			#endif
+			stg_num_settings=0 'this setting (with its type, number of members, etc.) would occupy more than 255 bytes, which is not allowed
+			stg_start=EN_STG_STATUS_WRONG_DEFINE
+			exit function
+		end if
+
+		if max_len_of_str_rep<len_of_str_rep then
+			max_len_of_str_rep=len_of_str_rep
+		end if
+
+		stg_sdr(stg_sdr_member).member_size=j 	'fill out member length
+		j=j*stg_sdr(stg_sdr_member).members+1
+		#if STG_TIMESTAMP
+			x=STG_TIMESTAMP_LENGTH
+		#else
+			x=0
+		#endif
+		j=j+x
+		if j>255 then
+			#if STG_DEBUG_PRINT
+				
+				select case stg_sdr(stg_sdr_member).stype
+				case `B`:
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): only up to "+str(254-x)+" members are possible for this word setting, you now have "+str(stg_sdr(stg_sdr_member).members)+".")
+				case `W`:
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): only up to "+str((254-x)/2)+" members are possible for this word setting, you now have "+str(stg_sdr(stg_sdr_member).members)+".")
+				case `S`:
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): with P2="+str(stg_sdr(stg_sdr_member).p2)+", only up to "+str((254-x)/(stg_sdr(stg_sdr_member).p2+1))+" members are possible for this string setting, you now have "+str(stg_sdr(stg_sdr_member).members)+".")
+				case `D`:
+					stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): with P2="+str(stg_sdr(stg_sdr_member).p2)+", only up to "+str((254-x)/(stg_sdr(stg_sdr_member).p2+1))+" members are possible for this dot-decimal setting, you now have "+str(stg_sdr(stg_sdr_member).members)+".")
+				end select
+			#endif
+			stg_num_settings=0 'this setting (with its type, number of members, etc.) would occupy more than 255 bytes, which is not allowed
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		stg_sdr(stg_sdr_member).setting_size=j
+		
+		'save the address of the setting in memory, increment memory counters
+		if stg_sdr(stg_sdr_member).storage=`E` then
+			stg_sdr(stg_sdr_member).memaddr=nvmem_offset_ctr
+			nvmem_offset_ctr=nvmem_offset_ctr+stg_sdr(stg_sdr_member).setting_size
+		else
+			stg_sdr(stg_sdr_member).memaddr=ramarr_offset_ctr
+			ramarr_offset_ctr=ramarr_offset_ctr+stg_sdr(stg_sdr_member).setting_size
+		end if
+
+		'extract initialization mode
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing initialization mode field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing intialization mode field.")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if len(s)<>1 then goto unknown_init_mode
+		select case asc(s)
+		case `I`
+		case `A`
+		case else
+unknown_init_mode:
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): unknown initialization mode '"+s+"', use 'I', or 'A' only.")
+			#endif
+			stg_num_settings=0 'unknown initialization mode; use "I" for "when invalid", "A" for "always"
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end select
+		stg_sdr(stg_sdr_member).ini=asc(s)
+
+		'extract default value field
+		s=stg_get_descriptor_field(line_end,field_start_pos)
+		stg_process_esc_seq(s)
+	
+		if s="" then
+			'missing default value field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): missing default value field (use '^' to specify NULL default value.).")
+			#endif
+			stg_num_settings=0
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+
+		'save default value field position
+		stg_sdr(stg_sdr_member).romaddr_def=field_start_pos
+
+		'verify the validity of the default value	
+		for f=0 to stg_sdr(stg_sdr_member).members-1
+			pos=instr(1,s,"/",1)
+			if pos=0 then
+				pos=len(s)+1
+			end if
+
+			select case stg_sdr(stg_sdr_member).stype
+			case `B`:
+				j=val(left(s,pos-1))
+				if left(s,pos-1)="^" then
+					j=0
+				end if
+				if j<stg_sdr(stg_sdr_member).p1 then
+					'def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value for member #"+str(f)+" = "+str(j)+", which is below P1 parameter ("+str(stg_sdr(stg_sdr_member).p1)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if j>stg_sdr(stg_sdr_member).p2 then
+					'def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value for member #"+str(f)+" = "+str(j)+", which is above P2 parameter ("+str(stg_sdr(stg_sdr_member).p2)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+			
+			case `W`:
+				l=lval(left(s,pos-1))
+				if left(s,pos-1)="^" then
+					l=0
+				end if
+				if l<stg_sdr(stg_sdr_member).p1 then
+					'def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value for member #"+str(f)+" = "+lstr(l)+", which is below P1 parameter ("+str(stg_sdr(stg_sdr_member).p1)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if l>stg_sdr(stg_sdr_member).p2 then
+					'def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value for member #"+str(f)+" = "+lstr(l)+", which is above P2 parameter ("+str(stg_sdr(stg_sdr_member).p2)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+
+			case `S`:
+				j=len(left(s,pos-1))
+				if left(s,pos-1)="^" then
+					j=0
+				end if
+				if j<stg_sdr(stg_sdr_member).p1 then
+					'def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value length for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is below P1 parameter ("+str(stg_sdr(stg_sdr_member).p1)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if j>stg_sdr(stg_sdr_member).p2 then
+					'def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default value length for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is above P2 parameter ("+str(stg_sdr(stg_sdr_member).p2)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+			
+			case `D`:
+				j=len(ddval(left(s,pos-1)))
+				if left(s,pos-1)="^" then
+					j=0
+				end if
+				if j<stg_sdr(stg_sdr_member).p1 then
+					'def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default number of bytes for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is below P1 parameter ("+str(stg_sdr(stg_sdr_member).p1)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if j>stg_sdr(stg_sdr_member).p2 then
+					'def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr(stg_sdr_member).name+"'): default number of bytes for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is above P2 parameter ("+str(stg_sdr(stg_sdr_member).p2)+").")
+					#endif
+					stg_num_settings=0
+					stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+
+			end select
+			s=mid(s,pos+1,255)
+			if s="" then goto skip_def_value_check
+		next f
+skip_def_value_check:
+
+
+		'done with this setting, move to next one
+		i=romfile.find(romfile.pointer,">>",1)
+		if stg_sdr_member<STG_MAX_NUM_SETTINGS-1 then
+			stg_sdr_member=stg_sdr_member+1
+		end if
+		stg_num_settings=stg_num_settings+1
+		c=c+x
+	wend
+
+	if stg_num_settings>STG_MAX_NUM_SETTINGS then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: total number of settings is "+str(stg_num_settings)+" while you have 'STG_MAX_NUM_SETTINGS "+str(STG_MAX_NUM_SETTINGS)+"'.")
+		#endif
+		stg_num_settings=0 'you need to increase STG_MAX_NUM_SETTINGS!
+		stg_start=EN_STG_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+
+#if STG_STORAGE_MEMORY=0
+	'exceeded EEPROM capacity? (we do not check this for the flash disk
+	#if STG_REDUNDANCY=0
+		if nvmem_offset_ctr-1>stor.size then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: your non-volatile settings do not fit in the EEPROM (needed: "+str(nvmem_offset_ctr-1)+", available: "+str(stor.size)+").")
+			#endif
+			stg_num_settings=0 'your non-volatile settings do not fit in the EEPROM!
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+	#else
+		if nvmem_offset_ctr-1>=stor.size/2 then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: your non-volatile settings do not fit in HALF of the EEPROM (needed: "+str(nvmem_offset_ctr-1)+", available: "+str(stor.size/2)+").")
+			#endif
+			stg_num_settings=0 'your non-volatile settings do not fit in HALF of the EEPROM (we need other half for backup)!
+			stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+	#endif
+#else
+	
+	c=nvmem_offset_ctr
+	#if STG_REDUNDANCY
+		c=c*2 '*2 because we have a backup copy to accommodate too
+	#endif
+		
+	if newfile=YES then
+		'create a file of required size
+		
+create_newfile:
+		fd_status=fd.setfilesize(0)
+		if fd_status<>PL_FD_STATUS_OK then
+			#if STG_DEBUG_PRINT
+				stg_debugprint("DISK ERROR")
+			#endif
+			stg_start=EN_STG_STATUS_FAILURE
+			exit function
+		end if
+		
+		while fd.filesize<c
+			if c-fd.filesize>255 then
+				x=255
+			else
+				x=c-fd.filesize
+			end if
+			s=strgen(x,chr(0))
+			fd_status=fd.setdata(s)
+			if fd_status<>PL_FD_STATUS_OK then
+				#if STG_DEBUG_PRINT
+					stg_debugprint("DISK ERROR")
+				#endif
+				stg_start=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+		wend
+	else
+		if fd.filesize<>c then
+			goto create_newfile
+		end if
+	end if
+#endif
+
+
+	'exceeded RAM array capacity?
+	#if STG_REDUNDANCY>=2
+		ramarr_offset_ctr=ramarr_offset_ctr*2
+	#endif
+	
+	
+	if ramarr_offset_ctr>STG_RAM_ARRAY_SIZE then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: your volatile settings need "+str(ramarr_offset_ctr)+" bytes in the RAM, you now have 'STG_RAM_ARRAY_SIZE "+str(STG_RAM_ARRAY_SIZE)+"'.")
+		#endif
+		stg_num_settings=0 'your RAM settings do not fit in the RAM array!
+		stg_start=EN_STG_STATUS_WRONG_DESCRIPTOR
+		exit function
+	end if
+
+	stg_init_flag=STG_INIT_SIGNATURE 'we need to set this before we call stg_restore_multiple()
+
+	'initialized settings stored in RAM
+	#if STG_DEBUG_PRINT
+		stg_debugprint("Check/init RAM (volatile) settings...")
+	#endif
+	stg_start=stg_restore_multiple(EN_STG_INIT_MODE_RAM_ONLY)
+	if stg_start<>EN_STG_STATUS_OK then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: failed to initialize RAM settings")
+		#endif
+		stg_init_flag=0
+		exit function
+	end if
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("Number of settings: "+str(stg_num_settings))
+		if stg_num_settings<STG_MAX_NUM_SETTINGS then
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set 'STG_MAX_NUM_SETTINGS "+str(stg_num_settings)+"'. It is now "+str(STG_MAX_NUM_SETTINGS)+".")
+		end if
+				
+		#if STG_REDUNDANCY
+			stg_debugprint("Non-volatile memory space required: "+str(nvmem_offset_ctr*2))
+		#else
+			stg_debugprint("Non-volatile memory space required: "+str(nvmem_offset_ctr))
+		#endif
+		
+		stg_debugprint("RAM (volatile memory) space required: "+str(ramarr_offset_ctr))
+		if ramarr_offset_ctr<STG_RAM_ARRAY_SIZE then
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set 'STG_RAM_ARRAY_SIZE "+str(ramarr_offset_ctr)+"'. It is now "+str(STG_RAM_ARRAY_SIZE)+".")
+		end if
+	
+		if max_stg_name_len<STG_MAX_SETTING_NAME_LEN then
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set STG_MAX_SETTING_NAME_LEN to "+str(max_stg_name_len)+". It is now "+str(STG_MAX_SETTING_NAME_LEN)+".")
+		end if
+		
+		if max_len_of_str_rep<STG_MAX_SETTING_VALUE_LEN then
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set STG_MAX_SETTING_VALUE_LEN to "+str(max_len_of_str_rep)+". It is now "+str(STG_MAX_SETTING_VALUE_LEN)+".")
+		end if
+	#endif
+
+end function
+
+'-------------------------------------------------------------
+public function stg_check_all(byref problem_stg as string) as en_stg_status_codes
+'API procedure, verifies each setting by reading its value thru stg_sg().
+
+	dim f as byte
+	dim stg_value as string(STG_MAX_SETTING_VALUE_LEN) 
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_CHECK()")
+	#endif
+
+	problem_stg=""
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_check_all=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	for f=0 to stg_num_settings-1
+		stg_check_all=stg_sg(str(f),0,stg_value,EN_STG_GET)
+		if stg_check_all<>EN_STG_STATUS_OK then
+			problem_stg=stg_sdr(f).name
+			exit function
+		end if
+	next f
+	stg_check_all=EN_STG_STATUS_OK
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_get_def(byref stg_name_or_num as string,index as byte,byref def_value as string) as en_stg_status_codes
+'API procedure, returns the default value for the specified setting's member.
+
+	dim num as byte
+	dim pos,pos2 as integer
+	dim s as string
+
+	def_value=""
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET_DEF()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_get_def=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	romfile.open(STG_DESCRIPTOR_FILE)
+	
+	num=stg_find(stg_name_or_num)
+	if num=0 then
+		'unknown setting
+		stg_get_def=EN_STG_STATUS_UNKNOWN
+		exit function
+	end if
+	num=num-1
+	
+	if index>=stg_sdr(num).members then
+		'invalid index
+		stg_get_def=EN_STG_STATUS_INVALID_INDEX
+		exit function
+	end if
+	
+	'get default value field
+	romfile.pointer=stg_sdr(num).romaddr_def
+	pos=romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1)
+	pos2=romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1)
+	if pos=0 and pos2=0 then
+		pos=romfile.size+1
+	else if pos=0 then
+		pos=pos2
+	else if pos2=0 then
+		'nothing to do here
+	else
+		if pos>pos2 then
+			pos=pos2
+		end if
+	end if
+	s=romfile.getdata(pos-romfile.pointer)
+	
+	pos=instr(1,s,"/",1)
+	while pos<>0 and index>0
+		s=right(s,len(s)-pos)
+		pos=instr(1,s,"/",1)
+		index=index-1
+	wend
+	pos=instr(1,s,"/",1)
+	if pos>0 then s=left(s,pos-1)
+	stg_process_esc_seq(s)
+	if s="^" then def_value="" else def_value=s
+	
+	'completed successfully!
+	stg_get_def=EN_STG_STATUS_OK
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_restore_multiple(init_mode as en_stg_init_modes) as en_stg_status_codes
+'API procedure, sets the default values for all or multiple settings.
+
+	dim x,f,f2 as byte
+	dim pos,pos2 as word
+	dim s,s2 as string
+
+	#if STG_DEBUG_PRINT
+		dim debug_str as string(32)
+		
+		select case init_mode
+		case EN_STG_INIT_MODE_NORMAL:				debug_str="ALL, NORMAL"
+		case EN_STG_INIT_MODE_OVERRIDE:				debug_str="ALL, OVERRIDE"
+		case EN_STG_INIT_MODE_RAM_ONLY:				debug_str="RAM ONLY, NORMAL"
+		case EN_STG_INIT_MODE_RAM_ONLY_OVERRIDE:	debug_str="RAM ONLY, OVERRIDE"
+		end select
+		stg_debugprint("STG_RESTORE_MULTIPLE(), init_mode= "+debug_str)
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_restore_multiple=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	#if STG_TIMESTAMP<>0
+		dim stg_timestamp_bup as struct_stg_timestamp
+	#endif
+	#if STG_STORAGE_MEMORY<>0
+		dim fd_status as pl_fd_status_codes
+	#endif
+
+	romfile.open(STG_DESCRIPTOR_FILE)
+	
+	#if STG_STORAGE_MEMORY<>0
+		fd.filenum=stg_filenum
+		suspend_flushing=YES
+	#endif
+
+	if stg_num_settings>0 then
+		for f=0 to stg_num_settings-1
+			'do we need to initialize this setting?
+			
+			select case init_mode
+			case EN_STG_INIT_MODE_NORMAL:
+				'Initialize (or keep) settings according to the INI field in setting definition file
+				if stg_sdr(f).ini=`A` then goto init_this
+				'otherwise just check if the setting is sane
+			
+			case EN_STG_INIT_MODE_OVERRIDE:
+				'Initialize ALL settings irregardless of their condition
+				goto init_this
+			
+			case EN_STG_INIT_MODE_RAM_ONLY:
+				'Initialize (or keep) RAM ARR settings according to the INIT field in setting definition file
+				if stg_sdr(f).storage=`R` then
+					if stg_sdr(f).ini=`A` then goto init_this
+					'otherwise just check if the setting is sane
+				else
+					goto skip_this
+				end if
+			
+			case EN_STG_INIT_MODE_RAM_ONLY_OVERRIDE:
+				'Initialize ALL RAM ARR settings irregardless of their condition
+				if stg_sdr(f).storage=`R` then
+					goto init_this
+				else
+					goto skip_this
+				end if	
+			
+			end select
+			
+			'we are here because we need to test if the setting is sane
+			#if STG_TIMESTAMP<>0
+				stg_timestamp_bup=stg_timestamp 'reading the setting will change stg_timestamp
+			#endif
+			
+			for f2=0 to stg_sdr(f).members-1
+				x=stg_sg(stg_sdr(f).name,f2,s,EN_STG_GET) 'here is where X is set -- we check it below
+				if x<>0 then goto stgl1
+			next f2
+stgl1:			
+			#if STG_TIMESTAMP<>0
+				stg_timestamp=stg_timestamp_bup
+			#endif
+
+			if x<>EN_STG_STATUS_OK then 'x is set above (see "here is where X is set")
+init_this:				
+				'yes, initialization is required- get default value
+				romfile.pointer=stg_sdr(f).romaddr_def
+				pos=romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1)
+				pos2=romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1)
+				if pos=0 and pos2=0 then
+					pos=romfile.size+1
+				else if pos=0 then
+					pos=pos2
+				else if pos2=0 then
+					'nothing to do here
+				else
+					if pos>pos2 then
+						pos=pos2
+					end if
+				end if
+				s=romfile.getdata(pos-romfile.pointer)
+
+				'we have two cases: when there is a single value for all setting members, and when there are
+				'separate values
+				if (instr(1,s,"/",1)<>0) and (stg_sdr(f).members>1) then
+					'there are 2 or more initialization values
+					for f2=0 to stg_sdr(f).members-1
+						pos=instr(1,s,"/",1)
+						if pos=0 then
+							s2=s
+						else	
+							s2=left(s,pos-1)
+							s=right(s,len(s)-pos)
+						end if
+						stg_process_esc_seq(s2)
+						if s2="^" then s2=""
+						x=stg_sg(stg_sdr(f).name,f2,s2,EN_STG_SET) '255 means "set all members to the same value"
+						if x<>EN_STG_STATUS_OK then
+							stg_restore_multiple=x
+							#if STG_STORAGE_MEMORY<>0
+								suspend_flushing=NO
+							#endif
+							exit function
+						end if
+					next f
+				else
+					'there is a single initialization value
+					stg_process_esc_seq(s)
+					if s="^" then s=""
+					x=stg_sg(stg_sdr(f).name,255,s,EN_STG_SET) '255 means "set all members to the same value"
+					if x<>EN_STG_STATUS_OK then
+						stg_restore_multiple=x
+						#if STG_STORAGE_MEMORY<>0
+							suspend_flushing=NO
+						#endif
+						exit function
+					end if
+				end if
+			end if
+skip_this:		
+		next f
+	end if
+
+	'all OK!
+	#if STG_STORAGE_MEMORY<>0
+		suspend_flushing=NO
+		fd_status=fd.flush
+		if fd_status<>PL_FD_STATUS_OK then
+			stg_restore_multiple=EN_STG_STATUS_FAILURE
+			exit function
+		end if
+	#endif	
+	stg_restore_multiple=EN_STG_STATUS_OK
+end function
+
+'-------------------------------------------------------------
+public function stg_restore_member(byref stg_name_or_num as string, index as byte) as en_stg_status_codes
+'API procedure, sets the default value for the specified setting's member.
+
+	dim s as string(STG_MAX_SETTING_VALUE_LEN)
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_RESTORE_MEMBER()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_restore_member=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	'get default value -- this will also verify that the setting exists
+	stg_restore_member=stg_get_def(stg_name_or_num,index,s)
+	if stg_restore_member<>EN_STG_STATUS_OK then exit function
+
+	'set default value
+	stg_restore_member=stg_sg(stg_name_or_num,index,s,EN_STG_SET)
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_get_num_settings() as byte
+'API procedure, returns the number of settings defined in your project.
+
+	stg_get_num_settings=stg_num_settings
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_get_num_members(byref stg_name_or_num as string, byref num_members as byte) as en_stg_status_codes
+'API procedure, returns the number of members for the specified setting.
+
+	dim num as byte
+
+	num_members=0
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET_NUM_MEMBERS()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_get_num_members=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	romfile.open(STG_DESCRIPTOR_FILE)
+	
+	num=stg_find(stg_name_or_num)
+	if num=0 then
+		'unknown setting
+		stg_get_num_members=EN_STG_STATUS_UNKNOWN
+		exit function
+	end if
+	num=num-1
+	
+	'get the number of members
+	num_members=stg_sdr(num).members 
+
+	'completed successfully!
+	stg_get_num_members=EN_STG_STATUS_OK
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_get(byref stg_name_or_num as string, index as byte) as string 
+'API procedure, reads (gets) the value of the specified setting's member; reports errors thru callback_stg_error(). 
+
+	dim s as string
+	dim status as en_stg_status_codes
+
+	stg_get=""
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	status=stg_sg(stg_name_or_num,index,s,EN_STG_GET)
+	select case status
+	case EN_STG_STATUS_OK:
+		stg_get=s
+		exit function
+	case EN_STG_STATUS_UNKNOWN, EN_STG_STATUS_INVALID_INDEX:
+		stg_get=""
+		callback_stg_error(stg_name_or_num,index,status)
+	case else:
+		stg_get_def(stg_name_or_num,index,s)
+		stg_get=s
+		callback_stg_error(stg_name_or_num,index,status)
+	end select
+end function
+
+'--------------------------------------------------------------------------------
+public sub stg_set(byref stg_name_or_num as string, index as byte, byref stg_value as string) 
+'API procedure, writes (sets) the value of the specified setting's member; reports errors thru callback_stg_error().
+
+	dim status as en_stg_status_codes
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SET()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit sub
+	end if
+
+	status=stg_sg(stg_name_or_num,index,stg_value,EN_STG_SET)
+	if status<>EN_STG_STATUS_OK then
+		callback_stg_error(stg_name_or_num,index,status)
+	end if
+
+end sub
+
+'--------------------------------------------------------------------------------
+public function stg_sg(byref stg_name_or_num as string,index as byte,byref stg_value as string,op as en_stg_rdwr) as en_stg_status_codes
+'API procedure, writes (sets) or reads (gets) the specified setting's member; directly returns the execution result.
+
+	dim original_stg_value as string(STG_MAX_SETTING_VALUE_LEN)
+	dim stg_name_or_num_copy as string(STG_MAX_SETTING_NAME_LEN)
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SG()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_sg=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	if op=EN_STG_GET then
+		stg_value=""
+		stg_sg=stg_sg_internal(stg_name_or_num,index,stg_value,EN_STG_GET,NO)
+		if stg_sg=EN_STG_STATUS_INVALID or stg_sg=EN_STG_STATUS_FAILURE then
+			#if STG_REDUNDANCY
+				'see if the backup copy of the setting contains a correct value
+				stg_sg=stg_sg_internal(stg_name_or_num,index,stg_value,EN_STG_GET,YES)
+				if stg_sg<>EN_STG_STATUS_OK then
+					exit function
+				else
+					'OK, second value worked, copy it into the first value
+					stg_sg=stg_sg_internal(stg_name_or_num,index,stg_value,EN_STG_SET,NO)
+					if stg_sg<>EN_STG_STATUS_OK then exit function
+				end if
+			#else
+				exit function
+			#endif
+		end if
+		
+		original_stg_value=stg_value
+		stg_name_or_num_copy=stg_name_or_num 'this way, callback_stg_pre_get() can't screw up setting name
+		callback_stg_pre_get(stg_name_or_num_copy,index,stg_value)
+		if stg_value<>original_stg_value then
+			stg_sg=stg_sg_internal(stg_name_or_num,index,stg_value,EN_STG_SET,NO)
+		end if
+	else
+		stg_sg=stg_sg_internal(stg_name_or_num,index,stg_value,EN_STG_SET,NO)
+		if stg_sg=EN_STG_STATUS_OK then
+			stg_name_or_num_copy=stg_name_or_num 'this way, callback_stg_post_set() can't screw up setting name
+			callback_stg_post_set(stg_name_or_num_copy,index,stg_value)
+		end if
+	end if
+
+end function
+
+'--------------------------------------------------------------------------------
+#if STG_TIMESTAMP<>0
+public function stg_set_ts(byref stg_name_or_num as string) as en_stg_status_codes
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SET_TS()")
+	#endif
+
+	if stg_init_flag<>STG_INIT_SIGNATURE then
+		stg_set_ts=EN_STG_STATUS_NOT_STARTED
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed")
+		#endif
+		exit function
+	end if
+
+	stg_set_ts=stg_set_ts_internal(stg_name_or_num,NO)
+	if stg_set_ts=EN_STG_STATUS_INVALID or stg_set_ts=EN_STG_STATUS_FAILURE then
+		#if STG_REDUNDANCY
+			stg_set_ts=stg_set_ts_internal(stg_name_or_num,YES)
+		#endif
+		exit function
+	end if
+end function
+#endif
+
+'--------------------------------------------------------------------------------
+public function stg_stype_get(byref stg_name_or_num as string) as byte
+	dim f as byte
+	
+	f=stg_find(stg_name_or_num)
+	if f>0 then
+		stg_stype_get=stg_sdr(f-1).stype
+	else
+		stg_stype_get=""
+	end if
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_find(byref stg_name_or_num as string) as byte
+'if stg_name_or_num starts with an alpha, then assumes that the setting name was supplied and
+'looks for the setting with this name. If the name starts with digit then assumes it is a setting
+'number. In both cases returns member number+1 if found, or 0 if not found.
+
+	dim f as byte
+	
+	f=asc(stg_name_or_num)
+	if f>=&h30 and f<=&h39 then
+		f=val(stg_name_or_num)
+		if f<stg_num_settings then
+			stg_find=f+1
+			exit function
+		end if
+	else
+		for f=0 to stg_num_settings-1
+			if stg_sdr(f).name=stg_name_or_num then
+				stg_find=f+1
+				exit function
+			end if
+		next f
+	end if
+	stg_find=0
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_sg_internal(byref stg_name_or_num as string,index as byte,byref stg_value as string,op as en_stg_rdwr,read_backup as no_yes) as en_stg_status_codes
+'Reads/writes setting stg_name_or_num, value is exchanged through stg_value. Read or write operation is
+'determined by op. Returns various en_stg_status status codes.
+'The following applies only when STG_TIMESTAMP<>0 (see settings.tbh):
+'For SETs, the timestamp of the setting is updated with the value from stg_timestamp (global struct).
+'For GETs, the stg_timestamp will contain the timestamp of the setting after the stg_sg() call.
+'NEW: index=255 will set all members of the setting to the supplied value. This saves time during initialization.
+'We can use index=255 for this because there may never be 255 members of the setting. Even when the timestamp is off,
+'and the setting is of the BYTE type we need one byte for the checksum, so we can only have 254 members!
+'For GET operation, and when STG_REDUNDANCY>0 and when read_backup=YES we will read the backup (second) copy of the setting
+
+	dim x,cs,f as byte
+	dim i as word
+	dim stg_str as string
+	dim new_member_str as string(STG_MAX_SETTING_VALUE_LEN+1)
+	dim num as byte
+	dim ts_str as string(STG_TIMESTAMP_LENGTH)
+	#if STG_STORAGE_MEMORY<>0
+		dim fd_status as pl_fd_status_codes
+	#endif
+	
+	#if STG_STORAGE_MEMORY<>0
+		fd.filenum=stg_filenum
+	#endif
+	
+	#if STG_DEBUG_PRINT
+		dim debug_str as string
+		
+		if op=EN_STG_GET then
+			debug_str="GET "
+		
+			#if STG_REDUNDANCY
+				if read_backup=NO then
+					debug_str=debug_str+"(use primary copy) "
+				else
+					debug_str=debug_str+"(use secondary copy) "
+				end if
+			#endif
+		else
+			debug_str="SET "
+		end if
+		
+		debug_str=debug_str+"'"+stg_name_or_num+"("+str(index)+")' "
+		
+		if op=EN_STG_SET then
+			debug_str=debug_str+"to '"+stg_value+"' "
+		end if
+
+		debug_str=debug_str+": "
+	#endif
+		
+	stg_sg_internal=stg_load_setting_data(stg_name_or_num,num,stg_str,read_backup)
+	if stg_sg_internal<>EN_STG_STATUS_OK then
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_sg_internal)
+		#endif
+		exit function
+	end if
+
+	'is index valid?
+	if index>=stg_sdr(num).members and index<>255 then
+		'invalid index
+		stg_sg_internal=EN_STG_STATUS_INVALID_INDEX
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_sg_internal)
+		#endif
+		exit function
+	end if
+
+	'is this a read or a write?
+	if op=EN_STG_GET then
+		'READ OPERATION
+		'verify the checksum
+		cs=strsum(left(stg_str,len(stg_str)-1))
+		if cs<>asc(right(stg_str,1)) then
+			stg_sg_internal=EN_STG_STATUS_FAILURE	'invalid checksum
+			#if STG_DEBUG_PRINT
+				stg_debug_print_error(debug_str,stg_sg_internal)
+			#endif
+			exit function
+		end if
+		
+		'handle the timestamp
+		#if STG_TIMESTAMP<>0
+			ts_str=mid(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH,STG_TIMESTAMP_LENGTH)
+			stg_timestamp.ts_daycount=256*asc(mid(ts_str,1,1))+asc(mid(ts_str,2,1))
+			stg_timestamp.ts_mincount=256*asc(mid(ts_str,3,1))+asc(mid(ts_str,4,1))
+			stg_timestamp.ts_seconds=asc(mid(ts_str,5,1))
+			stg_timestamp.ts_milsec=256*asc(mid(ts_str,6,1))+asc(mid(ts_str,7,1))
+		#endif
+
+		'extract target member
+		stg_str=mid(stg_str,index*stg_sdr(num).member_size+1,stg_sdr(num).member_size)	
+				
+		'make sure this member has a valid value
+		select case chr(stg_sdr(num).stype)
+		case "B":	'byte- convert into value
+			i=asc(stg_str)
+			stg_value=str(i)
+			goto lb1
+						
+		case "W":	'word- convert into value
+			i=asc(left(stg_str,1))*256+asc(mid(stg_str,2,1))
+			stg_value=str(i)
+			goto lb1
+
+		case "S":	'string- take length
+			stg_value=mid(stg_str,2,asc(left(stg_str,1)))
+			i=asc(left(stg_str,1))
+			goto lb1
+					
+		case else:	'dot-decimal string- take length
+			stg_value=ddstr(mid(stg_str,2,asc(left(stg_str,1))))
+			i=asc(left(stg_str,1))
+lb1:		if i<stg_sdr(num).p1 or i>stg_sdr(num).p2 then
+				stg_sg_internal=EN_STG_STATUS_INVALID	'invalid checksum
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal)
+				#endif
+				exit function
+			end if
+		end select		
+
+		'OK, so this member's value is OK and the stg_value is already set to it!
+		stg_sg_internal=EN_STG_STATUS_OK
+
+		#if STG_DEBUG_PRINT
+			debug_str=debug_str+"OK, '"+stg_value+"'"
+			stg_debugprint(debug_str)
+		#endif
+
+		exit function
+	
+	else
+		'WRITE OPERATION
+	#if STG_ENABLE_VALIDATION_CALLBACK
+		'Validation check
+		stg_sg_internal = callback_stg_validation_check(stg_name_or_num,index,stg_value)
+		if (stg_sg_internal<>EN_STG_STATUS_OK) then	'invalid input
+			#if STG_DEBUG_PRINT
+				stg_debug_print_error(debug_str,stg_sg_internal)
+			#endif
+			exit function
+		end if
+	#endif
+
+		'Branch according to the setting type and verify new value
+		select case chr(stg_sdr(num).stype)
+		case "B":	'byte- convert into value
+			i=val(stg_value)
+			new_member_str=chr(i)
+			goto lb2
+
+		case "W":	'word- convert into value
+			i=val(stg_value)
+			x=i/256
+			new_member_str=chr(x)+chr(i-x*256)
+			goto lb2
+
+		case "S":	'string
+			new_member_str=chr(len(stg_value))+stg_value
+			i=len(new_member_str)-1
+			goto lb2
+					
+		case else:	'dot-decimal string- take length
+			new_member_str=ddval(stg_value)
+			new_member_str=chr(len(new_member_str))+new_member_str
+			i=len(new_member_str)-1
+lb2:		if i<stg_sdr(num).p1 or i>stg_sdr(num).p2 then
+				stg_sg_internal=EN_STG_STATUS_INVALID	'invalid checksum
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal)
+				#endif
+				exit function
+			end if
+		
+		end select
+
+		'insert new member value into the setting data
+		if index<>255 then
+			'regular save of a single member
+			insert(stg_str,index*stg_sdr(num).member_size+1,new_member_str)
+		else
+			'set all members to the same value
+			for f=0 to stg_sdr(num).members-1
+				insert(stg_str,f*stg_sdr(num).member_size+1,new_member_str)
+			next f
+		end if
+
+		#if STG_TIMESTAMP<>0
+			ts_str=chr(stg_timestamp.ts_daycount/256)
+			ts_str=ts_str+chr(stg_timestamp.ts_daycount and &hFF)
+			ts_str=ts_str+chr(stg_timestamp.ts_mincount/256)
+			ts_str=ts_str+chr(stg_timestamp.ts_mincount and &hFF)
+			ts_str=ts_str+chr(stg_timestamp.ts_seconds)
+			ts_str=ts_str+chr(stg_timestamp.ts_milsec/256)
+			ts_str=ts_str+chr(stg_timestamp.ts_milsec and &hFF)
+			insert(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH+1-1,ts_str) '-1 because of checksum field in the end 
+		#endif
+
+		'recalculate the checksum
+		stg_str=left(stg_str,len(stg_str)-1)
+		cs=strsum(stg_str)
+		stg_str=stg_str+chr(cs)
+
+		if stg_sdr(num).storage=`E` then
+			'store the data into the NV MEM
+			stg_sg_internal=EN_STG_STATUS_FAILURE
+
+
+			#if STG_STORAGE_MEMORY=0
+				if stor.setdata(stg_str,stg_sdr(num).memaddr)=len(stg_str) then
+					stg_sg_internal=EN_STG_STATUS_OK
+				end if
+				#if STG_REDUNDANCY
+					if stor.setdata(stg_str,stg_sdr(num).memaddr+stor.size/2)=len(stg_str) then
+						stg_sg_internal=EN_STG_STATUS_OK
+					end if
+				#endif
+			#else
+				if (fd.setpointer(stg_sdr(num).memaddr) = PL_FD_STATUS_OK) and (fd.setdata(stg_str) = PL_FD_STATUS_OK) then
+					stg_sg_internal=EN_STG_STATUS_OK
+				end if
+				
+				#if STG_REDUNDANCY
+					if (fd.setpointer(stg_sdr(num).memaddr+fd.filesize/2) = PL_FD_STATUS_OK) and (fd.setdata(stg_str) = PL_FD_STATUS_OK) then
+						stg_sg_internal=EN_STG_STATUS_OK
+					end if
+				#endif	
+				
+				if suspend_flushing=NO then
+					fd.flush
+				end if
+			#endif
+
+			if (stg_sg_internal<>EN_STG_STATUS_OK) then
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal)
+				#endif
+				exit function
+			end if
+		else
+			'store the data into the volatile memory
+			stg_ramarr_setdata(stg_str,stg_sdr(num).memaddr)
+			#if STG_REDUNDANCY>=2
+				stg_ramarr_setdata(stg_str,stg_sdr(num).memaddr+STG_RAM_ARRAY_SIZE/2)
+			#endif
+			stg_sg_internal=EN_STG_STATUS_OK
+		end if
+	end if
+
+	'completed successfully!
+	stg_sg_internal=EN_STG_STATUS_OK
+
+	#if STG_DEBUG_PRINT
+		debug_str=debug_str+"OK"
+		stg_debugprint(debug_str)
+	#endif
+end function
+
+'--------------------------------------------------------------------------------
+#if STG_TIMESTAMP<>0
+public function stg_set_ts_internal(byref stg_name_or_num as string,read_backup as no_yes) as en_stg_status_codes
+'Writes the timestamp of the setting without changing its value. The timestamp is passed in a
+'global stg_timestamp structure (the reason we don't use a function argument is because all other
+'procedures in this library use the stg_timestamp, so we do this for uniformity).
+
+	dim cs as byte
+	dim num as byte
+	dim stg_str as string
+	dim ts_str as string(STG_TIMESTAMP_LENGTH)
+	#if STG_STORAGE_MEMORY<>0
+		dim fd_status as pl_fd_status_codes
+	#endif
+
+	#if STG_STORAGE_MEMORY<>0
+		fd.filenum=stg_filenum
+	#endif
+
+	#if STG_DEBUG_PRINT
+		dim debug_str as string
+		
+		debug_str="SET TIMESTAMP "
+		
+		#if STG_REDUNDANCY
+			if read_backup=NO then
+				debug_str=debug_str+"(use primary copy for reading) "
+			else
+				debug_str=debug_str+"(use secondary copy for reading) "
+			end if
+		#endif
+		
+		debug_str=debug_str+"for '"+stg_name_or_num+"': "
+	#endif
+
+	stg_set_ts_internal=stg_load_setting_data(stg_name_or_num,num,stg_str,read_backup)
+	if stg_set_ts_internal<>EN_STG_STATUS_OK then
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_set_ts_internal)
+		#endif
+		exit function
+	end if
+	
+	'verify the checksum
+	cs=strsum(left(stg_str,len(stg_str)-1))
+	if cs<>asc(right(stg_str,1)) then
+		stg_set_ts_internal=EN_STG_STATUS_FAILURE	'invalid checksum
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_set_ts_internal)
+		#endif
+		exit function
+	end if
+	
+	stg_str=left(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH-1) 'cut off the timestamp and checksum
+
+	'set new timestamp
+	ts_str=chr(stg_timestamp.ts_daycount/256)
+	ts_str=ts_str+chr(stg_timestamp.ts_daycount and &hFF)
+	ts_str=ts_str+chr(stg_timestamp.ts_mincount/256)
+	ts_str=ts_str+chr(stg_timestamp.ts_mincount and &hFF)
+	ts_str=ts_str+chr(stg_timestamp.ts_seconds)
+	ts_str=ts_str+chr(stg_timestamp.ts_milsec/256)
+	ts_str=ts_str+chr(stg_timestamp.ts_milsec and &hFF)
+	stg_str=stg_str+ts_str	
+
+	'calculate checksum and add this checksum to the data
+	cs=strsum(stg_str)
+	stg_str=stg_str+chr(cs)
+
+
+	if stg_sdr(num).storage=`E` then
+		'store the data into the NV MEM
+		#if STG_STORAGE_MEMORY=0
+			if stor.setdata(stg_str,stg_sdr(num).memaddr)<>len(stg_str) then
+				stg_set_ts_internal=EN_STG_STATUS_FAILURE
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal)
+				#endif
+				exit function
+			end if
+			#if STG_REDUNDANCY
+				if stor.setdata(stg_str,stg_sdr(num).memaddr+stor.size/2)<>len(stg_str) then
+					stg_set_ts_internal=EN_STG_STATUS_FAILURE
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal)
+					#endif
+					exit function
+				end if
+			#endif
+		#else
+			
+			fd_status=fd.setpointer(stg_sdr(num).memaddr)
+			if fd_status<>PL_FD_STATUS_OK then
+				stg_set_ts_internal=EN_STG_STATUS_FAILURE
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal)
+				#endif
+				exit function
+			end if
+			
+			fd_status=fd.setdata(stg_str)
+			if fd_status<>PL_FD_STATUS_OK then
+				stg_set_ts_internal=EN_STG_STATUS_FAILURE
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal)
+				#endif
+				exit function
+			end if
+
+			#if STG_REDUNDANCY
+				fd_status=fd.setpointer(stg_sdr(num).memaddr+fd.filesize/2)
+				if fd_status<>PL_FD_STATUS_OK then
+					stg_set_ts_internal=EN_STG_STATUS_FAILURE
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal)
+					#endif
+					exit function
+				end if
+				
+				fd_status=fd.setdata(stg_str)
+				if fd_status<>PL_FD_STATUS_OK then
+					stg_set_ts_internal=EN_STG_STATUS_FAILURE
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal)
+					#endif
+					exit function
+				end if
+			#endif
+
+			if suspend_flushing=NO then
+				fd.flush
+			end if	
+		#endif
+	else
+		'store the data into the RAM array
+		stg_ramarr_setdata(stg_str,stg_sdr(num).memaddr)
+		#if STG_REDUNDANCY>=2
+			stg_ramarr_setdata(stg_str,stg_sdr(num).memaddr+STG_RAM_ARRAY_SIZE/2)
+		#endif
+		stg_set_ts_internal=EN_STG_STATUS_OK
+	end if
+	
+	'completed successfully!
+	stg_set_ts_internal=EN_STG_STATUS_OK
+
+	#if STG_DEBUG_PRINT
+		debug_str=debug_str+"OK"
+		stg_debugprint(debug_str)
+	#endif
+
+end function
+#endif
+
+'--------------------------------------------------------------------------------
+function stg_load_setting_data(byref stg_name_or_num as string,byref num as byte,byref stg_str as string,read_backup as no_yes) as en_stg_status_codes
+'Converts setting name (stg_name_or_num) into setting number (num), also loads the entire setting (all members, timestamp,
+'checksum) into the stg_str
+
+	#if STG_STORAGE_MEMORY<>0
+		dim fd_status as pl_fd_status_codes
+	#endif
+	
+	#if STG_STORAGE_MEMORY<>0
+		fd.filenum=stg_filenum
+	#endif
+	
+	'does this setting exist?
+	num=stg_find(stg_name_or_num)
+	if num=0 then
+		'unknown setting
+		stg_load_setting_data=EN_STG_STATUS_UNKNOWN
+		exit function
+	end if
+	num=num-1
+
+	'no matter read or write, we read the entire setting first (all members, checksum, timestamp if enabled)
+	if stg_sdr(num).storage=`E` then
+		#if STG_STORAGE_MEMORY=0
+			if read_backup=NO then
+				stg_str=stor.getdata(stg_sdr(num).memaddr,stg_sdr(num).setting_size)
+			else
+				stg_str=stor.getdata(stg_sdr(num).memaddr+stor.size/2,stg_sdr(num).setting_size)
+			end if
+		#else
+			if read_backup=0 then
+				fd_status=fd.setpointer(stg_sdr(num).memaddr)
+			else
+				fd_status=fd.setpointer(stg_sdr(num).memaddr+fd.filesize/2)
+			end if
+			
+			if fd_status<>PL_FD_STATUS_OK then
+				stg_load_setting_data=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+			
+			stg_str=fd.getdata(stg_sdr(num).setting_size)
+			if fd.laststatus<>PL_FD_STATUS_OK then
+				stg_load_setting_data=EN_STG_STATUS_FAILURE
+				exit function
+			end if
+		#endif
+	else
+		if read_backup=NO then
+			stg_str=stg_ramarr_getdata(stg_sdr(num).memaddr,stg_sdr(num).setting_size)
+		else
+			stg_str=stg_ramarr_getdata(stg_sdr(num).memaddr+STG_RAM_ARRAY_SIZE/2,stg_sdr(num).setting_size)
+		end if
+		stg_load_setting_data=EN_STG_STATUS_OK
+	end if
+
+	stg_load_setting_data=EN_STG_STATUS_OK	
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_ramarr_getdata(startaddr as word,len as byte) as string
+	dim f as byte
+	
+	stg_ramarr_getdata=""
+	for f=0 to len-1
+		#if STG_RAM_TYPE=0
+			stg_ramarr_getdata=stg_ramarr_getdata+chr(stg_ram_array(f+startaddr))
+		#else
+			stg_ramarr_getdata=stg_ramarr_getdata+chr(callback_stg_vm_read(f+startaddr))
+		#endif
+	next f
+end function
+
+'--------------------------------------------------------------------------------
+public function stg_ramarr_setdata(byref datatoset as string,startaddr as word) as byte
+	dim f as byte
+	
+	for f=0 to len(datatoset)-1
+		#if STG_RAM_TYPE=0
+			stg_ram_array(f+startaddr)=asc(mid(datatoset,f+1,1))
+		#else
+			callback_stg_vm_write(asc(mid(datatoset,f+1,1)),f+startaddr)
+		#endif
+	next f
+	stg_ramarr_setdata=len(datatoset)
+end function
+
+'-------------------------------------------------------------
+function stg_get_descriptor_field(line_end_pos as word, byref field_start_pos as word) as string
+'line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
+
+	dim i as word
+	
+	do
+		if romfile.pointer>=line_end_pos then
+			'the field is missing
+			stg_get_descriptor_field=""
+			field_start_pos=0
+			exit function
+		end if
+		
+		i=romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1)
+		field_start_pos=romfile.pointer
+		if i=0 or i>line_end_pos then
+			'no next field separator found on this line, so we assume the field goes to the end of the line
+			i=line_end_pos
+			stg_get_descriptor_field=romfile.getdata(i-romfile.pointer)
+			romfile.pointer=line_end_pos+1
+		else
+			stg_get_descriptor_field=romfile.getdata(i-romfile.pointer)
+			romfile.pointer=i+1
+		end if
+	loop while stg_get_descriptor_field="" 		
+end function
+
+'------------------------------------------------------------------------------
+sub stg_process_esc_seq(byref s as string)
+	dim pos,x as byte
+	
+	'process escape sequences
+	pos=instr(1,s,"\x5Cx",1) 'we are searching for "\x"
+	while pos>0
+		x=val("&h"+mid(s,pos+2,2))
+		s=mid(s,1,pos-1)+chr(x)+mid(s,pos+4,255)
+		pos=instr(1,s,"\x5C",1)
+	wend
+end sub
+
+'------------------------------------------------------------------------------
+#if STG_DEBUG_PRINT
+sub stg_debug_print_error(byref debug_str as string,status_code as en_stg_status_codes)
+
+	select case status_code
+	case EN_STG_STATUS_UNKNOWN:			debug_str=debug_str+ "ERROR: unknown setting or invalid setting number"
+	case EN_STG_STATUS_INVALID_INDEX:	debug_str=debug_str+ "ERROR: invalid index"
+	case EN_STG_STATUS_FAILURE:			debug_str=debug_str+ "ERROR: checksum error or hardware malfunction"
+	case EN_STG_STATUS_INVALID:			debug_str=debug_str+ "ERROR: invalid setting value"
+	end select
+	stg_debugprint(debug_str)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if STG_DEBUG_PRINT
+sub stg_debugprint(byref print_data as string)
+
+	sys.debugprint(STG_STAMP+print_data+STG_CR_LF)
+end sub
+#endif

@@ -1,0 +1,368 @@
+'**************************************************************************************************
+'       BT (Bluetooth) object
+'**************************************************************************************************
+
+#if OBJECT_BT=BT_ENABLED
+
+#define BT_AVAILABLE 1
+
+object bt
+'The bt. object represents the BLE interface of your device.
+'<br><br>
+'The bt. object is designed to work with the WA2000 add-on Wi-Fi/BLE module. For BT (BLE) radio to work, you must first boot the module using the wln.boot method.
+'This will enable not only the Wi-Fi, but also the BT (BLE) portion of the WA2000.
+
+'--------------------------------------------------------------------
+syscall(753) bt.enable()
+'<b>METHOD. </b><br><br>
+'Instructs the WA2000 Wi-Fi/BLE add-on module to turns the BLE radio on. This is an asynchronous method -- it returns control back to the app immediately. On_bt_event(PL_BT_EVENT_ENABLED) is generated when the radio turns on. 
+'<br><br>
+'This method will only have effect if the WA2000 is booted (wln.boot was called and wln.enabled= 1- YES) and if the BLE radio is currently off (bt.enabled= 0-NO).
+'<br><br>
+'This method has no effect on the GA1000 device.
+'<br><br>
+
+
+'--------------------------------------------------------------------
+syscall(800) bt.disable()
+'<b>METHOD. </b><br><br>
+'Instructs the WA2000 Wi-Fi/BLE add-on module to turn the BLE radio off. This is an asynchronous method -- it returns control back to the app immediately. On_bt_event(PL_BT_EVENT_DISABLED) is generated when the radio turns off.
+'<br><br>
+'This method will only have effect if the WA2000 is booted (wln.boot was called and wln.enabled= 1- YES) and if the BLE radio is currently on (bt.enabled= 1-YES).
+'<br><br>
+'This method has no effect on the GA1000 device.
+
+'--------------------------------------------------------------------
+property bt.enabled
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
+'<br><br>
+'Informs whether the BLE interface of the Wi-Fi/BLE add-on module is on. The interface turns on after the bt.enable method is invoked. 
+'<br><br>
+'The BLE interface is disabled and the bt.enabled is reset to 0- NO if the module is disconnected, powered down, malfunctions, or is put in reset.
+'When this happens, the on_bt_event(PL_BT_EVENT_DISABLED) event is generated as well.
+    get = syscall(752) as no_yes
+end property
+ 
+'--------------------------------------------------------------------
+'enum pl_wln_bt_modes
+'    PL_WLN_BT_MODE_NOT_SUPPORTED, '<b>PLATFORM CONSTANT.</b><br><br> Bluetooth is not supported by this module.'
+'    PL_WLN_BT_MODE_LE	'<b>PLATFORM CONSTANT.</b><br><br> Bluetooth Low Energy Mode.
+	'PL_WLN_BT_MODE_EDR	'<b>PLATFORM CONSTANT.</b><br><br> Bluetooth Classic Mode.
+'end enum
+
+'property bt.mode
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font> PL_WLN_BT_MODE_NOT_SUPPORTED. </b><br>
+'The value of this will not be updated until module type has been detected.<br>
+'    get = syscall(754) as pl_wln_bt_modes
+'    'set = syscall(755) (value as pl_wln_bt_modes)
+'end property
+
+'--------------------------------------------------------------------
+property bt.name
+'<b>PROPERTY (STRING), DEFAULT VALUE= "". </b><br><br>
+'Defines the BLE advertising name. The name can be up to 21 characters long.
+'<br><br>
+'The value of property can only be changed when bt.advertise is 0- NO.
+'<br><br>
+'<b>Note that your phone (central device) will typically cache advertising data. </b>
+'On iOS, restarting the iOS device will clear the advertising cache. On Android, you can clear the Bluetooth cache via the settings (plus, some applications allow scanning without caching).<br>
+    get = syscall(756) as string
+    set = syscall(757) (byref btname as string)
+end property
+
+'--------------------------------------------------------------------
+'property bt.advstring
+'<b>PROPERTY (STRING), DEFAULT VALUE= "". </b><br><br>
+'<br><br>
+'The raw advertising data that is being advertised by the device. 
+'<br><br>
+'The name change will only take effect after the btadvertise property is toggled to true.
+'    get = syscall(758) as string
+'    set = syscall(759) (byref btadvstring as string)
+'end property
+
+'--------------------------------------------------------------------
+enum pl_wln_bt_emulation_modes    
+	PL_WLN_BT_EMULATION_MODE_TI,            '<b>PLATFORM CONSTANT.</b><br><br> Emulates the TI UART-over-BLE service. Not fully supported at this time.
+	PL_WLN_BT_EMULATION_MODE_NORDIC,        '<b>PLATFORM CONSTANT.</b><br><br> Emulates the NORDIC UART-over-BLE service.
+	PL_WLN_BT_EMULATION_MODE_MICROCHIP      '<b>PLATFORM CONSTANT.</b><br><br> Emulates the Microchip UART-over-BLE service.
+end enum
+
+property bt.emulation
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 2- PL_WLN_BT_EMULATION_MODE_MICROCHIP. </b><br><br>
+'Configures the BLE interface to mimic TI, Nordic, or Microchip BLE devices. 
+'<br><br>
+'The value of this property can only be changed when bt.enabled= 0- NO (that is, before calling bt.enable).
+    get = syscall(760) as pl_wln_bt_emulation_modes
+    set = syscall(761) (value as pl_wln_bt_emulation_modes)
+end property
+
+'--------------------------------------------------------------------
+syscall(762) bt.rxbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'Pre-requests the "numpages" number of buffer pages (1 page is 256 bytes) for the RX buffer of the BLE interface. Returns the actual number of pages that can be allocated.
+'The actual buffer allocation happens when the sys.buffalloc method is called.
+'<br><br>
+'The BLE interface is unable to receive data if its RX buffer has zero capacity. Current buffer capacity can be checked through
+'bt.rxbuffsize, which returns the buffer capacity in bytes.
+'<br><br>
+'Relationship between the two is as follows: bt.rxbuffsize = num_pages * 256 - 33 (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through bt.rxbuffrq. "-33" is because a number of bytes is needed for internal buffer
+'variables.
+'<br><br>
+'Buffer allocation will not work if the BLE interface is enabled (bt.enabled= 1- YES at the time when sys.buffalloc executes).
+'<br><br>
+'The maximum number of pages you can request for this buffer is limited to 255.
+
+'--------------------------------------------------------------------
+syscall(763) bt.txbuffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD. </b><br><br>
+'Pre-requests the "numpages" number of buffer pages (1 page is 256 bytes) for the TX buffer of the BLE interface. Returns the actual number of pages that can be allocated.
+'The actual buffer allocation happens when the sys.buffalloc method is called.
+'<br><br>
+'The BLE interface is unable to transmit data if its TX buffer has zero capacity. Current buffer capacity can be checked through
+'bt.txbuffsize, which returns the buffer capacity in bytes.
+'<br><br>
+'Relationship between the two is as follows: bt.txbuffsize = num_pages * 256 - 33 (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through bt.txbuffrq. "-33" is because a number of bytes is needed for internal buffer
+'variables.
+'<br><br>
+'Buffer allocation will not work if the BLE interface is enabled (bt.enabled= 1- YES at the time when sys.buffalloc executes).
+'<br><br>
+'The maximum number of pages you can request for this buffer is limited to 255.
+
+'--------------------------------------------------------------------
+property bt.rxbuffsize
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the current capacity, in bytes, of the BLE's RX buffer.  
+'To change the buffer capacity, use the bt.rxbuffrq method followed by the sys.buffalloc method.
+'<br><br>
+'Bt.rxbuffrq requests buffer allocation in 256-byte pages whereas this property returns the buffer size in bytes.
+'Relationship between the two is as follows: bt.rxbuffsize = num_pages * 256 - 33 (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through bt.rxbuffrq.
+'"-33" is because a number of bytes is needed for internal buffer variables.
+'<br><br>
+'The BLE interface is unable to receive data when its RX buffer has zero capacity.
+    get = syscall(764) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property bt.txbuffsize
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the current capacity, in bytes, of the BLE's TX buffer.  
+'To change the buffer capacity, use the bt.txbuffrq method followed by the sys.buffalloc method.
+'<br><br>
+'Bt.txbuffrq requests buffer allocation in 256-byte pages whereas this property returns the buffer size in bytes.
+'Relationship between the two is as follows: bt.txbuffsize = num_pages * 256 - 33 (or =0 when num_pages=0), where
+'"num_pages" is the number of buffer pages that was GRANTED through bt.txbuffrq.
+'"-33" is because a number of bytes is needed for internal buffer variables.
+'<br><br>
+'The BLE interface is unable to transmit data when its TX buffer has zero capacity.
+    get = syscall(765) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property bt.rxlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the total number of bytes currently waiting in the RX buffer of the BLE interface.
+    get = syscall(766) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property bt.txlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the total number of committed bytes in the TX buffer of the BLE interface.
+    get = syscall(767) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property bt.txfree
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the amount of free space, in bytes, in the TX buffer of the BLE interface, not taking into the account uncommitted data.
+'<br><br>
+'The actual free space in the buffer is bt.txfree - bt.newtxlen. Your application will not be able to store more data than this amount.
+    get = syscall(768) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property bt.newtxlen
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE=0 (0 bytes). </b><br><br>
+'Returns the total number of uncommitted bytes in the TX buffer of the BLE interface.
+'<br><br>
+'Uncommited data is data that was added to the TX buffer using bt.setdata but hasn't been committed using bt.send.
+    get = syscall(769) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+syscall(770) bt.rxclear
+'<b>METHOD. </b><br><br>
+'Clears the RX buffer of the BLE interface.
+
+'--------------------------------------------------------------------
+syscall(771) bt.txclear
+'<b>METHOD. </b><br><br>
+'Clears the TX buffer of the BLE interface.
+
+'--------------------------------------------------------------------
+syscall(772) bt.getdata(maxinplen as word) as string
+'<b>METHOD. </b><br><br>
+'Returns the string containing the data extracted from the RX buffer of the BLE interface. Extracted data is removed from the buffer.
+'<br><br>
+'The length of extracted data is limited by one of the three factors, whichever is smaller: the amount of data in the RX buffer itself,
+'capacity of the receiving string variable, and the limit set by the maxinplen argument.
+
+'--------------------------------------------------------------------
+syscall(773) bt.peekdata(maxinplen as word) as string
+'<b>METHOD.</b><br><br>
+'Returns the string containing the "preview" of data from the RX buffer of the BLE interface. The data is NOT removed from the buffer.
+'<br><br>
+'The length of returned data is limited by one of the three factors, whichever is smaller: the amount of data in the RX buffer itself, capacity of the receiving string variable,
+'and the limit set by the maxinplen argument.
+'<br><br>
+'Since string variables can hold up to 255 bytes of data, this method will only allow you to preview up to this number of bytes.
+
+'--------------------------------------------------------------------
+syscall(774) bt.setdata(byref txdata as string)
+'<b>METHOD. </b><br><br>
+'Stores the data passed in the txdata argument into the TX buffer of the BLE inteface.
+'<br><br>
+'If the buffer doesn't have enough space to accommodate the data being added then this data will be truncated.
+'<br><br>
+'The newly stored data is not sent out immediately. This only happens after the bt.send method is used to commit this data.
+'This allows your application to prepare large amounts of data before sending it out.
+
+'--------------------------------------------------------------------
+syscall(775) bt.send()
+'<b>METHOD. </b><br><br>
+'Commits (allows sending out) the data that was previously saved into the TX buffer of the BLE interface using the bt.setdata method.
+
+'--------------------------------------------------------------------
+syscall(776) bt.notifysent(threshold as word)
+'<b>METHOD. </b><br><br>
+'Invoking this method will cause the on_bt_data_sent event to be generated when the amount of committed data in the TX buffer of the BLE interface drops to or below
+'the "threshold" number of bytes.
+'<br><br>
+'This method, together with on_bt_data_sent provides a way to handle data sending asynchronously.
+'<br><br>
+'Only one on_bt_data_sent event will be generated each time after bt.notifysent is invoked.
+
+'--------------------------------------------------------------------
+property bt.advertise
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= <font color="olive"><b>0- NO</b></font></b><br><br>
+'Setting this property to 1 -YES will start the advertising service on the BLE interface. Setting the property to 0- NO halts BLE advertising.
+'<br><br>
+'The value of this property can only be set to 1- YES when the BLE interface is enabled (bt.enabled= 1- YES, i.e. bt.enable was previously called).
+'<br><br>
+'The value of this property is reset to 0- NO if the BLE interface becomes disabled (bt.enabled= 0- NO) for any reason.
+    get = syscall(778) as no_yes
+    set = syscall(779) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+enum pl_bt_events 
+    PL_BT_EVENT_CONNECTED,      '<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has accepted an incoming connection.
+    PL_BT_EVENT_DISCONNECTED,   '<b>PLATFORM CONSTANT.</b><br><br>The BLE interface is no longer engaged in a connection.
+    PL_BT_EVENT_ENABLED,        '<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been enabled.
+    PL_BT_EVENT_DISABLED        '<b>PLATFORM CONSTANT.</b><br><br>The BLE interface has been disabled.
+end enum
+
+event(29)  on_bt_event(bt_event as pl_bt_events)
+'<b>EVENT of the bt object. </b><br><br>
+'Generated when the following BLE events occur:
+'<br><br>
+'0- _CONNECTED -- The BLE interface has accepted an incoming connection.
+'<br><br>
+'1- _DISCONNECTED -- The BLE interface is no longer engaged in a connection.
+'<br><br>
+'2- _ENABLED -- The BLE interface has been enabled (through bt.enable).
+'<br><br>
+'3- _DISABLED -- The BLE interface has been disabled (through bt.disable).
+
+'--------------------------------------------------------------------
+event(30) on_bt_data_arrival()
+'<b>EVENT of the bt object. </b><br><br> 
+'Generated as soon as the BLE interface receives data into the RX buffer.
+'<br><br>
+'There may be only one on_bt_data_arrival event in the event queue.
+'Another on_bt_data_arrival event will be generated only after the previous one is handled.
+'<br><br>
+'If, during the on_bt_data_arrival event handler execution, not all data is extracted from the RX 
+'buffer, another on_bt_data_arrival event is generated immediately after the 
+'on_bt_data_arrival event handler is exited.
+
+'--------------------------------------------------------------------
+event(32) on_bt_data_sent()
+'<b>EVENT of the bt object. </b><br><br> 
+'Generated after the total amount of committed data in the TX buffer of the BLE interface drops to or below the threshold that was preset through the bt.notifysent method.
+'<br><br>
+'This event, together with bt.notifysent provides a way to handle data sending asynchronously.
+'<br><br>
+'Only one on_bt_data_sent event will be generated each time after bt.notifysent is invoked.
+
+'--------------------------------------------------------------------
+event(34) on_bt_overrun()
+'<b>EVENT of the bt object. </b><br><br>
+'Generated when the RX buffer of the BLE interface overflows.
+'<br><br>
+'An overrun may happen if the BLE interface is receiving data faster than the speed at which your app is extracting and processing it.
+
+'--------------------------------------------------------------------
+property bt.connected
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b><br><br>
+'Indicates whether the BLE interface is engaged in a connection.
+    get = syscall(797) as no_yes
+end property
+
+'--------------------------------------------------------------------
+property bt.mac
+'<b>PROPERTY(STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
+'Sets and returns the MAC address of the BLE interface.
+'<br><br>
+'Each WA2000 device comes with its own unique hardcoded Bluetooth MAC. You can use this MAC or set another MAC programmatically.
+'<br><br>
+'If you do not write to this property, bt.mac returns 0.0.0.0.0.0 before executing wln.boot.
+'The property returns the hardcoded MAC address of the WA2000 after wln.boot is called (and wln.enabled becomes 1- YES).
+'<br><br>
+'To set a different Bluetooth MAC, assign a new value to this property before calling wln.boot.
+'The value of the property cannot be changed after the wln.boot method has been invoked.
+    get = syscall(794) as string
+    set = syscall(827) (byref mac_str as string)
+end property
+
+'--------------------------------------------------------------------
+syscall(795) !bt.gettxdata(maxinplen as word) as string
+
+'--------------------------------------------------------------------
+syscall(796) !bt.setcommitrxdata(byref txdata as string)
+
+'--------------------------------------------------------------------
+'property bt.num
+'<b>PROPERTY (BYTE), DEFAULT VALUE= 0 (bt channel selected). </b><br><br>
+'Sets/returns the number of currently selected bt channel (channels are enumerated from 0).
+'Most other properties and methods of this object relate to the bt channel selected through this property.<br><br>
+'Note that bt channel related events such as <font color="teal"><b>on_bt_data_arrival </b></font> change currently selected port!
+'The value of this property won't exceed <font color="maroon"><b>bt.numofchannels</b></font>-1 (even if you attempt to set a higher value).
+'    get = syscall(798) as byte
+'    set = syscall(799) (value as byte)
+'end property
+
+
+
+
+enum pl_bt_flowcontrol
+'<b>ENUM. </b><br><br> 
+'Contains the list of constants related to the flow control for the bluetooth object.
+    PL_BT_FC_DISABLED, '<b>PLATFORM CONSTANT (DEFAULT). </b><br><br> 
+                'No flow control, the on_bt_overrun event will be received.
+    PL_BT_FC_ENABLED   '<b>PLATFORM CONSTANT. </b><br><br> 
+                'Flow control enabled. When receiving data via reliable writes the data will no longer be accepted once all bluetooth buffers are full. 
+end enum
+
+property bt.flowcontrol
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- DISABLED. </b><br><br> 
+'Sets/returns flow control mode for bluetooth object. When enabled this property will stop receiving data from the bluetooth link when its RX buffer is full. It is only relevant when the application that is sending data to the device is using reliable writes. When this property is enabled it is not possible to receive the on_bt_overrun event. 
+    get = syscall(832) as pl_bt_flowcontrol
+    set = syscall(833) (value as pl_bt_flowcontrol)
+end property
+
+#endif

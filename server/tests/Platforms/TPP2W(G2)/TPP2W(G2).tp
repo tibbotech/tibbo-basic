@@ -1,0 +1,31 @@
+[platform]
+description=TPP2(G2) Board
+version=TPP2W(G2)-3.80
+rom=786432
+ram=66816
+codebits=24
+databits=32
+sector=131072
+
+[transport1]
+name=udp_winpcap
+description=WinPCap (non-broadcast) UDP Transport
+device=taiko.winpcapdevice
+browsedlg=em202ui.browsedlg
+
+[transport2]
+name=udp_broadcast
+description=Broadcast UDP Transport
+device=taiko.udpdevice
+browsedlg=em202ui.browsedlg
+
+[transport3]
+name=serial
+description=Taiko Serial Transport
+device=taiko.serialdevice
+browsedlg=taiko.serialportsdlg
+
+
+[defineimports]
+import1=../GEN.tp
+

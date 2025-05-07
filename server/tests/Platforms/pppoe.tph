@@ -1,0 +1,41 @@
+'**************************************************************************************************
+'       PPPOE (PPPoE) object
+'**************************************************************************************************
+
+#define PPPOE_AVAILABLE 1
+
+object pppoe
+'The pppoe object represents the PPPoE interface of your device. This object only specifies the interface itself and is not responsible for
+'sending/transmitting network data. The latter is the job of the sock object. The object does not perform PPPoE login and configuration either -- use
+'PPPOE library for this.
+
+'--------------------------------------------------------------------
+property pppoe.acmac
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b><br><br>
+'Sets/returns the MAC address of the ADSL modem (a.k.a. "access concentrator").
+'<br><br>
+'This property uniquely identifies the ADSL modem (access concentrator) that your device will use to access the Internet.
+    get = syscall(486,"39.TDL"+) as string
+    set = syscall(487,"40.TDL"+) (byref macstr as string)
+end property
+
+'--------------------------------------------------------------------
+property pppoe.ip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'Sets/returns the IP address of the PPPoE interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communications over the PPPoE interface, i.e. there is no socket
+'for which <b>sock.statesimple </b>is <u>not </u> equal to 0- PL_SSTS_CLOSED and <b>sock.currentinterface</b>= 1- PL_INTERFACE_PPPOE.
+    get = syscall(477,"39.TDL"+) as string
+    set = syscall(478,"40.TDL"+) (byref ipstr as string)
+end property
+
+'--------------------------------------------------------------------
+property pppoe.sessionid
+'<b>PROPERTY (STRING), DEFAULT VALUE= 0. </b><br><br>
+'Sets/returns the ID of the current PPPoE session.
+'<br><br>
+'Session ID is required for correct interaction between your device and ADSL modem (access concentrator). Use the PPPOE library and let it take care of this and (almost) everything else.
+    get = syscall(447,"39.TDL"+) as word
+    set = syscall(448,"39.TDL"+) (id as word)
+end property

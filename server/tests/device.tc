@@ -1,0 +1,73 @@
+#include "global.th"
+
+
+
+void close_interface_sockets(pl_sock_interfaces interface) {
+    unsigned char f, sock_num_bup;
+    unsigned int i;
+
+    sock_num_bup = sock.num;
+
+    for (f=0; f <= sock.numofsock-1; f++) {
+        sock.num = f;
+        if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED) {
+            sock.discard();
+        }
+    }
+
+    i = sys.timercount;
+
+wait_close_interface_sockets: 
+    for (f=0; f <= sock.numofsock-1; f++) {
+        sock.num = f;
+        if (sock.currentinterface == interface && sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
+            goto wait_close_interface_sockets;
+        }
+    }
+
+    sock.num = sock_num_bup;
+
+}
+
+
+void callback_dhcp_ok(no_yes renew, pl_sock_interfaces interface, string *ip, string *gateway_ip, string *netmask, unsigned long lease_time) {
+
+    if (interface == PL_SOCK_INTERFACE_NET) {
+        if (renew == YES && net.ip != *ip) {
+            //this is a lease renewal and the DHCP server has issues new IP
+            //it is better to reboot than deal with the implications of the changed IP
+            sys.reboot();
+        }
+
+        #if DEV_DEBUG_PRINT
+            dev_debugprint("Ethernet DHCP OK ("+*ip+")");
+        #endif
+
+        if (net.ip != *ip) {
+            sock.inconenabledmaster = NO;
+            close_interface_sockets(PL_SOCK_INTERFACE_NET);
+            net.ip = *ip;
+            if (*gateway_ip != "") { net.gatewayip = *gateway_ip;}
+            if (*netmask != "") { net.netmask = *netmask;}
+            sock.inconenabledmaster = YES;
+        }
+    }
+
+
+}
+
+void callback_dhcp_failure(pl_sock_interfaces interface, en_dhcp_status_codes failure_code) {
+
+}
+
+void callback_dhcp_pre_clear_ip(pl_sock_interfaces interface) {
+
+}
+
+void callback_dhcp_pre_buffrq(unsigned char required_buff_pages) {
+
+}
+
+void callback_dhcp_buff_released() {
+
+}

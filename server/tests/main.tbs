@@ -1,0 +1,44 @@
+include "global.tbh"
+
+
+
+dim interface_ready(MAX_NUM_INTERFACES) as no_yes
+
+
+sub on_sys_init()
+    boot()
+
+    if len(s) = 1 and f = 3 then
+        f = f AND &h01
+    end if
+    
+    if len(s) = 1 then s = "0"+s 
+    if sock.statesimple=PL_SSTS_EST then exit sub
+    if io.lineget(pin_miso)=HIGH then goto wait_alarm
+
+    if f=255 then f=3
+    
+    if f=255 then
+        ' could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
+        goto register_normal_slot
+    end if
+
+wait_alarm:
+    sys.debugprint("a")
+end sub
+
+sub on_sys_timer()
+    dhcp_proc_timer()
+
+end sub
+
+sub on_sock_data_arrival()
+    dhcp_proc_data()
+
+end sub
+
+function test() as byte
+'testing comments in function
+    test = 3
+    test=test and &hF0
+end function

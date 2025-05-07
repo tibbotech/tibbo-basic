@@ -1,0 +1,473 @@
+#include "global.th"
+
+#define DNS_STAMP "DNS> "
+#define DNS_CR_LF chr(13)+chr(10)
+#define DNS_INIT_SIGNATURE 0xABAE
+#define DNS_QUERY_FLAG "0"//message is a query
+#define DNS_RESPONSE_FLAG "1"//message is a response
+#define DNS_OPCODE "0000"//4-bits 0 statndard query, 1 inverse query, 2 server status request
+#define DNS_AA "0"//authoritative answer, the server is authoritative for the domain in the question 
+#define DNS_TC "1"//truncated, only keep first 512 bytes
+#define DNS_RD "1"//0 iterative query(doesn't resolve by itself),1 recursive query (resolve by itself)
+#define DNS_RA "0"//0 recursive not available, 1 recursive available (only matter in response )
+
+#define DNS_NUMBER_QUESTION 1
+#define DNS_QUERY_TYPE 1//1 for IP Address ,2 for Name Server, 5 for Canonical name, 12 for pointer record, 13 for host info, 15 for mail exchange
+#define DNS_QUERY_CLASS 1//1 for internet
+#define DNS_SERVER_PORT 53
+
+#define DNS_TX_BUF_SIZE 1
+#define DNS_RX_BUF_SIZE 2
+#define DNS_CONNECTION_TIMEOUT 10
+#define DNS_REPLY_TIMEOUT 10
+
+unsigned int dns_init_flag;
+unsigned char dns_sock, dns_name_len;
+string<2> dns_id;
+unsigned char dns_conn_tmr, dns_rpl_tmr;
+
+#if DNS_DEBUG_PRINT
+void dns_debug_print_status(en_dns_status_codes status);
+void dns_debugprint(string *print_data);
+#endif
+//====================================================================
+
+en_dns_status_codes dns_start(unsigned char dns_sock_num) {
+en_dns_status_codes dns_start;
+	unsigned char x;
+
+	#if DNS_DEBUG_PRINT
+		dns_debugprint("---START---");
+	#endif
+
+	dns_start = EN_STATUS_DNS_OK;
+
+	if (dns_init_flag == DNS_INIT_SIGNATURE) {
+		return dns_start;
+	}
+
+	if (dns_sock_num>=sock.numofsock) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_INVALID_SOCKET);
+		#endif
+		dns_start = EN_STATUS_DNS_INVALID_SOCKET;
+		callback_dns_failure(EN_STATUS_DNS_INVALID_SOCKET);
+		return dns_start;
+	}
+
+	if (sys.freebuffpages<DNS_RX_BUF_SIZE+DNS_TX_BUF_SIZE) {
+		x = sys.freebuffpages-DNS_RX_BUF_SIZE-DNS_TX_BUF_SIZE;
+		callback_dns_pre_buffrq(x);
+		if (sys.freebuffpages<DNS_RX_BUF_SIZE+DNS_TX_BUF_SIZE) {
+			#if DNS_DEBUG_PRINT
+				dns_debug_print_status(EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE);
+			#endif		
+			dns_start = EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE;
+			callback_dns_failure(EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE);
+			return dns_start;
+		}
+	}
+
+	dns_sock = dns_sock_num;
+	sock.num = dns_sock_num;
+	sock.txbuffrq(DNS_TX_BUF_SIZE);
+	sock.rxbuffrq(DNS_RX_BUF_SIZE);
+	sys.buffalloc();
+	sock.protocol = PL_SOCK_PROTOCOL_UDP;
+	sock.inconmode = PL_SOCK_INCONMODE_ANY_IP_ANY_PORT;
+	sock.reconmode = PL_SOCK_RECONMODE_3;
+
+	dns_init_flag = DNS_INIT_SIGNATURE;
+	return dns_start;
+}
+
+en_dns_status_codes dns_connect(pl_sock_interfaces interface, string *dns_server_ip, unsigned int dns_port) {
+en_dns_status_codes dns_connect;
+
+	if (dns_init_flag != DNS_INIT_SIGNATURE) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NOT_STARTED);
+		#endif		
+		callback_dns_failure(EN_STATUS_DNS_NOT_STARTED);
+		dns_connect = EN_STATUS_DNS_NOT_STARTED;
+		return dns_connect;
+	}
+
+	sock.num = dns_sock;
+
+	#if NET_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_NET) {
+			sock.targetinterface = PL_SOCK_INTERFACE_NET;
+			goto l1;
+		}
+	#endif
+
+	#if WLN_AVAILABLE
+		if (interface == PL_SOCK_INTERFACE_WLN) {
+			sock.targetinterface = PL_SOCK_INTERFACE_WLN;
+			goto l1;
+		}
+	#endif
+
+	#if SUPPORTS_GPRS
+		if (interface == PL_SOCK_INTERFACE_PPP) {
+			sock.targetinterface = PL_SOCK_INTERFACE_PPP;
+			goto l1;
+		}
+	#endif
+
+	#if DNS_DEBUG_PRINT
+		dns_debug_print_status(EN_STATUS_DNS_INVALID_INTERFACE);
+	#endif
+
+	dns_connect = EN_STATUS_DNS_INVALID_INTERFACE;
+	return dns_connect;//invalid interface specified	
+l1: 
+	sock.targetip = *dns_server_ip;
+	if (dns_port == 0) {
+		sock.targetport = DNS_SERVER_PORT;
+	} else {
+		sock.targetport = dns_port;
+	}
+
+	#if DNS_DEBUG_PRINT
+		string s;
+		dns_debugprint("conn to "+sock.targetip+":"+str(sock.targetport));
+	#endif
+
+	sock.connect();
+	dns_conn_tmr = DNS_CONNECTION_TIMEOUT;
+	return dns_connect;
+}
+
+void dns_disconnect() {
+	if (dns_init_flag != DNS_INIT_SIGNATURE) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NOT_STARTED);
+		#endif		
+		return;
+	}
+
+	sock.num = dns_sock;
+	#if DNS_DEBUG_PRINT
+		dns_debugprint("disc from "+sock.targetip+":"+str(sock.targetport));
+	#endif
+	dns_conn_tmr = 0;
+	sock.close();
+}
+
+void dns_query(string *query_name) {
+	string dns_query_question;
+	unsigned int query_flag;
+	unsigned char pos1, pos2, l;
+
+	if (dns_init_flag != DNS_INIT_SIGNATURE) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NOT_STARTED);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_NOT_STARTED);
+		return;
+	}
+
+	//generate an radom id
+	dns_id = random(2);
+
+	//construct the flag
+	query_flag = val("&b"+DNS_QUERY_FLAG+DNS_OPCODE+DNS_AA+DNS_TC+DNS_RD+DNS_RA+"0000000");
+
+	dns_query_question = "";
+	pos1 = 0;
+
+	//convert query name
+	do {
+		pos2 = pos1;
+		pos1 = instr(pos1+1,*query_name,".",1);
+		if (pos1>0) {
+			l = pos1-pos2-1;
+		} else {
+			l = len(*query_name)-pos2;
+		}
+		dns_query_question = dns_query_question+chr(l)+mid(*query_name,pos2+1,l);
+	} while (pos1>0);
+
+	//end with chr(0)
+	dns_query_question = dns_query_question+chr(0);
+
+	//record the length of query name
+	dns_name_len = len(dns_query_question);
+
+	//query structure id(2)+flag(2)+number of question(2)+number of answer RRs(2)+number of authority RRs(2)+number of additional RRs(2)+query name(?)+query type(2)+query class(2)
+	dns_query_question = dns_id+chr(query_flag/256)+chr(query_flag % 256)+chr(DNS_NUMBER_QUESTION/256)+chr(DNS_NUMBER_QUESTION % 256)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+dns_query_question+chr(DNS_QUERY_TYPE/256)+chr(DNS_QUERY_TYPE % 256)+chr(DNS_QUERY_CLASS/256)+chr(DNS_QUERY_CLASS % 256);
+
+	sock.num = dns_sock;
+	sock.setdata(dns_query_question);
+	sock.send();
+
+}
+
+void dns_stop() {
+
+	if (dns_init_flag != DNS_INIT_SIGNATURE) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NOT_STARTED);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_NOT_STARTED);
+		return;
+	}
+
+	dns_init_flag = "";
+	//release dns port
+	sock.num = dns_sock;
+	sock.discard();
+	sock.txbuffrq(0);
+	sock.rxbuffrq(0);
+	sys.buffalloc();
+	callback_dns_buff_released();
+	#if DNS_DEBUG_PRINT
+		dns_debugprint("---STOP---");
+	#endif	
+}
+
+void dns_proc_data() {
+	string s;
+	unsigned int i, j;
+	unsigned int number_answer;
+	en_dns_return_type answer_type;
+
+	if (dns_init_flag != DNS_INIT_SIGNATURE) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NOT_STARTED);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_NOT_STARTED);
+		return;
+	}
+
+	if (sock.num != dns_sock) { return;}
+
+	//compare id
+	s = sock.getdata(2);
+	if (s != dns_id) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_BAD_ANSWER);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_BAD_ANSWER);
+		return;
+	}
+
+	//analysis flag
+	s = sock.getdata(2);
+	i = asc(left(s,1))*256+asc(right(s,1));
+	s = bin(i);
+	i = len(s)-2;
+	s = strgen(16-i,"0")+right(s,i);
+
+	if (left(s,1) != DNS_RESPONSE_FLAG) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_BAD_ANSWER);
+		#endif		
+		callback_dns_failure(EN_STATUS_DNS_BAD_ANSWER);
+		return;
+	}
+
+	if (mid(s,9,1) == DNS_RA) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_RECURSIVE_UNAVALIABLE);
+		#endif		
+		callback_dns_failure(EN_STATUS_DNS_RECURSIVE_UNAVALIABLE);
+		return;
+	}
+
+	s = "&b"+right(s,4);
+	if (val(s) == 3) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NAME_ERROR);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_NAME_ERROR);
+		return;
+	}
+
+	//number of questions
+	s = sock.getdata(2);
+
+	//number of answers
+	s = sock.getdata(2);
+	number_answer = asc(left(s,1))*256+asc(right(s,1));
+	if (number_answer == 0) {
+		#if DNS_DEBUG_PRINT
+			dns_debug_print_status(EN_STATUS_DNS_NO_ANSWER);
+		#endif	
+		callback_dns_failure(EN_STATUS_DNS_NO_ANSWER);
+		return;
+	}
+
+	//numer of authority RRs
+	s = sock.getdata(2);
+
+	//number of additional RRs
+	s = sock.getdata(2);
+
+	//question
+	s = sock.getdata(dns_name_len);
+
+	//query type for question
+	s = sock.getdata(2);
+
+	//query class for question
+	s = sock.getdata(2);
+
+	for (j=1; j <= number_answer; j++) {
+		//determin if compress scheme is used
+		s = sock.getdata(1);
+		i = asc(s);
+		if (i<=63) {
+			do {
+				s = sock.getdata(i);
+				i = val(sock.getdata(1));
+			} while (i>0);
+		} else {
+			s = sock.getdata(1);
+		}
+
+		//query type for answer
+		s = sock.getdata(2);
+		answer_type = asc(right(s,1));
+
+		//query class for answer
+		s = sock.getdata(2);
+
+		//time to live
+		s = sock.getdata(4);
+
+		//resource data length
+		s = sock.getdata(2);
+		i = asc(left(s,1))*256+asc(right(s,1));
+
+		//resource data
+		s = sock.getdata(i);
+
+		#if DNS_DEBUG_PRINT
+			string s1;
+			switch (answer_type) {
+			case EN_DNS_RET_IP:
+
+				s1 = "IP: "+ddstr(s);
+				break;
+			case EN_DNS_RET_NAME_SERVER:
+
+				s1 = "NS: "+s;
+				break;
+			case EN_DNS_RET_CANONICAL_NAME:
+
+				s1 = "CNAME: "+s;
+				break;
+			case EN_DNS_RET_POINTER_RECORD:
+
+				s1 = "PTR: "+s;
+				break;
+			case EN_DNS_RET_HOST_INFO:
+
+				s1 = "HINFO: "+s;
+				break;
+			case EN_DNS_RET_MAIL_EXCHANGE_SERVER:
+
+				s1 = "MX: "+s;
+				break;
+			}
+			dns_debugprint(s1);
+		#endif
+
+		callback_dns_answer_acquired(answer_type,s);
+	}
+	callback_dns_ok();
+}
+
+void dns_proc_timer() {
+	if (dns_init_flag != DNS_INIT_SIGNATURE) { return;}
+
+	sock.num = dns_sock;
+
+	if (sock.statesimple == PL_SSTS_EST) {
+		if (dns_rpl_tmr>0) {
+			dns_rpl_tmr = dns_rpl_tmr-1;
+			if (dns_rpl_tmr == 0) {
+				#if DNS_DEBUG_PRINT
+					dns_debug_print_status(EN_STATUS_DNS_REPLY_TIMEOUT);
+				#endif		
+				callback_dns_failure(EN_STATUS_DNS_REPLY_TIMEOUT);
+				return;
+			}
+		}
+	} else {
+		if (dns_conn_tmr>0) {
+			dns_conn_tmr = dns_conn_tmr-1;
+			if (dns_conn_tmr == 0) {
+				#if DNS_DEBUG_PRINT
+					dns_debug_print_status(EN_STATUS_DNS_CONNECTION_TIMEOUT);
+				#endif		
+				callback_dns_failure(EN_STATUS_DNS_CONNECTION_TIMEOUT);
+				return;
+			}
+		}
+	}
+}
+
+#if DNS_DEBUG_PRINT
+void dns_debug_print_status(en_dns_status_codes status) {
+	string<64> s;
+
+	switch (status) {
+	case EN_STATUS_DNS_OK:
+
+		return;
+		break;
+	case EN_STATUS_DNS_NOT_STARTED:
+
+		s = "dns_start() wasn't used or failed.";
+		break;
+	case EN_STATUS_DNS_INVALID_SOCKET:
+
+		s = "Invalid socket.";
+		break;
+	case EN_STATUS_DNS_INVALID_INTERFACE:
+
+		s = "Invalid interface.";
+		break;
+	case EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE:
+
+		s = "Insufficient buffer space.";
+		break;
+	case EN_STATUS_DNS_CONNECTION_TIMEOUT:
+
+		s = "Unable to connect to the DNS server.";
+		break;
+	case EN_STATUS_DNS_REPLY_TIMEOUT:
+
+		s = "Cannot get reply from DNS server.";
+		break;
+	case EN_STATUS_DNS_RECURSIVE_UNAVALIABLE:
+
+		s = "Recursive query is unavliable for the destinated DNS server.";
+		break;
+	case EN_STATUS_DNS_NAME_ERROR:
+
+		s = "Invalid domain name.";
+		break;
+	case EN_STATUS_DNS_NO_ANSWER:
+
+		s = "There is no anwser for the domain name.";
+		break;
+	case EN_STATUS_DNS_BAD_ANSWER:
+
+		s = "Unable to resolve the the answer from DNS server.";
+		break;
+	}
+	dns_debugprint("ERROR: "+s);
+}
+#endif
+
+#if DNS_DEBUG_PRINT
+void dns_debugprint(string *print_data) {
+
+	sys.debugprint(DNS_STAMP+*print_data+DNS_CR_LF);
+}
+#endif

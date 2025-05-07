@@ -1,0 +1,14 @@
+'=============================================================
+'	SNTP.TBS
+'=============================================================
+CONST SNTP_RETRY = 1
+CONST SNTP_WAIT_REPLY = 6
+enum sntp_states 
+	SNTP_ERROR_FORMAT,
+	SNTP_CONNECT_FAIL,
+	SNTP_TIME_SYNC_OK,
+	SNTP_REPLY_TIMEOUT
+end enum
+
+declare sub SNTP_init
+declare function ConnectToTimeServer(sTimeServerIP as string, sTimeServerPort as string,byref wDays as word,byref wMinus as word,byref bSeconds as byte ) as sntp_states

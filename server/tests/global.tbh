@@ -1,0 +1,15 @@
+'DEFINES-------------------------------------------------------------
+#define DHCP_DEBUG_PRINT 1
+#define WLN_AVAILABLE 0
+#define SIGNAL_STRENGTH_INDICATION 1
+const MAX_NUM_INTERFACES=4
+const DEVICE_NET_IP = "192.168.1.137"
+const DEVICE_NET_MASK = "255.255.255.0"
+const DEVICE_NET_GATEWAY = "192.168.1.1"
+'INCLUDES------------------------------------------------------------
+include "dhcp\trunk\dhcp.tbh"
+include "sock\trunk\sock.tbh"
+'DECLARATIONS--------------------------------------------------------
+declare interface_ready(MAX_NUM_INTERFACES) as no_yes
+declare sub close_interface_sockets(interface as pl_sock_interfaces)
+declare sub boot()

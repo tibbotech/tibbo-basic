@@ -1,0 +1,677 @@
+'**************************************************************************************************
+'       BUILT-IN FUNCTIONS
+'**************************************************************************************************
+
+syscall(506,"87.TDL")  !jmptbl(value as integer, byref table)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(510,"69.TDL")  !gotohtml(offset as word)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(60,"69.TDL")  !finalgotohtml(offset as word)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(511,"20.TDL")  !strload(byref dststr as string, byref sourcestr as string)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(505,"87.TDL")  !load(byref dest, byref src, len as word)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(512,"21.TDL")  !strcpy(byref deststr as string, byref sourcestr as string)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(513,"22.TDL")  !strcat(byref dst as string, byref src as string)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(514,"02.TDL")  val(byref sourcestr as string) as word
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts string representation of a value into 16-bit value (word or short). Recognizes &b (binary) and &h (hexadecimal) prefixes. 
+'Can be invoked implicitly, through the word_var=string_var expression. <br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>val()
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(515,"69.TDL"+)  !httpoutput
+'<b>INTRINSIC PLATFORM SYSCALL.</b><br><br>
+
+'--------------------------------------------------------------------
+syscall(294,"54.TDL") lval(byref sourcestr as string) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts string representation of a value into 32-bit value (dword or long). Recognizes &b (binary) and &h (hexadecimal) prefixes.
+'Can be invoked implicitly, through the dword_var=string_var expression. <br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>lval()
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(516,"03.TDL")  str(num as integer) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 16-bit numeric value (word) into its decimal string representation.Can be invoked implicitly, through the 
+'string_var=word_var expression. <br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>str()
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(283,"48.TDL") lstr(byref num as dword) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 32-bit numeric value (dword) into its decimal string representation. Can be invoked implicitly, through the 
+'string_var=dword_var expression. <br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>lstr()
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(517,"03.TDL")  stri(num as integer) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts signed 16-bit numeric value (short) into its decimal string representation. Can be invoked implicitly, through the
+'string_var=short_var expression. <br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>stri() 
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(284,"48.TDL") lstri(byref num as long) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+'Converts signed 32-bit numeric value (long) into its decimal string representation. Can be invoked implicitly, through the 
+'string_var=long_var expression.<br><br>
+'Compiler is smart enough to pre-calculate constant-only expressions involving implicit use of <font color="teal"><b>lstri()
+'</b></font>function.
+
+'--------------------------------------------------------------------
+syscall(518,"03.TDL")  hex(num as word) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 16-bit numeric value (word) into its HEX string representation.
+'Standard "&h" prefix is added at the beginning of the string.
+
+'--------------------------------------------------------------------
+syscall(285,"48.TDL") lhex(byref num as dword) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 32-bit numeric value (dword) into its HEX string representation.
+'Standard "&h" prefix is added at the beginning of the string.
+
+'--------------------------------------------------------------------
+syscall(519,"03.TDL")  bin(num as word) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 16-bit numeric value (word) into its binary string representation.
+'Standard "&b" prefix is added at the beginning of the string.
+
+'--------------------------------------------------------------------
+syscall(286,"48.TDL") lbin(byref num as dword) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts unsigned 32-bit numeric value (dword) into its binary string representation.
+'Standard "&b" prefix is added at the beginning of the string.
+
+'--------------------------------------------------------------------
+syscall(520,"01.TDL") left(byref sourcestr as string, len as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns len leftmost characters of a string sourcestring. Example of use: s=<font color="teal"><b>left("ABCDE",3)</b></font>,
+'result will be "ABC". 
+
+'--------------------------------------------------------------------
+syscall(521,"01.TDL") right(byref sourcestr as string, len as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns len rightmost characters of a string sourcestr. Example of use: s=<font color="teal"><b>right("ABCDE",3)</b></font>,
+'result will be "CDE".
+
+'--------------------------------------------------------------------
+syscall(522,"01.TDL") mid(byref sourcestr as string, frompos as byte, len as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns len characters from a string sourcestr starting from position pos. The leftmost string character is counted to be at position 1.
+'Example of use:<br><br>
+'s=<font color="teal"><b>mid("ABCDE",2,3)</b></font>, result will be "BCD".
+
+'--------------------------------------------------------------------
+syscall(523,"23.TDL") !strcmp(byref string1 as string, byref string2 as string) as integer
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br> 
+
+'--------------------------------------------------------------------
+syscall(524,"04.TDL") len(byref sourcestr as string) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the length of (number of characters in) the string sourcestr. Example of use: <br><br>
+'x=<font color="teal"><b>len("ABC")</b></font>, result will be 3.
+
+'--------------------------------------------------------------------
+syscall(525,"05.TDL") instr(frompos as byte,byref sourcestr as string,byref substr as string,num as byte) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Finds the Nth occurrence (defined by num, counting from 1) of a substring substr in a string sourcestr.<br><br>
+'Search is conducted from position frompos (leftmost character has position 1). This function returns position in a string or zero if the
+'Nth occurrence of the substring is not found. Example of use:<br><br>
+'x=<font color="teal"><b>instr(3,"ABCABCDEABC12","BC",2)</b></font>, result will be 10.
+
+'--------------------------------------------------------------------
+syscall(526,"06.TDL") asc(byref sourcestr as string) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the ASCII code of the leftmost character of the string. Example: <br><br>
+'x=<font color="teal"><b>asc("123")</b></font>, result will be 49 (ASCII code of '1').
+
+'--------------------------------------------------------------------
+syscall(527,"07.TDL") chr(asciicode as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the string that consists of a single character with ASCII code asciicode. Example of use: <br><br>
+'s=<font color="teal"><b>chr(49)</b></font>, result will be "1".    
+
+'--------------------------------------------------------------------
+syscall(528,"39.TDL") ddstr(byref str as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts "dot-decimal value" in <b>str </b>into "dot-decimal string". Returns a dot-separated string consisting of decimal representations of all binary values in the input string.
+'Each decimal value will be in the 0-255 range.
+'<br><br>
+'This function is convenient for converting groups of bytes representing binary data (such as IP or MAC addresses) into their string representation.
+'<br><br>
+'See also:
+'<font color="teal"><b>ddval</b</font>.
+
+'--------------------------------------------------------------------
+syscall(529,"40.TDL") ddval (byref str as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts "dot-decimal string" in <b>str </b>into "dot-decimal value".
+'<br><br>
+'The contents of <b>str </b>should comprise one or more dot-separated decimal values in the 0-255 range.
+'Values that exceed 255 will produce an overflow, so result will be incorrect.
+'If any other character other than "0"-"9" or "." is encountered then all digits after this character and up to the next "." (if any) will be ignored.
+'Leading spaces before each decimal value are allowed.
+'<br><br>
+'This function is convenient for converting string representation of groups of bytes (such as IP or MAC addresses) into their binary form.
+'<br><br>
+'See also:
+'<font color="teal"><b>ddstr</b</font>.
+
+'--------------------------------------------------------------------
+syscall(24,"09.TDL") strgen(len as byte,byref substr as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Generates a string of len length consisting of repeating substrings substr. Example: <br><br>
+'s=<font color="teal"><b>strgen(10,"ABC")</b></font>, result will be "ABCABCABCA". <br><br>
+'Notice that len parameter specifies total resulting string length in bytes so the last substring will be truncated if necessary to
+'achieve exact required length. <br><br>
+'This function is an expanded version of the STRING$ function commonly found in other BASICs. 
+
+'--------------------------------------------------------------------
+syscall(22,"08.TDL") strsum(byref sourcestr as string) as word
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Calculates 16-bit (word) sum of ASCII codes of all characters in a string sourcestr. This function is useful for checksum
+'calculation. Example: <br><br>
+'<font color="teal"><b>strgen("012") </b></font>will return 147 (48+49+50).
+
+'--------------------------------------------------------------------
+syscall(135) !doevents
+'<b>INTRINSIC SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+enum pl_days_of_week
+    PL_DOW_MONDAY=1,    '<b>PLATFORM CONSTANT. </b><br><br> Monday.
+    PL_DOW_TUESDAY,     '<b>PLATFORM CONSTANT. </b><br><br> Tuesday.
+    PL_DOW_WEDNESDAY,   '<b>PLATFORM CONSTANT. </b><br><br> Wednesday.
+    PL_DOW_THURSDAY,    '<b>PLATFORM CONSTANT. </b><br><br> Thursday.
+    PL_DOW_FRIDAY,      '<b>PLATFORM CONSTANT. </b><br><br> Friday.
+    PL_DOW_SATURDAY,    '<b>PLATFORM CONSTANT. </b><br><br> Saturday.
+    PL_DOW_SUNDAY       '<b>PLATFORM CONSTANT. </b><br><br> Sunday.
+end enum
+
+syscall(25,"10.TDL") weekday(daycount as word) as pl_days_of_week
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the day of the week for a given day number. Base date for the day count is 1-JAN-2000 (this is day #0).<br><br>
+'See also <font color="teal"><b>year</b></font>, <font color="teal"><b>month</b></font>, 
+'<font color="teal"><b>date</b></font>, <font color="teal"><b>hours</b></font>, 
+'<font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(26,"11.TDL") year(daycount as word) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the year for a given day number. Base date for the day count is 1-JAN-2000 (this is day #0). Only last two
+'digits of the year are returned, so 0 means 2000, 1- 2001, and so on. <br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>month</b></font>, 
+'<font color="teal"><b>date</b></font>, <font color="teal"><b>hours</b></font>, 
+'<font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+enum pl_months
+    PL_MONTH_JANUARY=1, '<b>PLATFORM CONSTANT. </b><br><br> January.
+    PL_MONTH_FEBRUARY,  '<b>PLATFORM CONSTANT. </b><br><br> February.
+    PL_MONTH_MARCH,     '<b>PLATFORM CONSTANT. </b><br><br> March.
+    PL_MONTH_APRIL,     '<b>PLATFORM CONSTANT. </b><br><br> April.
+    PL_MONTH_MAY,       '<b>PLATFORM CONSTANT. </b><br><br> May.
+    PL_MONTH_JUNE,      '<b>PLATFORM CONSTANT. </b><br><br> June.
+    PL_MONTH_JULY,      '<b>PLATFORM CONSTANT. </b><br><br> July.
+    PL_MONTH_AUGUST,    '<b>PLATFORM CONSTANT. </b><br><br> August.
+    PL_MONTH_SEPTEMBER, '<b>PLATFORM CONSTANT. </b><br><br> September.
+    PL_MONTH_OCTOBER,   '<b>PLATFORM CONSTANT. </b><br><br> October.
+    PL_MONTH_NOVEMBER,  '<b>PLATFORM CONSTANT. </b><br><br> November.
+    PL_MONTH_DECEMBER   '<b>PLATFORM CONSTANT. </b><br><br> December.
+end enum
+
+syscall(27,"11.TDL") month(daycount as word) as pl_months
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the month for a given day number. Base date for the day count is 1-JAN-2000 (this is day #0). <br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>date</b></font>, <font color="teal"><b>hours</b></font>, 
+'<font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(28,"11.TDL") date(daycount as integer) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the date for a given day number. Base date for the day count is 1-JAN-2000 (this is day #0). <br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>month</b></font>, <font color="teal"><b>hours</b></font>, 
+'<font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(29,"12.TDL") daycount(year as byte, month as byte, date as byte) as word
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the day number for a given year, month, and date. Base date for the day number is 1-JAN-2000 (this is day #0).<br><br>
+'The year is supplied as offset from year 2000 (so, it is 6 for year 2006). Acceptable year range is 0-99 (2000-2099).<br><br>
+'If any input parameter is illegal (year exceeds 99, month exceeds 12, etc.) this syscall will return 65535. This error
+'value cannot be confused with an actual valid day number since the maximum day number recognized by this syscall is
+'12-DEC-2099 (day number 36524).<br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, 
+'<font color="teal"><b>hours</b></font>, <font color="teal"><b>minutes</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(30,"13.TDL") hours(mincount as word) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the hours value (in 24-hour format) for a given minutes number. Mincount is the number of minutes elapsed
+'since midnight (00:00 is minute #0). Maximum mincount number is 1439 (23:59). <br><br>
+'If higher value is supplied this call will return 255. This error value cannot be confused with a valid output since normal 
+'hours value cannot exceed 23.<br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, 
+'<font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(31,"13.TDL") minutes(mincount as word) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the minutes value for given minutes number. Mincount is the number of minutes since from midnight (00:00 is
+'minute #0). Maximum mincount number is 1439 (23:59). <br><br>
+'If a value higher than 1439 is supplied, this call will return 255. This error value cannot be confused with valid output 
+'since normal minutes value cannot exceed 59.<br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, 
+'<font color="teal"><b>hours</b></font>, <font color="teal"><b>daycount</b></font>, and 
+'<font color="teal"><b>mincount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(32,"14.TDL") mincount(hours as byte, minutes as byte) as word
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns the minutes number for a given hours and minutes. Minutes are counted from midnight (00:00 is minute #0).<br><br>
+'If any input parameter is illegal (hours exceeds 23, minutes exceeds 59, etc.) this syscall will return 65535.
+'This error value cannot be confused with an actual valid minute number since the maximum minute number cannot exceed 1439.<br><br>
+'See also <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, 
+'<font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, 
+'<font color="teal"><b>hours</b></font>, <font color="teal"><b>minutes</b></font>, and 
+'<font color="teal"><b>daycount </b></font>syscalls.
+
+'--------------------------------------------------------------------
+syscall(289,"50.TDL") cfloat(byref num as real) as valid_invalid
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Floating-point calculations can lead to invalid result (#INF, -#INF errors, as per IEEE specification).<br><br>
+'When your application is in the debug mode you will get a FPERR exception if such an error is encountered. <br><br>
+'In the release mode the Virtual Machine won't generate an exception, yet your application may need to know if a certain floating-point 
+'variable contains correct value. This is where cfloat() function comes handy. <br><br>
+'The <font color="teal"><b>cfloat() </b></font>returns <font color="olive"><b>0- VALID </b></font>if the floating-point
+'variable num contains a valid value, and <font color="olive"><b>1- INVALID </b></font>if the num contains invalid value.
+
+'--------------------------------------------------------------------
+syscall(296,"44.TDL") !fstr(byref num as real) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+enum ftostr_mode
+    FTOSTR_MODE_AUTO,   'Choose between plain and mantissa/exponent format automatically. Format that results in the
+                        'shortest string will be selected.
+    FTOSTR_MODE_ME,     'Use mantissa/exponent format.
+    FTOSTR_MODE_PLAIN   'Use regular plain format, not mantissa/exponent representation. 
+end enum
+
+syscall(287,"44.TDL") ftostr(byref num as real, mode as ftostr_mode, rnd as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts real value into its string representation. <font color="teal"><b>Ftostr() </b></font>function offers two formatting 
+'options: mode argument selects mantissa/exponent, plain, or "whichever is more compact" format for the output string.<br><br>
+'Rnd argument defines how many digits (both in the integer and fractional part) the number should be rounded to.
+
+'--------------------------------------------------------------------
+syscall(288,"43.TDL") strtof(byref str as string) as real
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Converts string representation of a real value into a real value. You must keep in mind that floating-point calculations
+'are inherently imprecise. Not every value can be converted into its exact floating-point representation.<br><br>
+'Also, <font color="teal"><b>strtof() </b></font>can be invoked implicitly (real_var=string_var).
+
+'--------------------------------------------------------------------
+syscall(183,"42.TDL"+) !proc_http_request()
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(260,"46.TDL") !loa32(byref dest, byref sourcestr as string) 
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(257,"47.TDL") !sto32 as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(258,"47.TDL") !sto32i as long
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(577,"47.TDL") !stof() as float
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(578,"47.TDL") !stofi() as float
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(259,"49.TDL") !cpy32(byref dst, byref src)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(256,"45.TDL") !ladd(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(262,"45.TDL") !lsub(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(261,"45.TDL") !lmul(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(263,"45.TDL") !ldiv(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(264,"45.TDL") !ldivi(byref x as long, byref y as long) as long
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(265,"45.TDL") !lmod(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(266,"45.TDL") !lmodi(byref x as long, byref y as long) as long
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(267,"45.TDL") !lneg(byref x as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(268,"45.TDL") !land(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(269,"45.TDL") !lor(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(270,"45.TDL") !lxor(byref x as dword, byref y as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(271,"45.TDL") !lnot(byref x as dword) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(272,"45.TDL") !lcmp(byref x as dword, byref y as dword)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(273,"45.TDL") !fadd(byref x as real, byref y as real) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(275,"45.TDL") !fsub(byref x as real, byref y as real) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(274,"45.TDL") !fmul(byref x as real, byref y as real) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(276,"45.TDL") !fdiv(byref x as real, byref y as real) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(278,"45.TDL") !ultof(byref x as dword) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(277,"45.TDL") !ltof(byref x as long) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(279,"45.TDL") !lround(byref x as real) as long
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(280,"45.TDL") !round(byref x as real) as short
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(281,"45.TDL") !fneg(byref x as real) as real
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(282,"45.TDL") !fcmp(byref x as real, byref y as real)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(62,"51.TDL") !initobj(byref obj, rtti as word)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(249,"51.TDL") !objtostr(byref obj, byref s as string)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(250,"51.TDL") !strtoobj(byref obj, byref s as string)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(63,"51.TDL") !gotoidx(byref obj,count as byte,i1 as word,i2 as word,i3 as word,i4 as word,i5 as word,i6 as word,i7 as word,i8 as word) as dword '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(64,"51.TDL") !objcpy(byref dst, byref src)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+enum md5_modes
+    MD5_UPDATE, 'Set this mode for all data portions except the last one.
+    MD5_FINISH 'Set this mode for the last data portion; also use this selection if you only have a single data portion.
+end enum
+
+syscall(290,"52.TDL") md5(byref str as string,byref input_hash as string,md5_mode as md5_modes,total_len as word) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Generates MD5 hash on the <b>str </b>string. Returns 16-character hash string; an empty string when invalid str or input_hash argument was detected.
+'<br><br>
+'<b>str</b> -- String containing (the next portion of) the input data to generate MD5 hash on. When md5_mode= <font color="olive"><b>0- MD5_UPDATE</b></font>, 
+'this string must be 64, 128, or 192 characters in length.  Any other length will result in error and the function will return an empty string. 
+'When md5_mode= <font color="olive"><b>1- md5_FINISH</b></font>, this string can have any length (up to 255 bytes).
+'<br>
+'<b>input_hash</b> -- Hash obtained as a result of MD5 calculation on the previous data portion. Leave it empty for the first portion of data.
+'Use the result of MD5 calculation on the previous data portion for the second and all subsequent portions of data.
+'The result of MD5 is always 16 characters long, so passing the string of any other length (except 0 -- see above) will result in error and this function will return an empty string.
+'<br>
+'<b>md5_mode</b> -- <font color="olive"><b>0- MD5_UPDATE </b></font> (set this mode for all data portions except the last one), or <font color="olive"><b>1- md5_FINISH </b></font>
+'(set this mode for the last data portion; also use this selection if you only have a single data portion).
+'<br>
+'<b>total_len</b> -- Total length of processed data (in all data portions combined). Only relevant when md5_mode= <font color="olive"><b>1- md5_FINISH</b></font>. 
+'That is, only relevant for the last or a single data portion.
+'<br><br>
+'MD5 is a standard method of calculating hash codes on data of any size. The amount of input data can often exceed maximum capacity of string variables (255 characters).
+'The md5 method can be invoked repeatedly in order to process the data of any size.
+'<br><br>
+'See also:
+'<font color="teal"><b>sha1</b</font>.
+
+'--------------------------------------------------------------------
+enum sha1_modes
+    SHA1_UPDATE, 'Set this mode for all data portions except the last one.
+    SHA1_FINISH 'Set this mode for the last data portion; also use this selection if you only have a single data portion.
+end enum
+
+syscall(291,"53.TDL") sha1(byref str as string,byref input_hash as string,sha1_mode as sha1_modes,totallen as word) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Generates SHA1 hash on the <b>str </b>string. Returns 20-character hash string; an empty string when invalid str or input_hash argument was detected.
+'<br><br>
+'<b>str</b> -- String containing (the next portion of) the input data to generate SHA1 hash on. When sha1_mode= <font color="olive"><b>0- SHA1_UPDATE</b></font>, 
+'this string must be 64, 128, or 192 characters in length. Any other length will result in error and the function will return an empty string. 
+'When sha1_mode= <font color="olive"><b>1- SHA1_FINISH</b></font>, this string can have any length (up to 255 bytes).
+'<br>
+'<b>input_hash</b> -- Hash obtained as a result of SHA1 calculation on the previous data portion. Leave it empty for the first portion of data.
+'Use the result of SHA1 calculation on the previous data portion for the second and all subsequent portions of data.
+'The result of SHA1 is always 20 characters long, so passing the string of any other length (except 0 -- see above) will result in error and this function will return an empty string.
+'<br>
+'<b>md5_mode</b> -- <font color="olive"><b>0- SHA1_UPDATE</b></font>(set this mode for all data portions except the last one), or <font color="olive"><b>1- SHA1_FINISH </b></font>
+'(set this mode for the last data portion; also use this selection if you only have a single data portion).
+'<br>
+'<b>total_len</b> -- Total length of processed data (in all data portions combined). Only relevant when sha1_mode= <font color="olive"><b>1- SHA1_FINISH</b></font>. 
+'That is, only relevant for the last or a single data portion.
+'<br><br>
+'SHA1 is a standard method of calculating hash codes on data of any size. The amount of input data can often exceed maximum capacity of string variables (255 characters).
+'The sha1 method can be invoked repeatedly in order to process the data of any size.
+'<br><br>
+'See also:
+'<font color="teal"><b>md5</b</font>.
+
+'--------------------------------------------------------------------
+syscall(253,"52.TDL") random(len as byte) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Generates a string consisting of <b>len </b>random characters.
+
+'--------------------------------------------------------------------
+syscall(252,"52.TDL") !md5ls() as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(254,"52.TDL") !md5ls2(byref str as string) as string
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(549,"09.TDL") insert(byref dest_str as string,pos as byte,byref insert_str as string) as byte
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Inserts insert_str string into the dest_str string at the insert position pos. Returns the new length of dest_str.
+'<br><br>
+'This is an insert with overwrite, meaning that the insert_str will overwrite a portion of the dest_str.
+'<br><br>
+'Dest_str length can increase as a result of this operation (but not beyond declared string capacity). This will happen if the insertion position does
+'not allow the source_str to fit within the current length of the dest_string.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>EM500W
+#if PLATFORM_ID<>DS1100
+syscall(463,"83.TDL") aes128enc(byref key as string,byref plain as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Encrypts data in 16-byte blocks according to the AES128 algorithm. Returns encrypted data (which will consist of complete 16-character blocks).
+'<br><br>
+'<b>Key </b>-- Encryption key. Must be 16 characters long, or NULL string will be returned.
+'<br><br>
+'<b>Plain </b>-- Plain (unencrypted) data. Will be processed in 16-byte blocks. Last incomplete block will be padded with zeroes. 
+'<br><br>
+'Not supported on the EM500W platform.
+'<b>See also: </b>aes128dec, rc4.
+#endif
+#endif
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>EM500W
+    #if PLATFORM_ID<>DS1100
+syscall(464,"84.TDL") aes128dec(byref key as string,byref cypher as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Decrypts data in 16-byte blocks according to the AES128 algorithm. Returns decrypted data (which will consist of complete 16-character blocks).
+'<br><br>
+'<b>Key </b>-- Encryption key. Must be 16 characters long, or NULL string will be returned.
+'<br><br>
+'<b>Cypher </b>-- Encrypted data, must consist of one or more complete 16-character blocks, or NULL string will be returned. 
+'<br><br>
+'Not supported on the EM500W platform.
+'<br><br>
+'<b>See also: </b>aes128dec, rc4.
+    #endif
+#endif
+
+'--------------------------------------------------------------------
+syscall(579,"88.TDL") rc4(byref key as string, skip as word, byref data as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Encrypts/decrypts the data stream according to the RC4 algorithm. Returns processed data.
+'<br><br>
+'<b>Key </b>-- Encryption key, can have any length.
+'<br><br>
+'<b>Skip </b>-- The number of "skip" iterations. These are additional iterations added past the standard "key scheduling algorithm". Set this argument to 0 to obtain
+'standard encryption results compatible with other systems.
+'<br><br>
+'<b>Key </b>-- Data to encrypt/decrypt.
+'<br><br>
+'With RC4 algorithm, the same function is used both for encrypting and decrypting the data.
+'<br><br>
+'<b>See also: </b>aes128enc, aes128dec.
+
+'--------------------------------------------------------------------
+syscall(465,"85.TDL") strand(byref str1 as string,byref str2 as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns a string containing the result of logical AND operation on data in str1 and str2 arguments.
+'<br><br>
+'This function treats data in str1 and str2 as two byte arrays. Logical AND operation is performed on corresponding byte pairs (first byte of str1 AND first byte of str2, etc.).
+'<br><br>
+'If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical AND operation.
+'<br><br>
+'<b>See also: </b>stror, strxor.
+
+'--------------------------------------------------------------------
+syscall(466,"85.TDL") stror(byref str1 as string,byref str2 as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns a string containing the result of logical OR operation on data in str1 and str2 arguments.
+'<br><br>
+'This function treats data in str1 and str2 as two byte arrays. Logical OR operation is performed on corresponding byte pairs (first byte of str1 OR first byte of str2, etc.).
+'<br><br>
+'If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical OR operation.
+'<br><br>
+'<b>See also: </b>strand, strxor.
+
+'--------------------------------------------------------------------
+syscall(467,"85.TDL") strxor(byref str1 as string,byref str2 as string) as string
+'<b>PLATFORM SYSCALL. </b><br><br>
+'Returns a string containing the result of logical exclusive OR (XOR) operation on data in str1 and str2 arguments.
+'<br><br>
+'This function treats data in str1 and str2 as two byte arrays. Logical XOR operation is performed on corresponding byte pairs (first byte of str1 XOR first byte of str2, etc.).
+'<br><br>
+'If one of the arguments contains less bytes, then this argument is padded with zeroes prior to performing logical XOR operation.
+'<br><br>
+'<b>See also: </b>strand, stror.
+
+'--------------------------------------------------------------------
+syscall(18) !memcpy(byref dest, byref src, len as word)
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(584,"45.TDL") !lshr(byref val as dword, num_bits as byte) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(585,"45.TDL") !lshl(byref val as dword, num_bits as byte) as dword
+'<b>INTRINSIC PLATFORM SYSCALL. </b><br><br>
+
+'--------------------------------------------------------------------
+syscall(586,"02.TDL") !strtobin(byref dst, byref src as string, size as byte)
+
+'--------------------------------------------------------------------
+syscall(587,"03.TDL") !bintostr(byref dst as string, byref src, size as byte)
+
+'--------------------------------------------------------------------
+syscall(422,"88.TDL") !debug.tx(byref s as string)
+'<b>METHOD.</b>
+
+'--------------------------------------------------------------------
+syscall(423,"88.TDL") !debug.rx() as string
+'<b>METHOD.</b>

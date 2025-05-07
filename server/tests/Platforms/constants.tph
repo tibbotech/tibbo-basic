@@ -1,0 +1,114 @@
+'**************************************************************************************************
+'       GENERIC PLATFORM CONSTANTS
+'**************************************************************************************************
+
+enum off_on 
+    PL_OFF,            '<b>GENERIC PLATFORM CONSTANT. </b>
+    PL_ON              '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum no_yes 
+    NO,                '<b>GENERIC PLATFORM CONSTANT. </b>
+    YES                '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum dis_en 
+    DISABLED,          '<b>GENERIC PLATFORM CONSTANT. </b>
+    ENABLED            '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum low_high 
+    LOW,               '<b>GENERIC PLATFORM CONSTANT. </b>
+    HIGH               '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum ok_ng 
+    OK,                '<b>GENERIC PLATFORM CONSTANT. </b>
+    NG                 '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum wln_ok_ng_rej 
+    WLN_OK,            '<b>GENERIC PLATFORM CONSTANT. </b>
+    WLN_NG,            '<b>GENERIC PLATFORM CONSTANT. </b>
+    WLN_REJ            '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+
+enum valid_invalid 
+    VALID,             '<b>GENERIC PLATFORM CONSTANT. </b>
+    INVALID            '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum accepted_rejected 
+    ACCEPTED,          '<b>GENERIC PLATFORM CONSTANT. </b>
+    REJECTED           '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum forward_back 
+    FORWARD,           '<b>GENERIC PLATFORM CONSTANT. </b>
+    BACK               '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+enum ver_hor 
+    PL_VERTICAL,       'PLATFORM CONSTANT. Vertical.
+    PL_HORIZONTAL      'PLATFORM CONSTANT. Horizontal.
+end enum
+
+enum ris_fal 
+    RISING,            '<b>GENERIC PLATFORM CONSTANT. </b>
+    FALLING            '<b>GENERIC PLATFORM CONSTANT. </b>
+end enum
+
+
+'**************************************************************************************************
+'       INTER-OBJECT CONSTANTS
+'**************************************************************************************************
+
+enum pl_redir
+'ENUM. Contains the list of constants that define redirection of data (buffer shorting) between two objects of current
+'platform that support buffers: the ser object and the sock object. Buffer shorting is enabled/disabled through the
+'ser.redir and sock.redir methods.
+    PL_REDIR_NONE=0,    'INTER-OBJECT CONSTANT. Cancels redirection for the serial port or socket.
+    PL_REDIR_SER,       'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of the serial port 0.
+    PL_REDIR_SER0=1,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of the serial port 0.
+    PL_REDIR_SER1,      'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of the serial port 1.
+    PL_REDIR_SER2,      'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of the serial port 2.
+    PL_REDIR_SER3,      'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of the serial port 3.
+    PL_REDIR_SOCK0=6,   'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 0.
+                        'This constant can be used as a "base" for all other sockets i.e. in expressions like sock.redir=PL_REDIR_SOCK0+f.
+    PL_REDIR_SOCK1,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 1.
+    PL_REDIR_SOCK2,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 2.
+    PL_REDIR_SOCK3,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 3.
+    PL_REDIR_SOCK4,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 4.
+    PL_REDIR_SOCK5,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 5.
+    PL_REDIR_SOCK6,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 6.
+    PL_REDIR_SOCK7,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 7.
+    PL_REDIR_SOCK8,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 8.
+    PL_REDIR_SOCK9,     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 9.
+    PL_REDIR_SOCK10,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 10.
+    PL_REDIR_SOCK11,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 11.
+    PL_REDIR_SOCK12,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 12.
+    PL_REDIR_SOCK13,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 13.
+    PL_REDIR_SOCK14,    'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 14.
+    PL_REDIR_SOCK15     'INTER-OBJECT CONSTANT. Redirects RX data of the serial port or socket to the TX buffer of socket 15.
+
+#if PLATFORM_ID=LTPP3
+    PL_REDIR_LSOCK0,
+    PL_REDIR_LSOCK1,
+    PL_REDIR_LSOCK2,
+    PL_REDIR_LSOCK3,
+    PL_REDIR_LSOCK4,
+    PL_REDIR_LSOCK5,
+    PL_REDIR_LSOCK6,
+    PL_REDIR_LSOCK7,
+    PL_REDIR_LSOCK8,
+    PL_REDIR_LSOCK9,
+    PL_REDIR_LSOCK10,
+    PL_REDIR_LSOCK11,
+    PL_REDIR_LSOCK12,
+    PL_REDIR_LSOCK13,
+    PL_REDIR_LSOCK14,
+    PL_REDIR_LSOCK15
+#endif
+
+end enum

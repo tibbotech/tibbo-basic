@@ -1,0 +1,119 @@
+//***********************************************************************************************************
+//			SSI CHANNEL ALLOCATION LIBRARY
+//***********************************************************************************************************
+
+#include "global.th"
+
+//--------------------------------------------------------------------
+#define SSI_STAMP "SSI> "
+#define SSI_CR_LF chr(13)+chr(10)
+#define SSI_MAX_CHANNELS 4
+#define SSI_UNUSED_SIGNATURE "----"
+#define SSI_INIT_SIGNATURE 0x1252
+
+//--------------------------------------------------------------------
+void ssi_init();
+void ssi_debugprint(string *print_data);
+
+//--------------------------------------------------------------------
+no_yes ssi_in_use[SSI_MAX_CHANNELS];
+string<SSI_MAX_SIGNATURE_LEN> ssi_user_signature[SSI_MAX_CHANNELS];
+unsigned int ssi_init_flag;
+
+//==============================================================================
+unsigned char ssi_get(string *signature) {
+unsigned char ssi_get;
+//Returns a free SSI channel number or 255 if no free channels left.
+
+	unsigned char f;
+
+	if (ssi_init_flag != SSI_INIT_SIGNATURE) {
+		ssi_init();
+		ssi_init_flag = SSI_INIT_SIGNATURE;
+	}
+
+	for (f=0; f <= SSI_MAX_CHANNELS-1; f++) {
+		if (ssi_in_use[f] == NO) {
+			ssi_in_use[f] = YES;
+			ssi_user_signature[f] = *signature;
+			ssi_get = f;
+			#if SSI_DEBUG_PRINT
+				ssi_debugprint("'"+ssi_user_signature[f]+"' got SSI channel #"+str(f));
+			#endif
+			return ssi_get;
+		}
+	}
+
+	//no free SSI channels found
+	#if SSI_DEBUG_PRINT
+		ssi_debugprint("'"+*signature+"' could not get an SSI channel: no free channels left");
+	#endif
+	ssi_get = 255;
+	return ssi_get;
+}
+
+//--------------------------------------------------------------------
+string ssi_who_uses(unsigned char ssi_num) {
+string ssi_who_uses;
+//Returns the signature of the specified SSI channel's user.
+
+	if (ssi_init_flag != SSI_INIT_SIGNATURE) {
+		ssi_init();
+		ssi_init_flag = SSI_INIT_SIGNATURE;
+	}
+
+	if (ssi_in_use[ssi_num] == NO) {
+		ssi_who_uses = SSI_UNUSED_SIGNATURE;
+	} else {
+		ssi_who_uses = ssi_user_signature[ssi_num];
+	}
+	return ssi_who_uses;
+}
+
+//--------------------------------------------------------------------
+void ssi_release(unsigned char ssi_num) {
+//Releases the SSI channel (number), restores the channel's properties to their default states.
+	unsigned char ssi_bup;
+	unsigned int i;
+
+	if (ssi_init_flag != SSI_INIT_SIGNATURE) {
+		ssi_init();
+		ssi_init_flag = SSI_INIT_SIGNATURE;
+	}
+
+	ssi_bup = ssi.channel;
+	ssi.channel = ssi_num;
+
+	//restore this SSI channel to its default state (except mapping)
+	ssi.enabled = NO;
+	ssi.baudrate = 1;
+	ssi.direction = PL_SSI_DIRECTION_RIGHT;
+	ssi.mode = PL_SSI_MODE_0;
+	ssi.zmode = PL_SSI_ZMODE_ALWAYS_ENABLED;
+
+	#if SSI_DEBUG_PRINT
+		ssi_debugprint("'"+ssi_user_signature[ssi_num]+"' released SSI channel #"+str(ssi_num));
+	#endif
+
+	ssi_in_use[ssi_num] = NO;
+	ssi_user_signature[ssi_num] = SSI_UNUSED_SIGNATURE;
+	ssi.channel = ssi_bup;
+}
+
+//------------------------------------------------------------------------------
+void ssi_init() {
+	unsigned char f;
+
+	for (f=0; f <= SSI_MAX_CHANNELS-1; f++) {
+		ssi_in_use[f] = NO;
+		ssi_user_signature[f] = SSI_UNUSED_SIGNATURE;
+	}
+}
+
+//------------------------------------------------------------------------------
+#if SSI_DEBUG_PRINT
+void ssi_debugprint(string *print_data) {
+
+	sys.debugprint(SSI_STAMP+*print_data+SSI_CR_LF);
+}
+#endif

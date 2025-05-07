@@ -1,21 +1,23 @@
 {
 	"compilerOptions": {
-		"declaration": true,
+		"module": "commonjs",
 		"target": "es2019",
 		"lib": ["ES2019"],
-		"module": "commonjs",
-        "moduleResolution": "node",
-		"preserveConstEnums": true,
-		"sourceMap": true,
-		"allowJs": true,
-		"strict": false,
-		"outDir": "lib",
+		"outDir": "out",
 		"rootDir": "src",
-		"noImplicitAny": false,
-		"typeRoots": [
-            "./node_modules/@types"
-        ]
+		"skipLibCheck": true,
+		"sourceMap": true
 	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules"]
+	"include": [
+		"src"
+	],
+	"exclude": [
+		"node_modules",
+		".vscode-test"
+	],
+	"references": [
+		{ "path": "./client" },
+		{ "path": "./server" }
+	],
+	"composite": true
 }

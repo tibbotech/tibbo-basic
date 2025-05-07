@@ -1,0 +1,159 @@
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'           COMMON PLATFORM DEFINES
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+#define EM1000 0
+#define EM1202 1
+#define EM110 2
+#define DS1206 3
+#define EM1206 4
+#define DS1202 5
+#define T1000W 6
+#define KLM601 7
+'#define EM500 8   NOT USED
+#define NB1010 9
+#define NB1010W 10
+#define EM1000W 11
+#define EM1202W 12
+#define EM1206W 13
+#define EM202 14
+#define EM500W 15
+#define DS1102W 16
+#define DS1100 17
+#define DS1101W 18
+#define TPP2W 19
+#define TPP3W 20
+'#define TPP2N 21  NOT USED
+#define EM1001 22
+#define EM1001W 23
+#define EM2000W 24
+#define TPP2WG2 25
+#define TPP3WG2 26
+#define KLM601_32 27
+#define SIMULATOR 28
+#define LTPP3 29
+#define SPACE_AGE 30
+#define DS1101W2 31
+#define LKLM601 32
+#define KLM106_32 33
+#define EM1000N	34
+#define EM1001N 35
+#define EM1202N 36
+#define EM1206N 37
+#define DS1101N 38
+#define DS1102N 39
+#define TPP2N   40
+#define TPP3N   41
+#define NB1010N 42
+#define EM510W  43
+
+#define LCD_DISABLED 0
+#define LCD_ENABLED 1
+
+#define SAMSUNG_S6B0108 0
+#define HIMAX_HX8309 1
+#define SOLOMON_SSD1329 2
+#define SOLOMON_SSD1963 3
+#define SOLOMON_SSD1963_FIXED_IO 4
+#define SOLOMON_SSD1305 5
+#define HIMAX_HX8347 6
+#define ILITEK_ILI9341 7
+#define SOLOMON_SSD1963_FIXED_IO2 8
+#define SITRONIX_ST7789S 9
+#define SOLOMON_SSD1963_ALT_COLOR 10
+
+'55x -- "driver" TDL (low-level stuff like setpixel, etc. but without getpixel)
+'56x -- "info" TDL (LCD dimensions, colors, etc.)
+'75x -- initialization (except LCD_TYPE=SAMSUNG_S6B0108 where it is combined with 55.TDL)
+'79x -- getpixel
+
+#if LCD_TYPE=SAMSUNG_S6B0108
+    #define LCD_DRIVER_TDL "55.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56.TDL"+ 
+    #define LCD_DRIVER_TDL3 "55.TDL"+
+    #define LCD_DRIVER_TDL4 "79.TDL"+ 
+#elif LCD_TYPE=HIMAX_HX8309
+    #define LCD_DRIVER_TDL "55b.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56b.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75b.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79b.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1329
+    #define LCD_DRIVER_TDL "55c.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56c.TDL"+ 
+    #define LCD_DRIVER_TDL3 "55c.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79c.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1963
+    #define LCD_DRIVER_TDL "55d.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56d.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75d.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79d.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1963_FIXED_IO
+    #define LCD_DRIVER_TDL "55i.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56d.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75d.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79d.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1963_FIXED_IO2
+    #define LCD_DRIVER_TDL "55h.TDL"+
+    #define LCD_DRIVER_TDL2 "56d.TDL"+
+    #define LCD_DRIVER_TDL3 "75d.TDL"+
+    #define LCD_DRIVER_TDL4 "79d.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1305
+    #define LCD_DRIVER_TDL "55e.TDL"+
+    #define LCD_DRIVER_TDL2 "56e.TDL"+
+    #define LCD_DRIVER_TDL3 "55e.TDL"+
+    #define LCD_DRIVER_TDL4 "79e.TDL"+
+#elif LCD_TYPE=HIMAX_HX8347
+    #define LCD_DRIVER_TDL "55f.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56f.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75f.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79f.TDL"+
+#elif LCD_TYPE=ILITEK_ILI9341
+    #define LCD_DRIVER_TDL "55g.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56g.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75g.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79g.TDL"+
+#elif LCD_TYPE=SITRONIX_ST7789S
+    #define LCD_DRIVER_TDL "55k.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56k.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75k.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79k.TDL"+
+#elif LCD_TYPE=SOLOMON_SSD1963_ALT_COLOR
+    #define LCD_DRIVER_TDL "55d.TDL"+ 
+    #define LCD_DRIVER_TDL2 "56d.TDL"+ 
+    #define LCD_DRIVER_TDL3 "75l.TDL"+ 
+    #define LCD_DRIVER_TDL4 "79d.TDL"+
+#endif
+
+#if PLATFORM_ID=KLM601
+    #define FD_DRIVER_TDL "64b.TDL"+
+    #define FD_COPYFIRMWARE "76b.TDL"+
+#elif PLATFORM_ID=DS1101W2
+    #define FD_DRIVER_TDL "64b.TDL"+
+    #define FD_COPYFIRMWARE "76b.TDL"+
+#else
+    #define FD_DRIVER_TDL "64.TDL"+
+    #define FD_COPYFIRMWARE "76.TDL"+
+#endif
+
+#define KP_DISABLED 0
+#define KP_ENABLED 1
+
+#define FD_DISABLED 0
+#define FD_ENABLED 1
+
+#define WLN_DISABLED 0
+#define WLN_ENABLED 1
+
+#if WLN_HARDWARE=2 		'WA2000
+	#define TDL_70 "70N.TDL"+
+	#define TDL_71 "71N.TDL"+
+	#define TDL_72 "72N.TDL"+
+	#define TDL_90 "90N.TDL"+
+#else					'GA1000
+	#define TDL_70 "70.TDL"+
+	#define TDL_71 "71.TDL"+
+	#define TDL_72 "72.TDL"+
+	#define TDL_90 "90.TDL"+
+#endif

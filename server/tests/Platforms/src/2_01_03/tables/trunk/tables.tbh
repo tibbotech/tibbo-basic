@@ -1,0 +1,179 @@
+'***********************************************************************************************************
+'			TABLES LIBRARY
+'***********************************************************************************************************
+
+#ifndef TBL_DEBUG_PRINT
+	#define TBL_DEBUG_PRINT 0
+#endif
+
+#ifndef TBL_AGGREGATE_HASH
+	#define TBL_AGGREGATE_HASH 0
+#endif
+
+#ifndef TBL_DESCRIPTOR_FILE
+	#define TBL_DESCRIPTOR_FILE "tables.txt"
+#endif
+
+#ifndef TBL_MAX_TABLE_NAME_LEN
+	#define TBL_MAX_TABLE_NAME_LEN 2
+#endif
+
+#ifndef TBL_MAX_FILE_NAME_LEN
+	#define TBL_MAX_FILE_NAME_LEN 42
+#endif
+
+#ifndef TBL_MAX_NUM_TABLES
+	#define TBL_MAX_NUM_TABLES 1
+#endif
+
+#ifndef TBL_MAX_FIELD_NAME_LEN
+	#define TBL_MAX_FIELD_NAME_LEN 2
+#endif
+
+#ifndef TBL_MAX_TOTAL_NUM_FIELDS
+	#define TBL_MAX_TOTAL_NUM_FIELDS 1
+#endif
+
+#ifndef TBL_MAX_RECORD_SIZE
+	#define TBL_MAX_RECORD_SIZE 2 'must be a power-of-two value
+#endif
+
+#ifndef TBL_ADJUST_LIST_WHEN_FULL
+	#define TBL_ADJUST_LIST_WHEN_FULL 1
+#endif
+
+#ifndef TBL_DISCARD_OLD_RECORD_WHEN_FULL
+	#define TBL_DISCARD_OLD_RECORD_WHEN_FULL 0
+#endif
+
+#ifndef TBL_TIME_TYPE_INCLUDED	'must include time library
+	#define TBL_TIME_TYPE_INCLUDED 1
+#endif
+
+const PL_FD_FIND_PARTIAL_EQUAL=7	'extending the fd.find mode
+'--------------------------------------------------------------------------------
+enum en_tbl_search_direction
+	EN_TBL_SEARCH_DOWN,
+	EN_TBL_SEARCH_UP
+end enum
+
+enum en_tbl_rdwr
+	EN_TBL_GET,							'Read operation
+	EN_TBL_SET							'Write operation
+end enum
+
+enum en_tbl_status_codes	
+	EN_TBL_STATUS_OK,					'Operation completed successfully
+	EN_TBL_STATUS_NOT_STARTED,
+	EN_TBL_STATUS_OUT_OF_FILE_NUMBERS,	'Need to open a file and there are no free file numbers left
+	EN_TBL_STATUS_WRONG_DEFINE,			'Wrong #define value
+	EN_TBL_STATUS_WRONG_DESCRIPTOR,		'Wrong descriptor file data
+	EN_TBL_STATUS_UNKNOWN_FILE,
+	EN_TBL_STATUS_FAILURE,				'Low-level failure (for example fd. error) or record checksum error
+	EN_TBL_STATUS_UNKNOWN_TABLE,		'Unknown table
+	EN_TBL_STATUS_UNKNOWN_FIELD,		'Unknown field
+	EN_TBL_STATUS_INVALID,				'Invalid field value
+	EN_TBL_STATUS_FULL,					'max record number reached or disk is full
+	EN_TBL_STATUS_NOT_FOUND,			'record not found
+	EN_TBL_STATUS_KEY_VIOLATION,		'key field violation
+	EN_TBL_STATUS_DELETED,				'this record is deleted (not active)
+	EN_TBL_STATUS_END_OF_TABLE,			'end of table
+	EN_TBL_STATUS_INV_PARAM				'invalid parameter
+end enum
+
+enum en_tbl_struct
+	EN_TBL_STRUCT_LIST,
+	EN_TBL_STRUCT_TABLE
+end enum
+
+enum en_tbl_date_time_format
+	EN_TBL_DT_DATE,						'YYYYMMDD (year,month,date)
+	EN_TBL_DT_TIME1,					'hhmm (hour,minutes)
+	EN_TBL_DT_TIME2,					'hhmmss (hour,minutes,second)
+	EN_TBL_DT_TIME3,					'hhmmssmls (hour,minutes,second,milsecond)
+	EN_TBL_DT_DATE_TIME1,				'YYYYMMDDhhmm (year,month,date,hour,minutes)
+	EN_TBL_DT_DATE_TIME2,				'YYYYMMDDhhmmss (year,month,date,hour,minutes,second)
+	EN_TBL_DT_ALL						'YYYYMMDDhhmmssmls (year,month,date,hour,minutes,second,milsecond)
+end enum
+
+enum en_tbl_record_states
+	EN_TBL_RECORD_DELETED,
+	EN_TBL_RECORD_ACTIVE,
+	EN_TBL_RECORD_BOTH
+end enum
+
+enum en_tbl_modified_operation
+	EN_TBL_MODIFIED_ADD,
+	EN_TBL_MODIFIED_DELETE,
+	EN_TBL_MODIFIED_UNDELETE,
+	EN_TBL_MODIFIED_EDIT,
+	EN_TBL_MODIFIED_REPLACE,
+	EN_TBL_MODIFIED_CLEAR
+end enum
+'--------------------------------------------------------------------------------
+type tbl_field_type
+	field_name as string(TBL_MAX_FIELD_NAME_LEN)
+	field_type as byte
+	p1 as dword
+	p2 as dword
+	key as no_yes
+	romaddr_def as word
+end type
+
+type tbl_type
+	table_name as string(TBL_MAX_TABLE_NAME_LEN)
+	maxrecs	as word
+	numkeyf	as byte
+	struct as en_tbl_struct
+	rec_size as byte
+	field_num_offset as word
+	num_of_fields as byte
+	clean_start as no_yes
+end type
+
+type struct_tbl_timestamp
+	ts_daycount as word
+	ts_mincount as word
+	ts_seconds as byte
+	ts_milsec as word
+end type
+
+'--------------------------------------------------------------------------------
+declare function tbl_start() as en_tbl_status_codes
+
+declare function tbl_get_table_info(byref table_name_or_num as string, byref table_metadata as tbl_type) as en_tbl_status_codes
+declare function tbl_get_num_fields(byref table_name_or_num as string) as byte
+declare function tbl_get_field_info(byref table_name_or_num as string, field_index as byte, byref field_metadata as tbl_field_type) as en_tbl_status_codes
+declare function tbl_get_field_def(byref table_name_or_num as string, byref field_name as string, byref def_value as string) as en_tbl_status_codes
+declare function tbl_get_max_field_size(byref table_name_or_num as string) as byte
+declare function tbl_replace(byref old_file_name as string, byref new_file_name as string) as en_tbl_status_codes
+declare function tbl_select(byref table_name_or_num as string, byref file_name as string) as en_tbl_status_codes
+declare function tbl_select_for_read(byref table_name_or_num as string, byref file_name as string) as en_tbl_status_codes
+
+	declare function tbl_clear() as en_tbl_status_codes
+	declare function tbl_get_hash() as string
+	declare function tbl_record_sg(byref rec_num as word, op as en_tbl_rdwr) as en_tbl_status_codes
+	declare function tbl_record_add(uid as string(32)) as en_tbl_status_codes
+	declare function tbl_record_edit(byref rec_num as word) as en_tbl_status_codes
+	declare function tbl_record_read_active(byref rec_num as word) as en_tbl_status_codes
+	declare function tbl_record_delete(byref rec_num as word) as en_tbl_status_codes
+	declare function tbl_record_undelete(byref rec_num as word) as en_tbl_status_codes
+	declare function tbl_record_find(record_type as en_tbl_record_states,byref search_data as string,byref field_name as string,byref rec_num as word,direction as en_tbl_search_direction,find_method as pl_fd_find_modes) as en_tbl_status_codes
+	declare function tbl_multi_field_record_find(record_type as en_tbl_record_states,byref search_data as string,byref starting_field as string,byref rec_num as word,direction as en_tbl_search_direction,find_method as pl_fd_find_modes) as en_tbl_status_codes
+	declare function tbl_get_num_records(byref num_of_records as word, include_deleted as no_yes) as en_tbl_status_codes
+	declare function tbl_timestamp_sg(byref timestamp as struct_tbl_timestamp,op as en_tbl_rdwr) as en_tbl_status_codes
+	declare function tbl_get_file_name() as string
+	declare function tbl_get_table_name() as string
+	declare function tbl_is_record_deleted(rec_num as word) as no_yes
+	declare function tbl_close(byref file_name as string)as en_tbl_status_codes '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	
+	declare function tbl_field_sg(byref field_name as string,byref field_value as string,op as en_tbl_rdwr) as en_tbl_status_codes
+	declare function tbl_field_get(byref field_name as string) as string
+	declare sub tbl_field_set(byref field_name as string, byref field_value as string)
+	declare function tbl_is_current_record_deleted() as no_yes
+	declare sub tbl_set_to_clean_start(op as no_yes)
+	
+declare sub callback_tbl_error(status as en_tbl_status_codes)
+declare function callback_tbl_fail_to_open(byref filename as string, status as pl_fd_status_codes, filenum as byte) as no_yes
+declare sub callback_tbl_field_error(byref file_name as string,byref field_name as string,tbl_result as en_tbl_status_codes)
+declare sub callback_tbl_modified(byref file_name as string, modified_operation as en_tbl_modified_operation)

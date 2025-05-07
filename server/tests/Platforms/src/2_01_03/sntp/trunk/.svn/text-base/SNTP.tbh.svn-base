@@ -1,0 +1,38 @@
+'***********************************************************************************************************
+'			SNTP LIBRARY
+'			(Obtains date/time from an SNTP server)
+'***********************************************************************************************************
+
+#ifndef SNTP_DEBUG_PRINT
+	#define SNTP_DEBUG_PRINT 0
+#endif
+
+#ifndef SNTP_REPLY_TIMEOUT
+	#define SNTP_REPLY_TIMEOUT 3
+#endif
+
+#ifndef SNTP_RETRY
+	#define SNTP_RETRY 3
+#endif
+
+'------------------------------------------------------------------------------
+enum en_sntp_status_codes
+	SNTP_STATUS_OK,
+	SNTP_STATUS_INVALID_SOCKET,
+	SNTP_STATUS_INVALID_INTERFACE,
+	SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE,
+	SNTP_STATUS_CONNECTION_TIMEOUT,
+	SNTP_STATUS_REPLY_TIMEOUT,
+	SNTP_STATUS_REPLY_DATA_ERROR
+end enum
+
+'------------------------------------------------------------------------------
+declare sub sntp_init()
+declare function sntp_start(interface as pl_sock_interfaces,byref server_ip as string,server_port as word,socket as byte) as en_sntp_status_codes
+declare sub sntp_proc_timer()
+declare sub sntp_proc_data()
+declare sub sntp_proc_sock_event(state as pl_sock_state_simple)
+
+declare sub callback_sntp_failure(sntp_status as en_sntp_status_codes)
+declare sub callback_sntp_ok(byref w_days as word,byref w_mins as word,byref b_seconds as byte)
+declare sub callback_sntp_pre_buffrq(required_buff_pages as byte)

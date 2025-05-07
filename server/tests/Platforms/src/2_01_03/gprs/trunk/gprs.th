@@ -1,0 +1,209 @@
+//***********************************************************************************************************
+//		GPRS LIBRARY
+//		(Works with TELIT GC864 GPRS module)
+//***********************************************************************************************************
+
+//0- GPRS disabled (library code won't be compiled into the project)
+//1- GPRS enabled
+#ifndef SUPPORTS_GPRS
+	#define SUPPORTS_GPRS 0
+#endif
+
+//0- no debug output.
+//1- debug output in console.
+#ifndef GPRS_DEBUG_PRINT
+	#define GPRS_DEBUG_PRINT 0
+#endif
+
+//0- suppress pinging.
+//1- ping GPRS_PING_IP in the end of PPP link establishment (as a proof of success).
+#ifndef GPRS_SEND_PING
+	#define GPRS_SEND_PING 0
+#endif
+
+//This is the IP address that will be pinged when GPRS_SEND_PING is set.
+//Only relevant when GPRS_SEND_PING is 1.
+#ifndef GPRS_PING_IP
+	#define GPRS_PING_IP "0.0.0.0"
+#endif
+
+//The serial port to which the GPRS modem is connected. Default=3.
+//Like with ser.num, serial ports are numbered from 0.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_SER_PORT
+	#define GPRS_SER_PORT 3
+#endif
+
+//The mapping of the RTS line connected to the GPRS modem.
+//Defines below intentionally use I/O pin numbers instead of names.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_SER_PORT_RTSMAP
+	#if PLATFORM_ID == TPP2W || PLATFORM_ID == TPP2N || PLATFORM_ID == TPP2WG2
+		#if GPRS_SER_PORT == 0
+			#define GPRS_SER_PORT_RTSMAP 0
+		#elif GPRS_SER_PORT == 1
+			//this choice is not available
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_SER_PORT_RTSMAP 2
+		#elif GPRS_SER_PORT == 3
+			//this choice is not available
+		#endif	
+	#else
+		#if GPRS_SER_PORT == 0
+			#define GPRS_SER_PORT_RTSMAP 0
+		#elif GPRS_SER_PORT == 1
+			#define GPRS_SER_PORT_RTSMAP 1
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_SER_PORT_RTSMAP 2
+		#elif GPRS_SER_PORT == 3
+			#define GPRS_SER_PORT_RTSMAP 3
+		#endif	
+	#endif
+#endif
+
+//The mapping of the CTS line connected to the GPRS modem.
+//Defines below intentionally use I/O pin numbers instead of names.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_SER_PORT_CTSMAP
+	#if PLATFORM_ID == TPP2W || PLATFORM_ID == TPP2N || PLATFORM_ID == TPP2WG2	
+		#if GPRS_SER_PORT == 0
+			#define GPRS_SER_PORT_CTSMAP 0
+		#elif GPRS_SER_PORT == 1
+			//this choice is not available
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_SER_PORT_CTSMAP 2
+		#elif GPRS_SER_PORT == 3
+			//this choice is not available
+		#endif	
+	#else	
+		#if GPRS_SER_PORT == 0
+			#define GPRS_SER_PORT_CTSMAP 0
+		#elif GPRS_SER_PORT == 1
+			#define GPRS_SER_PORT_CTSMAP 1
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_SER_PORT_CTSMAP 2
+		#elif GPRS_SER_PORT == 3
+			#define GPRS_SER_PORT_CTSMAP 3
+		#endif	
+	#endif
+#endif
+
+
+//0- the GPRS module is external, GPRS_SWITCH and GPRS_RESET GPIO lines are not in use, there is no startup delay-
+//the GPRS module is supposed to be up and running by the time gprs_start() is called
+//1- the GPRS module is internal (like on the NB1010 and DS101x), GPRS_SWITCH and GPRS_RESET
+//lines are used to control the module; there is a proper reset and startup delay when gprs_init_start()
+//is called
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_MODULE_EXTERNAL
+	#define GPRS_MODULE_EXTERNAL 0
+#endif
+
+//GPIO line that, when set LOW, diverts traffic on GPRS_SER_PORT to the GPRS module.
+//When the line is HIGH or disabled, serial port traffic goes elsewhere in the device.
+//Only relevant when GPRS_MODULE_EXTERNAL is 0
+//Define below intentionally uses I/O pin number instead of the name.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_SWITCH
+	#define GPRS_SWITCH 54
+#endif
+
+//GPIO line that, when set HIGH, applies hardware reset to the GPRS module.
+//The line is set to LOW to release the GPRS module from reset.
+//Only relevant when GPRS_MODULE_EXTERNAL is 0.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_RESET
+	#if PLATFORM_ID == TPP2W || PLATFORM_ID == TPP2N || PLATFORM_ID == TPP2WG2
+		#if GPRS_SER_PORT == 0
+			#define GPRS_RESET PL_IO_NUM_1
+		#elif GPRS_SER_PORT == 1
+			//this choice is not available
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_RESET PL_IO_NUM_3
+		#elif GPRS_SER_PORT == 3
+			//this choice is not available
+		#endif
+	#elif PLATFORM_ID == TPP3W  || PLATFORM_ID == TPP3N || PLATFORM_ID == TPP3WG2
+		#if GPRS_SER_PORT == 0
+			#define GPRS_RESET PL_IO_NUM_4
+		#elif GPRS_SER_PORT == 1
+			#define GPRS_RESET PL_IO_NUM_5
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_RESET PL_IO_NUM_6
+		#elif GPRS_SER_PORT == 3
+			#define GPRS_RESET PL_IO_NUM_7
+		#endif
+	#elif PLATFORM_ID == NB1010 || PLATFORM_ID == NB1010W || PLATFORM_ID == NB1010N
+		#define GPRS_RESET PL_IO_NUM_55
+	#else
+		#define GPRS_RESET PL_IO_NULL
+	#endif
+#endif
+
+//GPIO line that is used for TOGGLING the GPRS module ON/OFF.
+//Only relevant when GPRS_MODULE_EXTERNAL is 0.
+//Keep at default value for NB1010 and DS101x devices.
+#ifndef GPRS_POWER
+	#if PLATFORM_ID == TPP2W || PLATFORM_ID == TPP2N || PLATFORM_ID == TPP2WG2
+		#if GPRS_SER_PORT == 0
+			#define GPRS_POWER PL_IO_NUM_10_RX1
+		#elif GPRS_SER_PORT == 1
+			//this choice is not available
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_POWER PL_IO_NUM_14_RX3
+		#elif GPRS_SER_PORT == 3
+			//this choice is not available
+		#endif
+	#elif PLATFORM_ID == TPP3W || PLATFORM_ID == TPP3N || PLATFORM_ID == TPP3WG2
+		#if GPRS_SER_PORT == 0
+			#define GPRS_POWER PL_IO_NUM_33
+		#elif GPRS_SER_PORT == 1
+			#define GPRS_POWER PL_IO_NUM_35
+		#elif GPRS_SER_PORT == 2
+			#define GPRS_POWER PL_IO_NUM_37
+		#elif GPRS_SER_PORT == 3
+			#define GPRS_POWER PL_IO_NUM_39
+		#endif
+	#elif PLATFORM_ID == NB1010 || PLATFORM_ID == NB1010W || PLATFORM_ID == NB1010N
+		#define GPRS_POWER PL_IO_NUM_33
+	#else
+		#define GPRS_POWER PL_IO_NULL
+	#endif
+#endif
+
+
+//Size of TCP and UDP packets that the GPRS interface will be able to carry, expressed in 256-byte units.
+//Do not set >4 or <1.
+#ifndef GPRS_PAYLOAD_SIZE
+	#define GPRS_PAYLOAD_SIZE 4
+#endif
+
+//--------------------------------------------------------------------
+enum en_gprs_status_codes {
+	GPRS_STATUS_OK,
+	GPRS_STATUS_INSUFFICIENT_BUFFER_SPACE
+};
+
+enum gprs_info_elements {
+	GPRS_INFO_ELEMENT_REQUIRED_BUFFERS
+};
+
+//--------------------------------------------------------------------
+string gprs_get_info(gprs_info_elements info_element, string *extra_data);
+en_gprs_status_codes gprs_start(string *at_dt_command_param, string *apn, string *username, string *password);
+void gprs_stop();
+void gprs_proc_ser_data();
+void gprs_proc_sock_data();
+void gprs_proc_timer();
+
+void callback_gprs_pre_buffrq(unsigned char required_buff_pages);
+//Callback procedure, informs of the insufficient number of free buffer pages available for use by the library.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_gprs_ok();
+//Callback procedure, informs of the successul establishment of the PPP link.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).
+
+void callback_gprs_failure();
+//Callback procedure, informs that PPP login/configuration or established link failed.
+//Procedure body has to be created elsewhere in the project (externally with respect to the library).

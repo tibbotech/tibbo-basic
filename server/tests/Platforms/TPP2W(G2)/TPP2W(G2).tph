@@ -1,0 +1,315 @@
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'			TPP2W-G2 WITH WI-FI INTERFACE
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+#define __notdl
+
+#define PLATFORM_ID 25
+
+#define BUFF_PAGE_TYPE word
+#define BUFF_SIZE_TYPE dword
+#define EXTENDED_SOCK 1
+#define SER_7BIT_LIMITATION 1
+#define PLATFORM_TYPE_32 1
+#define OBJECT_KP KP_ENABLED
+#define OBJECT_FD FD_ENABLED
+#define OBJECT_WLN WLN_ENABLED
+#define OBJECT_BT BT_ENABLED
+#define OBJECT_LCD LCD_ENABLED
+#define COPY_FIRMWARE 1
+#define EXTENDED_FD 1
+
+
+'--------------------------------------------------------------------
+#if OBJECT_FD=FD_ENABLED
+	#define __cfgstr "<FD>"
+#endif
+
+'--------------------------------------------------------------------
+enum pl_sock_interfaces
+	PL_SOCK_INTERFACE_NULL,		'<b>PLATFORM CONSTANT.</b><br><br>Null interface (no connection possible).
+	PL_SOCK_INTERFACE_NET,		'<b>PLATFORM CONSTANT.</b><br><br>Ethernet interface.
+	PL_SOCK_INTERFACE_WLN,		'<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi interface.
+	PL_SOCK_INTERFACE_PPP=3,	'<b>PLATFORM CONSTANT.</b><br><br>PPP interface on a serial port.
+	PL_SOCK_INTERFACE_PPPOE		'<b>PLATFORM CONSTANT.</b><br><br>PPPoE interface.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_io_num 
+	PL_IO_NUM_0,		'<b>PLATFORM CONSTANT. </b><br><br> 
+				'Socket 1, control line C.
+
+	PL_IO_NUM_1,		'<b>PLATFORM CONSTANT. </b><br><br> 
+				'Socket 3, control line C.
+
+	PL_IO_NUM_2,		'<b>PLATFORM CONSTANT. </b><br><br> 
+				'Socket 5, control line C.
+
+	PL_IO_NUM_3,		'<b>PLATFORM CONSTANT. </b><br><br> 
+				'Socket 7, control line C.
+
+	PL_IO_NUM_4,		'<b>PLATFORM CONSTANT. </b><br><br>
+				'Socket 9, control line C.
+
+	PL_IO_NUM_5,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Socket 11, control line C.
+
+	PL_IO_NUM_6,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Not connected.
+
+	PL_IO_NUM_7,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Not connected.
+
+	PL_IO_NUM_8_RX0,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 1, control line B. This line is also the RX/W1in/din input of the serial port 0.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_9_TX0,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 1, control line A. This line is also the TX/W1out/dout output of the serial port 0.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_10_RX1,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 3, control line B. This line is also the RX/W0&1in/din input of the serial port 1.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_11_TX1,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 3, control line A. This line is also the TX/W1out/dout output of the serial port 1.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_12_RX2,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 5, control line B. This line is also the RX/W0&1in/din input of the serial port 2.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_13_TX2,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 5, control line A. This line is also the TX/W1out/dout output of the serial port 2.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_14_RX3,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 7, control line B. This line is also the RX/W0&1in/din input of the serial port 3.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_15_TX3,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 7, control line A. This line is also the TX/W1out/dout output of the serial port 3.<br><br>
+				'When this serial port is in the UART mode
+				'(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+				'and is enabled
+				'(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+				'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+				'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer. 				
+
+	PL_IO_NUM_16_INT0,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 1, control line D. This is also the interrupt line 0.
+
+	PL_IO_NUM_17_INT1,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 3, control line D. This is also the interrupt line 1.
+
+	PL_IO_NUM_18_INT2,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 5, control line D. This is also the interrupt line 2.
+
+	PL_IO_NUM_19_INT3,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 7, control line D. This is also the interrupt line 3.
+
+	PL_IO_NUM_20_INT4,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 9, control line D. This is also the interrupt line 4.
+
+	PL_IO_NUM_21_INT5,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 11, control line D. This is also the interrupt line 5.
+
+	PL_IO_NUM_22_INT6,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Not connected.
+				
+	PL_IO_NUM_23_INT7,	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Not connected.
+
+	PL_IO_NUM_24,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, data bus, line 0 (P0.0).
+
+	PL_IO_NUM_25,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, data bus, line 1 (P0.1).
+
+	PL_IO_NUM_26,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 2 (P0.2).
+
+	PL_IO_NUM_27,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 3 (P0.3).
+
+	PL_IO_NUM_28,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 4 (P0.4).
+				
+	PL_IO_NUM_29,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 5 (P0.5).
+
+	PL_IO_NUM_30,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 6 (P0.6).
+
+	PL_IO_NUM_31,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'LCD connector, data bus, line 7 (P0.7).
+
+	PL_IO_NUM_32,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 9, control line A.
+
+	PL_IO_NUM_33,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 9, control line B.
+
+	PL_IO_NUM_34,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Socket 11, control line A.
+
+	PL_IO_NUM_35,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Socket 11, control line B.
+
+	PL_IO_NUM_36,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Keypad connector, return line 1 (for the leftmost button, active low).
+
+	PL_IO_NUM_37,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Keypad connector, return line 2 (active low).
+
+	PL_IO_NUM_38,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Keypad connector, return line 3 (active low).
+
+	PL_IO_NUM_39,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Keypad connector, return line 4 (for the rightmost button, active low).
+
+	PL_IO_NUM_40,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, CS line (active low).
+
+	PL_IO_NUM_41,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, RD line (active low).
+
+	PL_IO_NUM_42,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, WR line (active low).
+
+	PL_IO_NUM_43,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, DC line.
+
+	PL_IO_NUM_44,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Keypad connector, reset line (for the sensor IC of the keypad, active low).
+
+	PL_IO_NUM_45_CO,	'<b>PLATFORM CONSTANT.</b><br><br>
+				'A square wave output controlled by the beep object. This output is driving a buzzer.<br><br>
+				'When the beeper pattern starts playing, the line is configured as output automatically. When the beeper pattern
+				'stops playing, the output returns to the input/output and high/low state that it had before the pattern started playing.
+
+	PL_IO_NUM_46,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Signal strength LED bar control circuit, reset line.
+
+	PL_IO_NUM_47,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Signal strength LED bar control circuit, clock line.
+
+	PL_IO_NUM_48		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Signal strength LED bar control circuit, data line.
+
+	PL_IO_NUM_49,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Wireless add-on socket, CS line.
+
+	PL_IO_NUM_50,		'PLATFORM CONSTANT.</b><br><br>
+				'Wireless add-on socket, DO line.
+
+	PL_IO_NUM_51,		'PLATFORM CONSTANT.</b><br><br>
+				'Wireless add-on socket, RST line.
+
+	PL_IO_NUM_52,		'PLATFORM CONSTANT.</b><br><br>
+				'Wireless add-on socket, DI line.
+
+	PL_IO_NUM_53,		'PLATFORM CONSTANT.</b><br><br>
+				'Wireless add-on socket, CLK line.
+
+	PL_IO_NUM_54,		'PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, backlight control line (active low).
+
+	PL_IO_NUM_55,		'PLATFORM CONSTANT.</b><br><br>
+				'LCD connector, RST line (active low).
+
+	PL_IO_NULL		'<b>PLATFORM CONSTANT.</b><br><br>
+				'This is a NULL line that does not physically exist.
+				'The state of this line is always detected as LOW. Setting this line has no effect.
+				
+end enum
+
+'--------------------------------------------------------------------
+enum pl_io_port_num
+	PL_IO_PORT_NUM_0	'<b>PLATFORM CONSTANT.</b><br><br> 
+				'8-bit port 0, contains I/O lines 24-31 (LCD data lines D0-7).
+end enum
+
+'--------------------------------------------------------------------
+enum pl_int_num 
+	PL_INT_NUM_0,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Interrupt line 0 (mapped to I/O line 16).
+
+	PL_INT_NUM_1,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Interrupt line 1 (mapped to I/O line 17).
+
+	PL_INT_NUM_2,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Interrupt line 2 (mapped to I/O line 18).
+
+	PL_INT_NUM_3,		'<b>PLATFORM CONSTANT.</b><br><br> 
+				'Interrupt line 3 (mapped to I/O line 19).
+
+	PL_INT_NUM_4,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Interrupt line 4 (mapped to I/O line 20).
+
+	PL_INT_NUM_5,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Interrupt line 5 (mapped to I/O line 21).
+
+	PL_INT_NUM_6,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Interrupt line 6 (mapped to I/O line 22).
+
+	PL_INT_NUM_7,		'<b>PLATFORM CONSTANT.</b><br><br>
+				'Interrupt line 7 (mapped to I/O line 23).
+
+	PL_INT_NULL		'<b>PLATFORM CONSTANT.</b><br><br>
+				'This is a NULL interrupt line that does not physically exist.
+end enum
+
+'--------------------------------------------------------------------
+include "..\GEN.tph"
+include "..\SYS-2xxx.tph"
+include "..\NET.tph"
+include "..\PPPOE.tph"
+include "..\IO-1xxx.tph"
+include "..\BEEP.tph"
+include "..\RTC.tph"
+include "..\LCD.tph"
+include "..\KP.tph"
+include "..\SSI.tph"
+include "..\FD.tph"
+include "..\TPRAM.tph"
+include "..\WLN.tph"
+include "..\BT.tph"

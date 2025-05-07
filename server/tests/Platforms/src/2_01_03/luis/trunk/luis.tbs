@@ -1,0 +1,367 @@
+'***********************************************************************************************************
+'			LUIS LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"
+#define WLN_RST 1
+'--------------------------------------------------------------------------------
+const LUIS_STAMP="LUIS> "
+const LUIS_CR_LF=chr(13)+chr(10)
+const LUIS_INIT_SIGNATURE=&hB5A4
+const LUIS_CMD_ESC_CHAR = "@"
+const LUIS_PLACEHOLDER_STR="####"
+const LUIS_HTML_FILE="luis.html"
+const LUIS_STX=2
+const LUIS_CR=13
+const LUIS_MAX_BT_CMD_LEN=30
+const LUIS_MAX_BT_RPL_LEN=30
+
+'State of html file sending
+enum en_luis_html_send_states
+	EN_LUIS_HTML_GOP_RESULT,
+	EN_LUIS_HTML_SEND_PART1,
+	EN_LUIS_HTML_SEND_CONFIG,
+	EN_LUIS_HTML_SEND_PART2
+end enum
+
+'--------------------------------------------------------------------------------
+declare sub luis_debugprint(byref print_data as string)
+declare sub luis_delay_ms(delay as integer)
+declare function luis_dot_decimal_to_hex(stored_mac as string) as string
+
+'--------------------------------------------------------------------------------
+dim luis_init_flag as word=0
+dim luis_GOP_result as string
+dim luis_current_send_chunk as string
+dim luis_html_placeholder_start as dword
+dim luis_html_placeholder_end as dword
+dim luis_html_read_pointer as dword
+dim luis_html_send_state as en_luis_html_send_states
+
+'================================================================================
+function luis_start(byref bt_name as string) as en_luis_status_codes
+	luis_start=EN_LUIS_STATUS_OK
+	if luis_init_flag=LUIS_INIT_SIGNATURE then
+		exit function
+	end if
+	
+	
+	#if LUIS_DEBUG_PRINT
+		luis_debugprint("---START---")
+	#endif
+	
+	if wln.enabled = NO then
+		wln.csmap=LUIS_BT_CS
+		io.num=LUIS_BT_CS
+		io.enabled=YES
+		wln.dimap=LUIS_BT_DI
+		wln.domap=LUIS_BT_DO
+		io.num=LUIS_BT_DO
+		io.enabled=YES
+		wln.clkmap=LUIS_BT_CLK
+		io.num=LUIS_BT_CLK
+		io.enabled=YES
+		io.num=LUIS_BT_RST
+		io.enabled=YES
+		wln.disable
+		
+		io.num=LUIS_BT_RST
+		io.state=LOW
+		luis_delay_ms(1)
+		io.state=HIGH
+		
+		sys.buffalloc()
+		
+		wln.boot(0)
+	else
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("WA2000 module already enabled")
+		#endif
+	end if
+	
+	if wln.enabled = NO then
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("WA2000 module failed to start")
+		#endif
+		luis_init_flag=0
+		luis_start=EN_LUIS_BT_FAILURE
+	else
+		bt.name=bt_name
+		bt.emulation=PL_WLN_BT_EMULATION_MODE_MICROCHIP
+		bt.txbuffrq(LUIS_BT_TX_BUF_SIZE)
+		bt.rxbuffrq(LUIS_BT_RX_BUF_SIZE)
+		sys.buffalloc()
+		bt.enable()
+	end if
+	
+	romfile.open(LUIS_HTML_FILE)
+	if romfile.pointer32<>1 then
+		luis_start=EN_LUIS_FILE_HTML_ERROR
+		#if LUIS_DEBUG_PRINT
+		luis_debugprint("Failed to open HTML file")
+		#endif 
+	end if
+	dim html_size as integer = romfile.size
+	romfile.open(LUIS_CONFIG_FILE)
+	if romfile.pointer32<>1 then
+		luis_start=EN_LUIS_FILE_CONFIG_ERROR
+		#if LUIS_DEBUG_PRINT
+		luis_debugprint("Failed to open LUIS Library file")
+		#endif
+	end if
+	dim config_size as integer = romfile.size
+	LUIS_GOP_result="{\x22type\x22:\x22spa\x22,\x22length\x22:"+lstr(html_size + config_size - len(LUIS_PLACEHOLDER_STR))+"}"
+	
+	if luis_start=EN_LUIS_STATUS_OK then
+		luis_init_flag=LUIS_INIT_SIGNATURE
+	end if
+	
+end function
+
+sub luis_on_bt_event(bt_event as enum pl_bt_events)
+	if luis_init_flag<>LUIS_INIT_SIGNATURE or wln.enabled=NO then
+		exit sub
+	end if
+	
+	select case bt_event 
+	
+	case PL_BT_EVENT_CONNECTED:
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("Device connected")
+		#endif
+		callback_luis_bt_connected()
+	case PL_BT_EVENT_DISCONNECTED:
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("Device disconnected")
+		#endif
+		callback_luis_bt_disconnected()
+	case PL_BT_EVENT_ENABLED:
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("Bluetooth enabled")
+			luis_debugprint("Connect to device named " + bt.name + " from the LUIS mobile app")
+		#endif
+		bt.advertise = YES
+		callback_luis_bt_enabled()
+	case PL_BT_EVENT_DISABLED:
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("Bluetooth disabled")
+		#endif
+		luis_init_flag=0
+		callback_luis_bt_disabled()
+	end select
+end sub
+
+sub luis_on_bt_data_sent()
+	if luis_init_flag<>LUIS_INIT_SIGNATURE then
+		#if LUIS_DEBUG_PRINT
+			luis_debugprint("got bluetooth data when LUIS not initialized")
+		#endif
+		exit sub
+	end if
+
+
+	dim chunk_size as dword = 255
+	
+	if len(luis_current_send_chunk)<>0 and bt.txfree-bt.newtxlen >=len(luis_current_send_chunk) then
+		bt.setdata(luis_current_send_chunk)
+		bt.send()
+	end if
+	
+	select case luis_html_send_state
+	case EN_LUIS_HTML_GOP_RESULT:
+		luis_html_send_state=EN_LUIS_HTML_SEND_PART1
+		romfile.open(LUIS_HTML_FILE)
+		luis_html_placeholder_start = romfile.find32(0, LUIS_PLACEHOLDER_STR, 0)
+		luis_html_placeholder_end = luis_html_placeholder_start + len(LUIS_PLACEHOLDER_STR)
+		luis_current_send_chunk=romfile.getdata(chunk_size)
+		luis_html_read_pointer=romfile.pointer32
+	case EN_LUIS_HTML_SEND_PART1:
+		romfile.open(LUIS_HTML_FILE)
+		romfile.pointer32=luis_html_read_pointer
+		if luis_html_read_pointer + chunk_size > luis_html_placeholder_start then
+			chunk_size = luis_html_placeholder_start - luis_html_read_pointer
+			luis_html_send_state=EN_LUIS_HTML_SEND_CONFIG
+		end if
+		luis_current_send_chunk=romfile.getdata(chunk_size)
+		if luis_html_send_state<>EN_LUIS_HTML_SEND_PART1 then
+			luis_html_read_pointer=1
+		else
+			luis_html_read_pointer=romfile.pointer32
+		end if
+	case EN_LUIS_HTML_SEND_CONFIG:
+		romfile.open(LUIS_CONFIG_FILE)
+		romfile.pointer32=luis_html_read_pointer
+		luis_current_send_chunk=romfile.getdata(chunk_size)
+		luis_html_read_pointer=romfile.pointer32
+		if luis_html_read_pointer>=romfile.size then
+			luis_html_send_state=EN_LUIS_HTML_SEND_PART2
+			luis_html_read_pointer=luis_html_placeholder_end
+		end if
+	case EN_LUIS_HTML_SEND_PART2:
+		romfile.open(LUIS_HTML_FILE)
+		romfile.pointer32=luis_html_read_pointer
+		luis_current_send_chunk=romfile.getdata(chunk_size)
+		luis_html_read_pointer=romfile.pointer32
+	end select
+	if len(luis_current_send_chunk) > 0 then
+		bt.notifysent(bt.txbuffsize-len(luis_current_send_chunk))
+	end if
+	
+end sub
+
+public sub luis_proc_bt_cmd(byref cmd_str as string)
+	dim reply_str as string(LUIS_MAX_BT_RPL_LEN)
+	dim x as byte
+	dim setting_name as string(STG_MAX_SETTING_NAME_LEN)
+	dim explicit_index as no_yes
+	dim index as byte
+	dim s2 as string(64)
+	dim stg_data as string(32)
+	explicit_index=NO
+	if left(cmd_str,1)<>"D" then
+		x=instr(1,cmd_str,LUIS_CMD_ESC_CHAR,1)
+		if x>0 then
+			'yes, the sequence is included -- extract it
+			setting_name=mid(cmd_str,2,x-2)
+			stg_data=mid(cmd_str,x+1,len(cmd_str)-x)
+			explicit_index=YES
+		end if
+	end if
+	
+
+	dim cs,f,pos as byte
+	dim mac_num as word
+	dim i as word
+
+	select case left(cmd_str,1)
+
+	case "G": 'get setting --------------------------------------
+		setting_name=mid(cmd_str,2,STG_MAX_SETTING_NAME_LEN)
+		if setting_name = "OP" then
+			luis_html_send_state=EN_LUIS_HTML_GOP_RESULT
+			luis_current_send_chunk=luis_GOP_result
+			bt.notifysent(bt.txbuffsize-len(luis_current_send_chunk))
+			exit sub
+		end if
+		
+		select case stg_sg(setting_name,0,reply_str,EN_STG_GET)
+		case EN_STG_STATUS_OK:
+			goto reply_ok_have_data
+		case EN_STG_STATUS_UNKNOWN:
+			goto reply_err
+		case EN_STG_STATUS_INVALID_INDEX:
+			goto reply_err
+		case else:
+			goto reply_failed
+		end select
+
+	case "S": 'set setting --------------------------------------
+		if explicit_index=NO then
+			setting_name=mid(cmd_str,2,2)
+			stg_data=right(cmd_str,len(cmd_str)-3)
+		end if
+		select case stg_sg(setting_name,0,stg_data,EN_STG_SET)
+		case EN_STG_STATUS_OK:
+			goto reply_ok_have_data
+		case EN_STG_STATUS_INVALID:
+			goto reply_err
+		case EN_STG_STATUS_INVALID_INDEX:
+			goto reply_err
+		case EN_STG_STATUS_UNKNOWN:
+			goto reply_err
+		case else:
+			goto reply_failed
+		end select
+	
+	case "B": 'buzz the device ---------------------------------- 
+		callback_luis_buzz_command()
+		goto reply_ok
+
+	case "I": 'initialize settings --------------------------
+		if stg_restore_multiple(EN_STG_INIT_MODE_NORMAL)<>EN_STG_STATUS_OK then goto reply_failed
+		goto reply_ok		
+
+	case "E": 'reboot -------------------------------------------
+		wln.disable()
+		io.num=LUIS_BT_RST
+		io.state=LOW
+		sys.reboot()
+	
+	case else
+		goto reply_err
+	
+	end select
+
+reply_rejected:
+	reply_str="R"
+	goto send
+
+reply_err:
+	reply_str="C"
+	goto send
+
+reply_failed:
+	reply_str="F"
+	goto send
+
+reply_ok:
+	reply_str="A"
+	goto send
+
+reply_ok_have_data:
+	reply_str="A"+reply_str
+	goto send
+
+send:
+	reply_str=chr(2)+reply_str+chr(13) 'add encapsulation
+	
+	bt.setdata(reply_str)
+	bt.send
+	
+reply_null:
+end sub
+
+function luis_on_bt_data_arrival() as en_luis_status_codes
+	dim x,y as byte
+	dim bt_cmd_str as string(LUIS_MAX_BT_CMD_LEN)
+	luis_on_bt_data_arrival=EN_LUIS_STATUS_OK
+	
+	if luis_init_flag<>LUIS_INIT_SIGNATURE then
+		luis_on_bt_data_arrival=EN_LUIS_STATUS_NOT_STARTED
+		exit function
+	end if
+
+	bt_cmd_str=bt_cmd_str+bt.getdata(255-len(bt_cmd_str))
+	
+	x=instr(1,bt_cmd_str,chr(LUIS_STX),1)
+	'this will prevent the string to overflow with garbage
+	if len(bt_cmd_str)=LUIS_MAX_BT_CMD_LEN then
+		y=instr(1,bt_cmd_str,chr(LUIS_CR),1)
+		if x=0 or y=0 then
+			bt_cmd_str=""
+			exit function
+		end if
+	end if
+	
+	while x<>0
+		'we've got STX
+		bt_cmd_str=right(bt_cmd_str,len(bt_cmd_str)+1-x) 'cut out everything to the left of STX
+		x=instr(1,bt_cmd_str,chr(LUIS_CR),1) 'look for command end
+		if x=0 then exit function
+		luis_proc_bt_cmd(mid(bt_cmd_str,2,x-2))
+		bt_cmd_str=right(bt_cmd_str,len(bt_cmd_str)-x)
+		x=instr(1,bt_cmd_str,chr(LUIS_STX),1)
+	wend
+end function
+
+#if LUIS_DEBUG_PRINT
+sub luis_debugprint(byref print_data as string)
+	sys.debugprint(LUIS_STAMP+print_data+LUIS_CR_LF)
+end sub
+#endif
+
+sub luis_delay_ms(delay as integer)
+	dim end_time as dword=sys.timercountms+delay
+	while sys.timercountms<end_time
+	wend
+end sub

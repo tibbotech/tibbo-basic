@@ -1,0 +1,46 @@
+
+//***********************************************************************************************************
+//			DNS LIBRARY
+//***********************************************************************************************************
+
+#ifndef DNS_DEBUG_PRINT
+	#define DNS_DEBUG_PRINT 0
+#endif
+
+//Status codes for dns-related operations
+enum en_dns_status_codes {
+	EN_STATUS_DNS_OK,
+	EN_STATUS_DNS_NOT_STARTED,
+	EN_STATUS_DNS_INVALID_SOCKET,
+	EN_STATUS_DNS_INVALID_INTERFACE,
+	EN_STATUS_DNS_INSUFFICIENT_BUFFER_SPACE,
+	EN_STATUS_DNS_CONNECTION_TIMEOUT,
+	EN_STATUS_DNS_REPLY_TIMEOUT,
+	EN_STATUS_DNS_RECURSIVE_UNAVALIABLE,
+	EN_STATUS_DNS_NAME_ERROR,
+	EN_STATUS_DNS_NO_ANSWER,
+	EN_STATUS_DNS_BAD_ANSWER
+};
+
+enum en_dns_return_type {
+	EN_DNS_RET_IP=1,
+	EN_DNS_RET_NAME_SERVER=2,
+	EN_DNS_RET_CANONICAL_NAME=5,
+	EN_DNS_RET_POINTER_RECORD=12,
+	EN_DNS_RET_HOST_INFO=13,
+	EN_DNS_RET_MAIL_EXCHANGE_SERVER=15
+};
+
+en_dns_status_codes dns_start(unsigned char dns_sock_num);
+en_dns_status_codes dns_connect(pl_sock_interfaces interface, string *dns_server_ip, unsigned int dns_port);
+void dns_disconnect();
+void dns_query(string *question);
+void dns_proc_data();
+void dns_proc_timer();
+void dns_stop();
+
+void callback_dns_failure(en_dns_status_codes status);
+void callback_dns_answer_acquired(en_dns_return_type return_type, string *return_string);
+void callback_dns_ok();
+void callback_dns_pre_buffrq(unsigned char num_of_pages_required);
+void callback_dns_buff_released();

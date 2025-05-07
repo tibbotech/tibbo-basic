@@ -1,0 +1,157 @@
+//***********************************************************************************************************
+//			SOCKET ALLOCATION LIBRARY
+//
+//***********************************************************************************************************
+
+#include "global.th"
+
+//--------------------------------------------------------------------
+#define SOCK_STAMP "SOCK> "
+#define SOCK_CR_LF chr(13)+chr(10)
+#define SOCK_MAX_SOCKETS SOCK_MAX_SOCKETS_PLATFORM
+#define SOCK_UNUSED_SIGNATURE "----"
+#define SOCK_INIT_SIGNATURE 0x4740
+
+//--------------------------------------------------------------------
+void sock_init();
+void sock_debugprint(string *print_data);
+
+//--------------------------------------------------------------------
+no_yes sock_in_use[SOCK_MAX_SOCKETS];
+string<SOCK_MAX_SIGNATURE_LEN> sock_user_signature[SOCK_MAX_SOCKETS];
+unsigned int sock_init_flag;
+
+//==============================================================================
+unsigned char sock_get(string *signature) {
+unsigned char sock_get;
+//Returns a free socket number or 255 if no free sockets left.
+
+	unsigned char f;
+
+	if (sock_init_flag != SOCK_INIT_SIGNATURE) {
+		sock_init();
+		sock_init_flag = SOCK_INIT_SIGNATURE;
+	}
+
+	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
+		if (sock_in_use[f] == NO) {
+			sock_in_use[f] = YES;
+			sock_user_signature[f] = *signature;
+			sock_get = f;
+			#if SOCK_DEBUG_PRINT
+				sock_debugprint("'"+sock_user_signature[f]+"' got socket #"+str(f));
+			#endif
+			return sock_get;
+		}
+	}
+
+	//no free socket found
+	#if SOCK_DEBUG_PRINT
+		sock_debugprint("'"+*signature+"' could not get a socket: no free sockets left");
+	#endif
+	sock_get = 255;
+	return sock_get;
+}
+
+//--------------------------------------------------------------------
+string sock_who_uses(unsigned char sock_num) {
+string sock_who_uses;
+//Returns the signature of the specified socket's user.
+
+	if (sock_init_flag != SOCK_INIT_SIGNATURE) {
+		sock_init();
+		sock_init_flag = SOCK_INIT_SIGNATURE;
+	}
+
+	if (sock_in_use[sock_num] == NO) {
+		sock_who_uses = SOCK_UNUSED_SIGNATURE;
+	} else {
+		sock_who_uses = sock_user_signature[sock_num];
+	}
+	return sock_who_uses;
+}
+
+//--------------------------------------------------------------------
+void sock_release(unsigned char sock_num) {
+//Releases the socket (number), discards socket connection, restores socket's properties to their default states.
+	unsigned char sock_bup;
+	unsigned int i;
+
+	if (sock_init_flag != SOCK_INIT_SIGNATURE) {
+		sock_init();
+		sock_init_flag = SOCK_INIT_SIGNATURE;
+	}
+
+	sock_bup = sock.num;
+	sock.num = sock_num;
+
+	//close existing connection, if any
+	i = sys.timercount;
+	sock.discard();
+	while (sock.statesimple != PL_SSTS_CLOSED && sys.timercount-i<3 && sys.timercount>=i) {
+	}
+
+	//release socket buffers
+	sock.rxbuffrq(0);
+	sock.txbuffrq(0);
+	sock.tx2buffrq(0);
+	sock.cmdbuffrq(0);
+	sock.rplbuffrq(0);
+	sock.varbuffrq(0);
+	sys.buffalloc();
+
+	//restore the socket to its default state
+	sock.acceptbcast = NO;
+	sock.allowedinterfaces = "NET";
+	sock.connectiontout = 0;
+	sock.endchar = 13;
+	sock.escchar = 255;
+	sock.gendataarrivalevent = YES;
+	sock.httpnoclose = NO;
+	sock.httpportlist = "";
+	sock.inbandcommands = NO;
+	sock.inconmode = PL_SOCK_INCONMODE_NONE;
+	sock.localportlist = "";
+	sock.outport = 0;
+	sock.protocol = PL_SOCK_PROTOCOL_UDP;
+	sock.reconmode = PL_SOCK_RECONMODE_0;
+	sock.sinkdata = NO;
+	sock.splittcppackets = NO;
+	sock.targetbcast = NO;
+	#if NET_AVAILABLE
+		sock.targetinterface = PL_SOCK_INTERFACE_NET;
+	#elif WLN_AVAILABLE
+		sock.targetinterface = PL_SOCK_INTERFACE_WLN;
+	#else
+		sock.targetinterface = PL_SOCK_INTERFACE_NULL;
+	#endif
+	sock.targetip = "0.0.0.0";
+	sock.targetport = 0;
+	sock.urlsubstitutes = "";
+
+	#if SOCK_DEBUG_PRINT
+		sock_debugprint("'"+sock_user_signature[sock_num]+"' released socket #"+str(sock_num));
+	#endif
+
+	sock_in_use[sock_num] = NO;
+	sock_user_signature[sock_num] = SOCK_UNUSED_SIGNATURE;
+	sock.num = sock_bup;
+}
+
+//------------------------------------------------------------------------------
+void sock_init() {
+	unsigned char f;
+
+	for (f=0; f <= SOCK_MAX_SOCKETS-1; f++) {
+		sock_in_use[f] = NO;
+		sock_user_signature[f] = SOCK_UNUSED_SIGNATURE;
+	}
+}
+
+//------------------------------------------------------------------------------
+#if SOCK_DEBUG_PRINT
+void sock_debugprint(string *print_data) {
+
+	sys.debugprint(SOCK_STAMP+*print_data+SOCK_CR_LF);
+}
+#endif

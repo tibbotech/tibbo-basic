@@ -1,0 +1,200 @@
+//***********************************************************************************************************
+//			FILE NUMBER ALLOCATION LIBRARY
+//***********************************************************************************************************
+
+#include "global.th"
+
+//--------------------------------------------------------------------
+#define FILENUM_STAMP "FILENUM> "
+#define FILENUM_CR_LF chr(13)+chr(10)
+#define FILENUM_MAX_FILES 26
+#define FILENUM_UNUSED_SIGNATURE "----"
+#define FILENUM_INIT_SIGNATURE 0x39BD
+
+//--------------------------------------------------------------------
+void filenum_init();
+void filenum_debugprint(string *print_data);
+
+//--------------------------------------------------------------------
+no_yes filenum_in_use[FILENUM_MAX_FILES];
+string<FILENUM_MAX_SIGNATURE_LEN> filenum_user_signature[FILENUM_MAX_FILES];
+string<FILENUM_MAX_FILENAME_LEN> filenum_filename[FILENUM_MAX_FILES];
+unsigned int filenum_init_flag;
+
+#if FILENUM_DEBUG_PRINT
+	no_yes filenum_do_not_debugprint;
+#endif
+
+//====================================================================
+unsigned char filenum_open(string *signature, string *filename, pl_fd_status_codes *status) {
+unsigned char filenum_open;
+	unsigned char f;
+
+	*status = PL_FD_STATUS_OK;
+
+	if (len(*filename)>FILENUM_MAX_FILENAME_LEN) {
+		filenum_open = 255;
+		*status = PL_FD_STATUS_INV_PARAM;
+		#if FILENUM_DEBUG_PRINT
+			filenum_debugprint("'"+*signature+"' tried to open file '"+*filename+"'. This name is "+str(len(*filename))+" characters long and exceeds FILENUM_MAX_FILENAME_LEN (currently "+str(FILENUM_MAX_FILENAME_LEN)+").");
+		#endif
+		return filenum_open;
+	}
+
+	//file already opened?
+	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
+		if (filenum_in_use[f]) {
+			if (filenum_filename[f] == *filename) {
+				#if FILENUM_DEBUG_PRINT
+					filenum_debugprint("'"+*signature+"' tried to open file '"+*filename+"'. This file is already opened on file number "+str(filenum_open)+".");
+				#endif
+
+				*status = PL_FD_STATUS_OK;
+				filenum_open = f;
+				return filenum_open;
+			}
+		}
+	}
+
+	//got free file numbers left?
+	#if FILENUM_DEBUG_PRINT
+		filenum_do_not_debugprint = YES;
+	#endif
+	filenum_open = filenum_get(*signature);
+	#if FILENUM_DEBUG_PRINT
+		filenum_do_not_debugprint = NO;
+	#endif
+	if (filenum_open>=FILENUM_MAX_FILES) {
+		#if FILENUM_DEBUG_PRINT
+			filenum_debugprint("ERROR: '"+*signature+"' tried to open file '"+*filename+"'. No free file numbers left.");
+		#endif
+		return filenum_open;
+	}
+
+	//disk ready?
+	if (fd.ready == NO) {
+		fd.mount();
+		if (fd.laststatus != PL_FD_STATUS_OK) { goto filenum_opened_failed;}
+	}
+
+	//can we open that file?
+	fd.filenum = filenum_open;
+	fd.open(*filename);
+	if (fd.laststatus != PL_FD_STATUS_OK) {
+filenum_opened_failed: 
+		#if FILENUM_DEBUG_PRINT
+			filenum_debugprint("ERROR: '"+*signature+"' failed to open file '"+*filename+"' on file number "+str(filenum_open));
+		#endif
+
+		*status = fd.laststatus;
+		#if FILENUM_DEBUG_PRINT
+			filenum_do_not_debugprint = YES;
+		#endif
+		filenum_release(filenum_open);
+		#if FILENUM_DEBUG_PRINT
+			filenum_do_not_debugprint = NO;
+		#endif
+		filenum_open = 255;
+		return filenum_open;
+	}
+
+	filenum_filename[filenum_open] = *filename;
+
+	#if FILENUM_DEBUG_PRINT
+		filenum_debugprint("'"+*signature+"' opened file '"+*filename+"' on file number "+str(filenum_open));
+	#endif
+
+return filenum_open;
+}
+
+//--------------------------------------------------------------------
+unsigned char filenum_get(string *signature) {
+unsigned char filenum_get;
+//find free file number or return 255 if no free file numbers available
+	unsigned char f;
+
+	if (filenum_init_flag != FILENUM_INIT_SIGNATURE) {
+		filenum_init();
+		filenum_init_flag = FILENUM_INIT_SIGNATURE;
+	}
+
+	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
+		if (filenum_in_use[f] == NO) {
+			filenum_in_use[f] = YES;
+			filenum_user_signature[f] = *signature;
+			filenum_get = f;
+			#if FILENUM_DEBUG_PRINT
+				filenum_debugprint("'"+filenum_user_signature[f]+"' got file number "+str(f));
+			#endif
+			return filenum_get;
+		}
+	}
+
+	//no free file number found
+	#if FILENUM_DEBUG_PRINT
+		filenum_debugprint("'"+*signature+"' could not get a file number: no free file numbers left");
+	#endif
+	filenum_get = 255;
+	return filenum_get;
+}
+
+//--------------------------------------------------------------------
+string filenum_who_uses(unsigned char file_num) {
+string filenum_who_uses;
+
+	if (filenum_init_flag != FILENUM_INIT_SIGNATURE) {
+		filenum_init();
+		filenum_init_flag = FILENUM_INIT_SIGNATURE;
+	}
+
+	if (filenum_in_use[file_num] == NO) {
+		filenum_who_uses = FILENUM_UNUSED_SIGNATURE;
+	} else {
+		filenum_who_uses = filenum_user_signature[file_num];
+	}
+	return filenum_who_uses;
+}
+
+//--------------------------------------------------------------------
+void filenum_release(unsigned char file_num) {
+//cleans and releases the file number so it can be used for something else
+
+	if (filenum_init_flag != FILENUM_INIT_SIGNATURE) {
+		filenum_init();
+		filenum_init_flag = FILENUM_INIT_SIGNATURE;
+	}
+
+	//close the file
+	fd.filenum = file_num;
+	fd.close();
+
+	#if FILENUM_DEBUG_PRINT
+		filenum_debugprint("'"+filenum_user_signature[file_num]+"' released file number"+str(file_num));
+	#endif
+
+	filenum_in_use[file_num] = NO;
+	filenum_user_signature[file_num] = FILENUM_UNUSED_SIGNATURE;
+}
+
+//------------------------------------------------------------------------------
+void filenum_init() {
+	unsigned char f;
+
+	for (f=0; f <= FILENUM_MAX_FILES-1; f++) {
+		filenum_in_use[f] = NO;
+		filenum_user_signature[f] = FILENUM_UNUSED_SIGNATURE;
+	}
+
+	#if FILENUM_DEBUG_PRINT
+		filenum_do_not_debugprint = NO;
+	#endif
+}
+
+//------------------------------------------------------------------------------
+#if FILENUM_DEBUG_PRINT
+void filenum_debugprint(string *print_data) {
+	if (filenum_do_not_debugprint == NO) {
+		sys.debugprint(FILENUM_STAMP+*print_data+FILENUM_CR_LF);
+	}
+}
+#endif

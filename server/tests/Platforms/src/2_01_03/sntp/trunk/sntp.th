@@ -1,0 +1,45 @@
+//***********************************************************************************************************
+//			SNTP LIBRARY
+//			(Obtains date/time from an SNTP server)
+//***********************************************************************************************************
+
+#ifndef SNTP_DEBUG_PRINT
+	#define SNTP_DEBUG_PRINT 0
+#endif
+
+#ifndef SNTP_REPLY_TIMEOUT
+	#define SNTP_REPLY_TIMEOUT 3
+#endif
+
+#ifndef SNTP_RETRY
+	#define SNTP_RETRY 3
+#endif
+
+#ifndef SNTP_OFFSET_CALCULATION
+	#define SNTP_OFFSET_CALCULATION 0
+#endif
+//------------------------------------------------------------------------------
+enum en_sntp_status_codes {
+	SNTP_STATUS_OK,
+	SNTP_STATUS_INVALID_SOCKET,
+	SNTP_STATUS_INVALID_INTERFACE,
+	SNTP_STATUS_INSUFFICIENT_BUFFER_SPACE,
+	SNTP_STATUS_CONNECTION_TIMEOUT,
+	SNTP_STATUS_REPLY_TIMEOUT,
+	SNTP_STATUS_REPLY_DATA_ERROR
+};
+
+//------------------------------------------------------------------------------
+void sntp_init();
+en_sntp_status_codes sntp_start(pl_sock_interfaces interface, string *server_ip, unsigned int server_port, unsigned char socket);
+void sntp_proc_timer();
+void sntp_proc_data();
+void sntp_proc_sock_event(pl_sock_state_simple state);
+
+void callback_sntp_failure(en_sntp_status_codes sntp_status);
+void callback_sntp_ok(unsigned int *w_days, unsigned int *w_mins, unsigned char *b_seconds);
+void callback_sntp_pre_buffrq(unsigned char required_buff_pages);
+
+#if SNTP_OFFSET_CALCULATION
+	void callback_sntp_get_rtc(unsigned int *w_days, unsigned int *w_mins, unsigned char *b_seconds);
+#endif

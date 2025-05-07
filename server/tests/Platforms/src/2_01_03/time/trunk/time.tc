@@ -1,0 +1,680 @@
+//***********************************************************************************************************
+//			DATE/TIME LIBRARY
+//***********************************************************************************************************
+
+#include "global.th"
+
+//------------------------------------------------------------------------------
+#define TD_DEFAULT_TD_STR "20000101000000000"
+#define TD_DEFAULT_BINSTR chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)
+
+//------------------------------------------------------------------------------
+void td_get_tzone_offset(en_td_timezones timezone, unsigned int *minutes_offset);
+
+//==============================================================================
+ok_ng td_from_binstr(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds) {
+ok_ng td_from_binstr;
+	string<7> time_str;
+
+	switch (len(*td_str)) {
+	case 0:
+case 2:
+case 4:
+case 5:
+case 7:
+
+		time_str = *td_str+right(TD_DEFAULT_BINSTR,7-len(*td_str));
+		break;
+	default:
+		td_from_binstr = NG;
+		return td_from_binstr;break;
+	}
+
+	*day_count = 256*asc(mid(time_str,1,1))+asc(mid(time_str,2,1));
+	*min_count = 256*asc(mid(time_str,3,1))+asc(mid(time_str,4,1));
+	*seconds = asc(mid(time_str,5,1));
+	*mseconds = 256*asc(mid(time_str,6,1))+asc(mid(time_str,7,1));
+
+	if (*day_count == 65535 || *min_count == 65535 || *seconds>59 || *mseconds>999) {
+		td_from_binstr = NG;
+	} else {
+		td_from_binstr = OK;
+	}
+
+return td_from_binstr;
+}
+
+//------------------------------------------------------------------------------
+ok_ng td_to_binstr(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds) {
+ok_ng td_to_binstr;
+
+	if (day_count>36524 || min_count>1439 || seconds>59 || mseconds>999) {
+		*td_str = "";
+		td_to_binstr = NG;
+		return td_to_binstr;
+	}
+
+	*td_str = chr(day_count/256);
+	*td_str = *td_str+chr(day_count & 0xFF);
+	*td_str = *td_str+chr(min_count/256);
+	*td_str = *td_str+chr(min_count & 0xFF);
+	*td_str = *td_str+chr(seconds);
+	*td_str = *td_str+chr(mseconds/256);
+	*td_str = *td_str+chr(mseconds & 0xFF);
+
+	td_to_binstr = OK;
+	return td_to_binstr;
+}
+
+//------------------------------------------------------------------------------
+ok_ng td_from_str(string *td_str, unsigned int *day_count, unsigned int *min_count, unsigned char *seconds, unsigned int *mseconds) {
+ok_ng td_from_str;
+	unsigned char year_byte, month_byte, date_byte, hour_byte, minute_byte;
+	string<2> month_str, date_str, hour_str, minute_str, second_str;
+	string<3> msecond_str;
+	string<4> year_str;
+	string<17> time_str;
+
+	switch (len(*td_str)) {
+	case 0:
+case 4:
+case 6:
+case 8:
+case 10:
+case 12:
+case 14:
+case 17:
+
+		time_str = *td_str+right(TD_DEFAULT_TD_STR,17-len(*td_str));
+		break;
+	default:
+		td_from_str = NG;
+		return td_from_str;break;
+	}
+
+	year_str = left(time_str,4);
+	month_str = mid(time_str,5,2);
+	date_str = mid(time_str,7,2);
+	hour_str = mid(time_str,9,2);
+	minute_str = mid(time_str,11,2);
+	second_str = mid(time_str,13,2);
+	msecond_str = mid(time_str,15,3);
+
+	year_byte = val(year_str)-2000;
+	month_byte = val(month_str);
+	date_byte = val(date_str);
+	hour_byte = val(hour_str);
+	minute_byte = val(minute_str);
+
+	*seconds = val(second_str);
+	*mseconds = val(msecond_str);
+	*day_count = daycount(year_byte,month_byte,date_byte);
+	*min_count = mincount(hour_byte,minute_byte);
+
+	if (*day_count == 65535 || *min_count == 65535 || *seconds>59 || *mseconds>999) {
+		td_from_str = NG;
+	} else {
+		td_from_str = OK;
+	}
+	return td_from_str;
+}
+
+//------------------------------------------------------------------------------
+ok_ng td_to_str(string *td_str, unsigned int day_count, unsigned int min_count, unsigned char seconds, unsigned int mseconds) {
+ok_ng td_to_str;
+	string<2> month_str, date_str, hour_str, minute_str, second_str;
+	string<3> msecond_str;
+	string<4> year_str;
+
+	if (day_count>36524 || min_count>1439 || seconds>59 || mseconds>999) {
+		*td_str = "";
+		td_to_str = NG;
+		return td_to_str;
+	}
+
+	year_str = str(year(day_count)+2000);
+	month_str = str(month(day_count));
+	date_str = str(date(day_count));
+	hour_str = str(hours(min_count));
+	minute_str = str(minutes(min_count));
+	second_str = str(seconds);
+	msecond_str = str(mseconds);
+
+	if (len(hour_str)<2) {
+		hour_str = "0"+hour_str;
+	}
+	if (len(minute_str)<2) {
+		minute_str = "0"+minute_str;
+	}
+	if (len(second_str)<2) {
+		second_str = "0"+second_str;
+	}
+	if (len(date_str)<2) {
+		date_str = "0"+date_str;
+	}
+	if (len(month_str)<2) {
+		month_str = "0"+month_str;
+	}
+	msecond_str = strgen(3-len(msecond_str),0)+msecond_str;
+
+	*td_str = year_str+month_str+date_str+hour_str+minute_str+second_str+msecond_str;
+	td_to_str = OK;
+	return td_to_str;
+}
+
+//------------------------------------------------------------------------------
+ok_ng td_str_to_binstr(string *td_str) {
+ok_ng td_str_to_binstr;
+	unsigned int day_count, min_count, mseconds;
+	unsigned char seconds, length;
+
+	length = len(*td_str);
+	switch (length) {
+	case 0:
+case 4:
+case 6:
+case 8:
+case 10:
+case 12:
+case 14:
+case 17:
+
+	break;
+	default:
+		td_str_to_binstr = NG;
+		*td_str = "";
+		return td_str_to_binstr;break;
+	}
+
+	if (td_from_str(*td_str,day_count,min_count,seconds,mseconds) == OK) {
+		td_str_to_binstr = td_to_binstr(*td_str,day_count,min_count,seconds,mseconds);
+	} else {
+		*td_str = "";
+		td_str_to_binstr = NG;
+		return td_str_to_binstr;
+	}
+	switch (length) {
+	case 0:
+*td_str = "";
+	break;
+	case 4:
+case 6:
+case 8:
+*td_str = left(*td_str,2);
+	break;
+	case 10:
+case 12:
+*td_str = left(*td_str,4);
+	break;
+	case 14:
+*td_str = left(*td_str,5);
+	break;
+	}
+
+return td_str_to_binstr;
+}
+
+//------------------------------------------------------------------------------
+ok_ng td_binstr_to_str(string *td_str) {
+ok_ng td_binstr_to_str;
+	unsigned int day_count, min_count, mseconds;
+	unsigned char seconds, length;
+
+	length = len(*td_str);
+	switch (length) {
+	case 0:
+case 2:
+case 4:
+case 5:
+case 7:
+
+	break;
+	default:
+		td_binstr_to_str = NG;
+		*td_str = "";
+		return td_binstr_to_str;break;
+	}
+	if (td_from_binstr(*td_str,day_count,min_count,seconds,mseconds) == OK) {
+		td_binstr_to_str = td_to_str(*td_str,day_count,min_count,seconds,mseconds);
+	} else {
+		*td_str = "";
+		td_binstr_to_str = NG;
+		return td_binstr_to_str;
+	}
+	switch (length) {
+	case 0:
+*td_str = "";
+	break;
+	case 2:
+*td_str = left(*td_str,8);
+	break;
+	case 4:
+*td_str = left(*td_str,12);
+	break;
+	case 5:
+*td_str = left(*td_str,14);
+	break;
+	}
+
+return td_binstr_to_str;
+}
+
+//------------------------------------------------------------------------------ 
+ok_ng td_str_date_time_reformat(string *td_str, en_td_string_ops op, en_td_date_formats date_format) {
+ok_ng td_str_date_time_reformat;
+	unsigned char length;
+	string<4> year_str;
+	string<3> ms_str;
+	string<2> month_str, date_str, hour_str, minute_str, second_str;
+
+	length = len(*td_str);
+	if (op == TD_STR_ADD_FORMATTING) {
+		switch (length) {
+		case 0:
+case 4:
+case 6:
+case 8:
+case 10:
+case 12:
+case 14:
+case 17:
+
+			*td_str = *td_str+right(TD_DEFAULT_TD_STR,17-len(*td_str));
+			break;
+		default:
+			*td_str = "";
+			td_str_date_time_reformat = NG;
+			return td_str_date_time_reformat;break;
+		}
+		year_str = left(*td_str,4);
+		month_str = mid(*td_str,5,2);
+		date_str = mid(*td_str,7,2);
+		hour_str = mid(*td_str,9,2);
+		minute_str = mid(*td_str,11,2);
+		second_str = mid(*td_str,13,2);
+		ms_str = mid(*td_str,15,3);
+
+		switch (date_format) {
+		case TD_DATE_FORMAT_YYYYMMDD:
+*td_str = year_str+"-"+month_str+"-"+date_str;
+		break;
+		case TD_DATE_FORMAT_MMDDYYYY:
+*td_str = month_str+"-"+date_str+"-"+year_str;
+		break;
+		case TD_DATE_FORMAT_DDMMYYYY:
+*td_str = date_str+"-"+month_str+"-"+year_str;
+		break;
+		}
+		switch (length) {
+		case 0:
+
+			*td_str = "";
+			break;
+		case 10:
+case 12:
+
+			*td_str = *td_str+" "+hour_str+":"+minute_str;
+			break;
+		case 14:
+
+			*td_str = *td_str+" "+hour_str+":"+minute_str+":"+second_str;
+			break;
+		case 17:
+
+			*td_str = *td_str+" "+hour_str+":"+minute_str+":"+second_str+"."+ms_str;
+			break;
+		}
+	} else {
+		switch (length) {
+		case 0:
+case 10:
+case 16:
+case 19:
+case 23:
+
+		break;
+		default:
+			*td_str = "";
+			td_str_date_time_reformat = NG;
+			return td_str_date_time_reformat;break;
+		}
+
+		switch (date_format) {
+		case TD_DATE_FORMAT_YYYYMMDD:
+
+			year_str = mid(*td_str,1,4);
+			month_str = mid(*td_str,6,2);
+			date_str = mid(*td_str,9,2);
+			break;
+
+		case TD_DATE_FORMAT_MMDDYYYY:
+
+			year_str = mid(*td_str,7,4);
+			month_str = mid(*td_str,1,2);
+			date_str = mid(*td_str,4,2);
+			break;
+
+		case TD_DATE_FORMAT_DDMMYYYY:
+
+			year_str = mid(*td_str,7,4);
+			month_str = mid(*td_str,4,2);
+			date_str = mid(*td_str,1,2);
+			break;
+
+		}
+		hour_str = mid(*td_str,12,2);
+		minute_str = mid(*td_str,15,2);
+		second_str = mid(*td_str,18,2);
+		ms_str = mid(*td_str,21,3);
+		switch (length) {
+		case 0:
+
+			*td_str = "";
+			break;
+		case 10:
+
+			*td_str = year_str+month_str+date_str;
+			break;
+		case 16:
+
+			*td_str = year_str+month_str+date_str+hour_str+minute_str;
+			break;
+		case 19:
+
+			*td_str = year_str+month_str+date_str+hour_str+minute_str+second_str;
+			break;
+		case 23:
+
+			*td_str = year_str+month_str+date_str+hour_str+minute_str+second_str+ms_str;
+			break;
+		}
+	}
+	td_str_date_time_reformat = OK;
+	return td_str_date_time_reformat;
+}
+
+//------------------------------------------------------------------------------ 
+ok_ng td_str_time_reformat(string *t_str, en_td_string_ops op) {
+ok_ng td_str_time_reformat;
+	unsigned char length;
+	string<3> ms_str;
+	string<2> hour_str, minute_str, second_str;
+
+	length = len(*t_str);
+	if (op == TD_STR_ADD_FORMATTING) {
+		switch (length) {
+		case 0:
+case 2:
+case 4:
+case 6:
+case 9:
+
+			*t_str = *t_str+right(TD_DEFAULT_TD_STR,9-len(*t_str));
+			break;
+		default:
+			*t_str = "";
+			td_str_time_reformat = NG;
+			return td_str_time_reformat;break;
+		}
+		hour_str = mid(*t_str,1,2);
+		minute_str = mid(*t_str,3,2);
+		second_str = mid(*t_str,5,2);
+		ms_str = mid(*t_str,7,3);
+
+		switch (length) {
+		case 0:
+
+			*t_str = "";
+			break;
+		case 2:
+case 4:
+
+			*t_str = hour_str+":"+minute_str;
+			break;
+		case 6:
+
+			*t_str = hour_str+":"+minute_str+":"+second_str;
+			break;
+		case 9:
+
+			*t_str = hour_str+":"+minute_str+":"+second_str+"."+ms_str;
+			break;
+		}
+	} else {
+		switch (length) {
+		case 0:
+case 5:
+case 8:
+case 12:
+
+		break;
+		default:
+			*t_str = "";
+			td_str_time_reformat = NG;
+			return td_str_time_reformat;break;
+		}
+
+		hour_str = mid(*t_str,1,2);
+		minute_str = mid(*t_str,4,2);
+		second_str = mid(*t_str,7,2);
+		ms_str = mid(*t_str,10,3);
+		switch (length) {
+		case 0:
+
+			*t_str = "";
+			break;
+		case 5:
+
+			*t_str = hour_str+minute_str;
+			break;
+		case 8:
+
+			*t_str = hour_str+minute_str+second_str;
+			break;
+		case 12:
+
+			*t_str = hour_str+minute_str+second_str+ms_str;
+			break;
+		}
+	}
+	td_str_time_reformat = OK;
+
+return td_str_time_reformat;
+}
+
+//------------------------------------------------------------------------------ 
+ok_ng td_local_to_gmt(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst) {
+ok_ng td_local_to_gmt;
+	unsigned int minute_offset, wtemp1;
+
+	//calculate daylight saving time
+	if (dst == PL_ON) {
+		if (*min_count>59) {
+			*min_count = *min_count-60;
+		} else {
+			*day_count = *day_count-1;
+			*min_count = *min_count-60+1440;
+		}
+	}
+
+	if (*day_count>36524 || *min_count>1439) {
+		td_local_to_gmt = NG;
+		return td_local_to_gmt;
+	}
+	td_get_tzone_offset(timezone,minute_offset);
+
+	if (timezone>TD_TIMEZONE_GMT) {
+		if (*min_count<minute_offset) {
+			*day_count = *day_count-1;
+			wtemp1 = 1439-minute_offset;
+			*min_count = *min_count+wtemp1+1;
+		} else {
+ 			*min_count = *min_count-minute_offset;
+ 		}
+	}
+	if (timezone<TD_TIMEZONE_GMT) {
+		wtemp1 = 1439-minute_offset;
+		if (*min_count>wtemp1) {
+			*day_count = *day_count+1;
+			*min_count = *min_count-wtemp1-1;
+		} else {
+			*min_count = *min_count+minute_offset;
+		}
+	}
+	td_local_to_gmt = OK;
+	return td_local_to_gmt;
+}
+
+//------------------------------------------------------------------------------ 
+ok_ng td_gmt_to_local(unsigned int *day_count, unsigned int *min_count, en_td_timezones timezone, off_on dst) {
+ok_ng td_gmt_to_local;
+	unsigned int minute_offset, wtemp1;
+
+	//calculate daylight saving time
+	if (dst == PL_ON) {
+		if (*min_count<1380) {
+			*min_count = *min_count+60;
+		} else {
+			*day_count = *day_count+1;
+			*min_count = *min_count+60-1439;
+		}
+	}
+
+	if (*day_count>36524 || *min_count>1439) {
+		td_gmt_to_local = NG;
+		return td_gmt_to_local;
+	}
+	td_get_tzone_offset(timezone,minute_offset);
+
+	if (timezone>TD_TIMEZONE_GMT) {
+		wtemp1 = 1439-minute_offset;
+		if (*min_count>wtemp1) {
+			*day_count = *day_count+1;
+			*min_count = *min_count-wtemp1-1;
+		} else {
+			*min_count = *min_count+minute_offset;
+		}
+	}
+	if (timezone<TD_TIMEZONE_GMT) {
+		if (*min_count<minute_offset) {
+			*day_count = *day_count-1;
+			wtemp1 = 1439-minute_offset;
+			*min_count = *min_count+wtemp1+1;
+		} else {
+ 			*min_count = *min_count-minute_offset;
+ 		}
+	}
+	td_gmt_to_local = OK;
+	return td_gmt_to_local;
+}
+
+//------------------------------------------------------------------------------
+void td_get_tzone_offset(en_td_timezones timezone, unsigned int *minutes_offset) {
+
+	switch (timezone) {
+	case TD_TIMEZONE_GMT_MINUS_12_00:
+*minutes_offset = 12*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_11_00:
+*minutes_offset = 11*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_10_00:
+*minutes_offset = 10*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_09_00:
+*minutes_offset = 9*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_08_00:
+*minutes_offset = 8*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_07_00:
+*minutes_offset = 7*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_06_00:
+*minutes_offset = 6*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_05_00:
+*minutes_offset = 5*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_04_30:
+*minutes_offset = 4*60+30;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_04_00:
+*minutes_offset = 4*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_03_30:
+*minutes_offset = 3*60+30;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_03_00:
+*minutes_offset = 3*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_02_00:
+*minutes_offset = 2*60;
+	break;
+	case TD_TIMEZONE_GMT_MINUS_01_00:
+*minutes_offset = 1*60;
+	break;
+	case TD_TIMEZONE_GMT:
+*minutes_offset = 0;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_01_00:
+*minutes_offset = 1*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_02_00:
+*minutes_offset = 2*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_03_00:
+*minutes_offset = 3*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_03_30:
+*minutes_offset = 3*60+30;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_04_00:
+*minutes_offset = 4*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_04_30:
+*minutes_offset = 4*60+30;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_05_00:
+*minutes_offset = 5*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_05_30:
+*minutes_offset = 5*60+30;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_05_45:
+*minutes_offset = 5*60+45;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_06_00:
+*minutes_offset = 6*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_06_30:
+*minutes_offset = 6*60+30;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_07_00:
+*minutes_offset = 7*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_08_00:
+*minutes_offset = 8*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_09_00:
+*minutes_offset = 9*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_09_30:
+*minutes_offset = 9*60+30;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_10_00:
+*minutes_offset = 10*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_11_00:
+*minutes_offset = 11*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_12_00:
+*minutes_offset = 12*60;
+	break;
+	case TD_TIMEZONE_GMT_PLUS_13_00:
+*minutes_offset = 13*60;
+	break;
+	default:
+		*minutes_offset = 0;break;
+	}
+}

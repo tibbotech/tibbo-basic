@@ -1,0 +1,62 @@
+'**************************************************************************************************
+'       RTC (Real-time Counter) object
+'**************************************************************************************************
+
+#define RTC_AVAILABLE 1
+
+object rtc
+'Facilitates access to the real-time counter (RTC) of the device. The RTC is an independent hardware counter that has its
+'own power input. When the backup battery is installed, the RTC will continue running even when the rest of the device is
+'powered off. <br><br>
+'The RTC keeps track of elapsed days, minutes, and seconds, not actual date and time. This is why it is called the "counter",
+'not "clock". This platform includes a set of convenient date and time conversion functions that can be used to transform RTC
+'data into current weekday, date, and time (see <font color="teal"><b>weekday</b></font>, <font color="teal"><b>year</b></font>, <font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, <font color="teal"><b>hours</b></font>, minutes).
+
+'--------------------------------------------------------------------
+syscall(175,"27.TDL") rtc.getdata(byref daycount as word, byref mincount as word, byref seconds as byte)
+'<b>METHOD. </b><br><br> 
+'Returns current RTC data as the number of elapsed days (daycount), minutes (mincount) and seconds.
+'This platform includes a set of convenient date and time conversion functions that can be used to transform "elapsed time"
+'values into current date/time and back (see <font color="teal"><b>year</b></font>, <font color="teal"><b>month</b></font>, <font color="teal"><b>date</b></font>, <font color="teal"><b>weekday</b></font>, <font color="teal"><b>hours</b></font>, <font color="teal"><b>minutes</b></font>, <font color="teal"><b>daycount</b></font>, mincount, and seconds
+'platform syscalls). <br><br>
+'Notice, that after the device powers up and provided that the backup power was not present at all times the RTC may be in the 
+'undetermined state and not work properly until the <font color="maroon"><b>rtc.setdata </b></font>method is executed at least once.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+syscall(176,"28.TDL") rtc.setdata(daycount as word, mincount as word, seconds as byte)
+'<b>METHOD. 
+'</b><br><br> Presets the RTC with a number of elapsed days (daycount), minutes (mincount), and seconds. This platform includes
+'a set of convenient date and time conversion functions that can be used to transform actual date into time into
+'"elapsed time" values (see daycount and mincount). <br><br>
+'Notice, that after the device powers up and provided that the backup power was not present at all times the RTC may be in the 
+'undetermined state and not work properly until the <font color="maroon"><b>rtc.setdata </b></font>method is executed at least once.
+#endif
+
+'--------------------------------------------------------------------
+property rtc.running
+'<b>R/O PROPERTY (ENUM, BYTE). </b><br><br> 
+'Returns current RTC state: <font color="olive"><b>0- NO </b></font>(RTC not running), <font color="olive"><b>1- YES </b></font>(RTC is running). 
+'When this property returns <font color="olive"><b>0- NO </b></font>this typically is the sign of a hardware malfunction (for instance, 
+'RTC crystal failure). <br><br>
+'When the RTC is powered up after being off (that is, device had not power AND no backup power for a period of time), it may not work 
+'correctly until you set it using <font color="maroon"><b>rtc.setdata </b></font>method. <font color="maroon"><b> Rtc.running </b></font>
+'cannot be used to reliably check RTC state in this situation.
+    get = syscall(177,"29.TDL"+) as no_yes
+end property
+
+'--------------------------------------------------------------------
+#if EXTENDED_RTC=1
+property rtc.clock512
+    get = syscall(614) as dis_en
+    set = syscall(615) (value as dis_en)
+end property
+#endif
+
+'--------------------------------------------------------------------
+#if EXTENDED_RTC=1
+property rtc.calibration
+    get = syscall(616) as char
+    set = syscall(617) (value as char)
+end property
+#endif

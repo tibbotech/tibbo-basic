@@ -1,0 +1,1977 @@
+//***********************************************************************************************************
+//			SETTINGS LIBRARY
+//***********************************************************************************************************
+
+#include "global.th"
+
+//--------------------------------------------------------------------------------
+#define STG_STAMP "STG> "
+#define STG_CR_LF chr(13)+chr(10)
+#define STG_FIELD_SEPARATOR 9
+#define STG_END_OF_LINE 13
+#define STG_TIMESTAMP_LENGTH 7
+#define STG_INIT_SIGNATURE 0xB5A2
+
+//--------------------------------------------------------------------------------
+struct en_sdr_type {
+	string<STG_MAX_SETTING_NAME_LEN> name;//name
+	unsigned char storage;
+	unsigned char stype;
+	unsigned char members;
+	unsigned int p1;
+	unsigned int p2;
+	unsigned char ini;
+	unsigned int memaddr;
+	unsigned int romaddr_def;
+	unsigned char member_size;
+	unsigned char setting_size;
+};
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_sg_internal(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op, no_yes read_backup);
+en_stg_status_codes stg_set_ts_internal(string *stg_name_or_num, no_yes read_backup);
+en_stg_status_codes stg_load_setting_data(string *stg_name_or_num, unsigned char *num, string *stg_str, no_yes read_backup);
+string stg_ramarr_getdata(unsigned int startaddr, unsigned char len);
+unsigned char stg_ramarr_setdata(string *datatoset, unsigned int startaddr);
+string stg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos);
+void stg_process_esc_seq(string *s);
+void stg_debug_print_error(string *debug_str, en_stg_status_codes stg_sg_internal);
+void stg_debugprint(string *print_data);
+
+//--------------------------------------------------------------------------------
+#if STG_TIMESTAMP != 0
+struct_stg_timestamp stg_timestamp;
+#endif
+
+en_sdr_type stg_sdr[STG_MAX_NUM_SETTINGS];
+unsigned char stg_num_settings;
+
+#if STG_STORAGE_MEMORY != 0
+	unsigned char stg_filenum;
+	no_yes suspend_flushing;
+#endif
+
+#if STG_RAM_TYPE == 0
+	unsigned char stg_ram_array[STG_RAM_ARRAY_SIZE];
+#endif
+
+unsigned int stg_init_flag;
+
+//================================================================================
+en_stg_status_codes stg_start() {
+en_stg_status_codes stg_start;
+//API procedure, starts the STG library, parses the descriptor file, restores all volatile (RAM) settings
+//to default values by calling stg_restore_multiple(EN_STG_INIT_MODE_RAM_ONLY).
+//MUST be called first, before any other procedure in this library is used.
+
+	unsigned char stg_sdr_member;
+	unsigned char max_stg_name_len;
+	unsigned int len_of_str_rep, max_len_of_str_rep;
+	string s;
+	unsigned int i, j, c, line_end, nvmem_offset_ctr, ramarr_offset_ctr;
+	unsigned char f, x;
+	unsigned int field_start_pos;
+	long l;
+	unsigned char pos;
+	#if STG_STORAGE_MEMORY
+		pl_fd_status_codes fd_status;
+		no_yes newfile;
+	#endif
+
+	stg_start = EN_STG_STATUS_OK;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("---START---");
+	#endif
+
+	if (STG_MAX_NUM_SETTINGS == 0 || STG_MAX_NUM_SETTINGS>255) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: STG_MAX_NUM_SETTINGS must be between 1 and 255, you now have '#STG_MAX_NUM_SETTINGS "+str(STG_MAX_NUM_SETTINGS)+"'.");
+		#endif
+		stg_num_settings = 0;//STG_MAX_NUM_SETTINGS must be between 1 and 255.
+		stg_start = EN_STG_STATUS_WRONG_DEFINE;
+		return stg_start;
+	}
+
+	if (STG_MAX_SETTING_NAME_LEN == 0 || STG_MAX_SETTING_NAME_LEN>255) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: STG_MAX_SETTING_NAME_LEN must be between 1 and 255, you now have 'STG_MAX_SETTING_NAME_LEN "+str(STG_MAX_SETTING_NAME_LEN)+"'.");
+		#endif
+		stg_num_settings = 0;//STG_MAX_SETTING_NAME_LEN must be between 1 and 255.
+		stg_start = EN_STG_STATUS_WRONG_DEFINE;
+		return stg_start;
+	}
+
+	#if STG_TIMESTAMP
+		if (STG_MAX_SETTING_VALUE_LEN == 0 || STG_MAX_SETTING_VALUE_LEN>246) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: STG_MAX_SETTING_VALUE_LEN must be between 1 and 246, you now have '"+str(STG_MAX_SETTING_VALUE_LEN)+"'.");
+			#endif
+			stg_num_settings = 0;//STG_MAX_SETTING_VALUE_LEN must be between 1 and 246.
+			stg_start = EN_STG_STATUS_WRONG_DEFINE;
+			return stg_start;
+		}
+	#else
+		if (STG_MAX_SETTING_VALUE_LEN == 0 || STG_MAX_SETTING_VALUE_LEN>253) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: STG_MAX_SETTING_VALUE_LEN must be between 1 and 253, it is now 'STG_MAX_SETTING_VALUE_LEN "+str(STG_MAX_SETTING_VALUE_LEN)+"'.");
+			#endif
+			stg_num_settings = 0;//STG_MAX_SETTING_VALUE_LEN must be between 1 and 253.
+			stg_start = EN_STG_STATUS_WRONG_DEFINE;
+			return stg_start;
+		}
+	#endif
+
+	#if STG_STORAGE_MEMORY
+		if (fd.ready == NO) {
+			if (fd.mount()) {
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: the flash disk is not formatted or malfunctioned.");
+				#endif
+				stg_start = EN_STG_STATUS_FAILURE;
+				return stg_start;
+			}
+		}
+
+		suspend_flushing = NO;
+
+		stg_filenum = filenum_get("STG");
+		if (stg_filenum>=fd.maxopenedfiles) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: out of file numbers");
+			#endif
+			stg_start = EN_STG_STATUS_OUT_OF_FILE_NUMBERS;
+			return stg_start;
+		}
+
+		newfile = NO;
+		fd.filenum = stg_filenum;
+		fd_status = fd.open(STG_FILENAME);
+		switch (fd_status) {
+		case PL_FD_STATUS_NOT_FOUND:
+
+			//need to create this file
+			fd_status = fd.create(STG_FILENAME);
+			if (fd_status != PL_FD_STATUS_OK) {
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: could not create the file");
+				#endif
+				stg_start = EN_STG_STATUS_FAILURE;
+				return stg_start;
+			}
+			newfile = YES;
+			fd_status = fd.open(STG_FILENAME);
+			if (fd_status != PL_FD_STATUS_OK) {
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR: could not open the file");
+				#endif
+				stg_start = EN_STG_STATUS_FAILURE;
+				return stg_start;
+			}
+			break;
+
+		case PL_FD_STATUS_OK:
+
+		break;
+			//all is good -- just reset the file size to 0
+
+		default:
+			//some other problem
+			#if STG_DEBUG_PRINT
+				stg_debugprint("DISK ERROR");
+			#endif
+			stg_start = EN_STG_STATUS_FAILURE;
+			return stg_start;break;
+		}
+	#endif
+
+	stg_num_settings = 0;//will count all settings in the descriptor file
+	stg_sdr_member = 0;//will select stg_sdr array member (follows stg_num_settings but is limited by array size)
+	max_stg_name_len = 0;//will keep the longest setting name encountered
+	max_len_of_str_rep = 0;//will keep the largest string length required to represent setting value
+	nvmem_offset_ctr = 1;//will count offset in the NV MEM (addresses start from 1).
+	ramarr_offset_ctr = 0;//will count offset in the RAM array (addresses start from 0).
+
+	romfile.open(STG_DESCRIPTOR_FILE);//this file is a setting descriptor table
+	if (romfile.size == 0) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: '"+STG_DESCRIPTOR_FILE+"' is not in your project or file is empty.");
+		#endif
+		stg_num_settings = 0;//setting descriptor file is not in your project (or file is empty)
+		stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+		return stg_start;
+	}
+
+	i = romfile.find(romfile.pointer,">>",1);
+	while (i != 0) {
+		//we are now at the ">>" pointing at the beginning of one setting descriptor line
+		romfile.pointer = i+2;
+
+		//find the end of this setting descriptor line (or the end of file)
+		line_end = romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1);
+		if (line_end == 0) {
+			line_end = romfile.size+1;
+		}
+
+		//extract setting name
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing setting name field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting #"+str(stg_sdr_member)+"): missing setting name field (settings are counted from 0).");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (len(s)>STG_MAX_SETTING_NAME_LEN) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+s+"'): this setting's name length is "+str(len(s))+", while you have 'STG_MAX_SETTING_NAME_LEN "+str(STG_MAX_SETTING_NAME_LEN)+"'.");
+			#endif
+			stg_num_settings = 0;//you need to increase STG_MAX_SETTING_NAME_LEN!
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+		stg_sdr[stg_sdr_member].name = s;
+		if (len(s)>max_stg_name_len) {
+			max_stg_name_len = len(s);
+		}
+
+		//extract storage type (non-volatile or RAM)
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing storage type field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing storage type field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (len(s) != 1 || (asc(s) != `E` and asc(s)<>`R`)) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): unknown storage type '"+s+"', use 'E' or 'R' only.");
+			#endif
+			stg_num_settings = 0;//unknown storage type; use "E" for non-volatile (EEPROM/FD) or "R" for volatile (RAM); capital letters only!
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+		stg_sdr[stg_sdr_member].storage = asc(s);
+
+		//extract setting type
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing setting type field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing setting type field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (len(s) != 1) { goto unknown_setting_type;}
+		switch (asc(s)) {
+		case `B`:
+
+		break;
+		case `W`:
+
+		break;
+		case `S`:
+
+		break;
+		case `D`:
+
+		break;
+		default:
+unknown_setting_type: 
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): unknown setting type '"+s+"', use 'B', 'W', 'S' or 'D' only.");
+			#endif
+			stg_num_settings = 0;//unknown setting type; use "B" for byte, "W" for word, "S" for string, "D" for dot-decimal string; capital letters only!
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;break;
+		}
+		stg_sdr[stg_sdr_member].stype = asc(s);
+
+		//extract the number of members
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing number of members field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing number of members field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (val(s) == 0) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): the number of members can't be 0, each setting must have at least one member.");
+			#endif
+			stg_num_settings = 0;//the number of members can't be 0, each setting must have at least one member
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+		if (val(s)>254) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): the number of members is "+s+", while it can't exceed 254.");
+			#endif
+			stg_num_settings = 0;//max number of members can't exceed 254, 255 is a special value- see stg_sg_internal()
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+		stg_sdr[stg_sdr_member].members = val(s);
+
+		//extract P1
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing p1 parameter field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing P1 parameter field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		switch (stg_sdr[stg_sdr_member].stype) {
+		case `B`:
+
+			if (val(s)>255) { goto p1_too_large;}
+			break;
+
+		case `W`:
+
+			if (lval(s)>65535) { goto p1_too_large;}
+			break;
+
+		case `S`:
+
+			if (val(s)>254) { goto p1_too_large;}
+			break;
+		case `D`:
+
+			if (val(s)>63) {
+p1_too_large: 
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): minimum value (P1 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s);
+				#endif
+				stg_num_settings = 0;
+				stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+				return stg_start;
+			}
+			break;
+		}
+		stg_sdr[stg_sdr_member].p1 = val(s);
+
+		//extract P2
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing P2 parameter field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing P2 parameter field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (val(s) == 0) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): maximum value (P2 param) can't be zero!");
+			#endif
+			//maximum value (P2 param) can't be zero
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		switch (stg_sdr[stg_sdr_member].stype) {
+		case `B`:
+
+			if (val(s)>255) { goto p2_too_large;}
+			break;
+
+		case `W`:
+
+			if (lval(s)>65535) { goto p2_too_large;}
+			break;
+
+		case `S`:
+
+			if (val(s)>254) { goto p2_too_large;}
+			break;
+
+		case `D`:
+
+			if (val(s)>63) {
+p2_too_large: 
+				#if STG_DEBUG_PRINT
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): maximum value (P2 param) can't exceed 255 for byte, 65535 for word, 254 for strings, and 63 for dot-decimal strings, it is now "+s);
+				#endif
+				//maximum value (P2 param) for byte, string, and dot-decimal settings can't exceed 255
+				stg_num_settings = 0;
+				stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+				return stg_start;
+			}
+			break;
+		}
+		stg_sdr[stg_sdr_member].p2 = val(s);
+
+		if (stg_sdr[stg_sdr_member].p2<stg_sdr[stg_sdr_member].p1) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): P2 parameter (now "+str(stg_sdr[stg_sdr_member].p2)+") cannot be smaller than P1 parameter (now "+str(stg_sdr[stg_sdr_member].p1)+").");
+			#endif
+			stg_num_settings = 0;//P2 parameter cannot be smaller than P1 parameter
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		//calculate how much space this setting will need in memory
+		switch (stg_sdr[stg_sdr_member].stype) {
+		case `B`:
+
+			j = 1;
+			len_of_str_rep = 3;
+			break;
+		case `W`:
+
+			j = 2;
+			len_of_str_rep = 5;
+			break;
+		case `S`:
+
+			j = stg_sdr[stg_sdr_member].p2+1;
+			len_of_str_rep = stg_sdr[stg_sdr_member].p2;
+			break;
+		case `D`:
+
+			j = stg_sdr[stg_sdr_member].p2+1;
+			len_of_str_rep = stg_sdr[stg_sdr_member].p2*4;
+			if (len_of_str_rep>0) {
+				len_of_str_rep = len_of_str_rep-1;
+			}
+			break;
+		}
+
+		if (len_of_str_rep>STG_MAX_SETTING_VALUE_LEN) {
+			#if STG_DEBUG_PRINT			
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): this setting would occupy up to "+str(len_of_str_rep)+" chars in string form, while you have 'STG_MAX_SETTING_VALUE_LEN "+str(STG_MAX_SETTING_VALUE_LEN)+"'.");
+			#endif
+			stg_num_settings = 0;//this setting (with its type, number of members, etc.) would occupy more than 255 bytes, which is not allowed
+			stg_start = EN_STG_STATUS_WRONG_DEFINE;
+			return stg_start;
+		}
+
+		if (max_len_of_str_rep<len_of_str_rep) {
+			max_len_of_str_rep = len_of_str_rep;
+		}
+
+		stg_sdr[stg_sdr_member].member_size = j;//fill out member length
+		j = j*stg_sdr[stg_sdr_member].members+1;
+		#if STG_TIMESTAMP
+			x = STG_TIMESTAMP_LENGTH;
+		#else
+			x = 0;
+		#endif
+		j = j+x;
+		if (j>255) {
+			#if STG_DEBUG_PRINT
+
+				switch (stg_sdr[stg_sdr_member].stype) {
+				case `B`:
+
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): only up to "+str(254-x)+" members are possible for this word setting, you now have "+str(stg_sdr[stg_sdr_member].members)+".");
+					break;
+				case `W`:
+
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): only up to "+str((254-x)/2)+" members are possible for this word setting, you now have "+str(stg_sdr[stg_sdr_member].members)+".");
+					break;
+				case `S`:
+
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): with P2="+str(stg_sdr[stg_sdr_member].p2)+", only up to "+str((254-x)/(stg_sdr[stg_sdr_member].p2+1))+" members are possible for this string setting, you now have "+str(stg_sdr[stg_sdr_member].members)+".");
+					break;
+				case `D`:
+
+					stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): with P2="+str(stg_sdr[stg_sdr_member].p2)+", only up to "+str((254-x)/(stg_sdr[stg_sdr_member].p2+1))+" members are possible for this dot-decimal setting, you now have "+str(stg_sdr[stg_sdr_member].members)+".");
+					break;
+				}
+			#endif
+			stg_num_settings = 0;//this setting (with its type, number of members, etc.) would occupy more than 255 bytes, which is not allowed
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+		stg_sdr[stg_sdr_member].setting_size = j;
+
+		//save the address of the setting in memory, increment memory counters
+		if (stg_sdr[stg_sdr_member].storage == `E`) {
+			stg_sdr[stg_sdr_member].memaddr = nvmem_offset_ctr;
+			nvmem_offset_ctr = nvmem_offset_ctr+stg_sdr[stg_sdr_member].setting_size;
+		} else {
+			stg_sdr[stg_sdr_member].memaddr = ramarr_offset_ctr;
+			ramarr_offset_ctr = ramarr_offset_ctr+stg_sdr[stg_sdr_member].setting_size;
+		}
+
+		//extract initialization mode
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		if (s == "") {
+			//missing initialization mode field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing intialization mode field.");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		if (len(s) != 1) { goto unknown_init_mode;}
+		switch (asc(s)) {
+		case `I`:
+
+		break;
+		case `A`:
+
+		break;
+		default:
+unknown_init_mode: 
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): unknown initialization mode '"+s+"', use 'I', or 'A' only.");
+			#endif
+			stg_num_settings = 0;//unknown initialization mode; use "I" for "when invalid", "A" for "always"
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;break;
+		}
+		stg_sdr[stg_sdr_member].ini = asc(s);
+
+		//extract default value field
+		s = stg_get_descriptor_field(line_end,field_start_pos);
+		stg_process_esc_seq(s);
+
+		if (s == "") {
+			//missing default value field
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): missing default value field (use '^' to specify NULL default value.).");
+			#endif
+			stg_num_settings = 0;
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+
+		//save default value field position
+		stg_sdr[stg_sdr_member].romaddr_def = field_start_pos;
+
+		//verify the validity of the default value	
+		for (f=0; f <= stg_sdr(stg_sdr_member).members-1; f++) {
+			pos = instr(1,s,"/",1);
+			if (pos == 0) {
+				pos = len(s)+1;
+			}
+
+			switch (stg_sdr[stg_sdr_member].stype) {
+			case `B`:
+
+				j = val(left(s,pos-1));
+				if (left(s,pos-1) == "^") {
+					j = 0;
+				}
+				if (j<stg_sdr[stg_sdr_member].p1) {
+					//def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value for member #"+str(f)+" = "+str(j)+", which is below P1 parameter ("+str(stg_sdr[stg_sdr_member].p1)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				if (j>stg_sdr[stg_sdr_member].p2) {
+					//def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value for member #"+str(f)+" = "+str(j)+", which is above P2 parameter ("+str(stg_sdr[stg_sdr_member].p2)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				break;
+
+			case `W`:
+
+				l = lval(left(s,pos-1));
+				if (left(s,pos-1) == "^") {
+					l = 0;
+				}
+				if (l<stg_sdr[stg_sdr_member].p1) {
+					//def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value for member #"+str(f)+" = "+lstr(l)+", which is below P1 parameter ("+str(stg_sdr[stg_sdr_member].p1)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				if (l>stg_sdr[stg_sdr_member].p2) {
+					//def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value for member #"+str(f)+" = "+lstr(l)+", which is above P2 parameter ("+str(stg_sdr[stg_sdr_member].p2)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				break;
+
+			case `S`:
+
+				j = len(left(s,pos-1));
+				if (left(s,pos-1) == "^") {
+					j = 0;
+				}
+				if (j<stg_sdr[stg_sdr_member].p1) {
+					//def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value length for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is below P1 parameter ("+str(stg_sdr[stg_sdr_member].p1)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				if (j>stg_sdr[stg_sdr_member].p2) {
+					//def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default value length for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is above P2 parameter ("+str(stg_sdr[stg_sdr_member].p2)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				break;
+
+			case `D`:
+
+				j = len(ddval(left(s,pos-1)));
+				if (left(s,pos-1) == "^") {
+					j = 0;
+				}
+				if (j<stg_sdr[stg_sdr_member].p1) {
+					//def value < P1
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default number of bytes for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is below P1 parameter ("+str(stg_sdr[stg_sdr_member].p1)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				if (j>stg_sdr[stg_sdr_member].p2) {
+					//def value > P2
+					#if STG_DEBUG_PRINT
+						stg_debugprint("ERROR (setting '"+stg_sdr[stg_sdr_member].name+"'): default number of bytes for member #"+str(f)+" = "+str(j)+" ("+left(s,pos-1)+"), which is above P2 parameter ("+str(stg_sdr[stg_sdr_member].p2)+").");
+					#endif
+					stg_num_settings = 0;
+					stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+					return stg_start;
+				}
+				break;
+
+			}
+			s = mid(s,pos+1,255);
+			if (s == "") { goto skip_def_value_check;}
+		}
+skip_def_value_check: 
+
+
+		//done with this setting, move to next one
+		i = romfile.find(romfile.pointer,">>",1);
+		if (stg_sdr_member<STG_MAX_NUM_SETTINGS-1) {
+			stg_sdr_member = stg_sdr_member+1;
+		}
+		stg_num_settings = stg_num_settings+1;
+		c = c+x;
+	}
+
+	if (stg_num_settings>STG_MAX_NUM_SETTINGS) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: total number of settings is "+str(stg_num_settings)+" while you have 'STG_MAX_NUM_SETTINGS "+str(STG_MAX_NUM_SETTINGS)+"'.");
+		#endif
+		stg_num_settings = 0;//you need to increase STG_MAX_NUM_SETTINGS!
+		stg_start = EN_STG_STATUS_WRONG_DEFINE;
+		return stg_start;
+	}
+
+
+#if STG_STORAGE_MEMORY == 0
+	//exceeded EEPROM capacity? (we do not check this for the flash disk
+	#if STG_REDUNDANCY == 0
+		if (nvmem_offset_ctr-1>stor.size) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: your non-volatile settings do not fit in the EEPROM (needed: "+str(nvmem_offset_ctr-1)+", available: "+str(stor.size)+").");
+			#endif
+			stg_num_settings = 0;//your non-volatile settings do not fit in the EEPROM!
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+	#else
+		if (nvmem_offset_ctr-1>=stor.size/2) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("ERROR: your non-volatile settings do not fit in HALF of the EEPROM (needed: "+str(nvmem_offset_ctr-1)+", available: "+str(stor.size/2)+").");
+			#endif
+			stg_num_settings = 0;//your non-volatile settings do not fit in HALF of the EEPROM (we need other half for backup)!
+			stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+			return stg_start;
+		}
+	#endif
+#else
+
+	c = nvmem_offset_ctr;
+	#if STG_REDUNDANCY
+		c = c*2;//*2 because we have a backup copy to accommodate too
+	#endif
+
+	if (newfile == YES) {
+		//create a file of required size
+
+create_newfile: 
+		fd_status = fd.setfilesize(0);
+		if (fd_status != PL_FD_STATUS_OK) {
+			#if STG_DEBUG_PRINT
+				stg_debugprint("DISK ERROR");
+			#endif
+			stg_start = EN_STG_STATUS_FAILURE;
+			return stg_start;
+		}
+
+		while (fd.filesize<c) {
+			if (c-fd.filesize>255) {
+				x = 255;
+			} else {
+				x = c-fd.filesize;
+			}
+			s = strgen(x,chr(0));
+			fd_status = fd.setdata(s);
+			if (fd_status != PL_FD_STATUS_OK) {
+				#if STG_DEBUG_PRINT
+					stg_debugprint("DISK ERROR");
+				#endif
+				stg_start = EN_STG_STATUS_FAILURE;
+				return stg_start;
+			}
+		}
+	} else {
+		if (fd.filesize != c) {
+			goto create_newfile;
+		}
+	}
+#endif
+
+
+	//exceeded RAM array capacity?
+	#if STG_REDUNDANCY> == 2
+		ramarr_offset_ctr = ramarr_offset_ctr*2;
+	#endif
+
+
+	if (ramarr_offset_ctr>STG_RAM_ARRAY_SIZE) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: your volatile settings need "+str(ramarr_offset_ctr)+" bytes in the RAM, you now have 'STG_RAM_ARRAY_SIZE "+str(STG_RAM_ARRAY_SIZE)+"'.");
+		#endif
+		stg_num_settings = 0;//your RAM settings do not fit in the RAM array!
+		stg_start = EN_STG_STATUS_WRONG_DESCRIPTOR;
+		return stg_start;
+	}
+
+	stg_init_flag = STG_INIT_SIGNATURE;//we need to set this before we call stg_restore_multiple()
+
+	//initialized settings stored in RAM
+	#if STG_DEBUG_PRINT
+		stg_debugprint("Check/init RAM (volatile) settings...");
+	#endif
+	stg_start = stg_restore_multiple(EN_STG_INIT_MODE_RAM_ONLY);
+	if (stg_start != EN_STG_STATUS_OK) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: failed to initialize RAM settings");
+		#endif
+		stg_init_flag = 0;
+		return stg_start;
+	}
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("Number of settings: "+str(stg_num_settings));
+		if (stg_num_settings<STG_MAX_NUM_SETTINGS) {
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set 'STG_MAX_NUM_SETTINGS "+str(stg_num_settings)+"'. It is now "+str(STG_MAX_NUM_SETTINGS)+".");
+		}
+
+		#if STG_REDUNDANCY
+			stg_debugprint("Non-volatile memory space required: "+str(nvmem_offset_ctr*2));
+		#else
+			stg_debugprint("Non-volatile memory space required: "+str(nvmem_offset_ctr));
+		#endif
+
+		stg_debugprint("RAM (volatile memory) space required: "+str(ramarr_offset_ctr));
+		if (ramarr_offset_ctr<STG_RAM_ARRAY_SIZE) {
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set 'STG_RAM_ARRAY_SIZE "+str(ramarr_offset_ctr)+"'. It is now "+str(STG_RAM_ARRAY_SIZE)+".");
+		}
+
+		if (max_stg_name_len<STG_MAX_SETTING_NAME_LEN) {
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set STG_MAX_SETTING_NAME_LEN to "+str(max_stg_name_len)+". It is now "+str(STG_MAX_SETTING_NAME_LEN)+".");
+		}
+
+		if (max_len_of_str_rep<STG_MAX_SETTING_VALUE_LEN) {
+			stg_debugprint("YOU ARE WASTING MEMORY!!! Set STG_MAX_SETTING_VALUE_LEN to "+str(max_len_of_str_rep)+". It is now "+str(STG_MAX_SETTING_VALUE_LEN)+".");
+		}
+	#endif
+
+return stg_start;
+}
+
+//-------------------------------------------------------------
+en_stg_status_codes stg_check_all(string *problem_stg) {
+en_stg_status_codes stg_check_all;
+//API procedure, verifies each setting by reading its value thru stg_sg().
+
+	unsigned char f;
+	string<STG_MAX_SETTING_VALUE_LEN> stg_value;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_CHECK()");
+	#endif
+
+	*problem_stg = "";
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_check_all = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_check_all;
+	}
+
+	for (f=0; f <= stg_num_settings-1; f++) {
+		stg_check_all = stg_sg(str(f),0,stg_value,EN_STG_GET);
+		if (stg_check_all != EN_STG_STATUS_OK) {
+			*problem_stg = stg_sdr[f].name;
+			return stg_check_all;
+		}
+	}
+	stg_check_all = EN_STG_STATUS_OK;
+	return stg_check_all;
+}
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_get_def(string *stg_name_or_num, unsigned char index, string *def_value) {
+en_stg_status_codes stg_get_def;
+//API procedure, returns the default value for the specified setting's member.
+
+	unsigned char num;
+	int pos, pos2;
+	string s;
+
+	*def_value = "";
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET_DEF()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_get_def = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_get_def;
+	}
+
+	romfile.open(STG_DESCRIPTOR_FILE);
+
+	num = stg_find(*stg_name_or_num);
+	if (num == 0) {
+		//unknown setting
+		stg_get_def = EN_STG_STATUS_UNKNOWN;
+		return stg_get_def;
+	}
+	num = num-1;
+
+	if (index>=stg_sdr[num].members) {
+		//invalid index
+		stg_get_def = EN_STG_STATUS_INVALID_INDEX;
+		return stg_get_def;
+	}
+
+	//get default value field
+	romfile.pointer = stg_sdr[num].romaddr_def;
+	pos = romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1);
+	pos2 = romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1);
+	if (pos == 0 && pos2 == 0) {
+		pos = romfile.size+1;
+	} else if (pos == 0) {
+		pos = pos2;
+	} else if (pos2 == 0) {
+		//nothing to do here
+	} else {
+		if (pos>pos2) {
+			pos = pos2;
+		}
+	}
+	s = romfile.getdata(pos-romfile.pointer);
+
+	pos = instr(1,s,"/",1);
+	while (pos != 0 && index>0) {
+		s = right(s,len(s)-pos);
+		pos = instr(1,s,"/",1);
+		index = index-1;
+	}
+	pos = instr(1,s,"/",1);
+	if (pos>0) { s = left(s,pos-1);}
+	stg_process_esc_seq(s);
+	if (s == "^") { else { *def_value = "";*def_value = s;}
+
+	//completed successfully!
+	stg_get_def = EN_STG_STATUS_OK;
+	return stg_get_def;
+}
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_restore_multiple(en_stg_init_modes init_mode) {
+en_stg_status_codes stg_restore_multiple;
+//API procedure, sets the default values for all or multiple settings.
+
+	unsigned char x, f, f2;
+	unsigned int pos, pos2;
+	string s, s2;
+
+	#if STG_DEBUG_PRINT
+		string<32> debug_str;
+
+		switch (init_mode) {
+		case EN_STG_INIT_MODE_NORMAL:
+debug_str = "ALL, NORMAL";
+		break;
+		case EN_STG_INIT_MODE_OVERRIDE:
+debug_str = "ALL, OVERRIDE";
+		break;
+		case EN_STG_INIT_MODE_RAM_ONLY:
+debug_str = "RAM ONLY, NORMAL";
+		break;
+		case EN_STG_INIT_MODE_RAM_ONLY_OVERRIDE:
+debug_str = "RAM ONLY, OVERRIDE";
+		break;
+		}
+		stg_debugprint("STG_RESTORE_MULTIPLE(), init_mode= "+debug_str);
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_restore_multiple = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_restore_multiple;
+	}
+
+	#if STG_TIMESTAMP != 0
+		struct_stg_timestamp stg_timestamp_bup;
+	#endif
+	#if STG_STORAGE_MEMORY != 0
+		pl_fd_status_codes fd_status;
+	#endif
+
+	romfile.open(STG_DESCRIPTOR_FILE);
+
+	#if STG_STORAGE_MEMORY != 0
+		fd.filenum = stg_filenum;
+		suspend_flushing = YES;
+	#endif
+
+	if (stg_num_settings>0) {
+		for (f=0; f <= stg_num_settings-1; f++) {
+			//do we need to initialize this setting?
+
+			switch (init_mode) {
+			case EN_STG_INIT_MODE_NORMAL:
+
+				//Initialize (or keep) settings according to the INI field in setting definition file
+				if (stg_sdr[f].ini == `A`) { goto init_this;}
+				break;
+				//otherwise just check if the setting is sane
+
+			case EN_STG_INIT_MODE_OVERRIDE:
+
+				//Initialize ALL settings irregardless of their condition
+				goto init_this;
+				break;
+
+			case EN_STG_INIT_MODE_RAM_ONLY:
+
+				//Initialize (or keep) RAM ARR settings according to the INIT field in setting definition file
+				if (stg_sdr[f].storage == `R`) {
+					if (stg_sdr[f].ini == `A`) { goto init_this;}
+					//otherwise just check if the setting is sane
+				} else {
+					goto skip_this;
+				}
+				break;
+
+			case EN_STG_INIT_MODE_RAM_ONLY_OVERRIDE:
+
+				//Initialize ALL RAM ARR settings irregardless of their condition
+				if (stg_sdr[f].storage == `R`) {
+					goto init_this;
+				} else {
+					goto skip_this;
+				}
+				break;
+
+			}
+
+			//we are here because we need to test if the setting is sane
+			#if STG_TIMESTAMP != 0
+				stg_timestamp_bup = stg_timestamp;//reading the setting will change stg_timestamp
+			#endif
+
+			for (f2=0; f2 <= stg_sdr(f).members-1; f2++) {
+				x = stg_sg(stg_sdr[f].name,f2,s,EN_STG_GET);//here is where X is set -- we check it below
+				if (x != 0) { goto stgl1;}
+			}
+stgl1: 
+			#if STG_TIMESTAMP != 0
+				stg_timestamp = stg_timestamp_bup;
+			#endif
+
+			if (x != EN_STG_STATUS_OK) {//x is set above (see "here is where X is set")
+init_this: 
+				//yes, initialization is required- get default value
+				romfile.pointer = stg_sdr[f].romaddr_def;
+				pos = romfile.find(romfile.pointer,chr(STG_END_OF_LINE),1);
+				pos2 = romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1);
+				if (pos == 0 && pos2 == 0) {
+					pos = romfile.size+1;
+				} else if (pos == 0) {
+					pos = pos2;
+				} else if (pos2 == 0) {
+					//nothing to do here
+				} else {
+					if (pos>pos2) {
+						pos = pos2;
+					}
+				}
+				s = romfile.getdata(pos-romfile.pointer);
+
+				//we have two cases: when there is a single value for all setting members, and when there are
+				//separate values
+				if ((instr(1,s,"/",1) != 0) && (stg_sdr[f].members>1)) {
+					//there are 2 or more initialization values
+					for (f2=0; f2 <= stg_sdr(f).members-1; f2++) {
+						pos = instr(1,s,"/",1);
+						if (pos == 0) {
+							s2 = s;
+						} else {
+							s2 = left(s,pos-1);
+							s = right(s,len(s)-pos);
+						}
+						stg_process_esc_seq(s2);
+						if (s2 == "^") { s2 = "";}
+						x = stg_sg(stg_sdr[f].name,f2,s2,EN_STG_SET);//255 means "set all members to the same value"
+						if (x != EN_STG_STATUS_OK) {
+							stg_restore_multiple = x;
+							#if STG_STORAGE_MEMORY != 0
+								suspend_flushing = NO;
+							#endif
+							return stg_restore_multiple;
+						}
+					}
+				} else {
+					//there is a single initialization value
+					stg_process_esc_seq(s);
+					if (s == "^") { s = "";}
+					x = stg_sg(stg_sdr[f].name,255,s,EN_STG_SET);//255 means "set all members to the same value"
+					if (x != EN_STG_STATUS_OK) {
+						stg_restore_multiple = x;
+						#if STG_STORAGE_MEMORY != 0
+							suspend_flushing = NO;
+						#endif
+						return stg_restore_multiple;
+					}
+				}
+			}
+skip_this: 
+		}
+	}
+
+	//all OK!
+	#if STG_STORAGE_MEMORY != 0
+		suspend_flushing = NO;
+		fd_status = fd.flush();
+		if (fd_status != PL_FD_STATUS_OK) {
+			stg_restore_multiple = EN_STG_STATUS_FAILURE;
+			return stg_restore_multiple;
+		}
+	#endif	
+	stg_restore_multiple = EN_STG_STATUS_OK;
+	return stg_restore_multiple;
+}
+
+//-------------------------------------------------------------
+en_stg_status_codes stg_restore_member(string *stg_name_or_num, unsigned char index) {
+en_stg_status_codes stg_restore_member;
+//API procedure, sets the default value for the specified setting's member.
+
+	string<STG_MAX_SETTING_VALUE_LEN> s;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_RESTORE_MEMBER()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_restore_member = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_restore_member;
+	}
+
+	//get default value -- this will also verify that the setting exists
+	stg_restore_member = stg_get_def(*stg_name_or_num,index,s);
+	if (stg_restore_member != EN_STG_STATUS_OK) { return stg_restore_member;}
+
+	//set default value
+	stg_restore_member = stg_sg(*stg_name_or_num,index,s,EN_STG_SET);
+	return stg_restore_member;
+}
+
+//--------------------------------------------------------------------------------
+unsigned char stg_get_num_settings() {
+unsigned char stg_get_num_settings;
+//API procedure, returns the number of settings defined in your project.
+
+	stg_get_num_settings = stg_num_settings;
+	return stg_get_num_settings;
+}
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_get_num_members(string *stg_name_or_num, unsigned char *num_members) {
+en_stg_status_codes stg_get_num_members;
+//API procedure, returns the number of members for the specified setting.
+
+	unsigned char num;
+
+	*num_members = 0;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET_NUM_MEMBERS()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_get_num_members = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_get_num_members;
+	}
+
+	romfile.open(STG_DESCRIPTOR_FILE);
+
+	num = stg_find(*stg_name_or_num);
+	if (num == 0) {
+		//unknown setting
+		stg_get_num_members = EN_STG_STATUS_UNKNOWN;
+		return stg_get_num_members;
+	}
+	num = num-1;
+
+	//get the number of members
+	*num_members = stg_sdr[num].members;
+
+	//completed successfully!
+	stg_get_num_members = EN_STG_STATUS_OK;
+	return stg_get_num_members;
+}
+
+//--------------------------------------------------------------------------------
+string stg_get(string *stg_name_or_num, unsigned char index) {
+string stg_get;
+//API procedure, reads (gets) the value of the specified setting's member; reports errors thru callback_stg_error(). 
+
+	string s;
+	en_stg_status_codes status;
+
+	stg_get = "";
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_GET()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_get;
+	}
+
+	status = stg_sg(*stg_name_or_num,index,s,EN_STG_GET);
+	switch (status) {
+	case EN_STG_STATUS_OK:
+
+		stg_get = s;
+		return stg_get;
+		break;
+	case EN_STG_STATUS_UNKNOWN:
+case EN_STG_STATUS_INVALID_INDEX:
+
+		stg_get = "";
+		callback_stg_error(*stg_name_or_num,index,status);
+		break;
+	default:
+		stg_get_def(*stg_name_or_num,index,s);
+		stg_get = s;
+		callback_stg_error(*stg_name_or_num,index,status);break;
+	}
+	return stg_get;
+}
+
+//--------------------------------------------------------------------------------
+void stg_set(string *stg_name_or_num, unsigned char index, string *stg_value) {
+//API procedure, writes (sets) the value of the specified setting's member; reports errors thru callback_stg_error().
+
+	en_stg_status_codes status;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SET()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return;
+	}
+
+	status = stg_sg(*stg_name_or_num,index,*stg_value,EN_STG_SET);
+	if (status != EN_STG_STATUS_OK) {
+		callback_stg_error(*stg_name_or_num,index,status);
+	}
+
+}
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_sg(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op) {
+en_stg_status_codes stg_sg;
+//API procedure, writes (sets) or reads (gets) the specified setting's member; directly returns the execution result.
+
+	string<STG_MAX_SETTING_VALUE_LEN> original_stg_value;
+	string<STG_MAX_SETTING_NAME_LEN> stg_name_or_num_copy;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SG()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_sg = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_sg;
+	}
+
+	if (op == EN_STG_GET) {
+		*stg_value = "";
+		stg_sg = stg_sg_internal(*stg_name_or_num,index,*stg_value,EN_STG_GET,NO);
+		if (stg_sg == EN_STG_STATUS_INVALID || stg_sg == EN_STG_STATUS_FAILURE) {
+			#if STG_REDUNDANCY
+				//see if the backup copy of the setting contains a correct value
+				stg_sg = stg_sg_internal(*stg_name_or_num,index,*stg_value,EN_STG_GET,YES);
+				if (stg_sg != EN_STG_STATUS_OK) {
+					return stg_sg;
+				} else {
+					//OK, second value worked, copy it into the first value
+					stg_sg = stg_sg_internal(*stg_name_or_num,index,*stg_value,EN_STG_SET,NO);
+					if (stg_sg != EN_STG_STATUS_OK) { return stg_sg;}
+				}
+			#else
+				return stg_sg;
+			#endif
+		}
+
+		original_stg_value = *stg_value;
+		stg_name_or_num_copy = *stg_name_or_num;//this way, callback_stg_pre_get() can't screw up setting name
+		callback_stg_pre_get(stg_name_or_num_copy,index,*stg_value);
+		if (*stg_value != original_stg_value) {
+			stg_sg = stg_sg_internal(*stg_name_or_num,index,*stg_value,EN_STG_SET,NO);
+		}
+	} else {
+		stg_sg = stg_sg_internal(*stg_name_or_num,index,*stg_value,EN_STG_SET,NO);
+		if (stg_sg == EN_STG_STATUS_OK) {
+			stg_name_or_num_copy = *stg_name_or_num;//this way, callback_stg_post_set() can't screw up setting name
+			callback_stg_post_set(stg_name_or_num_copy,index,*stg_value);
+		}
+	}
+
+return stg_sg;
+}
+
+//--------------------------------------------------------------------------------
+#if STG_TIMESTAMP != 0
+en_stg_status_codes stg_set_ts(string *stg_name_or_num) {
+en_stg_status_codes stg_set_ts;
+
+	#if STG_DEBUG_PRINT
+		stg_debugprint("STG_SET_TS()");
+	#endif
+
+	if (stg_init_flag != STG_INIT_SIGNATURE) {
+		stg_set_ts = EN_STG_STATUS_NOT_STARTED;
+		#if STG_DEBUG_PRINT
+			stg_debugprint("ERROR: stg_start() wasn't used or failed");
+		#endif
+		return stg_set_ts;
+	}
+
+	stg_set_ts = stg_set_ts_internal(*stg_name_or_num,NO);
+	if (stg_set_ts == EN_STG_STATUS_INVALID || stg_set_ts == EN_STG_STATUS_FAILURE) {
+		#if STG_REDUNDANCY
+			stg_set_ts = stg_set_ts_internal(*stg_name_or_num,YES);
+		#endif
+		return stg_set_ts;
+	}
+	return stg_set_ts;
+}
+#endif
+
+//--------------------------------------------------------------------------------
+unsigned char stg_stype_get(string *stg_name_or_num) {
+unsigned char stg_stype_get;
+	unsigned char f;
+
+	f = stg_find(*stg_name_or_num);
+	if (f>0) {
+		stg_stype_get = stg_sdr[f-1].stype;
+	} else {
+		stg_stype_get = "";
+	}
+	return stg_stype_get;
+}
+
+//--------------------------------------------------------------------------------
+unsigned char stg_find(string *stg_name_or_num) {
+unsigned char stg_find;
+//if stg_name_or_num starts with an alpha, then assumes that the setting name was supplied and
+//looks for the setting with this name. If the name starts with digit then assumes it is a setting
+//number. In both cases returns member number+1 if found, or 0 if not found.
+
+	unsigned char f;
+
+	f = asc(*stg_name_or_num);
+	if (f>=0x30 && f<=0x39) {
+		f = val(*stg_name_or_num);
+		if (f<stg_num_settings) {
+			stg_find = f+1;
+			return stg_find;
+		}
+	} else {
+		for (f=0; f <= stg_num_settings-1; f++) {
+			if (stg_sdr[f].name == *stg_name_or_num) {
+				stg_find = f+1;
+				return stg_find;
+			}
+		}
+	}
+	stg_find = 0;
+	return stg_find;
+}
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_sg_internal(string *stg_name_or_num, unsigned char index, string *stg_value, en_stg_rdwr op, no_yes read_backup) {
+en_stg_status_codes stg_sg_internal;
+//Reads/writes setting stg_name_or_num, value is exchanged through stg_value. Read or write operation is
+//determined by op. Returns various en_stg_status status codes.
+//The following applies only when STG_TIMESTAMP<>0 (see settings.tbh):
+//For SETs, the timestamp of the setting is updated with the value from stg_timestamp (global struct).
+//For GETs, the stg_timestamp will contain the timestamp of the setting after the stg_sg() call.
+//NEW: index=255 will set all members of the setting to the supplied value. This saves time during initialization.
+//We can use index=255 for this because there may never be 255 members of the setting. Even when the timestamp is off,
+//and the setting is of the BYTE type we need one byte for the checksum, so we can only have 254 members!
+//For GET operation, and when STG_REDUNDANCY>0 and when read_backup=YES we will read the backup (second) copy of the setting
+
+	unsigned char x, cs, f;
+	unsigned int i;
+	string stg_str;
+	string new_member_str;(STG_MAX_SETTING_VALUE_LEN+1);
+	unsigned char num;
+	string<STG_TIMESTAMP_LENGTH> ts_str;
+	#if STG_STORAGE_MEMORY != 0
+		pl_fd_status_codes fd_status;
+	#endif
+
+	#if STG_STORAGE_MEMORY != 0
+		fd.filenum = stg_filenum;
+	#endif
+
+	#if STG_DEBUG_PRINT
+		string debug_str;
+
+		if (op == EN_STG_GET) {
+			debug_str = "GET ";
+
+			#if STG_REDUNDANCY
+				if (read_backup == NO) {
+					debug_str = debug_str+"(use primary copy) ";
+				} else {
+					debug_str = debug_str+"(use secondary copy) ";
+				}
+			#endif
+		} else {
+			debug_str = "SET ";
+		}
+
+		debug_str = debug_str+"'"+*stg_name_or_num+"("+str(index)+")' ";
+
+		if (op == EN_STG_SET) {
+			debug_str = debug_str+"to '"+*stg_value+"' ";
+		}
+
+		debug_str = debug_str+": ";
+	#endif
+
+	stg_sg_internal = stg_load_setting_data(*stg_name_or_num,num,stg_str,read_backup);
+	if (stg_sg_internal != EN_STG_STATUS_OK) {
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_sg_internal);
+		#endif
+		return stg_sg_internal;
+	}
+
+	//is index valid?
+	if (index>=stg_sdr[num].members && index != 255) {
+		//invalid index
+		stg_sg_internal = EN_STG_STATUS_INVALID_INDEX;
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_sg_internal);
+		#endif
+		return stg_sg_internal;
+	}
+
+	//is this a read or a write?
+	if (op == EN_STG_GET) {
+		//READ OPERATION
+		//verify the checksum
+		cs = strsum(left(stg_str,len(stg_str)-1));
+		if (cs != asc(right(stg_str,1))) {
+			stg_sg_internal = EN_STG_STATUS_FAILURE;//invalid checksum
+			#if STG_DEBUG_PRINT
+				stg_debug_print_error(debug_str,stg_sg_internal);
+			#endif
+			return stg_sg_internal;
+		}
+
+		//handle the timestamp
+		#if STG_TIMESTAMP != 0
+			ts_str = mid(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH,STG_TIMESTAMP_LENGTH);
+			stg_timestamp.ts_daycount = 256*asc(mid(ts_str,1,1))+asc(mid(ts_str,2,1));
+			stg_timestamp.ts_mincount = 256*asc(mid(ts_str,3,1))+asc(mid(ts_str,4,1));
+			stg_timestamp.ts_seconds = asc(mid(ts_str,5,1));
+			stg_timestamp.ts_milsec = 256*asc(mid(ts_str,6,1))+asc(mid(ts_str,7,1));
+		#endif
+
+		//extract target member
+		stg_str = mid(stg_str,index*stg_sdr[num].member_size+1,stg_sdr[num].member_size);
+
+		//make sure this member has a valid value
+		switch (chr(stg_sdr[num].stype)) {
+		case "B":
+//byte- convert into value
+			i = asc(stg_str);
+			*stg_value = str(i);
+			goto lb1;
+			break;
+
+		case "W":
+//word- convert into value
+			i = asc(left(stg_str,1))*256+asc(mid(stg_str,2,1));
+			*stg_value = str(i);
+			goto lb1;
+			break;
+
+		case "S":
+//string- take length
+			*stg_value = mid(stg_str,2,asc(left(stg_str,1)));
+			i = asc(left(stg_str,1));
+			goto lb1;
+			break;
+
+		default://dot-decimal string- take length
+			*stg_value = ddstr(mid(stg_str,2,asc(left(stg_str,1))));
+			i = asc(left(stg_str,1));
+lb1: if (i<stg_sdr[num].p1 || i>stg_sdr[num].p2) {
+				stg_sg_internal = EN_STG_STATUS_INVALID;//invalid checksum
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal);
+				#endif
+				return stg_sg_internal;
+			}break;
+		}
+
+		//OK, so this member's value is OK and the stg_value is already set to it!
+		stg_sg_internal = EN_STG_STATUS_OK;
+
+		#if STG_DEBUG_PRINT
+			debug_str = debug_str+"OK, '"+*stg_value+"'";
+			stg_debugprint(debug_str);
+		#endif
+
+		return stg_sg_internal;
+
+	} else {
+		//WRITE OPERATION
+	#if STG_ENABLE_VALIDATION_CALLBACK
+		//Validation check
+		stg_sg_internal = callback_stg_validation_check(*stg_name_or_num,index,*stg_value);
+		if ((stg_sg_internal != EN_STG_STATUS_OK)) {//invalid input
+			#if STG_DEBUG_PRINT
+				stg_debug_print_error(debug_str,stg_sg_internal);
+			#endif
+			return stg_sg_internal;
+		}
+	#endif
+
+		//Branch according to the setting type and verify new value
+		switch (chr(stg_sdr[num].stype)) {
+		case "B":
+//byte- convert into value
+			i = val(*stg_value);
+			new_member_str = chr(i);
+			goto lb2;
+			break;
+
+		case "W":
+//word- convert into value
+			i = val(*stg_value);
+			x = i/256;
+			new_member_str = chr(x)+chr(i-x*256);
+			goto lb2;
+			break;
+
+		case "S":
+//string
+			new_member_str = chr(len(*stg_value))+*stg_value;
+			i = len(new_member_str)-1;
+			goto lb2;
+			break;
+
+		default://dot-decimal string- take length
+			new_member_str = ddval(*stg_value);
+			new_member_str = chr(len(new_member_str))+new_member_str;
+			i = len(new_member_str)-1;
+lb2: if (i<stg_sdr[num].p1 || i>stg_sdr[num].p2) {
+				stg_sg_internal = EN_STG_STATUS_INVALID;//invalid checksum
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal);
+				#endif
+				return stg_sg_internal;
+			}break;
+
+		}
+
+		//insert new member value into the setting data
+		if (index != 255) {
+			//regular save of a single member
+			insert(stg_str,index*stg_sdr[num].member_size+1,new_member_str);
+		} else {
+			//set all members to the same value
+			for (f=0; f <= stg_sdr(num).members-1; f++) {
+				insert(stg_str,f*stg_sdr[num].member_size+1,new_member_str);
+			}
+		}
+
+		#if STG_TIMESTAMP != 0
+			ts_str = chr(stg_timestamp.ts_daycount/256);
+			ts_str = ts_str+chr(stg_timestamp.ts_daycount & 0xFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
+			ts_str = ts_str+chr(stg_timestamp.ts_mincount & 0xFF);
+			ts_str = ts_str+chr(stg_timestamp.ts_seconds);
+			ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
+			ts_str = ts_str+chr(stg_timestamp.ts_milsec & 0xFF);
+			insert(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH+1-1,ts_str);//-1 because of checksum field in the end 
+		#endif
+
+		//recalculate the checksum
+		stg_str = left(stg_str,len(stg_str)-1);
+		cs = strsum(stg_str);
+		stg_str = stg_str+chr(cs);
+
+		if (stg_sdr[num].storage == `E`) {
+			//store the data into the NV MEM
+			stg_sg_internal = EN_STG_STATUS_FAILURE;
+
+
+			#if STG_STORAGE_MEMORY == 0
+				if (stor.setdata(stg_str,stg_sdr[num].memaddr) == len(stg_str)) {
+					stg_sg_internal = EN_STG_STATUS_OK;
+				}
+				#if STG_REDUNDANCY
+					if (stor.setdata(stg_str,stg_sdr[num].memaddr+stor.size/2) == len(stg_str)) {
+						stg_sg_internal = EN_STG_STATUS_OK;
+					}
+				#endif
+			#else
+				if ((fd.setpointer(stg_sdr[num].memaddr) == PL_FD_STATUS_OK) && (fd.setdata(stg_str) == PL_FD_STATUS_OK)) {
+					stg_sg_internal = EN_STG_STATUS_OK;
+				}
+
+				#if STG_REDUNDANCY
+					if ((fd.setpointer(stg_sdr[num].memaddr+fd.filesize/2) == PL_FD_STATUS_OK) && (fd.setdata(stg_str) == PL_FD_STATUS_OK)) {
+						stg_sg_internal = EN_STG_STATUS_OK;
+					}
+				#endif	
+
+				if (suspend_flushing == NO) {
+					fd.flush();
+				}
+			#endif
+
+			if ((stg_sg_internal != EN_STG_STATUS_OK)) {
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_sg_internal);
+				#endif
+				return stg_sg_internal;
+			}
+		} else {
+			//store the data into the volatile memory
+			stg_ramarr_setdata(stg_str,stg_sdr[num].memaddr);
+			#if STG_REDUNDANCY> == 2
+				stg_ramarr_setdata(stg_str,stg_sdr[num].memaddr+STG_RAM_ARRAY_SIZE/2);
+			#endif
+			stg_sg_internal = EN_STG_STATUS_OK;
+		}
+	}
+
+	//completed successfully!
+	stg_sg_internal = EN_STG_STATUS_OK;
+
+	#if STG_DEBUG_PRINT
+		debug_str = debug_str+"OK";
+		stg_debugprint(debug_str);
+	#endif
+	return stg_sg_internal;
+}
+
+//--------------------------------------------------------------------------------
+#if STG_TIMESTAMP != 0
+en_stg_status_codes stg_set_ts_internal(string *stg_name_or_num, no_yes read_backup) {
+en_stg_status_codes stg_set_ts_internal;
+//Writes the timestamp of the setting without changing its value. The timestamp is passed in a
+//global stg_timestamp structure (the reason we don't use a function argument is because all other
+//procedures in this library use the stg_timestamp, so we do this for uniformity).
+
+	unsigned char cs;
+	unsigned char num;
+	string stg_str;
+	string<STG_TIMESTAMP_LENGTH> ts_str;
+	#if STG_STORAGE_MEMORY != 0
+		pl_fd_status_codes fd_status;
+	#endif
+
+	#if STG_STORAGE_MEMORY != 0
+		fd.filenum = stg_filenum;
+	#endif
+
+	#if STG_DEBUG_PRINT
+		string debug_str;
+
+		debug_str = "SET TIMESTAMP ";
+
+		#if STG_REDUNDANCY
+			if (read_backup == NO) {
+				debug_str = debug_str+"(use primary copy for reading) ";
+			} else {
+				debug_str = debug_str+"(use secondary copy for reading) ";
+			}
+		#endif
+
+		debug_str = debug_str+"for '"+*stg_name_or_num+"': ";
+	#endif
+
+	stg_set_ts_internal = stg_load_setting_data(*stg_name_or_num,num,stg_str,read_backup);
+	if (stg_set_ts_internal != EN_STG_STATUS_OK) {
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_set_ts_internal);
+		#endif
+		return stg_set_ts_internal;
+	}
+
+	//verify the checksum
+	cs = strsum(left(stg_str,len(stg_str)-1));
+	if (cs != asc(right(stg_str,1))) {
+		stg_set_ts_internal = EN_STG_STATUS_FAILURE;//invalid checksum
+		#if STG_DEBUG_PRINT
+			stg_debug_print_error(debug_str,stg_set_ts_internal);
+		#endif
+		return stg_set_ts_internal;
+	}
+
+	stg_str = left(stg_str,len(stg_str)-STG_TIMESTAMP_LENGTH-1);//cut off the timestamp and checksum
+
+	//set new timestamp
+	ts_str = chr(stg_timestamp.ts_daycount/256);
+	ts_str = ts_str+chr(stg_timestamp.ts_daycount & 0xFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_mincount/256);
+	ts_str = ts_str+chr(stg_timestamp.ts_mincount & 0xFF);
+	ts_str = ts_str+chr(stg_timestamp.ts_seconds);
+	ts_str = ts_str+chr(stg_timestamp.ts_milsec/256);
+	ts_str = ts_str+chr(stg_timestamp.ts_milsec & 0xFF);
+	stg_str = stg_str+ts_str;
+
+	//calculate checksum and add this checksum to the data
+	cs = strsum(stg_str);
+	stg_str = stg_str+chr(cs);
+
+
+	if (stg_sdr[num].storage == `E`) {
+		//store the data into the NV MEM
+		#if STG_STORAGE_MEMORY == 0
+			if (stor.setdata(stg_str,stg_sdr[num].memaddr) != len(stg_str)) {
+				stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal);
+				#endif
+				return stg_set_ts_internal;
+			}
+			#if STG_REDUNDANCY
+				if (stor.setdata(stg_str,stg_sdr[num].memaddr+stor.size/2) != len(stg_str)) {
+					stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal);
+					#endif
+					return stg_set_ts_internal;
+				}
+			#endif
+		#else
+
+			fd_status = fd.setpointer(stg_sdr[num].memaddr);
+			if (fd_status != PL_FD_STATUS_OK) {
+				stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal);
+				#endif
+				return stg_set_ts_internal;
+			}
+
+			fd_status = fd.setdata(stg_str);
+			if (fd_status != PL_FD_STATUS_OK) {
+				stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+				#if STG_DEBUG_PRINT
+					stg_debug_print_error(debug_str,stg_set_ts_internal);
+				#endif
+				return stg_set_ts_internal;
+			}
+
+			#if STG_REDUNDANCY
+				fd_status = fd.setpointer(stg_sdr[num].memaddr+fd.filesize/2);
+				if (fd_status != PL_FD_STATUS_OK) {
+					stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal);
+					#endif
+					return stg_set_ts_internal;
+				}
+
+				fd_status = fd.setdata(stg_str);
+				if (fd_status != PL_FD_STATUS_OK) {
+					stg_set_ts_internal = EN_STG_STATUS_FAILURE;
+					#if STG_DEBUG_PRINT
+						stg_debug_print_error(debug_str,stg_set_ts_internal);
+					#endif
+					return stg_set_ts_internal;
+				}
+			#endif
+
+			if (suspend_flushing == NO) {
+				fd.flush();
+			}
+		#endif
+	} else {
+		//store the data into the RAM array
+		stg_ramarr_setdata(stg_str,stg_sdr[num].memaddr);
+		#if STG_REDUNDANCY> == 2
+			stg_ramarr_setdata(stg_str,stg_sdr[num].memaddr+STG_RAM_ARRAY_SIZE/2);
+		#endif
+		stg_set_ts_internal = EN_STG_STATUS_OK;
+	}
+
+	//completed successfully!
+	stg_set_ts_internal = EN_STG_STATUS_OK;
+
+	#if STG_DEBUG_PRINT
+		debug_str = debug_str+"OK";
+		stg_debugprint(debug_str);
+	#endif
+
+return stg_set_ts_internal;
+}
+#endif
+
+//--------------------------------------------------------------------------------
+en_stg_status_codes stg_load_setting_data(string *stg_name_or_num, unsigned char *num, string *stg_str, no_yes read_backup) {
+en_stg_status_codes stg_load_setting_data;
+//Converts setting name (stg_name_or_num) into setting number (num), also loads the entire setting (all members, timestamp,
+//checksum) into the stg_str
+
+	#if STG_STORAGE_MEMORY != 0
+		pl_fd_status_codes fd_status;
+	#endif
+
+	#if STG_STORAGE_MEMORY != 0
+		fd.filenum = stg_filenum;
+	#endif
+
+	//does this setting exist?
+	*num = stg_find(*stg_name_or_num);
+	if (*num == 0) {
+		//unknown setting
+		stg_load_setting_data = EN_STG_STATUS_UNKNOWN;
+		return stg_load_setting_data;
+	}
+	*num = *num-1;
+
+	//no matter read or write, we read the entire setting first (all members, checksum, timestamp if enabled)
+	if (stg_sdr[*num].storage == `E`) {
+		#if STG_STORAGE_MEMORY == 0
+			if (read_backup == NO) {
+				*stg_str = stor.getdata(stg_sdr[*num].memaddr,stg_sdr[*num].setting_size);
+			} else {
+				*stg_str = stor.getdata(stg_sdr[*num].memaddr+stor.size/2,stg_sdr[*num].setting_size);
+			}
+		#else
+			if (read_backup == 0) {
+				fd_status = fd.setpointer(stg_sdr[*num].memaddr);
+			} else {
+				fd_status = fd.setpointer(stg_sdr[*num].memaddr+fd.filesize/2);
+			}
+
+			if (fd_status != PL_FD_STATUS_OK) {
+				stg_load_setting_data = EN_STG_STATUS_FAILURE;
+				return stg_load_setting_data;
+			}
+
+			*stg_str = fd.getdata(stg_sdr[*num].setting_size);
+			if (fd.laststatus != PL_FD_STATUS_OK) {
+				stg_load_setting_data = EN_STG_STATUS_FAILURE;
+				return stg_load_setting_data;
+			}
+		#endif
+	} else {
+		if (read_backup == NO) {
+			*stg_str = stg_ramarr_getdata(stg_sdr[*num].memaddr,stg_sdr[*num].setting_size);
+		} else {
+			*stg_str = stg_ramarr_getdata(stg_sdr[*num].memaddr+STG_RAM_ARRAY_SIZE/2,stg_sdr[*num].setting_size);
+		}
+		stg_load_setting_data = EN_STG_STATUS_OK;
+	}
+
+	stg_load_setting_data = EN_STG_STATUS_OK;
+	return stg_load_setting_data;
+}
+
+//--------------------------------------------------------------------------------
+string stg_ramarr_getdata(unsigned int startaddr, unsigned char len) {
+string stg_ramarr_getdata;
+	unsigned char f;
+
+	stg_ramarr_getdata = "";
+	for (f=0; f <= len-1; f++) {
+		#if STG_RAM_TYPE == 0
+			stg_ramarr_getdata = stg_ramarr_getdata+chr(stg_ram_array[f+startaddr]);
+		#else
+			stg_ramarr_getdata = stg_ramarr_getdata+chr(callback_stg_vm_read(f+startaddr));
+		#endif
+	}
+	return stg_ramarr_getdata;
+}
+
+//--------------------------------------------------------------------------------
+unsigned char stg_ramarr_setdata(string *datatoset, unsigned int startaddr) {
+unsigned char stg_ramarr_setdata;
+	unsigned char f;
+
+	for (f=0; f <= len(datatoset)-1; f++) {
+		#if STG_RAM_TYPE == 0
+			stg_ram_array[f+startaddr] = asc(mid(*datatoset,f+1,1));
+		#else
+			callback_stg_vm_write(asc(mid(*datatoset,f+1,1)),f+startaddr);
+		#endif
+	}
+	stg_ramarr_setdata = len(*datatoset);
+	return stg_ramarr_setdata;
+}
+
+//-------------------------------------------------------------
+string stg_get_descriptor_field(unsigned int line_end_pos, unsigned int *field_start_pos) {
+string stg_get_descriptor_field;
+//line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
+
+	unsigned int i;
+
+	do {
+		if (romfile.pointer>=line_end_pos) {
+			//the field is missing
+			stg_get_descriptor_field = "";
+			*field_start_pos = 0;
+			return stg_get_descriptor_field;
+		}
+
+		i = romfile.find(romfile.pointer,chr(STG_FIELD_SEPARATOR),1);
+		*field_start_pos = romfile.pointer;
+		if (i == 0 || i>line_end_pos) {
+			//no next field separator found on this line, so we assume the field goes to the end of the line
+			i = line_end_pos;
+			stg_get_descriptor_field = romfile.getdata(i-romfile.pointer);
+			romfile.pointer = line_end_pos+1;
+		} else {
+			stg_get_descriptor_field = romfile.getdata(i-romfile.pointer);
+			romfile.pointer = i+1;
+		}
+	} while (stg_get_descriptor_field == "");
+	return stg_get_descriptor_field;
+}
+
+//------------------------------------------------------------------------------
+void stg_process_esc_seq(string *s) {
+	unsigned char pos, x;
+
+	//process escape sequences
+	pos = instr(1,*s,"\x5Cx",1);//we are searching for "\x"
+	while (pos>0) {
+		x = val("0x"+mid(*s,pos+2,2));
+		*s = mid(*s,1,pos-1)+chr(x)+mid(*s,pos+4,255);
+		pos = instr(1,*s,"\x5C",1);
+	}
+}
+
+//------------------------------------------------------------------------------
+#if STG_DEBUG_PRINT
+void stg_debug_print_error(string *debug_str, en_stg_status_codes status_code) {
+
+	switch (status_code) {
+	case EN_STG_STATUS_UNKNOWN:
+*debug_str = *debug_str+"ERROR: unknown setting or invalid setting number";
+	break;
+	case EN_STG_STATUS_INVALID_INDEX:
+*debug_str = *debug_str+"ERROR: invalid index";
+	break;
+	case EN_STG_STATUS_FAILURE:
+*debug_str = *debug_str+"ERROR: checksum error or hardware malfunction";
+	break;
+	case EN_STG_STATUS_INVALID:
+*debug_str = *debug_str+"ERROR: invalid setting value";
+	break;
+	}
+	stg_debugprint(*debug_str);
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if STG_DEBUG_PRINT
+void stg_debugprint(string *print_data) {
+
+	sys.debugprint(STG_STAMP+*print_data+STG_CR_LF);
+}
+#endif

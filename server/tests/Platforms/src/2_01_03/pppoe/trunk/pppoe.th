@@ -1,0 +1,32 @@
+//***********************************************************************************************************
+//		PPPOE LIBRARY
+//***********************************************************************************************************
+
+//1- debug output in console.
+//0- no debug output.
+#ifndef PPPOE_DEBUG_PRINT
+	#define PPPOE_DEBUG_PRINT 0
+#endif
+
+//--------------------------------------------------------------------
+enum en_pppoe_status_codes {
+	PPPOE_STATUS_OK,
+	PPPOE_STATUS_OUT_OF_SOCKETS,
+	PPPOE_STATUS_INSUFFICIENT_BUFFER_SPACE,
+	PPPOE_TIMEOUT,
+	PPPOE_CONFIGURATION_ERROR,
+	PPPOE_STOPPED
+};
+
+enum pppoe_info_elements {
+	PPPOE_INFO_ELEMENT_REQUIRED_BUFFERS
+};
+
+//--------------------------------------------------------------------
+en_pppoe_status_codes pppoe_start(string *login, string *password);
+void pppoe_stop();
+void pppoe_proc_data();
+void pppoe_proc_timer();
+void callback_pppoe_pre_buffrq(unsigned char required_buff_pages);
+void callback_pppoe_ok();
+void callback_pppoe_failure(en_pppoe_status_codes pppoe_code);

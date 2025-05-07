@@ -1,0 +1,923 @@
+'**************************************************************************************************
+'       WLN (Wi-Fi) object
+'**************************************************************************************************
+
+#if OBJECT_WLN=WLN_ENABLED
+
+#define WLN_AVAILABLE 1
+
+object wln
+'The wln. object represents the Wi-Fi interface of your device. This object is responsible for finding and associating with Wi-Fi networks, as well as for creating your own network.
+'It also specifies various parameters related to the Wi-Fi interface (IP address, default gateway IP, netmask, etc.).  The object is not in charge of
+'sending/transmitting data. The latter is the job of the sock. object.
+'<br><br>
+'The wln. object is designed to work with the GA1000 and WA2000 devices.
+
+'--------------------------------------------------------------------
+syscall(580,TDL_71) wln.activescan(byref ssid as string) as accepted_rejected
+'<b>METHOD.</b>
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence either the active detection of available wireless networks or obtainment of an additional information about a particular network specified by its SSID (name).
+'<br><br>
+'<b>Ssid </b>-- Network name. Leave empty to scan for all available networks -- after the scan, the comma-delimited list of networks will be in wln.scanresultssid.
+'Alternatively, specify the network name. If the network is found, its parameters will be available through
+'wln.scanresultssid, wln.scanresultbssid, wln.scanresultbssmode, wln.scanresultchannel, wln.scanresultrssi, and wln.scanresultwpainfo.
+'<br><br>
+'Active scanning is limited to frequency bands and modes allowed by the wln.band property, as well as the current domain (wln.domain).
+'<br><br>
+'The scan process is a "task". As such, wln.scan will be rejected (return 1- REJECTED) if another task is currently in progress.
+'The task will also be rejected if the Wi-Fi interface is not operational (wln.enabled=0- NO).
+'<br><br>
+'The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time and the values of related R/O properties are updated. 
+'<br><br>
+'Scanning while the Wi-Fi interface is in the associated state (wln.associationstate= 1- PL_WLN_ASSOCIATED) or running its own network
+'(wln.associationstate= 2- PL_WLN_OWN_NETWORK) will temporarily disrupt communications between your device and other stations.
+
+'--------------------------------------------------------------------
+enum pl_wln_bss_modes 
+    PL_WLN_BSS_MODE_INFRASTRUCTURE, '<b>PLATFORM CONSTANT.</b><br><br> Infrastructure mode.
+    PL_WLN_BSS_MODE_ADHOC       '<b>PLATFORM CONSTANT.</b><br><br> Ad-hoc (device-to-device) mode.
+end enum
+
+'--------------------------------------------------------------------
+syscall(488,TDL_71) wln.associate(byref bssid as string, byref ssid as string, channel as byte, bssmode as pl_wln_bss_modes) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to attempt association with the specified wireless network.
+'<br><br>
+'<b>Bssid </b>--
+'GA1000: This argument must contain the actual BSSID ("MAC address") of the target network.
+'WA2000: Provide the BSSID of the target network or set this argument to "" or "0.0.0.0.0.0" to allow the wln. object associate with any network with matching SSID. 
+'<br><br>
+'<b>Ssid </b>-- The name of the target network with which to associate.
+'<br><br>
+'<b>Channel </b>--
+'GA1000: This argument must contain the correct channel on which the target network operates.
+'WA2000: Provide the correct channel or set this argument to 0 to allow the wln. object associate with the target network on any channel.
+'<br><br>
+'<b>Bssmode </b>-- Network mode of the target network (infrastructure or ad-hoc).
+'GA1000 can associate with infrastructure and ad-hoc networks.
+'WA2000 can only associate with infrastructure networks. For it, this argument should always be set to 0- PL_WLN_BSS_MODE_INFRASTRUCTURE.
+'<br><br>
+'Association is a task. As such, it will only be accepted when no other task is being executed (wln.task= 0- WLN_TASK_IDLE).
+'Task completion does not guarantee success. After the task completes, verify association status through the wln.associationstate R/O property.
+'<br><br>
+'Wi-Fi security (wln.wep, wln.wpa) must be set before attempting to associate.
+'<br><br>
+'Association is a complex subject. It is difficult to explain everything there is to explain in a tooltip like this.
+'To get more information (and there is <i>a lot </i>of information to get!), highlight wln.associate in your code and press F1.  
+
+'--------------------------------------------------------------------
+enum pl_wln_association_states 
+    PL_WLN_NOT_ASSOCIATED,      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is idle.
+    PL_WLN_ASSOCIATED,      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is associated with a wireless network.
+    PL_WLN_OWN_NETWORK      '<b>PLATFORM CONSTANT.</b><br><br> The Wi-Fi interface is running its own ad-hoc network.   
+end enum
+
+property wln.associationstate
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_NOT_ASSOCIATED (the Wi-Fi interface is idle). </b>
+'<br><br>
+'Indicates whether the Wi-Fi interface is idle, associated with another network, or running its own network.
+'<br><br>
+'After the successful association, which is initiated through the wln.associate method, the value of this property changes to 
+'1- PL_WLN_ASSOCIATED. The value is reset back to 0- PL_WLN_NOT_ASSOCIATED if disassociation occurs (on_wln_event will be generated too).
+'<br><br>
+'After the Wi-Fi interface succeeds in creating its own network (see wln.networkstart), the value of this property becomes 2- PL_WLN_OWN_NETWORK.
+'The value is reset back to 0- PL_WLN_NOT_ASSOCIATED when the network is terminated with wln.networkstop.
+    get = syscall(457,TDL_72) as pl_wln_association_states
+end property
+
+'--------------------------------------------------------------------
+enum pl_wln_phy_modes
+    WIFI_PHY_11BG_MIXED = 0,     '2.4GHz band, 802.11b/g. 
+    WIFI_PHY_11B,                '2.4GHz band, 802.11b. 
+    WIFI_PHY_11A,                '5GHz band, 802.11a. 
+    WIFI_PHY_11ABG_MIXED,        '2.4G and 5G band, 802.11a/b/g. 
+    WIFI_PHY_11G,                '2.4GHz band, 802.11g. 
+    WIFI_PHY_11ABGN_MIXED,       '2.4G and 5G band (default), 802.11a/b/g/n. 
+    WIFI_PHY_11N_2_4G,           '11n-only with 2.4GHz band, 802.11n. 
+    WIFI_PHY_11GN_MIXED,         '2.4GHz band, 802.11g/n. 
+    WIFI_PHY_11AN_MIXED,         '5GHz band, 802.11a/n. 
+    WIFI_PHY_11BGN_MIXED,        '2.4GHz band, 802.11b/g/n. 
+    WIFI_PHY_11AGN_MIXED,        '2.4G and 5G band, 802.11a/g/n. 
+    WIFI_PHY_11N_5G              '11n-only with 5GHz band, 802.11n. 
+end enum
+
+'--------------------------------------------------------------------
+syscall(451,TDL_70) wln.boot(offset as dword) as ok_ng
+'<b>METHOD.</b>
+'<br><br>
+'Boots up the Wi-Fi add-on module.
+'<br><br>
+'<b>Offset </b>--
+'GA1000: Offset of the <i>ga1000fw.bin </i>file within the compiled binary of your project. The offset is obtained using the romfile.offset R/O property.
+'WA2000: Must be set to 0 (this module stores its firmware in its flash memory and does not require the firmware file to be uploaded on every boot).
+'<br><br>
+'The method will return 0- OK if the boot was completed successfully. At that moment, wln.enabled will become 1- YES.
+'<br><br>
+'The boot will fail (return 1- NG) if the Wi-Fi hardware is not powered, not properly reset, connected improperly, mapped incorrectly, or malfunctioned.
+'<br><br>
+'On the GA1000, the method will also fail if the offset to the firmware file is incorrect or the file is not included in your project.
+'On the WA2000, the method will fail if the offset is anything but 0.
+'<br><br>
+'Finally, the method will fail if the Wi-Fi hardware is already booted and operational.
+
+'--------------------------------------------------------------------
+syscall(503,"35.TDL") wln.buffrq(numpages as BUFF_PAGE_TYPE) as BUFF_PAGE_TYPE
+'<b>METHOD.</b>
+'<br><br>
+'Pre-requests a number of buffer pages (1 page= 256 bytes) for the TX buffer of the wln. object.
+'<br><br>
+'<b>Numpages </b>-- Requested numbers of buffer pages to allocate (recommended value is <b>5</b>).
+'<br><br>
+'Returns the actual number of pages that can be allocated. Allocation happens when the sys.buffalloc is executed. The wln object
+'will be unable to operate properly if its TX buffer has inadequate capacity.
+'<br><br>
+'Buffer allocation will not work if the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
+
+'--------------------------------------------------------------------
+property wln.buffsize
+'<b>R/O PROPERTY (WORD | DWORD), DEFAULT VALUE= 0 (0 bytes).</b>
+'<br><br>
+'Returns the current capacity (in bytes) of the wln object's TX buffer.
+'<br><br>
+'Buffer capacity is set using wln.buffrq method.
+    get = syscall(504,TDL_72) as BUFF_SIZE_TYPE
+end property
+
+'--------------------------------------------------------------------
+property wln.clkmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
+'<br><br>
+'Sets/returns the number of the GPIO line acting as the clock (CLK) line of the Wi-Fi module's SPI interface. The line is selected from
+'the pl_io_num list.
+'<br><br>
+'This selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
+'<br><br>
+'This property has no effect on the EM500W platform.
+    get = syscall(554,TDL_72) as pl_io_num
+    set = syscall(555,TDL_72) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property wln.csmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
+'<br><br>
+'Sets/returns the number of the GPIO line acting as the chip select (CS) line of the Wi-Fi module's SPI interface. The line is selected from
+'the pl_io_num list.
+'<br><br>
+'This selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
+'<br><br>
+'This property has no effect on the EM500W platform.
+    get = syscall(535,TDL_72) as pl_io_num
+    set = syscall(536,TDL_72) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property wln.dimap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
+'<br><br>
+'Sets/returns the number of the GPIO line acting as the data in (DI) line of the Wi-Fi module's SPI interface. The line is selected from
+'the pl_io_num list.
+'<br><br>
+'The selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
+'<br><br>
+'This DI line must be connected to the DO pin of the GA1000.
+'<br><br>
+'This property has no effect on the EM500W platform.
+    get = syscall(550,TDL_72) as pl_io_num
+    set = syscall(551,TDL_72) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+syscall(492,TDL_71) wln.disassociate() as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence disassociation from a wireless network.
+'<br><br>
+'The disassociation process is a task. As such, it will be rejected if another task is currently in progress (wln.task <> 0- WLN_TASK_IDLE).
+'<br><br>
+'Wln.disassociate will also be rejected if the Wi-Fi interface is not operational (wln.enabled=0- NO) or
+'if the Wi-Fi interface is not currently associated (wln.associationstate <> 1- PL_WLN_ASSOCIATED).
+
+'--------------------------------------------------------------------
+enum pl_wln_domains 
+    PL_WLN_DOMAIN_FCC,  '<b>PLATFORM CONSTANT.</b><br><br> FCC (US), default. GA1000: channels 1-11 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range.
+    PL_WLN_DOMAIN_EU,   '<b>PLATFORM CONSTANT.</b><br><br> European Union. GA1000: channels 1-13 of the 2.4GHz range; WA2000: the same plus channels 52-64, 100-140, 149-165 of the 5.0GHz range. 
+    PL_WLN_DOMAIN_JAPAN    '<b>PLATFORM CONSTANT.</b><br><br> Japan. GA1000: channels 1-14 of the 2.4GHz range; WA2000: the same plus channels 34-36 of the 5.0GHz range. 
+end enum
+
+'--------------------------------------------------------------------
+property wln.domain
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_DOMAIN_FCC. </b>
+'<br><br>
+'Selects the domain (area of the world) in which this device is operating. This defines the list of channels on which the Wi-Fi interface
+'will be allowed to active-scan (wln.activescan) or associate (wln.associate) with wireless networks.
+'<br><br>
+'Passive scanning (wln.scan) is performed on all channels of enabled bands (wln.band), regardless of the value of wln.domain.
+'<br><br>
+'This property can't be changed while the Wi-Fi hardware is operational (wln.enabled= 1- YES).
+    get = syscall(480,TDL_72) as pl_wln_domains
+    set = syscall(481,TDL_72) (value as pl_wln_domains)
+end property
+
+'--------------------------------------------------------------------
+property wln.domap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= PL_IO_NULL (NULL line). </b>
+'<br><br>
+'Sets/returns the number of the GPIO line acting as the data out (DO) line of the Wi-Fi module's SPI interface. The line is selected from
+'the pl_io_num list.
+'<br><br>
+'The selection cannot be changed once the Wi-Fi hardware is already operational (wln.enabled= 1- YES).
+'<br><br>
+'This DO line must be connected to the DI pin of the GA1000.
+'<br><br>
+'This property has no effect on the EM500W platform.
+    get = syscall(552,TDL_72) as pl_io_num
+    set = syscall(553,TDL_72) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property wln.enabled
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
+'<br><br>
+'Indicates whether the Wi-Fi interface is operational.
+'<br><br>
+'The Wi-Fi hardware becomes operational after a successful boot using the wln.boot method, at which time wln.enabled is set to 1- YES.
+'<br><br>
+'The Wi-Fi interface is disabled and the wln.enabled is reset to 0- NO if wln.disable is called, or the Wi-Fi hardware is disconnected, powered down, malfunctioned,
+'or was intentionally reset. In all these cases the on_wln_event(0- PL_WLN_EVENT_DISABLED) event is generated, too.
+    get = syscall(452,TDL_72) as no_yes
+end property
+
+'--------------------------------------------------------------------
+property wln.gatewayip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'Sets/returns the IP address of the default gateway for the Wi-Fi interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
+'sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
+    get = syscall(537,TDL_72) as string
+    set = syscall(538,TDL_72) (byref gateway_ip_str as string)
+end property
+
+'--------------------------------------------------------------------
+enum pl_wln_module_types    
+	PL_WLN_MODULE_TYPE_GA1000,
+	PL_WLN_MODULE_TYPE_WA2000
+end enum
+
+'--------------------------------------------------------------------
+enum pl_wln_upgrade_regions
+    PL_WLN_UPGRADE_REGION_MAIN,    'Main firmware region.
+	PL_WLN_UPGRADE_REGION_MONITOR  'Monitor/Loader firmware region.
+end enum
+
+#if SYS_VER = 1000 or PLATFORM_ID=EM500W    'T1000 Based Devices and EM500W
+
+#if PLATFORM_ID=EM1000N or PLATFORM_ID=EM1001N or PLATFORM_ID=EM1202N or PLATFORM_ID=EM1206N or PLATFORM_ID=TPP2N or PLATFORM_ID=TPP3N or PLATFORM_ID=DS1101N or PLATFORM_ID=DS1102N
+'--------------------------------------------------------------------
+syscall(601,TDL_90) wln.getmoduletype() as pl_wln_module_types
+'<b>R/O PROPERTY (BYTE, ENUM). </b><br><br>
+'Detects and returns the Wi-Fi module type, or just returns the module type if it has already been detected earlier.
+'<br><br>
+'The actual module type detection happens on the first invocation of wln.getmoduletype or wln.boot, whichever is called first after the reset of the Wi-Fi module.
+'<br><br>
+'Wln.getmoduletype also has a side job -- it can be used to boot the WA2000 into the Monitor/Loader, which is necessary for performing firmware updates.
+
+'--------------------------------------------------------------------
+property wln.monversion
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's Monitor/Loader.
+'<br><br>
+'This property starts returning the Monitor/Loader version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
+'<br><br>
+'When the GA1000 device is used, this property always returns an empty string.
+    get = syscall(603,TDL_90) as string
+end property
+
+'--------------------------------------------------------------------
+property wln.fwversion
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's main firmware.
+'<br><br>
+'This property starts returning the firmware version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
+'<br><br>
+'When the GA1000 device is used, this property always returns an empty string.
+    get = syscall(602,TDL_90) as string
+end property
+
+'--------------------------------------------------------------------
+syscall(604,TDL_90) wln.disable()
+'<b>METHOD. </b><br><br>
+'Causes the wln. object to be disabled.
+'<br><br>
+'Disabling the wln. object is not the same as shutting down the Wi-Fi module. Disabling the wln. object means that TiOS stops servicing it.
+'The Wi-Fi module itself continues to run. To shut the Wi-Fi module down, put it in reset.   
+'<br><br>
+'Note that the object does not become disabled immediately upon invoking wln.disable. To detect when this actually happens, poll the value of wln.enabled until it becomes 0- NO.
+'Alternatively, wait for the on_wln_event(0- PL_WLN_EVENT_DISABLED) event -- it is generated when the wln. object is disabled.
+'<br><br>
+'You can enable the wln. object again by resetting the Wi-Fi module and calling wln.boot.
+
+'--------------------------------------------------------------------
+syscall(608,TDL_90) wln.setupgraderegion(region as pl_wln_upgrade_regions)
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, specifies what region (portion) of the WA2000's firmware is going to be upgraded -- the main firmware or the Monitor/Loader.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+'--------------------------------------------------------------------
+syscall(605,TDL_90) wln.writeflashpage(byref page as string) as accepted_rejected
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, sends a 128-byte page (block) of firmware data into the module. The method should be called repeatedly until the entire firmware "file" has been uploaded onto the WA2000.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect. 
+
+'--------------------------------------------------------------------
+#if SYS_VER = 1000
+
+syscall(607,TDL_90) wln.upgrade(region as pl_wln_upgrade_regions, fwlength_l as word, fwlength_h as word , checksum_l as word, checksum_h as word)
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, initiates copying of the firmware "file" (that was uploaded onto the WA2000 using wln.writeflashpage) from the spare area into the target region of the module's flash memory. The target region 'is selected with wln.setupgraderegion.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+#else
+
+syscall(607,TDL_90) wln.upgrade(region as pl_wln_upgrade_regions, fwlength as dword, checksum as dword)
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, initiates copying of the firmware "file" (that was uploaded onto the WA2000 using wln.writeflashpage) from the spare area into the target region of the module's flash memory. The target region 'is selected with wln.setupgraderegion.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+#endif
+
+
+'--------------------------------------------------------------------
+syscall(606,TDL_90) wln.waitforupgradecompletion() as ok_ng    
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, waits for the firmware copying to complete and returns the result of the copying process. Firmware copying is initiated using wln.upgrade.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+'--------------------------------------------------------------------
+property wln.band    
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 5- WIFI_PHY_11ABGN_MIXED (2.4G and 5G bands, 802.11a/b/g/n).</b>
+'<br><br>
+'Specifies what frequency bands (2.4GHz, 5.0GHz, or both) and 802.11 communications standards ("a", "b", "g", "n" or combinations thereof) are enabled.
+'<br><br>
+'Since the GA1000 device only supports 2.4GHz "b" and "g" modes, the value of this property is reset to 0- WIFI_PHY_11BG_MIXED as soon as the wln.boot or wln.getmoduletype method is executed (and the Wi-Fi module type is detected).
+'<br><br>
+'The value of this property cannot be changed when the wln.enabled R/O property is at 1- ENABLED (the wln.boot method has been executed). 
+    get = syscall(609,TDL_90) as pl_wln_phy_modes    
+    set = syscall(610,TDL_90) (value as no_yes) 
+end property
+
+#else 
+
+'These syscalls are not supported on T1000 devices except for the N platforms
+
+declare function wln.getmoduletype() as pl_wln_module_types
+declare sub wln.disable()
+
+#endif 
+
+#elif SYS_VER=2000
+
+'--------------------------------------------------------------------
+syscall(780) wln.getmoduletype() as pl_wln_module_types
+'<b>R/O PROPERTY (BYTE, ENUM). </b><br><br>
+'Detects and returns the Wi-Fi module type, or just returns the module type if it has already been detected earlier.
+'<br><br>
+'The actual module type detection happens on the first invocation of wln.getmoduletype or wln.boot, whichever is called first after the reset of the Wi-Fi module.
+'<br><br>
+'Wln.getmoduletype also has a side job -- it can be used to boot the WA2000 into the Monitor/Loader, which is necessary for performing firmware updates.
+
+'--------------------------------------------------------------------
+property wln.monversion
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's Monitor/Loader.
+'<br><br>
+'This property starts returning the Monitor/Loader version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
+'<br><br>
+'When the GA1000 device is used, this property always returns an empty string.
+  get = syscall(792) as string
+end property
+
+'--------------------------------------------------------------------
+property wln.fwversion
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, returns the version string of the module's main firmware.
+'<br><br>
+'This property starts returning the firmware version after the WA2000 is booted (wln.boot) or after the Wi-Fi module type is detected (wln.getmoduletype).
+'<br><br>
+'When the GA1000 device is used, this property always returns an empty string.
+    get = syscall(791) as string
+end property
+
+'--------------------------------------------------------------------
+syscall(777) wln.disable()
+'<b>METHOD. </b><br><br>
+'Causes the wln. object to be disabled.
+'<br><br>
+'Disabling the wln. object is not the same as shutting down the Wi-Fi module. Disabling the wln. object means that TiOS stops servicing it.
+'The Wi-Fi module itself continues to run. To shut the Wi-Fi module down, put it in reset.   
+'<br><br>
+'Note that the object does not become disabled immediately upon invoking wln.disable. To detect when this actually happens, poll the value of wln.enabled until it becomes 0- NO.
+'Alternatively, wait for the on_wln_event(0- PL_WLN_EVENT_DISABLED) event -- it is generated when the wln. object is disabled.
+'<br><br>
+'You can enable the wln. object again by resetting the Wi-Fi module and calling wln.boot.
+
+'--------------------------------------------------------------------
+syscall(786) wln.setupgraderegion(region as pl_wln_upgrade_regions)
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, specifies what region (portion) of the WA2000's firmware is going to be upgraded -- the main firmware or the Monitor/Loader.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+'--------------------------------------------------------------------
+syscall(787) wln.writeflashpage(byref page as string) as accepted_rejected
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, sends a 128-byte page (block) of firmware data into the module. The method should be called repeatedly until the entire firmware "file" has been uploaded onto the WA2000.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect. 
+
+'--------------------------------------------------------------------
+syscall(788) wln.upgrade(region as pl_wln_upgrade_regions, fwlength as dword, checksum as dword)
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, initiates copying of the firmware "file" (that was uploaded onto the WA2000 using wln.writeflashpage) from the spare area into the target region of the module's flash memory. The target region 'is selected with wln.setupgraderegion.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+'--------------------------------------------------------------------
+syscall(793) wln.waitforupgradecompletion() as ok_ng    
+'<b>METHOD. </b><br><br>
+'For the WA2000 Wi-Fi/BLE add-on, waits for the firmware copying to complete and returns the result of the copying process. Firmware copying is initiated using wln.upgrade.
+'<br><br>
+'The algorithm of upgrading the firmware of the WA2000 is rather complex and it is not possible to explain it in tooltips. For more information see
+'<b>TIDE, TiOS, Tibbo BASIC and Tibbo C Manual</b> (you can access it by pressing F1 in TIDE) <b>-> THE REFERENCE -> Objects -> Wln Object -> Overview -> Updating Firmware (WA2000 only)</b>. 
+'<br><br>
+'Invoking this method while using the GA1000 device will have no effect.
+
+'--------------------------------------------------------------------
+property wln.band    
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 5- WIFI_PHY_11ABGN_MIXED (2.4G and 5G bands, 802.11a/b/g/n).</b>
+'<br><br>
+'Specifies what frequency bands (2.4GHz, 5.0GHz, or both) and 802.11 communications standards ("a", "b", "g", "n" or combinations thereof) are enabled.
+'<br><br>
+'Since the GA1000 device only supports 2.4GHz "b" and "g" modes, the value of this property is reset to 0- WIFI_PHY_11BG_MIXED as soon as the wln.boot or wln.getmoduletype method is executed (and the Wi-Fi module type is detected).
+'<br><br>
+'The value of this property cannot be changed when the wln.enabled R/O property is at 1- ENABLED (the wln.boot method has been executed). 
+    get = syscall(789,TDL_90) as pl_wln_phy_modes    
+    set = syscall(790,TDL_90) (value as no_yes) 
+end property
+
+#endif 
+
+'--------------------------------------------------------------------
+property wln.ip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "1.0.0.1". </b><br><br>
+'Sets/returns the IP address of the Wi-Fi interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
+'sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
+    get = syscall(472,TDL_72) as string
+    set = syscall(473,TDL_72) (byref ip_str as string)
+end property
+
+'--------------------------------------------------------------------
+property wln.mac
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0.0.0". </b>
+'<br><br>
+'Sets/returns the MAC address of the Wi-Fi interface.
+'<br><br>
+'This property can only be written to while the Wi-Fi hardware is not operational (wln.enabled= 0- NO).
+'<br><br>
+'Each GA1000 and WA2000 device carries a unique MAC address.
+'To use this internal MAC of the module, do not write to this property. After a successful boot, wln.mac will contain the MAC address obtained from the Wi-Fi module.
+'<br><br>
+'Alternatively, set your own MAC address before calling wln.boot. This MAC address, and not the internal MAC of the Wi-Fi module will
+'be used (but only until the module is rebooted). The MAC address hardcoded into the module is never overwitten or erased.
+    get = syscall(470,TDL_72) as string
+    set = syscall(471,TDL_72) (byref mac_str as string)
+end property
+
+'--------------------------------------------------------------------
+property wln.netmask
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'Sets/returns the netmask of the Wi-Fi interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communicating through the Wi-Fi interface, i.e. there is no socket for which
+'sock.statesimple <> 0- PL_SSTS_CLOSED and sock.currentinterface = 2- PL_INTERFACE_WLN.
+    get = syscall(539,TDL_72) as string
+    set = syscall(540,TDL_72) (byref netmask_str as string)
+end property
+
+'--------------------------------------------------------------------
+syscall(475,TDL_71) wln.networkstart(byref ssid as string,channel as byte) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence creating its own network.
+'<br><br>
+'<b>Ssid </b>-- The name of the network to create.
+'<br><br>
+'<b>Channel </b>-- Channel on which the new network will operate.
+'<br><br>
+'Network creation process is a task. As such, wln.networkstart will be rejected (return 1- REJECTED) if another task is currently in progress.
+'The task will also be rejected if the Wi-Fi hardware is not operational (wln.enabled=0- NO) or if
+'the Wi-Fi interface is already non-idle (wln.associationstate <> 0- PL_WLN_NOT_ASSOCIATED).
+'<br><br>
+'The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time. 
+'Completion does not imply success -- the result has to be verified by reading the state of the wln.associationstate R/O property.
+
+'--------------------------------------------------------------------
+syscall(476,TDL_71) wln.networkstop() as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence the termination of its own network.
+'<br><br>
+'Network termination process is a task. As such, wln.networkstop will be rejected (return 1- REJECTED) if another task is currently in progress.
+'The task will also be rejected if the Wi-Fi hardware is not operational (wln.enabled=0- NO) or the Wi-Fi interface is not currently running own network (wln.assiciationstate <> 2- PL_WLN_OWN_NETWORK).
+'<br><br>
+'The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time.
+
+'--------------------------------------------------------------------
+enum pl_wln_events 
+    PL_WLN_EVENT_DISABLED,      '<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi hardware has been disconnected, powered-down, reset, or is malfunctioning.
+    PL_WLN_EVENT_DISASSOCIATED  '<b>PLATFORM CONSTANT.</b><br><br>Wi-Fi interface has been disassociated from the wireless network.
+end enum
+
+event(23)  on_wln_event(wln_event as pl_wln_events)
+'<b>EVENT of the wln object.</b>
+'<br><br>
+'Generated when the wln. object detects disassociation from the wireless network, the Wi-Fi interface is disabled by calling wln.disable,
+'or the Wi-Fi hardware is disconnected, powered-down, reset, or have malfunctioned.
+'<br><br>
+'<b>Wln_event </b>-- registered event (DISABLED or DISASSOCIATED).
+'<br><br>
+'Multiple on_wln_event events may be waiting in the event queue.
+'For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
+'for this event or the body of any procedure in the related call chain.
+
+'--------------------------------------------------------------------
+enum pl_wln_tasks 
+    PL_WLN_TASK_IDLE,       	'<b>PLATFORM CONSTANT.</b><br><br>No task (idle). 
+    PL_WLN_TASK_SCAN,       	'<b>PLATFORM CONSTANT.</b><br><br>Passive scan task.
+    PL_WLN_TASK_ASSOCIATE,      '<b>PLATFORM CONSTANT.</b><br><br>Association task.
+    PL_WLN_TASK_SETTXPOWER,     '<b>PLATFORM CONSTANT.</b><br><br>TX power adjustment task (completes immediately).
+    PL_WLN_TASK_SETWEP,     	'<b>PLATFORM CONSTANT.</b><br><br>WEP mode and keys setup task (completes immediately).
+    PL_WLN_TASK_DISASSOCIATE,   '<b>PLATFORM CONSTANT.</b><br><br>Disassociation task.
+    PL_WLN_TASK_NETWORK_START,  '<b>PLATFORM CONSTANT.</b><br><br>Network start task.
+    PL_WLN_TASK_NETWORK_STOP,   '<b>PLATFORM CONSTANT.</b><br><br>Network stop task.
+    PL_WLN_TASK_SETWPA,     	'<b>PLATFORM CONSTANT.</b><br><br>WPA mode and keys setup task (completes immediately). 
+    PL_WLN_TASK_ACTIVESCAN,     '<b>PLATFORM CONSTANT.</b><br><br>Active scan task.
+    PL_WLN_TASK_UPDATERSSI,     '<b>PLATFORM CONSTANT.</b><br><br>RSSI update task.
+	PL_WLN_TASK_SET_EAP_TLS,    '<b>PLATFORM CONSTANT.</b><br><br>EAP-TLS mode and keys setup task (completes immediately). 
+	PL_WLN_TASK_SET_EAP_PEAP,   '<b>PLATFORM CONSTANT.</b><br><br>EAP-PEAP mode and keys setup task (completes immediately). 
+	PL_WLN_TASK_SET_EAP_TTLS    '<b>PLATFORM CONSTANT.</b><br><br>EAP-TTLS mode and keys setup task (completes immediately).     
+end enum
+
+event(22)  on_wln_task_complete(completed_task as pl_wln_tasks)
+'<b>EVENT of the wln object.</b>
+'<br><br>
+'Generated when the Wi-Fi interface completes executing a given task.
+'<br><br>
+'<b>Wln_event </b>-- the task completed.
+'<br><br>
+'The wln.task R/O property will change to 0- PL_WLN_TASK_IDLE along with this event generation.
+'The wln object will only accept another task for execution after the previous task has been completed.
+'<br><br>
+'Multiple on_wln_task_complete events may be waiting in the event queue.
+'For this reason the doevents statement will be skipped (not executed) if encountered within the event handler
+'for this event or the body of any procedure in the related call chain.
+
+'--------------------------------------------------------------------
+property wln.rssi
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b>
+'<br><br>
+'Indicates the strength of the signal being received from the wireless peer.
+'<br><br>
+'The signal strength is expressed in 256 arbitrary levels that do not correspond to any standard measurement unit.
+'<br><br>
+'This property is only updated while the Wi-Fi interface is in the non-idle state (wln.associationstate <> 0- PL_WLN_NOT_ASSOCIATED).
+    get = syscall(474,TDL_72) as byte
+end property
+
+'--------------------------------------------------------------------
+syscall(581,TDL_71) !wln.updaterssi() as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence RSSI value updating.
+
+'--------------------------------------------------------------------
+syscall(489,TDL_71) wln.scan(byref ssid as string) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence either the passive detection of available wireless networks or obtainment of an additional information about a particular network specified by its SSID (name).
+'<br><br>
+'<b>Ssid </b>-- Network name. Leave empty to scan for all available networks -- after the scan, the comma-delimited list of networks will be in wln.scanresultssid.
+'Alternatively, specify the network name. If the network is found, its parameters will be available through
+'wln.scanresultssid, wln.scanresultbssid, wln.scanresultbssmode, wln.scanresultchannel, wln.scanresultrssi, and wln.scanresultwpainfo.
+'<br><br>
+'Scanning is limited to frequency bands and modes allowed by the wln.band property.
+'<br><br>
+'The scan process is a "task". As such, wln.scan will be rejected (return 1- REJECTED) if another task is currently in progress.
+'The task will also be rejected if the Wi-Fi interface is not operational (wln.enabled=0- NO).
+'<br><br>
+'The task is completed when wln.task becomes 0- PL_WLN_TASK_IDLE. The on_wln_task_complete event is also generated at that time and the values of related R/O properties are updated. 
+'<br><br>
+'Scanning while the Wi-Fi interface is in the associated state (wln.associationstate= 1- PL_WLN_ASSOCIATED) or running its own network
+'(wln.associationstate= 2- PL_WLN_OWN_NETWORK) will temporarily disrupt communications between your device and other stations.
+
+'--------------------------------------------------------------------
+enum pl_wln_scan_filter 
+    PL_WLN_SCAN_ALL,            '<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure and ad-hoc networks.
+    PL_WLN_ASCAN_INFRASTRUCTURE,    '<b>PLATFORM CONSTANT.</b><br><br> Scan for infrastructure networks only.
+    PL_WLN_OWN_ADHOC            '<b>PLATFORM CONSTANT.</b><br><br> Scan for ad-hoc networks only.
+end enum
+
+property wln.scanfilter
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_SCAN_ALL. </b>
+'<br><br>
+'Determines what wireless networks are included in the scan results (after scanning with wln.scan or wln.activescan): all networks, only infrastructure networks (access points), or only ad-hoc networks.
+'<br><br>
+'Note that WA2000 does not support association with ad-hoc networks.
+    get = syscall(582,TDL_72) as pl_wln_scan_filter
+    set = syscall(583,TDL_72) (value as pl_wln_scan_filter)
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultbssid
+'<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
+'<br><br>
+'After a successful scan for a particular network (wln.scan or wln.activescan with the SSID specified) this property will contain the BSSID ("MAC address") of this network. 
+'<br><br>
+'This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
+    get = syscall(497,TDL_72) as string
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultbssmode
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_BSS_MODE_INFRASTRUCTURE.</b>
+'<br><br>
+'After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the network mode of this network
+'(infrastructure or ad-hoc).
+'<br><br>
+'This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
+    get = syscall(500,TDL_72) as pl_wln_bss_modes
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultchannel
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 1 (channel 1).</b>
+'<br><br>
+'After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the number of the channel on which this network operates.
+'<br><br>
+'This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
+    get = syscall(496,TDL_72) as byte
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultrssi
+'<b>R/O PROPERTY (BYTE), DEFAULT VALUE= 0.</b>
+'<br><br>
+'After a successful scan for a particular network (wln.scan with the ssid specified) this property will contain the strength of the signal received from this network.
+'<br><br>
+'This property will not be updated if wln.scan or wln.activescan is invoked with its ssid argument left empty ("search for all networks" mode).
+'<br><br>
+'The signal strength is expressed in 256 arbitrary levels that do not correspond to any standard measurement unit.
+    get = syscall(499,TDL_72) as byte
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultssid
+'<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
+'<br><br>
+'After a scan (wln.scan or wln.activescan) this property will contain a comma-delimited list of discovered networks or the name of a particular network depending on how the scan was performed.
+'<br><br>
+'If the wln.scan or wln.activescan method was invoked with its name argument left empty, this property will contain the list of all discovered networks.
+'If the name argument specified a particular network and scanning found this network to be present, then this property will contain the name of this network
+'(otherwise an empty string will be returned).
+    get = syscall(495,TDL_72) as string
+end property
+
+'--------------------------------------------------------------------
+property wln.scanresultwpainfo
+'<b>R/O PROPERTY (STRING), DEFAULT VALUE= "".</b>
+'<br><br>
+'On GA1000, after a successful scan for a particular network (wln.scan or wln.activescan with the SSID specified) this property will contain binary data required for WPA/WPA2 security protocol.
+'The property always returns an empty string on WA2000.
+'<br><br>
+'This property will not be updated if the wln.scan method is invoked with its ssid argument left empty ("search for all networks" mode).
+'<br><br>
+'The string returned by this property is not intended for humans. The property exists to facilitate the operation of the WLN library, which calculates the WPA key for the GA1000.
+    get = syscall(498,TDL_72) as string
+end property
+
+'--------------------------------------------------------------------
+syscall(494,TDL_90) wln.settxpower(level as byte) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence the adjustment of the TX power to the specified level.
+'<br><br>
+'<b>Level </b>-- Value between 4 and 15 that roughly corresponds to the transmitter's output power in dB.
+'Attempting to specify the level < 4 results in level = 4; attempting to specify the level > 15 results in level = 15.
+'<br><br>
+'Adjusting TX power is an immediate task. As such, wln.settxpower will be rejected (return 1- REJECTED) if another task is currently in progress.
+'The task will also be rejected if the Wi-Fi hardware is not online (wln.enabled= 0- NO).
+'<br><br>
+'"Immediate" means you don't have to wait for the task to complete -- it is finished as soon as wln.settxpower is done executing.
+'The on_wln_task_complete event is still generated.
+
+
+'--------------------------------------------------------------------
+enum pl_wln_wep_modes 
+    PL_WLN_WEP_MODE_DISABLED,   '<b>PLATFORM CONSTANT.</b><br><br>WEP is disabled.
+    PL_WLN_WEP_MODE_64,     '<b>PLATFORM CONSTANT.</b><br><br>WEP-64 is enabled.
+    PL_WLN_WEP_MODE_128     '<b>PLATFORM CONSTANT.</b><br><br>WEP-128 is enabled.
+end enum
+
+syscall(502,TDL_71) wln.setwep(byref wepkey as string, wepmode as pl_wln_wep_modes) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to set new WEP mode and key.
+'<br><br>
+'<b>Wepkey </b>-- A string containing the new WEP key. This is a "HEX strings" -- each character in the string represents one HEX digit.
+'The string must contain 10 HEX digits for WEP64 and 26 HEX digits for WEP128. Any data in excess of these lengths is ignored. Missing digits are assumed to be 0.
+'<br><br>
+'<b>Wepmode </b>-- choose between "disabled", "WEP64", or "WEP128".
+'<br><br>
+'The WEP mode must be set prior to performing association (wln.associate) or starting own network (wln.networkstart).
+'If you are switching from an access point using WEP security to another access point with no security or WPA security, you still need to execute wln.setwep("",PL_WLN_WEP_MODE_DISABLED).
+'<br><br>
+'Only one WEP key (wepkey1) is used by the wln. object.
+'<br><br>
+'Changing WEP mode and keys is an immediate task.
+'This task completes as soon as wln.setwep finishes executing.
+'The on_wln_task_complete event is still generated.
+'<br><br> 
+'The task will be rejected if the Wi-Fi interface is not operational (wln.enabled= 0- NO).
+
+'--------------------------------------------------------------------
+enum pl_wln_wpa_modes
+    PL_WLN_WPA_DISABLED,    '<b>PLATFORM CONSTANT.</b><br><br>WPA disabled.
+    PL_WLN_WPA_WPA1_PSK,    '<b>PLATFORM CONSTANT.</b><br><br>WPA1-PSK mode.
+    PL_WLN_WPA_WPA2_PSK '<b>PLATFORM CONSTANT.</b><br><br>WPA2-PSK mode.
+end enum
+
+enum pl_wln_wpa_algorithms
+    PL_WLN_WPA_ALGORITHM_TKIP,  '<b>PLATFORM CONSTANT.</b><br><br>Install TKIP key.
+    PL_WLN_WPA_ALGORITHM_AES    '<b>PLATFORM CONSTANT.</b><br><br>Install AES key.
+end enum
+
+enum pl_wln_wpa_unicast_multicast 
+    PL_WLN_WPA_CAST_UNICAST,    '<b>PLATFORM CONSTANT.</b><br><br>Install unicast key.
+    PL_WLN_WPA_CAST_MULTICAST   '<b>PLATFORM CONSTANT.</b><br><br>Install multicast key.
+end enum
+
+syscall(493,TDL_71) wln.setwpa(wpamode as pl_wln_wpa_modes, algorithm as pl_wln_wpa_algorithms, byref wpakey as string, cast as pl_wln_wpa_unicast_multicast) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence setting new WPA mode and key.
+'<br><br>
+'<b>Wpamode </b>-- choose between "disabled", "WPA1", or "WPA2".
+'<br><br>
+'<b>Algorithm </b>-- choices are "TKIP" and "AES".
+'<br><br>
+'<b>Wpakey </b>-- GA1000: A string containing new WPA key (must be 16 characters long). The key is <i>not</i> the password to your access point. The key is calculated <i>from</i> the password.
+'The math involved is complex and is better left to the WLN library that we provide. WA2000: A string containing the password itself. The WA2000 performs the WPA key calculation internally.
+'<br><br>
+'<b>Cast </b>-- Always set it to 1- PL_WLN_WPA_CAST_MULTICAST.
+'<br><br>
+'The WPA mode must be set prior to performing association (wln.associate) or starting own network (wln.networkstart).
+'If you are switching from an access point using WPA security to another access point with no security or WEP security, you still need to execute wln.setwpa(PL_WLN_WPA_DISABLED,0,"",PL_WLN_WPA_CAST_MULTICAST).
+'<br><br>
+'Changing WPA mode and keys is an immediate task.
+'This task completes as soon as wln.setwpa finishes executing.
+'The on_wln_task_complete event is still generated.
+'<br><br> 
+'The task will be rejected if the Wi-Fi interface is not operational (wln.enabled= 0- NO).
+
+'--------------------------------------------------------------------
+property wln.task
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_WLN_TASK_IDLE.</b>
+'<br><br>
+'Indicates the current wln. task being executed.
+'<br><br>
+'The wln. object will only accept another task for execution after the previous task has been completed
+'(wln.task= 0- PL_WLN_TASK_IDLE). Every time the task completes, the on_wln_task_complete event is generated.
+    get = syscall(501,TDL_72) as pl_wln_tasks
+end property
+
+'--------------------------------------------------------------------
+syscall(456,TDL_70) !wln.mfgboot(offset as dword) as ok_ng
+
+'--------------------------------------------------------------------
+enum pl_wln_mfgtx_modes
+    PL_WLN_MFGTX_MODE_CONTINUOUS,   '<b>PLATFORM CONSTANT.</b><br><br>Continuous output.
+    PL_WLN_MFGTX_MODE_BURST,    '<b>PLATFORM CONSTANT.</b><br><br>Burst output.
+    PL_WLN_MFGTX_MODE_DATATX    '<b>PLATFORM CONSTANT.</b><br><br>Continuous output of data.
+end enum
+
+enum pl_wln_mfgtx_rates
+    PL_WLN_MFGTX_RATE_1M,   '<b>PLATFORM CONSTANT.</b><br><br>Rate = 1 Mbps.
+    PL_WLN_MFGTX_RATE_2M,   '<b>PLATFORM CONSTANT.</b><br><br>Rate = 2 Mbps.
+    PL_WLN_MFGTX_RATE_5_5M, '<b>PLATFORM CONSTANT.</b><br><br>Rate = 5.5 Mbps.
+    PL_WLN_MFGTX_RATE_11M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 11 Mbps.
+    PL_WLN_MFGTX_RATE_22M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 22 Mbps.
+    PL_WLN_MFGTX_RATE_6M,   '<b>PLATFORM CONSTANT.</b><br><br>Rate = 6 Mbps.
+    PL_WLN_MFGTX_RATE_9M,   '<b>PLATFORM CONSTANT.</b><br><br>Rate = 9 Mbps.
+    PL_WLN_MFGTX_RATE_12M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 12 Mbps.
+    PL_WLN_MFGTX_RATE_18M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 18 Mbps.
+    PL_WLN_MFGTX_RATE_24M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 24 Mbps.
+    PL_WLN_MFGTX_RATE_36M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 36 Mbps.
+    PL_WLN_MFGTX_RATE_48M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 48 Mbps.
+    PL_WLN_MFGTX_RATE_54M,  '<b>PLATFORM CONSTANT.</b><br><br>Rate = 54 Mbps.
+    PL_WLN_MFGTX_RATE_72M   '<b>PLATFORM CONSTANT.</b><br><br>Rate = 72 Mbps.
+end enum
+
+syscall(469,TDL_90) !wln.mfgtx(mode as pl_wln_mfgtx_modes, channel as byte, txpower as byte, datarate as pl_wln_mfgtx_rates) as ok_ng
+
+'--------------------------------------------------------------------
+property !wln.mfgenabled
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO.</b>
+    get = syscall(468,TDL_72) as no_yes
+end property
+
+#endif
+
+#if PLATFORM_ID=LTPP3 Or PLATFORM_ID=LKLM601
+
+'--------------------------------------------------------------------
+syscall(739) wln.seteaptls(byref ca_cert as string, byref client_cert as string, byref private_key as string, byref private_key_passwd as string, byref identify as string) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence setting the new data for EAP TLS Enterprise ciphering.
+
+'--------------------------------------------------------------------
+enum pl_wln_peap_phase1
+    PL_WLN_PEAP_PHASE2_0,
+	PL_WLN_PEAP_PHASE2_1
+end enum
+
+'--------------------------------------------------------------------
+enum pl_wln_peap_phase2
+    PL_WLN_PEAP_PHASE2_MSCHAPV2,
+	PL_WLN_PEAP_PHASE2_TLS,
+	PL_WLN_PEAP_PHASE2_GTC,
+	PL_WLN_PEAP_PHASE2_OTP,
+	PL_WLN_PEAP_PHASE2_MD5
+end enum
+
+'--------------------------------------------------------------------
+syscall(740) wln.seteappeap(byref ca_cert as string, byref identify as string, byref password as string, phase1 as pl_wln_peap_phase1, phase2 as pl_wln_peap_phase2) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence setting the new data for EAP PEAP Enterprise ciphering.
+
+'--------------------------------------------------------------------
+enum pl_wln_ttls_phase2
+    PL_WLN_TTLS_PHASE2_EAP_MD5,
+	PL_WLN_TTLS_PHASE2_EAP_GTC,
+	PL_WLN_TTLS_PHASE2_EAP_OTP,
+	PL_WLN_TTLS_PHASE2_EAP_MSCHAPV2,
+	PL_WLN_TTLS_PHASE2_EAP_TLS,
+	PL_WLN_TTLS_PHASE2_MSCHAPV2,
+	PL_WLN_TTLS_PHASE2_MSCHAP,
+	PL_WLN_TTLS_PHASE2_PAP,
+	PL_WLN_TTLS_PHASE2_CHAP
+end enum
+
+'--------------------------------------------------------------------
+syscall(741) wln.seteapttls(byref ca_cert as string, byref identify as string, byref password as string, phase2 as pl_wln_ttls_phase2) as accepted_rejected
+'<b>METHOD.</b>
+'<br><br>
+'Causes the Wi-Fi interface to commence setting the new data for EAP PEAP Enterprise ciphering.
+
+#endif

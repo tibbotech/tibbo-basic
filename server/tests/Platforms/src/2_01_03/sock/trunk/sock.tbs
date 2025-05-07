@@ -1,0 +1,153 @@
+'***********************************************************************************************************
+'			SOCKET ALLOCATION LIBRARY
+'
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'--------------------------------------------------------------------
+const SOCK_STAMP="SOCK> "
+const SOCK_CR_LF=chr(13)+chr(10)
+const SOCK_MAX_SOCKETS=SOCK_MAX_SOCKETS_PLATFORM
+const SOCK_UNUSED_SIGNATURE="----"
+const SOCK_INIT_SIGNATURE=&h4740
+
+'--------------------------------------------------------------------
+declare sub sock_init()
+declare sub sock_debugprint(byref print_data as string)
+
+'--------------------------------------------------------------------
+dim sock_in_use(SOCK_MAX_SOCKETS) as no_yes
+dim sock_user_signature(SOCK_MAX_SOCKETS) as string(SOCK_MAX_SIGNATURE_LEN)
+dim sock_init_flag as word
+
+'==============================================================================
+public function sock_get(byref signature as string) as byte
+'Returns a free socket number or 255 if no free sockets left.
+
+	dim f as byte
+
+	if sock_init_flag<>SOCK_INIT_SIGNATURE then
+		sock_init()
+		sock_init_flag=SOCK_INIT_SIGNATURE
+	end if
+	
+	for f=0 to SOCK_MAX_SOCKETS-1
+		if sock_in_use(f)=NO then
+			sock_in_use(f)=YES
+			sock_user_signature(f)=signature
+			sock_get=f
+			#if SOCK_DEBUG_PRINT
+				sock_debugprint("'"+sock_user_signature(f)+"' got socket #"+str(f))
+			#endif
+			exit function
+		end if
+	next f
+
+	'no free socket found
+	#if SOCK_DEBUG_PRINT
+		sock_debugprint("'"+signature+"' could not get a socket: no free sockets left")
+	#endif
+	sock_get=255
+end function
+
+'--------------------------------------------------------------------
+public function sock_who_uses(sock_num as byte) as string
+'Returns the signature of the specified socket's user.
+
+	if sock_init_flag<>SOCK_INIT_SIGNATURE then
+		sock_init()
+		sock_init_flag=SOCK_INIT_SIGNATURE
+	end if
+
+	if sock_in_use(sock_num)=NO then
+		sock_who_uses=SOCK_UNUSED_SIGNATURE
+	else
+		sock_who_uses=sock_user_signature(sock_num)
+	end if
+end function
+
+'--------------------------------------------------------------------
+public sub sock_release(sock_num as byte)
+'Releases the socket (number), discards socket connection, restores socket's properties to their default states.
+	dim sock_bup as byte
+	dim i as word
+
+	if sock_init_flag<>SOCK_INIT_SIGNATURE then
+		sock_init()
+		sock_init_flag=SOCK_INIT_SIGNATURE
+	end if
+
+	sock_bup=sock.num
+	sock.num=sock_num
+
+	'close existing connection, if any
+	i=sys.timercount
+	sock.discard
+	while sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i
+	wend
+	
+	'release socket buffers
+	sock.rxbuffrq(0)
+	sock.txbuffrq(0)
+	sock.tx2buffrq(0)
+	sock.cmdbuffrq(0)
+	sock.rplbuffrq(0)
+	sock.varbuffrq(0)
+	sys.buffalloc
+	
+	'restore the socket to its default state
+	sock.acceptbcast=NO
+	sock.allowedinterfaces="NET"
+	sock.connectiontout=0
+	sock.endchar=13
+	sock.escchar=255
+	sock.gendataarrivalevent=YES
+	sock.httpnoclose=NO
+	sock.httpportlist=""
+	sock.inbandcommands=NO
+	sock.inconmode=PL_SOCK_INCONMODE_NONE
+	sock.localportlist=""
+	sock.outport=0
+	sock.protocol=PL_SOCK_PROTOCOL_UDP
+	sock.reconmode=PL_SOCK_RECONMODE_0
+	sock.sinkdata=NO
+	sock.splittcppackets=NO
+	sock.targetbcast=NO
+	#if NET_AVAILABLE
+		sock.targetinterface=PL_SOCK_INTERFACE_NET
+	#elif WLN_AVAILABLE
+		sock.targetinterface=PL_SOCK_INTERFACE_WLN
+	#else
+		sock.targetinterface=PL_SOCK_INTERFACE_NULL
+	#endif
+	sock.targetip="0.0.0.0"
+	sock.targetport=0
+	sock.urlsubstitutes=""
+
+	#if SOCK_DEBUG_PRINT
+		sock_debugprint("'"+sock_user_signature(sock_num)+"' released socket #"+str(sock_num))
+	#endif
+	
+	sock_in_use(sock_num)=NO
+	sock_user_signature(sock_num)=SOCK_UNUSED_SIGNATURE
+	sock.num=sock_bup
+end sub
+
+'------------------------------------------------------------------------------
+sub sock_init()
+	dim f as byte
+	
+	for f=0 to SOCK_MAX_SOCKETS-1
+		sock_in_use(f)=NO
+		sock_user_signature(f)=SOCK_UNUSED_SIGNATURE
+	next f
+end sub
+
+'------------------------------------------------------------------------------
+#if SOCK_DEBUG_PRINT
+sub sock_debugprint(byref print_data as string)
+
+	sys.debugprint(SOCK_STAMP+print_data+SOCK_CR_LF)
+end sub
+#endif

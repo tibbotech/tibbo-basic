@@ -1,0 +1,3038 @@
+'***********************************************************************************************************
+'			TABLES LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'------------------------------------------------------------------------------
+const TBL_DELETE_FLAG=chr(val("&hFF"))
+const TBL_ACTIVE_FLAG=chr(val("&hFE"))
+const TBL_NULL=0
+const TBL_FIELD_SEPARATOR=9
+const TBL_STAMP="TBL> "
+const TBL_CR_LF=chr(13)+chr(10)
+const TBL_ELEMENT_START=28
+const TBL_ELEMENT_END=29
+const TBL_ELEMENT_NAME_VALUE_SEPARATOR=30
+const TBL_INIT_SIGNATURE=&h54F1
+
+#if TBL_AGGREGATE_HASH
+	#if TBL_MAX_RECORD_SIZE>9
+		#define TBL_MAX_FIELD_VALUE_LEN TBL_MAX_RECORD_SIZE-9
+	#else
+		#define TBL_MAX_FIELD_VALUE_LEN 0
+	#endif
+#else
+	#if TBL_MAX_RECORD_SIZE>1
+		#define TBL_MAX_FIELD_VALUE_LEN TBL_MAX_RECORD_SIZE-1
+	#else
+		#define TBL_MAX_FIELD_VALUE_LEN 0
+	#endif
+#endif
+
+'------------------------------------------------------------------------------
+declare function tbl_info_find(byref table_name_or_num as string, byref index as byte) as en_tbl_status_codes
+declare function tbl_check_key_violation(byref key_ptr as word) as no_yes
+declare function tbl_field_find(field_name as string, byref field_index as word) as en_tbl_status_codes
+declare function tbl_generate_uid(byref id_string as string) as en_tbl_status_codes
+declare function tbl_get_descriptor_field(line_end_pos as word, byref field_start_pos as word) as string
+declare function tbl_adjust_size() as en_tbl_status_codes
+declare function tbl_attributes_sg(byref tbl_file_name as string, attri_name as string(4),byref attri_val as string,op as en_tbl_rdwr) as pl_fd_status_codes
+declare function tbl_active_rc_sg(byref rec_count as word,op as en_tbl_rdwr) as pl_fd_status_codes
+declare function tbl_get_field_size(field_index as word) as byte
+declare function tbl_record_ptr_sg(byref rec_num as word,op as en_tbl_rdwr) as en_tbl_status_codes
+declare sub tbl_check_for_missing_fields(curr_pos as word, line_end_pos as word)
+declare sub tbl_debug_print_error(byref debug_str as string,status_code as en_tbl_status_codes)
+declare sub tbl_debugprint(byref print_data as string)
+declare sub tbl_mod_hash(byref d as dword)
+
+#if TBL_AGGREGATE_HASH
+	declare function tbl_set_md5() as dword
+#endif
+
+'------------------------------------------------------------------------------
+dim tbl_info_index as byte
+dim tbl_fld_offset as byte
+dim tbl_record_string as string(TBL_MAX_RECORD_SIZE)
+dim tbl_selected_file_name as string(TBL_MAX_FILE_NAME_LEN)
+dim tbl_info as tbl_type(TBL_MAX_NUM_TABLES)
+dim tbl_field_info as tbl_field_type(TBL_MAX_TOTAL_NUM_FIELDS)
+dim tbl_selected_active_rc as word
+dim tbl_selected_all_rc as word
+dim tbl_init_flag as word
+
+#if TBL_DEBUG_PRINT
+	dim tbl_do_not_debug_print as no_yes
+#endif
+
+'==============================================================================
+public function tbl_start() as en_tbl_status_codes
+'API procedure, starts the table library, parses the descriptor file, checks compilation options, and exams the memory usage.
+'Also mounts flash disk
+
+	dim s as string
+	dim i, j, k, line_end, field_start_pos, num_fields as word
+	dim dw as dword
+	dim b, record_size as byte
+	dim max_tbl_name_len, max_fld_name_len, max_record_size as byte
+	dim tbl_item as tbl_type
+	dim field_item as tbl_field_type
+	dim field_index as word
+	
+	tbl_start=EN_TBL_STATUS_OK
+
+	#if TBL_DEBUG_PRINT
+		tbl_do_not_debug_print=NO
+	#endif
+
+	#if TBL_DEBUG_PRINT
+		tbl_debugprint("---START---")
+	#endif
+	
+	if TBL_MAX_TABLE_NAME_LEN=0 or TBL_MAX_TABLE_NAME_LEN>32 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_TABLE_NAME_LEN must be between 1 and 32, you now have '#TBL_MAX_TABLE_NAME_LEN "+str(TBL_MAX_TABLE_NAME_LEN)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if TBL_MAX_FILE_NAME_LEN=0 or TBL_MAX_FILE_NAME_LEN>42 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_FILE_NAME_LEN must be between 1 and 42, you now have '#TBL_MAX_FILE_NAME_LEN "+str(TBL_MAX_FILE_NAME_LEN)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if TBL_MAX_NUM_TABLES=0 or TBL_MAX_NUM_TABLES>255 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_NUM_TABLES must be between 1 and 255, you now have '#TBL_MAX_NUM_TABLES "+str(TBL_MAX_NUM_TABLES)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if TBL_MAX_FIELD_NAME_LEN=0 or TBL_MAX_FIELD_NAME_LEN>32 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_FIELD_NAME_LEN must be between 1 and 32, you now have '#TBL_MAX_FIELD_NAME_LEN "+str(TBL_MAX_FIELD_NAME_LEN)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if TBL_MAX_TOTAL_NUM_FIELDS=0 or TBL_MAX_TOTAL_NUM_FIELDS>65535 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_TOTAL_NUM_FIELDS must be between 1 and 65535, you now have '#TBL_MAX_TOTAL_NUM_FIELDS "+str(TBL_MAX_TOTAL_NUM_FIELDS)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	select case TBL_MAX_RECORD_SIZE
+	case 2,4,8,16,32,64,128:
+		'---
+	
+	case else:
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: TBL_MAX_RECORD_SIZE must be equal to 2,4,8,16,32,64, or 128, you now have '#TBL_MAX_RECORD_SIZE "+str(TBL_MAX_RECORD_SIZE)+"'.")
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end select
+
+	if TBL_MAX_FIELD_VALUE_LEN=0 then
+		#if TBL_DEBUG_PRINT
+			#if TBL_AGGREGATE_HASH
+				tbl_debugprint("ERROR: TBL_MAX_RECORD_SIZE is too small, You need to increase TBL_MAX_RECORD_SIZE to at least 16.")
+			#else
+				tbl_debugprint("ERROR: TBL_MAX_RECORD_SIZE is too small, You need to increase TBL_MAX_RECORD_SIZE to at least 2.")
+			#endif
+		#endif
+		tbl_info_index=0
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+
+	if fd.ready=NO then
+		if fd.mount<>PL_FD_STATUS_OK then
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR: the flash disk is not formatted or malfunctioned.")
+			#endif
+			tbl_start=EN_TBL_STATUS_FAILURE	
+			exit function
+		end if
+		if fd.transactioncapacityremaining<16 then
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR: Current flash disk formatting doesn't support transactions. Use 'fd.formatj()' with maxjournalsectors>=16 (currently "+str(fd.transactioncapacityremaining)+").")
+			#endif
+			tbl_start=EN_TBL_STATUS_INV_PARAM
+			exit function
+		end if		
+	end if
+	
+	num_fields=0
+	max_tbl_name_len=0
+	max_fld_name_len=0
+	max_record_size=0
+	tbl_fld_offset=0
+	#if TBL_AGGREGATE_HASH
+		tbl_fld_offset=tbl_fld_offset+2
+	#endif
+
+	s=strgen(TBL_MAX_RECORD_SIZE-1,chr(TBL_NULL))
+	tbl_record_string=TBL_ACTIVE_FLAG+s
+	tbl_info_index=0 'will select table_info array member (follows table_num_tables but is limited by array size)
+	tbl_selected_file_name=""
+	field_index=0	'total number of fields (for all tables)	
+	
+	romfile.open(TBL_DESCRIPTOR_FILE)				'this file is a table descriptor file
+	if romfile.size=0 then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: '"+TBL_DESCRIPTOR_FILE+"' is not in your project or file is empty.")
+		#endif
+		tbl_info_index=0 'table descriptor file is not in your project (or file is empty)
+		tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+		exit function
+	end if
+	
+	i=romfile.find(romfile.pointer,"==",1)
+	while i<>0	
+		'we are now at the "==" pointing at the beginning of one table descriptor line
+		romfile.pointer=i+2
+		
+		'find the end of this table descriptor line
+		line_end=romfile.find(romfile.pointer,TBL_CR_LF,1)
+		if line_end=0 then
+			line_end=romfile.size+1
+		end if
+
+		'extract table name
+		s=tbl_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing table name field
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table #"+str(tbl_info_index)+"'): missing table name field (tables are counted from 0).")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if len(s)>TBL_MAX_TABLE_NAME_LEN then
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+s+"'): this table's name length is "+str(len(s))+", while you have 'TBL_MAX_TABLE_NAME_LEN "+str(TBL_MAX_TABLE_NAME_LEN)+"'.")
+			#endif
+			tbl_info_index=0 'you need to increase TBL_MAX_TABLE_NAME_LEN!
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		if len(s)>max_tbl_name_len then max_tbl_name_len=len(s)
+		tbl_item.table_name=s
+		
+		'extract the maximum number of records
+		s=tbl_get_descriptor_field(line_end,field_start_pos)
+
+		if s="" then
+			'missing missing maximum number field
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): missing maximum number of records field.")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if lval(s)>65535 then
+			'exceeded max possible number of records
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): maximum number of records cannot exceed 65535, you now have "+lstr(lval(s))+".")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		tbl_item.maxrecs=val(s)
+
+		'extract the table type
+		s=tbl_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing table type field
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): missing table type field.")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		select case s
+		case "L": tbl_item.struct=EN_TBL_STRUCT_LIST
+		case "T": tbl_item.struct=EN_TBL_STRUCT_TABLE
+		case else
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): unknown table type'"+s+"', use 'T' or 'L' only.")
+			#endif
+			tbl_info_index=0 'change table type field to either "L" or "T"
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end select
+		
+		'extract number of key fields
+		s=tbl_get_descriptor_field(line_end,field_start_pos)
+		if s="" then
+			'missing number of key fields
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): missing number of key fields.")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		
+		if val(s)>TBL_MAX_TOTAL_NUM_FIELDS then
+			'exceeded max possible number of key fields
+			#if TBL_DEBUG_PRINT
+				tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): maximum number of fields (and key fields) cannot exceed TBL_MAX_TOTAL_NUM_FIELDS, now "+str(TBL_MAX_TOTAL_NUM_FIELDS)+". Number of key fields is currently "+s+".")
+			#endif
+			tbl_info_index=0
+			tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+			exit function
+		end if
+		tbl_item.numkeyf=val(s)
+
+		record_size=1	'active flag is 1 byte long
+		i=romfile.find(romfile.pointer,"==",1)	'looking for the addr for the next table.
+		j=romfile.find(romfile.pointer,">>",1)	'looking for the addr of the first field of current table
+		
+		if i<>0 and i<j then goto no_field_found
+
+		tbl_item.field_num_offset=field_index
+		#if TBL_AGGREGATE_HASH
+			field_item.field_name ="MD5"
+			field_item.field_type=asc("U")
+			field_item.key=no
+			field_item.p1=0
+			field_item.p2=4294967295 
+			field_item.romaddr_def=0
+			record_size=record_size+4
+			if field_index<TBL_MAX_TOTAL_NUM_FIELDS then
+				tbl_field_info(field_index)=field_item
+			end if
+			field_index=field_index+1
+
+			field_item.field_name ="UID"
+			field_item.field_type=asc("U")
+			field_item.key=yes
+			field_item.p1=0
+			field_item.p2=2147483647 
+			field_item.romaddr_def=0	
+			record_size=record_size+4
+			if field_index<TBL_MAX_TOTAL_NUM_FIELDS then
+				tbl_field_info(field_index)=field_item
+			end if
+			field_index=field_index+1
+		#endif
+		
+		'addr of the fields for current table should not exceed the addr of the next table, unless the current table is the last table
+		while (j<>0 and j<i) or (i=0 and j>0)
+			romfile.pointer=j+2
+	
+			'find the end of this field descriptor line
+			line_end=romfile.find(romfile.pointer,TBL_CR_LF,1)
+			if line_end=0 then
+				line_end=romfile.size+1
+			end if
+
+			'extract field name
+			s=tbl_get_descriptor_field(line_end,field_start_pos)
+			if s="" then
+				'missing field name field
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field #"+str(field_index-num_fields)+"): missing field name (fields are counted from 0).")
+				#endif
+				field_index=0
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+		
+			if len(s)>TBL_MAX_FIELD_NAME_LEN then
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+s+"'): this field's name length is "+str(len(s))+", while you have 'TBL_MAX_FIELD_NAME_LEN "+str(TBL_MAX_FIELD_NAME_LEN)+"'.")
+				#endif
+				field_index=0 'you need to increase TBL_MAX_FIELD_NAME_LEN!
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+			if len(s)>max_fld_name_len then max_fld_name_len=len(s)			
+			field_item.field_name=s
+			
+			'extract field type
+			s=tbl_get_descriptor_field(line_end,field_start_pos)
+
+			if s="" then
+				'missing field type
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): missing field type.")
+				#endif
+				field_index=0
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+		
+			select case s
+			#if TBL_TIME_TYPE_INCLUDED
+				case "S","B","W","U","T":
+			#else
+				case "S","B","W","U":
+			#endif
+			case else
+				#if TBL_TIME_TYPE_INCLUDED
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): unknown field type '"+s+"', use 'B','W','U', 'S' or 'T' only.")
+					#endif
+				#else
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): unknown field type '"+s+"', use 'B','W','U' or 'S' only.")
+					#endif
+				#endif
+				field_index=0 'change field type to 'S','B','W','U' or 'T'
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end select
+			field_item.field_type=asc(s)
+
+			'extract p1
+			s=tbl_get_descriptor_field(line_end,field_start_pos)
+
+			if s="" then
+				'missing p1
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): missing P1 parameter field.")
+				#endif
+				field_index=0
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+			
+			select case field_item.field_type
+			#if TBL_TIME_TYPE_INCLUDED			
+				case `T`: 
+					if val(s)>6 then
+						#if TBL_DEBUG_PRINT
+							tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): minimum value (P1 param) can't exceed 6 for date/time type. It is now "+s)
+						#endif
+						tbl_info_index=0
+						tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+						exit function
+					end if
+			#endif			
+			case `B`: 
+				if val(s)>255 then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): minimum value (P1 param) can't exceed 255 for byte type. It is now "+s)
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function				
+				end if
+			case `W`: 
+				if lval(s)>65535 then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): minimum value (P1 param) can't exceed 65535 for word type. It is now "+s)
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function				
+				end if
+			case `U`:
+				b=len(s)
+				if b>9 then 
+					if (lval(right(s,9))>294967295 and lval(left(s,b-9))>3) or lval(left(s,b-9))>4 then
+						#if TBL_DEBUG_PRINT
+							tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): minimum value (P1 param) can't exceed 4294967295 for dword type. It is now "+s)
+						#endif
+						tbl_info_index=0
+						tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+						exit function
+					end if
+				end if				
+			case `S`:
+				if val(s)>TBL_MAX_FIELD_VALUE_LEN then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): minimum length (P1 param) exceed maximum string field length for this record, please decrease p1 or increase TBL_MAX_RECORD_SIZE.")
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if			
+			end select
+			field_item.p1=lval(s)
+			
+			'extract p2
+			s=tbl_get_descriptor_field(line_end,field_start_pos)
+			if s="" then
+				'missing p2
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): missing P2 parameter field.")
+				#endif
+				field_index=0
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+			
+			select case field_item.field_type
+			case `B`: 
+				if val(s)>255 then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): maximum value (P2 param) can't exceed 255 for byte type. It is now "+s)
+					#endif
+					field_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function				
+				end if
+			case `W`: 
+				if lval(s)>65535 then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): maximum value (P2 param) can't exceed 65535 for word type. It is now "+s)
+					#endif
+					field_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function			
+				end if
+			case `U`:
+				b=len(s)
+				if b>9 then
+					if (lval(right(s,9))>294967295 and lval(left(s,b-9))>3) or lval(left(s,b-9))>4 then
+						#if TBL_DEBUG_PRINT
+							tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): maximum value (P2 param) can't exceed 4294967295 for dword type. It is now "+s)
+						#endif
+						field_index=0
+						tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+						exit function
+					end if
+				end if				
+			case `S`:
+				if val(s)>TBL_MAX_FIELD_VALUE_LEN then
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): maximum length (P2 param) exceed maximum string field length for this record, please decrease p2 or increase TBL_MAX_RECORD_SIZE.")
+					#endif
+					field_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+			end select
+			field_item.p2=lval(s)
+
+			if field_item.p2<field_item.p1 and field_item.field_type<>`T` then
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): P2 parameter (now "+lstr(field_item.p2)+") cannot be smaller than P1 parameter (now "+lstr(field_item.p1)+").")
+				#endif
+				field_index=0	'P2 parameter cannot be smaller than P1 parameter
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+
+			'extract default value field
+			s=tbl_get_descriptor_field(line_end,field_start_pos)
+			if s="" then
+				'missing default value field
+				#if TBL_DEBUG_PRINT
+					tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): missing default value field (use '^' to specify NULL default value.).")
+				#endif
+				field_index=0
+				tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+				exit function
+			end if
+
+			'save default value field position
+			field_item.romaddr_def=field_start_pos
+			
+			'verify the validity of the default value
+			select case field_item.field_type
+			case `U`:
+				b=len(s)
+				if b>9 then
+					if (lval(right(s,9))>294967295 and lval(left(s,b-9))>3) or lval(left(s,b-9))>4 then
+						#if TBL_DEBUG_PRINT
+							tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): maximum default value can't exceed 4294967295 for dword type. It is now "+s)
+						#endif
+						field_index=0
+						tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+						exit function
+					end if
+				end if
+				goto check_for_p1_p2
+			case `B`,`W`,`U`:
+check_for_p1_p2:
+				if s="^" then
+					dw=0
+				else
+					dw=lval(s)
+				end if
+				if dw<field_item.p1 then
+					'def value < P1
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): default value is "+lstr(dw)+" which is below P1 parameter ("+lstr(field_item.p1)+").")
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if dw>field_item.p2 then
+					'def value > P2
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): default value is "+lstr(dw)+" which is above P2 parameter ("+lstr(field_item.p2)+").")
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+			
+			case `S`:
+				if s="^" then
+					k=0
+				else
+					k=len(s)
+				end if
+
+				if k<field_item.p1 then
+					'def value < P1
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): default value length is "+str(k)+" which is below P1 parameter ("+str(field_item.p1)+").")
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+				if k>field_item.p2 then
+					'def value > P2
+					#if TBL_DEBUG_PRINT
+						tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): default value length is "+str(k)+" which is above P2 parameter ("+str(field_item.p2)+").")
+					#endif
+					tbl_info_index=0
+					tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+					exit function
+				end if
+			#if TBL_TIME_TYPE_INCLUDED		
+				case `T`:
+					select case field_item.p1
+					case EN_TBL_DT_DATE:		'YYYYMMDD (year,month,date)
+						s=s+"000000"
+					case EN_TBL_DT_TIME1:		'hhmm (hour,minutes)
+						s="20000101"+s+"00"
+					case EN_TBL_DT_TIME2:		'hhmmss (hour,minutes,second)
+						s="20000101"+s
+					case EN_TBL_DT_TIME3:		'hhmmssmls (hour,minutes,second,milsecond)
+						s="20000101"+left(s,6)
+					case EN_TBL_DT_DATE_TIME1:	'YYYYMMDDhhmm (year,month,date,hour,minutes)
+						s=s+"00"
+					case EN_TBL_DT_DATE_TIME2:	'YYYYMMDDhhmmss (year,month,date,hour,minutes,second)
+					case EN_TBL_DT_ALL:			'YYYYMMDDhhmmssmls (year,month,date,hour,minutes,second,milsecond)
+						s=left(s,14)
+					end select				
+					if td_str_to_binstr(s)<>OK then
+						'def value 
+						#if TBL_DEBUG_PRINT
+							tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): default value is "+s+" which is not a valid date/time string (YYYYMMDDhhmmssmls).")
+						#endif
+						tbl_info_index=0
+						tbl_start=EN_TBL_STATUS_WRONG_DESCRIPTOR
+						exit function				
+					end if
+			#endif
+			end select
+
+			if field_index<TBL_MAX_TOTAL_NUM_FIELDS then
+				tbl_field_info(field_index)=field_item
+				k=tbl_get_field_size(field_index)
+				if k>TBL_MAX_FIELD_VALUE_LEN then
+					#if TBL_DEBUG_PRINT
+						 tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'/field '"+field_item.field_name+"'): this field would occupy up to "+str(k)+" chars in string form, while you have 'TBL_MAX_FIELD_VALUE_LEN "+str(TBL_MAX_FIELD_VALUE_LEN)+"'.")
+					#endif
+					tbl_info_index=0 'you need to increase TBL_MAX_RECORD_SIZE!
+					tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+					exit function
+				end if
+				record_size=record_size+k
+			end if
+			field_index=field_index+1	
+			j=romfile.find(romfile.pointer,">>",1)
+		wend
+		
+		num_fields=field_index-tbl_item.field_num_offset
+		if num_fields=0 then
+no_field_found:		
+			#if TBL_DEBUG_PRINT
+				 tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): No fields defined. There must be at least one field in each table.")
+			#endif
+			tbl_info_index=0 'no field found
+			tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+			exit function		
+		end if
+		
+		if tbl_item.numkeyf>num_fields then
+			#if TBL_DEBUG_PRINT
+				 tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): the number of key fields ("+str(tbl_item.numkeyf)+") is greater than the number of fields ("+str(num_fields)+") in the table.")
+			#endif
+			tbl_info_index=0 'number of key fields exceed number of field
+			tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+			exit function		
+		end if
+		
+		tbl_item.num_of_fields=num_fields
+		
+		if tbl_item.struct=EN_TBL_STRUCT_LIST then
+			k=2
+			while (TBL_MAX_RECORD_SIZE mod record_size)>0 and record_size<TBL_MAX_RECORD_SIZE+1 and record_size>0
+				if record_size>k then 
+					k=k*2
+				else
+					record_size=k
+				end if
+			wend
+		end if
+		
+		if record_size>TBL_MAX_RECORD_SIZE then
+			#if TBL_DEBUG_PRINT
+				 tbl_debugprint("ERROR (table '"+tbl_item.table_name+"'): TBL_MAX_RECORD_SIZE is too small. It is now "+str(TBL_MAX_RECORD_SIZE)+", it should be bigger than "+str(record_size)+" and in power of 2.")
+			#endif
+			tbl_info_index=0 'you need to increase TBL_MAX_RECORD_SIZE!
+			tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+			exit function
+		end if
+		if max_record_size<record_size then max_record_size=record_size
+		tbl_item.rec_size=record_size
+		
+		tbl_item.clean_start=NO
+		
+		if tbl_info_index<TBL_MAX_NUM_TABLES then
+			tbl_info(tbl_info_index)=tbl_item	
+		end if
+		tbl_info_index=tbl_info_index+1
+	wend
+	
+	if tbl_info_index>TBL_MAX_NUM_TABLES then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: total number of tables is "+str(tbl_info_index)+" while you have 'TBL_MAX_NUM_TABLES "+str(TBL_MAX_NUM_TABLES)+"'.")
+		#endif
+		tbl_info_index=0 'you need to increase TBL_MAX_NUM_TABLES!
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+	if field_index>TBL_MAX_TOTAL_NUM_FIELDS then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("ERROR: total number of fields is "+str(field_index)+" while you have 'TBL_MAX_TOTAL_NUM_FIELDS "+str(TBL_MAX_TOTAL_NUM_FIELDS)+"'.")
+		#endif
+		field_index=0 'you need to increase TBL_MAX_TOTAL_NUM_FIELDS!
+		tbl_start=EN_TBL_STATUS_WRONG_DEFINE
+		exit function
+	end if
+	
+	tbl_init_flag=TBL_INIT_SIGNATURE
+	#if TBL_DEBUG_PRINT
+		tbl_debugprint("Number of tables: "+str(tbl_info_index))
+		tbl_debugprint("Number of fields: "+str(field_index))
+		
+		if tbl_info_index<TBL_MAX_NUM_TABLES then
+			tbl_debugprint("YOU ARE WASTING MEMORY!!! Set TBL_MAX_NUM_TABLES to "+str(tbl_info_index)+". It is now "+str(TBL_MAX_NUM_TABLES)+".")
+		end if
+	
+		if max_tbl_name_len<TBL_MAX_TABLE_NAME_LEN then
+			tbl_debugprint("YOU ARE WASTING MEMORY!!! Set TBL_MAX_TABLE_NAME_LEN to "+str(max_tbl_name_len)+". It is now "+str(TBL_MAX_TABLE_NAME_LEN)+".")
+		end if
+
+		if field_index<TBL_MAX_TOTAL_NUM_FIELDS then
+			tbl_debugprint("YOU ARE WASTING MEMORY!!! Set TBL_MAX_TOTAL_NUM_FIELDS to "+str(field_index)+". It is now "+str(TBL_MAX_TOTAL_NUM_FIELDS)+".")
+		end if
+	
+		if max_fld_name_len<TBL_MAX_FIELD_NAME_LEN then
+			tbl_debugprint("YOU ARE WASTING MEMORY!!! Set TBL_MAX_FIELD_NAME_LEN to "+str(max_fld_name_len)+". It is now "+str(TBL_MAX_FIELD_NAME_LEN)+".")
+		end if
+
+		k=2
+		while (TBL_MAX_RECORD_SIZE mod max_record_size)>0 and max_record_size<TBL_MAX_RECORD_SIZE+1 and record_size>0
+			if max_record_size>k then 
+				k=k*2
+			else
+				max_record_size=k
+			end if
+		wend
+		if max_record_size<TBL_MAX_RECORD_SIZE then
+			tbl_debugprint("YOU ARE WASTING MEMORY!!! Set TBL_MAX_RECORD_SIZE to "+str(max_record_size)+". It is now "+str(TBL_MAX_RECORD_SIZE)+".")
+		end if
+	#endif
+	
+	tbl_info_index=0
+	
+	#if TBL_DEBUG_PRINT
+		tbl_debug_print_error("tbl_start()",tbl_start)
+	#endif
+
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_select(byref table_name_or_num as string, byref file_name as string) as en_tbl_status_codes
+'API procedure, selecting the data file that is used in following table operations, if such data file does not exist, a new file will be created, 
+'based on the table info provided(table_name_or_num)
+'if file is created then attributes set to NULL
+'fills tbl_record_string with default values
+
+	dim fd_status as pl_fd_status_codes
+	dim f as byte
+	dim i,j as word
+	dim s as string
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_select=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select("+table_name_or_num+")",tbl_select)
+		#endif		
+		exit function
+	end if
+	
+	if len(table_name_or_num)>TBL_MAX_TABLE_NAME_LEN or len(file_name)>TBL_MAX_FILE_NAME_LEN then
+		tbl_select=EN_TBL_STATUS_INV_PARAM
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select("+table_name_or_num+")",tbl_select)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	'find table
+	
+	#if TBL_DEBUG_PRINT
+		tbl_do_not_debug_print=YES
+	#endif
+	if tbl_info_find(table_name_or_num,f)<>EN_TBL_STATUS_OK then
+		#if TBL_DEBUG_PRINT
+			tbl_do_not_debug_print=NO
+		#endif
+		goto tbl_unknown_tbl
+	end if
+		
+	#if TBL_DEBUG_PRINT
+		tbl_do_not_debug_print=NO
+	#endif
+
+	'open file (or switch filenum)
+file_open:
+	i=filenum_open("TBL",file_name,fd_status)	
+	select case fd_status
+	case PL_FD_STATUS_NOT_FOUND:
+		'need to create this file
+		
+		if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+		fd_status=fd.create(file_name)
+		if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+		if fd_status<>PL_FD_STATUS_OK then
+			goto tbl_fail
+		end if
+		
+		'reset all attribute
+		if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+		tbl_attributes_sg(file_name,"","",EN_TBL_SET)
+		if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+		
+		i=filenum_open("TBL",file_name,fd_status)
+		if fd_status<>PL_FD_STATUS_OK then
+			goto fail_to_open
+		end if
+
+	case PL_FD_STATUS_OK,PL_FD_STATUS_ALREADY_OPENED:
+		if i=255 then goto fail_to_open
+		
+	case else
+		'some other problem
+fail_to_open:		
+		if callback_tbl_fail_to_open(file_name,fd_status,i)=YES then
+			goto file_open
+		else
+			goto tbl_fail
+		end if
+	end select
+
+	fd.filenum=i
+
+	'skip the rest if it is currently selected table.
+	if f=tbl_info_index and file_name=tbl_selected_file_name then
+		goto tbl_ok
+	end if
+	
+	tbl_info_index=f
+	tbl_selected_file_name=file_name
+	tbl_get_num_records(tbl_selected_all_rc,yes)
+	
+	if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+	if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_GET)<>PL_FD_STATUS_OK then goto fd_error
+	if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+	
+	'fill up tbl_record_string with default value
+	for j=0 to tbl_info(tbl_info_index).num_of_fields-1
+		i=tbl_info(tbl_info_index).field_num_offset+j
+		if tbl_field_info(i).field_name="MD5" or tbl_field_info(i).field_name="UID" then 
+			s=strgen(4,chr(0))
+		else
+			tbl_get_field_def(str(tbl_info_index),tbl_field_info(i).field_name,s)
+		end if
+		tbl_field_sg(tbl_field_info(i).field_name,s,EN_TBL_SET)
+	next f
+	goto tbl_ok
+	
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+	tbl_select=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_select=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_file:
+	tbl_select=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish
+tbl_unknown_tbl:
+	tbl_select=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_select=EN_TBL_STATUS_FAILURE
+	if tbl_select<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_select)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select("+table_name_or_num+")",tbl_select)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_select_for_read(byref table_name_or_num as string, byref file_name as string) as en_tbl_status_codes
+'API procedure, selecting the data file that is used in following table operations, if such data file does not exist, a new file will be created, 
+'based on the table info provided(table_name_or_num)
+'if file is created then attributes set to NULL
+'fills tbl_record_string with default values
+
+	dim fd_status as pl_fd_status_codes
+	dim f as byte
+	dim i,j as word
+	dim s as string
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_select_for_read=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select_for_read("+table_name_or_num+")",tbl_select_for_read)
+		#endif		
+		exit function
+	end if
+	
+	if len(table_name_or_num)>TBL_MAX_TABLE_NAME_LEN or len(file_name)>TBL_MAX_FILE_NAME_LEN then
+		tbl_select_for_read=EN_TBL_STATUS_INV_PARAM
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select_for_read("+table_name_or_num+")",tbl_select_for_read)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	'find table
+	
+	#if TBL_DEBUG_PRINT
+		tbl_do_not_debug_print=YES
+	#endif
+	if tbl_info_find(table_name_or_num,f)<>EN_TBL_STATUS_OK then
+		#if TBL_DEBUG_PRINT
+			tbl_do_not_debug_print=NO
+		#endif
+		goto tbl_unknown_tbl
+	end if
+		
+	#if TBL_DEBUG_PRINT
+		tbl_do_not_debug_print=NO
+	#endif
+
+	'open file (or switch filenum)
+file_open:
+	i=filenum_open("TBL",file_name,fd_status)	
+	select case fd_status
+	case PL_FD_STATUS_NOT_FOUND:
+		'need to create this file
+		
+		if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+		fd_status=fd.create(file_name)
+		if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+		if fd_status<>PL_FD_STATUS_OK then
+			goto tbl_fail
+		end if
+		
+		'reset all attribute
+		if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+		tbl_attributes_sg(file_name,"","",EN_TBL_SET)
+		if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+		
+		i=filenum_open("TBL",file_name,fd_status)
+		if fd_status<>PL_FD_STATUS_OK then
+			goto fail_to_open
+		end if
+
+	case PL_FD_STATUS_OK,PL_FD_STATUS_ALREADY_OPENED:
+		if i=255 then goto fail_to_open
+		
+	case else
+		'some other problem
+fail_to_open:		
+		if callback_tbl_fail_to_open(file_name,fd_status,i)=YES then
+			goto file_open
+		else
+			goto tbl_fail
+		end if
+	end select
+
+	fd.filenum=i
+
+	'skip the rest if it is currently selected table.
+	if f=tbl_info_index and file_name=tbl_selected_file_name then
+		goto tbl_ok
+	end if
+	
+	tbl_info_index=f
+	tbl_selected_file_name=file_name
+	tbl_get_num_records(tbl_selected_all_rc,yes)
+	
+	if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+	if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_GET)<>PL_FD_STATUS_OK then goto fd_error
+	if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+	
+	goto tbl_ok
+	
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+	tbl_select_for_read=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_select_for_read=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_file:
+	tbl_select_for_read=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish
+tbl_unknown_tbl:
+	tbl_select_for_read=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_select_for_read=EN_TBL_STATUS_FAILURE
+	if tbl_select_for_read<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_select_for_read)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_select_for_read("+table_name_or_num+")",tbl_select_for_read)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_close(byref file_name as string)as en_tbl_status_codes
+
+'<<<<<<<<<<<<<<<<<<<<<<<<<<< UNFINISHED
+
+
+
+tbl_ok:
+	tbl_close=EN_TBL_STATUS_OK
+	goto finish
+tbl_unknown_file:
+	tbl_close=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_close=EN_TBL_STATUS_FAILURE
+	if tbl_close<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_close)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_close("+file_name+")",tbl_close)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_clear() as en_tbl_status_codes
+'tbl_select() must be used
+'API procedure, a selected data file is required, sets the selected data file size to 0, all file attribute will be set to NULL
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_clear=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_clear()",tbl_clear)
+		#endif		
+		exit function
+	end if
+	
+	if tbl_selected_file_name="" then
+		tbl_clear=EN_TBL_STATUS_UNKNOWN_FILE
+		goto finish
+	end if
+	
+	if fd.setfilesize(0)<>PL_FD_STATUS_OK then 
+		tbl_clear=EN_TBL_STATUS_FAILURE
+		goto finish
+	end if
+	
+	if fd.transactionstart()<>PL_FD_STATUS_OK then goto tbl_fail
+	if tbl_attributes_sg(tbl_selected_file_name,"","",EN_TBL_SET)<>PL_FD_STATUS_OK then goto tbl_fail
+	tbl_clear=tbl_get_num_records(tbl_selected_all_rc,yes)
+	if tbl_clear<>EN_TBL_STATUS_OK then goto finish 
+	if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_GET)<>PL_FD_STATUS_OK then goto tbl_fail
+	if fd.transactioncommit()<>PL_FD_STATUS_OK then goto tbl_fail
+	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_CLEAR)
+	goto tbl_ok
+	
+tbl_ok:
+	tbl_clear=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_clear=EN_TBL_STATUS_FAILURE
+	goto finish	
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_clear=EN_TBL_STATUS_FAILURE
+	if tbl_clear<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_clear)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_clear()",tbl_clear)
+		#endif
+	end if	
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_replace(byref old_file_name as string, byref new_file_name as string) as en_tbl_status_codes
+'API procedure, delete the old data file (old_file_name), and rename the new data file (new_file_name) to old data file name (old_file_name).
+
+	dim i as byte
+	dim fd_status as pl_fd_status_codes
+	
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_replace=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_replace()",tbl_replace)
+		#endif		
+		exit function
+	end if
+
+	if old_file_name="" or new_file_name="" then
+		tbl_replace=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_replace()",tbl_replace)
+		#endif		
+		exit function
+	end if
+
+	if len(old_file_name)>TBL_MAX_FILE_NAME_LEN or len(new_file_name)>TBL_MAX_FILE_NAME_LEN then
+		tbl_replace=EN_TBL_STATUS_INV_PARAM
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_replace()",tbl_replace)
+		#endif
+		exit function
+	end if
+	
+	'if one of the file is selected, unselect the file.
+	if tbl_selected_file_name=old_file_name or tbl_selected_file_name=new_file_name then
+		tbl_selected_file_name=""
+	end if
+	
+	'close both files
+	if fd.ready=NO then goto tbl_fail
+	i=filenum_open("TBL",old_file_name,fd_status)
+	if i<>255 then filenum_release(i)
+	i=filenum_open("TBL",new_file_name,fd_status)
+	if i<>255 then filenum_release(i)
+	
+	if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+	if fd.delete(old_file_name)<>PL_FD_STATUS_OK then 
+		goto fd_error
+	end if
+	
+	if fd.rename(new_file_name,old_file_name)<>PL_FD_STATUS_OK then goto fd_error
+	if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+	callback_tbl_modified(old_file_name,EN_TBL_MODIFIED_REPLACE)
+	goto tbl_ok
+	
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file		
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+	tbl_replace=EN_TBL_STATUS_OK
+	goto finish
+tbl_unknown_file:
+	tbl_replace=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish	
+tbl_fail:
+	tbl_replace=EN_TBL_STATUS_FAILURE
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_replace=EN_TBL_STATUS_FAILURE
+	if tbl_replace<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_replace)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_replace()",tbl_replace)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+#if TBL_AGGREGATE_HASH
+public function tbl_get_hash() as string
+'tbl_select() must be used
+'API procedure, a selected data file is required, returns the current hash value of the selected data file.
+
+	dim hash as string(4)
+	dim msw, lsw as word
+	dim hash_val as dword
+
+	if tbl_selected_file_name="" then
+		tbl_get_hash=""
+		exit function
+	end if
+	
+	if tbl_selected_active_rc=0 then 
+		hash_val=0
+	else
+		fd.transactionstart()
+		tbl_attributes_sg(tbl_selected_file_name,"HASH",hash,EN_TBL_GET)
+		fd.transactioncommit()
+		msw=asc(left(hash,1))*256+asc(mid(hash,2,1))
+		lsw=asc(mid(hash,3,1))*256+asc(mid(hash,4,1))
+		hash_val=msw*65536+lsw
+	end if
+	tbl_get_hash=lstri(hash_val)
+end function
+#endif
+
+'------------------------------------------------------------------------------
+public function tbl_record_sg(byref rec_num as word, op as en_tbl_rdwr) as en_tbl_status_codes
+'tbl_select() must be used
+'depends on record ptr
+'API procedure, a selected data file is required, loads the record pointed at by tbl_record_ptr to record buffer (tbl_record_string).
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_sg=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_sg",tbl_record_sg)
+		#endif		
+		exit function
+	end if	
+
+	if tbl_selected_file_name="" then
+		tbl_record_sg=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_sg",tbl_record_sg)
+		#endif		
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	'set pointer
+	tbl_record_ptr_sg(rec_num,EN_TBL_SET)
+
+	if op=EN_TBL_GET then
+	'get data
+		if fd.pointer>fd.filesize or fd.filesize=0 then goto tbl_not_found
+		tbl_record_string=fd.getdata(tbl_info(tbl_info_index).rec_size)
+		if fd.laststatus<>PL_FD_STATUS_OK then goto tbl_fail
+	else
+	'set data
+		tbl_record_string=left(tbl_record_string,tbl_info(tbl_info_index).rec_size)
+		if fd.transactionstart()<>PL_FD_STATUS_OK then goto fd_error
+		if fd.setdata(tbl_record_string)<>PL_FD_STATUS_OK then goto fd_error
+		if fd.transactioncommit()<>PL_FD_STATUS_OK then goto fd_error
+		callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_EDIT)
+	end if
+	
+	goto tbl_ok
+	
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file
+	case else goto tbl_fail
+	end select	
+tbl_ok:
+	tbl_record_sg=EN_TBL_STATUS_OK
+	goto finish
+tbl_not_found:
+	tbl_record_sg=EN_TBL_STATUS_NOT_FOUND
+	goto finish
+tbl_unknown_file:
+	tbl_record_sg=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish	
+tbl_fail:
+	tbl_record_sg=EN_TBL_STATUS_FAILURE
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_record_sg=EN_TBL_STATUS_FAILURE
+	if tbl_record_sg<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_sg)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_sg",tbl_record_sg)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_add(uid as string(32)) as en_tbl_status_codes
+'tbl_select() must be used
+
+'API procedure, a selected data file is required, stores the data in the record buffer (tbl_record_string) to the selectd data file.
+'If the table type is "T"(table) the record will overwrite the first deleted record, if there is no deleted record, the
+'record will be appended to the end of the selected data file.
+'If the the table type is "L"(list) the record will always be appended to the end of the seleted data file.
+'If TBL_ADJUST_LIST_WHEN_FULL is set to 1, table type is "L"(list) this operation will also try to remove data from the top of the data file,
+'if and only if there is a sector, which if full with deleted record.
+'The data file hash and record count are updated accordingly.
+
+	dim temp as string(TBL_MAX_RECORD_SIZE)
+	dim daddr1,dwtemp as dword
+	dim add_to_del_pos as no_yes
+	
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_add=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_add()",tbl_record_add)
+		#endif		
+		exit function
+	end if	
+
+	if tbl_selected_file_name="" then
+		tbl_record_add=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_add()",tbl_record_add)
+		#endif		
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+#if TBL_AGGREGATE_HASH
+	'if hash is enabled, the new hash will be calculated and stored to the file attribute
+	dim md5_val as dword
+	dim result as en_tbl_status_codes
+
+	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_TABLE then
+		result=tbl_generate_uid(uid)
+		if result<>EN_TBL_STATUS_OK then
+			tbl_record_add=result
+			goto finish
+		end if
+		md5_val=tbl_set_md5()
+	end if
+#endif
+	if tbl_info(tbl_info_index).clean_start=NO then
+		if tbl_check_key_violation(0)=YES then goto tbl_key_violate
+	end if
+	
+	'find the first deleted record, if not found move the pointer to the end of file and set data
+	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+		'check if table is full
+		
+		dwtemp=tbl_info(tbl_info_index).rec_size
+		dwtemp=dwtemp*tbl_info(tbl_info_index).maxrecs
+		
+		#if TBL_DISCARD_OLD_RECORD_WHEN_FULL
+			dim rec_num,count as word
+			rec_num=1
+			count=256/tbl_info(tbl_info_index).rec_size
+			while not(fd.filesize<dwtemp) and count>0
+				tbl_record_delete(rec_num)
+				count=count-1
+			wend
+			
+		#endif			
+		
+		#if TBL_ADJUST_LIST_WHEN_FULL
+			if fd.transactionstart<>PL_FD_STATUS_OK then goto fd_error
+			if tbl_adjust_size()<>EN_TBL_STATUS_OK then goto fd_error
+			if fd.transactioncommit<>PL_FD_STATUS_OK then goto fd_error
+		#endif		
+		if not(fd.filesize<dwtemp) then goto tbl_full
+		daddr1=fd.filesize+1
+		add_to_del_pos=NO
+	else
+		if tbl_info(tbl_info_index).clean_start=NO then
+			daddr1=fd.find(1,TBL_DELETE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+			if daddr1=0 then 
+add_at_bottom:			
+				'check if table is full
+				dwtemp=tbl_info(tbl_info_index).rec_size
+				dwtemp=dwtemp*tbl_info(tbl_info_index).maxrecs
+				if not(fd.filesize<dwtemp) then goto tbl_full
+				daddr1=fd.filesize+1
+				add_to_del_pos=NO
+			else
+				add_to_del_pos=YES
+			end if
+		else
+			goto add_at_bottom
+		end if
+	end if
+	
+	fd.setpointer(daddr1)
+	tbl_record_string=mid(tbl_record_string,2,tbl_info(tbl_info_index).rec_size-1)
+	tbl_record_string=TBL_ACTIVE_FLAG+tbl_record_string
+	temp=strgen(tbl_info(tbl_info_index).rec_size-len(tbl_record_string),chr(TBL_NULL))
+	tbl_record_string=tbl_record_string+temp
+	
+	if fd.transactionstart<>PL_FD_STATUS_OK then goto fd_error
+	if fd.setdata(tbl_record_string)<>PL_FD_STATUS_OK then goto fd_error
+	tbl_selected_active_rc=tbl_selected_active_rc+1
+	if add_to_del_pos=NO then tbl_selected_all_rc=tbl_selected_all_rc+1
+	if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_SET)<>PL_FD_STATUS_OK then goto fd_error
+	if fd.transactioncommit<>PL_FD_STATUS_OK then goto fd_error
+	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_ADD)
+	goto tbl_ok
+	
+fd_error:	
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file
+	case PL_FD_STATUS_DATA_FULL: goto tbl_full
+	case else goto tbl_fail
+	end select
+	 
+tbl_ok:
+	#if TBL_AGGREGATE_HASH				
+		tbl_mod_hash(md5_val)
+	#endif
+	'set the pointer to the record position (it might be the last record, or the first deleted record position)
+	tbl_record_add=EN_TBL_STATUS_OK
+	goto finish
+tbl_unknown_file:
+	tbl_record_add=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish
+tbl_fail:
+	tbl_record_add=EN_TBL_STATUS_FAILURE	'fd errors, and other errors
+	goto finish
+tbl_full:
+	tbl_record_add=EN_TBL_STATUS_FULL
+	goto finish
+tbl_key_violate:
+	tbl_record_add=EN_TBL_STATUS_KEY_VIOLATION
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_record_add=EN_TBL_STATUS_FAILURE
+	if tbl_record_add<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_add)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_add()",tbl_record_add)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_edit(byref rec_num as word) as en_tbl_status_codes
+'tbl_select() must be used
+'depends on record ptr
+
+'API procedure, a selected data file is required, overwrites the current record (pointed by tbl_record_ptr) with the data from the record buffer(tbl_record_string).
+'The data file hash is updated accordingly
+
+	dim w as word
+	dim key_violation_found as no_yes
+	dim sflag as string(1)
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_edit=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_edit()",tbl_record_edit)
+		#endif
+		exit function
+	end if
+	
+	if tbl_selected_file_name="" then
+		tbl_record_edit=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_edit()",tbl_record_edit)
+		#endif
+		exit function
+	end if
+	
+#if TBL_AGGREGATE_HASH
+	dim md5_val,md5_val_old as dword
+	dim md5_string as string(16)
+	tbl_record_edit=tbl_field_sg("MD5",md5_string,EN_TBL_GET)
+	if tbl_record_edit<>EN_TBL_STATUS_OK then goto finish
+	md5_val_old=lval(md5_string)
+	md5_val=tbl_set_md5()
+#endif
+
+	'check for key violation
+	key_violation_found=tbl_check_key_violation(w)	
+	if key_violation_found=YES and w<>rec_num then 
+		tbl_record_edit=EN_TBL_STATUS_KEY_VIOLATION
+		exit function
+	end if
+	
+	'check if the record is deleted
+	tbl_record_edit=tbl_record_ptr_sg(rec_num,EN_TBL_SET)
+	if tbl_record_edit<>EN_TBL_STATUS_OK then goto finish
+	sflag=fd.getdata(1)
+	if sflag<>TBL_ACTIVE_FLAG then 
+		tbl_record_edit=EN_TBL_STATUS_DELETED
+		exit function
+	end if
+	
+	tbl_record_edit=tbl_record_sg(rec_num,EN_TBL_SET)
+	if tbl_record_edit=EN_TBL_STATUS_OK then
+#if TBL_AGGREGATE_HASH
+	tbl_mod_hash(md5_val_old)
+	tbl_mod_hash(md5_val)
+#endif
+	end if
+
+finish:
+	if fd.ready=NO then tbl_record_edit=EN_TBL_STATUS_FAILURE
+	if tbl_record_edit<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_edit)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_edit()",tbl_record_edit)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_read_active(byref rec_num as word) as en_tbl_status_codes
+'tbl_select() must be used
+'depends on record ptr
+
+'API procedure, a selected data file is required, load the record buffer(tbl_record_string) with the record that pointed by record pointer(tbl_record_ptr)
+
+	dim daddr as dword
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_read_active=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_read_active()",tbl_record_read_active)
+		#endif
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_record_read_active=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_read_active()",tbl_record_read_active)
+		#endif
+		exit function
+	end if
+	
+	tbl_record_read_active=tbl_record_ptr_sg(rec_num,EN_TBL_SET)
+	
+	if fd.pointer>=fd.filesize then
+		goto not_found
+	end if	
+	
+	daddr=fd.find(fd.pointer,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+
+	if daddr=0 then
+not_found:	
+		rec_num=0
+		tbl_record_read_active=EN_TBL_STATUS_END_OF_TABLE
+		exit function
+	end if
+	
+	rec_num=(daddr/tbl_info(tbl_info_index).rec_size)+1
+	
+	tbl_record_read_active=tbl_record_sg(rec_num,EN_TBL_GET)
+finish:
+	if tbl_record_read_active=EN_TBL_STATUS_OK then exit function
+	#if TBL_DEBUG_PRINT
+		tbl_debug_print_error("tbl_record_read_active()",tbl_record_read_active)
+	#endif
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_delete(byref rec_num as word) as en_tbl_status_codes
+'tbl_select() must be used
+'depends on record ptr
+
+'API procedure, a selected data file is required, deletes a record.
+'If the table type is "T"(table) the record that is pointed by the record pointer will be mark as deleted.
+'If the table type is "L"(list) the first active record in the top of the selected data file will be mark as deleted.
+'If TBL_ADJUST_LIST_WHEN_FULL is set to 0, and table type is "L"(list) this operation will also try to remove data from the top of the data file,
+'if and only if there is a sector, which if full with deleted record.
+'The data file hash and record count are updated accordingly.
+
+	dim dptr as dword
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_delete=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_delete()",tbl_record_delete)
+		#endif
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_record_delete=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_delete()",tbl_record_delete)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	'examine if the record is deleted
+	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+		dptr=fd.find(1,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+		if dptr=0 then goto tbl_deleted
+		fd.setpointer(dptr)
+	else
+		if tbl_is_record_deleted(rec_num)=YES then goto tbl_deleted
+		tbl_record_delete=tbl_record_ptr_sg(rec_num,EN_TBL_SET)
+		if tbl_record_delete<>EN_TBL_STATUS_OK then exit function
+	end if
+	
+	'delete record
+	if tbl_selected_active_rc>0 then 
+		if fd.transactionstart<>PL_FD_STATUS_OK then goto fd_error
+		tbl_selected_active_rc=tbl_selected_active_rc-1
+		if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_SET)<>PL_FD_STATUS_OK then goto fd_error
+		if fd.setdata(TBL_DELETE_FLAG)<>PL_FD_STATUS_OK then goto fd_error
+		#if TBL_ADJUST_LIST_WHEN_FULL=0
+			if tbl_adjust_size()<>EN_TBL_STATUS_OK then goto fd_error
+		#endif
+		if fd.transactioncommit<>PL_FD_STATUS_OK then goto fd_error
+		callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_DELETE)
+	else
+		goto tbl_deleted
+	end if
+	goto tbl_ok
+
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_file
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_deleted
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+#if TBL_AGGREGATE_HASH
+	dim md5_val as dword
+	tbl_record_sg(rec_num,EN_TBL_GET)
+	md5_val=tbl_set_md5()
+	tbl_mod_hash(md5_val)
+#endif
+	tbl_record_delete=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_record_delete=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_file:
+	tbl_record_delete=EN_TBL_STATUS_UNKNOWN_FILE
+	goto finish
+tbl_deleted:
+	tbl_record_delete=EN_TBL_STATUS_DELETED
+	goto finish
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_record_delete=EN_TBL_STATUS_FAILURE
+	if tbl_record_delete<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_delete)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_delete()",tbl_record_delete)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_undelete(byref rec_num as word) as en_tbl_status_codes
+'tbl_select() must be used
+'depends on record ptr
+
+'API procedure, a selected data file is required, undelete a deleted record.
+'If the table type is "T"(table) the record that is pointed by the record pointer will be mark as active.
+'If the table type is "L"(list) the last deleted record in the top of the selected data file will be mark as active.
+
+	dim d,dptr as dword
+	
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_undelete=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_undelete()",tbl_record_undelete)
+		#endif
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_record_undelete=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_undelete()",tbl_record_undelete)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	'examine if the record is deleted
+	if tbl_info(tbl_info_index).struct=EN_TBL_STRUCT_LIST then
+		d=fd.filesize-tbl_info(tbl_info_index).rec_size+1
+		dptr=fd.find(d,TBL_DELETE_FLAG,1,BACK,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+		if dptr=0 then goto tbl_ok
+		fd.setpointer(dptr)
+	else
+		if tbl_is_record_deleted(rec_num)=NO then goto tbl_ok
+		tbl_record_undelete=tbl_record_ptr_sg(rec_num,EN_TBL_SET)
+		if tbl_record_undelete<>EN_TBL_STATUS_OK then exit function
+	end if
+		
+	'undelete record	
+	if fd.transactionstart<>PL_FD_STATUS_OK then goto fd_error
+	if fd.setdata(TBL_ACTIVE_FLAG)<>PL_FD_STATUS_OK then goto fd_error
+	tbl_selected_active_rc=tbl_selected_active_rc+1
+	if tbl_active_rc_sg(tbl_selected_active_rc,EN_TBL_SET)<>PL_FD_STATUS_OK then goto fd_error
+	if fd.transactioncommit<>PL_FD_STATUS_OK then goto fd_error
+	callback_tbl_modified(tbl_selected_file_name,EN_TBL_MODIFIED_UNDELETE)
+	goto tbl_ok
+	
+fd_error:
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_tbl
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+#if TBL_AGGREGATE_HASH=1
+	tbl_set_md5()
+#endif
+	tbl_record_undelete=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_record_undelete=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_tbl:
+	tbl_record_undelete=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_not_found:
+	tbl_record_undelete=EN_TBL_STATUS_NOT_FOUND
+	goto finish	
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_record_undelete=EN_TBL_STATUS_FAILURE
+	if tbl_record_undelete<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_undelete)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_undelete()",tbl_record_undelete)
+		#endif
+	end if	
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_is_record_deleted(rec_num as word) as no_yes
+'API procedure, a selected data file is required, return the status of the record that is currently pointed by the record pointer.
+	
+	dim s as string(1)
+	
+	tbl_is_record_deleted=YES
+	
+	if tbl_selected_file_name="" then exit function
+	
+	if tbl_record_ptr_sg(rec_num,EN_TBL_SET)<>EN_TBL_STATUS_OK then exit function
+	s=fd.getdata(1)
+
+	if s=TBL_ACTIVE_FLAG then tbl_is_record_deleted=NO
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_is_current_record_deleted() as no_yes
+'API procedure, check if the current record loaded in the tbl_record_string is an active record.
+
+	if left(tbl_record_string,1)=TBL_ACTIVE_FLAG then
+		tbl_is_current_record_deleted=NO
+	else
+		tbl_is_current_record_deleted=YES
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_record_find(
+		record_type as en_tbl_record_states,			'If the search includes the records that are marked as deleted.
+		byref search_data as string, 						'Searching criteria data.
+		byref field_name as string, 					'Searching criteria name.
+		byref rec_num as word, 							'Starting record number, also returns the first found record number
+		direction as en_tbl_search_direction, 				'Searching direction
+		find_method as pl_fd_find_modes) as en_tbl_status_codes	'find method (equal, greater, lesser, etc.)
+
+'tbl_select() must be used
+
+'API procedure, a selected data file is required, searches through the data file, looks for "search_data" pattern
+'Search starts at current (rec_num) record, goes until the end or the top of data file depending on the search direction.
+'Serach direction depends on "direction"
+'Search stops at the first matching record found, tbl_record_ptr is set to this record's number
+	
+	dim i as byte
+	dim daddr,daddr_temp,daddr_offset as dword
+	dim field_index as word
+	dim s as string
+	dim w1, w2 as word
+	dim temp1 as string(3)
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_record_find=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_find()",tbl_record_find)
+		#endif
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_record_find=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_find()",tbl_record_find)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	if rec_num=0 or rec_num>tbl_selected_all_rc then goto tbl_not_found
+	daddr=(rec_num-1)
+	daddr=daddr*tbl_info(tbl_info_index).rec_size+1
+	
+	if search_data<>"" then
+		if tbl_field_find(field_name, field_index)=EN_TBL_STATUS_UNKNOWN_FIELD then goto tbl_unknown_fld
+		select case tbl_field_info(field_index).field_type
+		#if TBL_TIME_TYPE_INCLUDED		
+			case `T`:
+				select case tbl_field_info(field_index).p1
+				case EN_TBL_DT_DATE:
+					s=search_data+"000000"
+					td_str_to_binstr(s)
+					s=left(s,2)
+				case EN_TBL_DT_TIME1:
+					s="20000101"+search_data+"00"
+					td_str_to_binstr(s)
+					s=mid(s,3,2)
+				case EN_TBL_DT_TIME2:
+					s="20000101"+search_data
+					td_str_to_binstr(s)
+					s=mid(s,3,3)
+				case EN_TBL_DT_TIME3:
+					s="20000101"+left(search_data,6)
+					temp1=mid(search_data,7,3)
+					td_str_to_binstr(s)
+					w1=val(temp1)/256
+					w2=val(temp1) mod 256
+					s=mid(s,3,3)+chr(w1)+chr(w2)
+				case EN_TBL_DT_DATE_TIME1:
+					s=search_data+"00"
+					td_str_to_binstr(s)
+					s=left(s,4)
+				case EN_TBL_DT_DATE_TIME2:
+					s=search_data
+					td_str_to_binstr(s)
+				case EN_TBL_DT_ALL:
+					s=left(search_data,14)
+					temp1=mid(search_data,15,3)
+					td_str_to_binstr(s)
+					w1=val(temp1)/256
+					w2=val(temp1) mod 256
+					s=s+chr(w1)+chr(w2)
+				end select
+		#endif				
+		case `B`:
+			s=chr(val(search_data))
+		case `W`:
+			w1=val(search_data)/256
+			w2=val(search_data) mod 256
+			s=chr(w1)+chr(w2)
+		case `S`:
+			s=chr(len(search_data))+search_data
+		case `U`:
+			w1=lval(search_data)/65536
+			w2=lval(search_data) mod 65536
+			s=chr(w1/256)+chr(w1 mod 256)+chr(w2/256)+chr(w2 mod 256)
+		end select
+
+		for i=tbl_info(tbl_info_index).field_num_offset to field_index
+			if i=tbl_info(tbl_info_index).field_num_offset then 
+				daddr_offset=1
+			else
+				daddr_offset=daddr_offset+tbl_get_field_size(i-1)
+			end if
+		next i
+query:		
+		'extended partial equal string search
+		if find_method=PL_FD_FIND_PARTIAL_EQUAL then
+			if tbl_field_info(field_index).field_type<>`S` then
+				goto tbl_not_found
+			end if
+			s=right(s,len(s)-1)
+			daddr_offset=daddr_offset+1
+			find_method=PL_FD_FIND_EQUAL
+		end if
+		
+		daddr=daddr+daddr_offset
+		daddr_temp=fd.find(daddr,s,1,direction,tbl_info(tbl_info_index).rec_size,find_method)
+		if daddr_temp=0 then
+			goto tbl_not_found
+		else 
+			daddr=daddr_temp-daddr_offset
+		end if
+	end if
+
+	select case record_type
+	case EN_TBL_RECORD_ACTIVE:
+		daddr_temp=fd.find(daddr,TBL_ACTIVE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+		goto check_record
+	case EN_TBL_RECORD_DELETED:
+		daddr_temp=fd.find(daddr,TBL_DELETE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+check_record:
+		if daddr_temp=0 then
+			goto tbl_not_found
+		end if
+		if daddr_temp<>daddr then
+			daddr=daddr_temp
+			if search_data<>"" then goto query
+		end if		
+	case else
+	end select
+	
+	'set the pointer to the record.
+	rec_num=daddr/tbl_info(tbl_info_index).rec_size+1
+	
+tbl_ok:
+	tbl_record_find=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	rec_num=0
+	tbl_record_find=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_tbl:
+	rec_num=0
+	tbl_record_find=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_unknown_fld:
+	rec_num=0
+	tbl_record_find=EN_TBL_STATUS_UNKNOWN_FIELD
+	goto finish
+tbl_not_found:
+	rec_num=0
+	tbl_record_find=EN_TBL_STATUS_NOT_FOUND
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_record_find=EN_TBL_STATUS_FAILURE
+	if tbl_record_find<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_find)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_find()",tbl_record_find)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_multi_field_record_find(
+		record_type as en_tbl_record_states,			'If the search includes the records that are marked as deleted.
+		byref search_data as string, 						'Searching criteria data.
+		byref starting_field as string, 					'Searching criteria name.
+		byref rec_num as word, 							'Starting record number, also returns the first found record number
+		direction as en_tbl_search_direction, 				'Searching direction
+		find_method as pl_fd_find_modes) as en_tbl_status_codes	'find method (equal, greater, lesser, etc.)
+
+'tbl_select() must be used
+'search_data has to be converted to raw data form before calling this function.
+'API procedure, a selected data file is required, searches through the data file, looks for "search_data" pattern
+'Search starts at current (rec_num) record, goes until the end or the top of data file depending on the search direction.
+'Serach direction depends on "direction"
+'Search stops at the first matching record found, tbl_record_ptr is set to this record's number
+	
+	dim i as byte
+	dim daddr,daddr_temp,daddr_offset as dword
+	dim field_index as word
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_multi_field_record_find=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_multi_field_record_find()",tbl_multi_field_record_find)
+		#endif
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_multi_field_record_find=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_multi_field_record_find()",tbl_multi_field_record_find)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	if rec_num=0 or rec_num>tbl_selected_all_rc then goto tbl_not_found
+	daddr=(rec_num-1)
+	daddr=daddr*tbl_info(tbl_info_index).rec_size+1
+	
+	if search_data<>"" then
+		if tbl_field_find(starting_field, field_index)=EN_TBL_STATUS_UNKNOWN_FIELD then goto tbl_unknown_fld
+
+		for i=tbl_info(tbl_info_index).field_num_offset to field_index
+			if i=tbl_info(tbl_info_index).field_num_offset then 
+				daddr_offset=1
+			else
+				daddr_offset=daddr_offset+tbl_get_field_size(i-1)
+			end if
+		next i
+query:		
+		daddr=daddr+daddr_offset		
+		daddr_temp=fd.find(daddr,search_data,1,direction,tbl_info(tbl_info_index).rec_size,find_method)
+		if daddr_temp=0 then
+			goto tbl_not_found
+		else 
+			daddr=daddr_temp-daddr_offset
+		end if
+	end if
+
+	select case record_type
+	case EN_TBL_RECORD_ACTIVE:
+		daddr_temp=fd.find(daddr,TBL_ACTIVE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+		goto check_record
+	case EN_TBL_RECORD_DELETED:
+		daddr_temp=fd.find(daddr,TBL_DELETE_FLAG,1,direction,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+check_record:
+		if daddr_temp=0 then
+			goto tbl_not_found
+		end if
+		if daddr_temp<>daddr then
+			daddr=daddr_temp
+			if search_data<>"" then goto query
+		end if		
+	case else
+	end select
+	
+	'set the pointer to the record.
+	rec_num=daddr/tbl_info(tbl_info_index).rec_size+1
+	
+tbl_ok:
+	tbl_multi_field_record_find=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	rec_num=0
+	tbl_multi_field_record_find=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_tbl:
+	rec_num=0
+	tbl_multi_field_record_find=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_unknown_fld:
+	rec_num=0
+	tbl_multi_field_record_find=EN_TBL_STATUS_UNKNOWN_FIELD
+	goto finish
+tbl_not_found:
+	rec_num=0
+	tbl_multi_field_record_find=EN_TBL_STATUS_NOT_FOUND
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_multi_field_record_find=EN_TBL_STATUS_FAILURE
+	if tbl_multi_field_record_find<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_multi_field_record_find)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_multi_field_record_find()",tbl_multi_field_record_find)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_field_sg(byref field_name as string,byref field_value as string,op as en_tbl_rdwr) as en_tbl_status_codes
+'API procedure, a selected table is required, extract the field from recorder buffer(tbl_record_string) or puts the field into the recorder buffer.
+
+	dim fld_pos,fld_sz,b1,lsb,msb as byte
+	dim s,temp1,temp2 as string(TBL_MAX_RECORD_SIZE)
+	dim w1,w2,w3 as word
+	dim d as dword
+	dim bp1, bp2 as byte
+	dim wp1, wp2 as word
+	dim dp1, dp2 as dword
+	dim i, field_index as word
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_field_sg=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_field_sg("+field_name+","+field_value+","+str(op)+")",tbl_field_sg)
+		#endif
+		exit function
+	end if
+
+	'find field
+	if tbl_field_find(field_name, field_index)<>EN_TBL_STATUS_OK then goto tbl_unknown_fld
+	fld_pos=2
+	for i=tbl_info(tbl_info_index).field_num_offset+1 to field_index
+		fld_pos=fld_pos+tbl_get_field_size(i-1)
+	next i
+	fld_sz=tbl_get_field_size(field_index)
+	if op=EN_TBL_GET then
+		s=mid(tbl_record_string,fld_pos,fld_sz) 
+		select case tbl_field_info(field_index).field_type
+		#if TBL_TIME_TYPE_INCLUDED		
+			case `T`:	'time type
+				select case tbl_field_info(field_index).p1					
+				case EN_TBL_DT_TIME1:
+					s=chr(0)+chr(0)+s	'2 bytes mincount
+					if td_binstr_to_str(s)<>OK then goto tbl_invalid
+					field_value=mid(s,9,4)
+
+				case EN_TBL_DT_TIME2:	'2 bytes mincount + 1 byte second
+					s=chr(0)+chr(0)+s
+					if td_binstr_to_str(s)<>OK then goto tbl_invalid
+					field_value=mid(s,9,6)
+
+				case EN_TBL_DT_TIME3:	'2 byte mincount + 1 byte second + 2 byte milisecond
+					s=chr(0)+chr(0)+s
+					if td_binstr_to_str(s)<>OK then goto tbl_invalid
+					field_value=mid(s,9,9)
+
+				case EN_TBL_DT_DATE,EN_TBL_DT_DATE_TIME1,EN_TBL_DT_DATE_TIME2,EN_TBL_DT_ALL:
+					if td_binstr_to_str(s)<>OK then goto tbl_invalid
+					field_value=s
+
+				end select
+			#endif
+		case `B`:	'byte type
+			field_value=str(asc(s))
+			bp1=tbl_field_info(field_index).p1
+			bp2=tbl_field_info(field_index).p2
+			if val(field_value)<bp1 then goto tbl_invalid
+			if val(field_value)>bp2 then goto tbl_invalid				
+		case `W`:	'word type
+			w1=asc(left(s,1))*256+asc(mid(s,2,1))
+			field_value=str(w1)
+			wp1=tbl_field_info(field_index).p1
+			wp2=tbl_field_info(field_index).p2
+			if val(field_value)<wp1 then goto tbl_invalid
+			if val(field_value)>wp2 then goto tbl_invalid				
+		case `S`:	'string type
+			b1=asc(left(s,1))
+			field_value=mid(s,2,b1)
+			bp1=tbl_field_info(field_index).p1
+			bp2=tbl_field_info(field_index).p2
+			if b1<bp1 then goto tbl_invalid
+			if b1>bp2 then goto tbl_invalid					
+		case `U`:	'unsign 32 bits
+			w2=asc(left(s,1))*256+asc(mid(s,2,1))
+			w3=asc(mid(s,3,1))*256+asc(mid(s,4,1))
+			d=w2*65536+w3
+			field_value =lstr(d)
+			dp1=tbl_field_info(field_index).p1
+			dp2=tbl_field_info(field_index).p2			
+			if lval(field_value)<dp1 then goto tbl_invalid
+			if lval(field_value)>dp2 then goto tbl_invalid
+		end select	
+		goto tbl_ok
+	else
+		select case tbl_field_info(field_index).field_type
+		#if TBL_TIME_TYPE_INCLUDED		
+			case `T`:
+				select case tbl_field_info(field_index).p1
+				case EN_TBL_DT_TIME1:
+					s="20000101"+field_value
+					if td_str_to_binstr(s)<>OK then goto tbl_invalid
+					s=mid(s,3,2)
+				case EN_TBL_DT_TIME2:
+					s="20000101"+field_value
+					if td_str_to_binstr(s)<>OK then goto tbl_invalid
+					s=mid(s,3,3)
+				case EN_TBL_DT_TIME3:
+					s="20000101"+left(field_value,6)
+					s=mid(s,3,5)
+				case EN_TBL_DT_DATE,EN_TBL_DT_DATE_TIME1,EN_TBL_DT_DATE_TIME2,EN_TBL_DT_ALL:
+					s=field_value
+					if td_str_to_binstr(s)<>OK then goto tbl_invalid
+				end select
+		#endif				
+		case `B`:
+			bp1=tbl_field_info(field_index).p1
+			bp2=tbl_field_info(field_index).p2
+			if val(field_value) < bp1 then goto tbl_invalid
+			if val(field_value) > bp2 then goto tbl_invalid
+			s=chr(val(field_value))
+		case `W`:
+			wp1=tbl_field_info(field_index).p1
+			wp2=tbl_field_info(field_index).p2
+			if lval(field_value)<wp1 then goto tbl_invalid
+			if lval(field_value)>wp2 then goto tbl_invalid
+			msb=val(field_value)/256
+			lsb=val(field_value) mod 256
+			s=chr(msb)+chr(lsb)
+		case `S`:
+			bp1=tbl_field_info(field_index).p1
+			bp2=tbl_field_info(field_index).p2
+			if len(field_value) < bp1 then goto tbl_invalid
+			if len(field_value) > bp2 then goto tbl_invalid
+			s=chr(len(field_value))+field_value+strgen(fld_sz-len(field_value)-1,chr(TBL_NULL))
+		case `U`:
+			dp1=tbl_field_info(field_index).p1
+			dp2=tbl_field_info(field_index).p2			
+			if lval(field_value) < dp1 then goto tbl_invalid
+			if lval(field_value) > dp2 then goto tbl_invalid
+			w2=lval(field_value)/65536
+			w3=lval(field_value) mod 65536
+			s=chr(w2/256)+chr(w2 mod 256)+chr(w3/256)+chr(w3 mod 256)
+		end select
+		temp1=left(tbl_record_string, fld_pos-1)
+		temp2=right(tbl_record_string,len(tbl_record_string)-fld_pos-fld_sz+1)
+		tbl_record_string=temp1+s+temp2
+		goto tbl_ok
+	end if
+tbl_ok:
+	tbl_field_sg=EN_TBL_STATUS_OK
+	goto finish
+tbl_unknown_tbl:
+	tbl_field_sg=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_unknown_fld:
+	tbl_field_sg=EN_TBL_STATUS_UNKNOWN_FIELD
+	goto finish
+tbl_invalid:
+	tbl_field_sg=EN_TBL_STATUS_INVALID
+finish:
+	if tbl_field_sg<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_field_sg)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_field_sg("+field_name+","+field_value+","+str(op)+")",tbl_field_sg)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public sub tbl_field_set(byref field_name as string, byref field_value as string)
+'API procedure, writes (sets) the value of the specified field of currently selected file, reports errors thru callback_tbl_field_error().
+
+	dim tbl_result as en_tbl_status_codes
+	
+	tbl_result=tbl_field_sg(field_name,field_value,EN_TBL_SET)
+	if tbl_result<>EN_TBL_STATUS_OK then
+		callback_tbl_field_error(tbl_selected_file_name,field_name,tbl_result)
+	end if
+end sub
+
+'------------------------------------------------------------------------------
+public function tbl_field_get(byref field_name as string) as string
+'API procedure, reads (gets) the value of the specified field of currently selected file, reports errors thru callback_tbl_field_error(). 
+
+	dim field_value as string
+	dim tbl_result as en_tbl_status_codes
+	
+	tbl_result=tbl_field_sg(field_name,field_value,EN_TBL_GET)
+	if tbl_result<>EN_TBL_STATUS_OK then
+		callback_tbl_field_error(tbl_selected_file_name,field_name,tbl_result)
+		tbl_field_get=""
+		exit function
+	end if	
+	tbl_field_get=field_value
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_field_def(byref table_name_or_num as string, byref field_name as string, byref def_value as string) as en_tbl_status_codes
+'API procedure, a selected table is required, returns the default value of selected field.
+	
+	dim i,f as word
+	dim j as byte
+	dim pos1, pos2 as word
+	
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_get_field_def=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_field_def("+field_name+","+def_value+")",tbl_get_field_def)
+		#endif		
+		exit function
+	end if
+	
+	tbl_get_field_def=tbl_info_find(table_name_or_num,j)
+	if tbl_get_field_def<>EN_TBL_STATUS_OK then
+		exit function
+	end if
+	
+	romfile.open(TBL_DESCRIPTOR_FILE)	
+	for f=0 to tbl_info(j).num_of_fields-1
+		i=f+tbl_info(j).field_num_offset
+		if tbl_field_info(i).field_name=field_name then
+			pos1=tbl_field_info(i).romaddr_def
+			pos2=romfile.find(pos1,TBL_CR_LF,1)
+			romfile.pointer=pos1
+			def_value=tbl_get_descriptor_field(pos2,pos1)
+			if def_value="^" then 
+				def_value=""
+			end if
+			goto tbl_ok
+		end if
+	next f
+	goto tbl_unknown_fld
+tbl_ok:
+	tbl_get_field_def=EN_TBL_STATUS_OK 
+	goto finish
+tbl_unknown_tbl:
+	tbl_get_field_def=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_unknown_fld:
+	tbl_get_field_def=EN_TBL_STATUS_UNKNOWN_FIELD
+finish:
+	if tbl_get_field_def<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_get_field_def)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_field_def("+field_name+","+def_value+")",tbl_get_field_def)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+function tbl_get_field_size(field_index as word) as byte
+'API procedure, a selected table is required, returns the size of the field (number of bytes)
+
+	dim sz as byte
+
+	select case tbl_field_info(field_index).field_type 
+	#if TBL_TIME_TYPE_INCLUDED	
+		case `T`:
+			select case tbl_field_info(field_index).p1
+			case EN_TBL_DT_DATE: sz=2
+			case EN_TBL_DT_TIME1: sz=2
+			case EN_TBL_DT_TIME2: sz=3
+			case EN_TBL_DT_TIME3: sz=5
+			case EN_TBL_DT_DATE_TIME1: sz=4
+			case EN_TBL_DT_DATE_TIME2: sz=5
+			case EN_TBL_DT_ALL: sz=7
+			end select
+	#endif
+	case `B`: sz=1
+	case `W`: sz=2
+	case `S`: sz=tbl_field_info(field_index).p2+1
+	case `U`: sz=4
+	case else: sz=0
+	end select
+	tbl_get_field_size=sz
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_num_records(byref num_of_records as word, include_deleted as no_yes) as en_tbl_status_codes
+'tbl_select() must be used
+
+'API procedure, a selected data file is required, gets total number of active records or all records(both active and inactive).
+
+	dim fz as dword
+	'calculate the number of records
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_get_num_records=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_num_records("+str(num_of_records)+","+str(include_deleted)+")",tbl_get_num_records)
+		#endif		
+		num_of_records=0
+		exit function
+	end if
+
+	if tbl_selected_file_name="" then
+		tbl_get_num_records=EN_TBL_STATUS_UNKNOWN_FILE
+		goto finish
+	end if
+	
+	if tbl_info(tbl_info_index).rec_size=0 then 
+		tbl_get_num_records=EN_TBL_STATUS_UNKNOWN_TABLE
+		goto finish
+	end if
+	
+	if include_deleted=yes then
+		fz=fd.filesize
+		num_of_records=fz/tbl_info(tbl_info_index).rec_size
+	else
+		num_of_records=tbl_selected_active_rc
+	end if
+	tbl_get_num_records=EN_TBL_STATUS_OK
+finish:
+	if fd.ready=NO then tbl_get_num_records=EN_TBL_STATUS_FAILURE
+	if tbl_get_num_records<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_get_num_records)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_num_records("+str(num_of_records)+","+str(include_deleted)+")",tbl_get_num_records)
+		#endif
+	end if
+end function
+
+
+'------------------------------------------------------------------------------
+public function tbl_timestamp_sg(byref timestamp as struct_tbl_timestamp,op as en_tbl_rdwr) as en_tbl_status_codes
+'tbl_select() must be used
+
+'API procedure, a selected data file is required, sets and gets the timestamp for the selected data file.
+
+	dim ts as string(7)
+
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_timestamp_sg=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_timestamp_sg()",tbl_timestamp_sg)
+		#endif
+		exit function
+	end if
+	
+	if tbl_selected_file_name="" then
+		tbl_timestamp_sg=EN_TBL_STATUS_UNKNOWN_FILE
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_timestamp_sg()",tbl_timestamp_sg)
+		#endif
+		exit function
+	end if
+	
+	if fd.ready=NO then goto tbl_fail
+	
+	if op=EN_TBL_GET then 
+		if tbl_attributes_sg(tbl_selected_file_name,"TS",ts,EN_TBL_GET)<>PL_FD_STATUS_OK then goto fd_error
+		if fd.laststatus<>PL_FD_STATUS_OK then goto tbl_fail
+		timestamp.ts_daycount=256*asc(mid(ts,1,1))+asc(mid(ts,2,1))
+		timestamp.ts_mincount=256*asc(mid(ts,3,1))+asc(mid(ts,4,1))
+		timestamp.ts_seconds=asc(mid(ts,5,1))
+		timestamp.ts_milsec=256*asc(mid(ts,6,1))+asc(mid(ts,7,1))
+	else
+		ts=chr(timestamp.ts_daycount/256)
+		ts=ts+chr(timestamp.ts_daycount and &hFF)
+		ts=ts+chr(timestamp.ts_mincount/256)
+		ts=ts+chr(timestamp.ts_mincount and &hFF)
+		ts=ts+chr(timestamp.ts_seconds)
+		ts=ts+chr(timestamp.ts_milsec/256)
+		ts=ts+chr(timestamp.ts_milsec and &hFF)
+		if fd.transactionstart<>PL_FD_STATUS_OK then goto fd_error
+		if tbl_attributes_sg(tbl_selected_file_name,"TS",ts,EN_TBL_SET)<>PL_FD_STATUS_OK then goto fd_error
+		if fd.transactioncommit<>PL_FD_STATUS_OK then goto fd_error
+	end if
+	goto tbl_ok
+
+fd_error:	
+	select case fd.laststatus
+	case PL_FD_STATUS_OK: goto tbl_ok
+	case PL_FD_STATUS_ALREADY_OPENED: goto tbl_ok
+	case PL_FD_STATUS_DUPLICATE_NAME: goto tbl_ok
+	case PL_FD_STATUS_NOT_FOUND: goto tbl_unknown_tbl
+	case PL_FD_STATUS_NOT_OPENED: goto tbl_unknown_tbl
+	case else goto tbl_fail
+	end select
+	
+tbl_ok:
+	tbl_timestamp_sg=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_timestamp_sg=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_unknown_tbl:
+	tbl_timestamp_sg=EN_TBL_STATUS_UNKNOWN_TABLE
+finish:
+	if fd.transactionstarted=YES then fd.transactioncommit
+	if fd.ready=NO then tbl_timestamp_sg=EN_TBL_STATUS_FAILURE
+	if tbl_timestamp_sg<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_timestamp_sg)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_timestamp_sg()",tbl_timestamp_sg)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_max_field_size(byref table_name_or_num as string) as byte
+'API procedure, a selected table sturcture is required, returns the size of the largest field for that table.
+
+	dim tbl_index, i, temp, sz, upper_bound as byte
+	
+	tbl_get_max_field_size=0
+	if tbl_info_find(table_name_or_num,tbl_index)<>EN_TBL_STATUS_OK then exit function
+	
+	if (tbl_index<0 and tbl_info(tbl_index).field_num_offset=0) or tbl_index=TBL_MAX_NUM_TABLES-1 then
+		upper_bound=TBL_MAX_TOTAL_NUM_FIELDS-1
+	else
+		upper_bound=tbl_info(tbl_index+1).field_num_offset-1
+	end if
+	
+	sz=0
+	for i=tbl_info(tbl_index).field_num_offset to upper_bound
+		temp=tbl_get_field_size(i)>sz 
+		if temp > sz then sz=temp
+	next i
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_table_info(byref table_name_or_num as string, byref table_metadata as tbl_type) as en_tbl_status_codes
+'API procedure, a selected table sturcture is required, returns infomation for the selected table.
+	dim i as byte
+	
+	if tbl_init_flag<>TBL_INIT_SIGNATURE then
+		tbl_get_table_info=EN_TBL_STATUS_NOT_STARTED
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_table_info()",tbl_get_table_info)
+		#endif		
+		exit function
+	end if
+	
+	tbl_get_table_info=tbl_info_find(table_name_or_num, i)
+	if tbl_get_table_info<>EN_TBL_STATUS_OK then
+		exit function
+	end if
+	
+	table_metadata=tbl_info(i)
+	tbl_get_table_info=EN_TBL_STATUS_OK
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_file_name() as string
+'API procedure, a selected data file is required, returns the name of the selected data file.
+
+	tbl_get_file_name=tbl_selected_file_name
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_table_name() as string
+'API procedure, a selected data file is required, returns the name of the selected table name.
+
+	if tbl_selected_file_name="" then
+		tbl_get_table_name=""
+	else
+		tbl_get_table_name=tbl_info(tbl_info_index).table_name
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_num_fields(byref table_name_or_num as string) as byte
+'API procedure, retures the number of the fields for the table specify by the table_name_or_num.
+	dim i as byte
+	
+	if tbl_info_find(table_name_or_num,i)<>EN_TBL_STATUS_OK then
+		tbl_get_num_fields=0
+		exit function
+	end if
+	
+	tbl_get_num_fields=tbl_info(i).num_of_fields
+	
+	#if TBL_AGGREGATE_HASH
+		tbl_get_num_fields=tbl_get_num_fields-2
+	#endif
+end function
+
+'------------------------------------------------------------------------------
+public function tbl_get_field_info(byref table_name_or_num as string, field_index as byte, byref field_metadata as tbl_field_type) as en_tbl_status_codes
+'API procedure, retures the information of the field for the table specify by the table_name_or_num.
+	
+	dim i as byte
+	dim w as word
+	
+	if len(table_name_or_num)>TBL_MAX_TABLE_NAME_LEN then
+		tbl_get_field_info=EN_TBL_STATUS_INV_PARAM
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_field_info()",tbl_get_field_info)
+		#endif
+		exit function
+	end if
+	
+	tbl_get_field_info=tbl_info_find(table_name_or_num,i)
+	if tbl_get_field_info<>EN_TBL_STATUS_OK then exit function
+	
+	if field_index>=tbl_info(i).num_of_fields then
+		tbl_get_field_info=EN_TBL_STATUS_INV_PARAM
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_get_field_info()",tbl_get_field_info)
+		#endif
+		exit function	
+	end if
+	
+	#if TBL_AGGREGATE_HASH
+		field_index=field_index+2
+	#endif
+	
+	tbl_get_field_info=EN_TBL_STATUS_OK
+	w=field_index
+	field_metadata=tbl_field_info(w+tbl_info(i).field_num_offset)
+end function
+
+'------------------------------------------------------------------------------
+function tbl_adjust_size() as en_tbl_status_codes
+'look through the data file for the deleted records, if all records in 1 sector are deleted, then free the sector.
+
+	dim free_sector, deleted_record, record_per_sector, removing_sector as word
+
+	if fd.ready=NO then goto tbl_fail
+
+	if tbl_info(tbl_info_index).struct<>EN_TBL_STRUCT_LIST then goto tbl_ok
+	record_per_sector=256/tbl_info(tbl_info_index).rec_size
+	deleted_record=tbl_selected_all_rc-tbl_selected_active_rc
+	
+#if TBL_ADJUST_LIST_WHEN_FULL
+	free_sector=fd.getfreespace
+	if (free_sector<1 or tbl_selected_all_rc>tbl_info(tbl_info_index).maxrecs-1) and deleted_record>=record_per_sector then
+		removing_sector=1
+	else
+		removing_sector=0
+	end if
+#else
+	removing_sector=deleted_record/record_per_sector
+#endif
+	if removing_sector>0 then
+		tbl_record_ptr_sg(1,EN_TBL_SET)
+		if fd.cutfromtop(removing_sector)<>PL_FD_STATUS_OK then goto tbl_fail
+		tbl_get_num_records(tbl_selected_all_rc,yes)
+		goto tbl_ok		
+	end if
+	
+tbl_ok:
+	tbl_adjust_size=EN_TBL_STATUS_OK
+	goto finish
+tbl_unknown_tbl:
+	tbl_adjust_size=EN_TBL_STATUS_UNKNOWN_TABLE
+	goto finish
+tbl_fail:
+	tbl_adjust_size=EN_TBL_STATUS_FAILURE
+	goto finish
+tbl_invalid:
+	tbl_adjust_size=EN_TBL_STATUS_INVALID
+finish:
+	if fd.ready=NO then tbl_adjust_size=EN_TBL_STATUS_FAILURE
+	if tbl_adjust_size<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_adjust_size)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_adjust_size()",tbl_adjust_size)
+		#endif
+	end if	
+end function
+
+'------------------------------------------------------------------------------
+function tbl_info_find(byref table_name_or_num as string, byref index as byte) as en_tbl_status_codes
+'Looking for the table in the table_info array, the table name can also be the index
+
+	dim i as byte
+
+	i=asc(table_name_or_num)
+	if i>=&h30 and i<=&h39 then
+		i=val(table_name_or_num)
+		goto check_index
+	else
+		for i=0 to TBL_MAX_NUM_TABLES-1
+			if tbl_info(i).table_name=table_name_or_num then
+				goto check_index
+			end if
+		next i
+	end if
+	goto tbl_not_found
+check_index:
+	if i<TBL_MAX_NUM_TABLES then
+		index=i
+		tbl_info_find=EN_TBL_STATUS_OK
+	else
+tbl_not_found:
+		index=0
+		tbl_info_find=EN_TBL_STATUS_UNKNOWN_TABLE
+	end if
+finish:
+	if tbl_info_find<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_info_find)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_info_find("+table_name_or_num+")",tbl_info_find)
+		#endif
+	end if	
+end function
+
+'------------------------------------------------------------------------------
+function tbl_record_ptr_sg(byref rec_num as word,op as en_tbl_rdwr) as en_tbl_status_codes
+'tbl_select() must be used
+
+'API procedure, a selected data file is required, sets the file pointer to the record that is at the position specify by rec_num. rec_num starts from 1.
+
+	dim dptr,drec as dword
+	
+	if fd.ready=NO then goto tbl_fail
+	if op=EN_TBL_GET then
+		rec_num=(fd.pointer/tbl_info(tbl_info_index).rec_size)+1
+		goto tbl_ok
+	else
+		if rec_num>tbl_selected_all_rc then
+			dptr=fd.filesize+1
+			rec_num=tbl_selected_all_rc+1
+		else
+			if rec_num=0 then
+				dptr=1
+				rec_num=1
+			else
+				drec=(rec_num-1)
+				dptr=drec*tbl_info(tbl_info_index).rec_size+1
+			end if
+		end if
+		if fd.pointer<>dptr then fd.setpointer(dptr)
+		goto tbl_ok
+	end if
+	
+tbl_ok:
+	tbl_record_ptr_sg=EN_TBL_STATUS_OK
+	goto finish
+tbl_fail:
+	tbl_record_ptr_sg=EN_TBL_STATUS_FAILURE	'fd errors, and other errors
+finish:
+	if fd.ready=NO then tbl_record_ptr_sg=EN_TBL_STATUS_FAILURE
+	if tbl_record_ptr_sg<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_record_ptr_sg)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_record_ptr_sg("+str(rec_num)+","+str(op)+")",tbl_record_ptr_sg)
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+#if TBL_AGGREGATE_HASH
+function tbl_set_md5() as dword
+'Calculate the MD5 of tbl_record_string, store it in the table, and also modify the table hash.
+	
+	dim f,i as word
+	dim temp as string
+	dim sfldval as string(TBL_MAX_FIELD_VALUE_LEN)
+	dim l as byte
+	dim d as dword
+	dim msw, lsw as word
+
+	tbl_field_sg("UID",sfldval,EN_TBL_GET)
+	temp=chr(TBL_ELEMENT_START)+"I"+chr(TBL_ELEMENT_NAME_VALUE_SEPARATOR)+sfldval+chr(TBL_ELEMENT_END)
+
+	for f=2 to tbl_info(tbl_info_index).num_of_fields-1
+		i=tbl_info(tbl_info_index).field_num_offset+f
+		if tbl_field_info(i).field_name="" then exit for
+		if tbl_field_sg(tbl_field_info(i).field_name,sfldval,EN_TBL_GET)=EN_TBL_STATUS_OK then
+			#if TBL_TIME_TYPE_INCLUDED		
+				if tbl_field_info(i).field_type=`T` then 
+					select case tbl_field_info(i).p1
+					case EN_TBL_DT_TIME1,EN_TBL_DT_TIME2,EN_TBL_DT_TIME3:
+						sfldval="20000101"+sfldval
+						td_str_date_time_reformat(sfldval,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD)
+						l=len(sfldval)
+						sfldval=mid(sfldval,12,l-11)
+					case EN_TBL_DT_DATE,EN_TBL_DT_DATE_TIME1,EN_TBL_DT_DATE_TIME2,EN_TBL_DT_ALL:
+						td_str_date_time_reformat(sfldval,TD_STR_ADD_FORMATTING,TD_DATE_FORMAT_YYYYMMDD)
+					end select
+				end if
+			#endif
+			temp=temp+chr(TBL_ELEMENT_START)+sfldval+chr(TBL_ELEMENT_END)
+		end if
+	next f
+	sfldval=md5(temp,"",MD5_FINISH,len(temp))
+	msw=asc(left(sfldval,1))*256+asc(mid(sfldval,2,1))
+	lsw=asc(mid(sfldval,3,1))*256+asc(mid(sfldval,4,1))
+	d=msw*65536+lsw
+	sfldval=lstr(d)
+	tbl_field_sg("MD5",sfldval,EN_TBL_SET)
+	tbl_set_md5=lval(sfldval)
+end function
+#endif
+
+'------------------------------------------------------------------------------
+function tbl_field_find(field_name as string, byref field_index as word) as en_tbl_status_codes
+	dim f,i as word
+	
+	i=asc(field_name)
+	if i>=&h30 and i<=&h39 then
+		i=val(field_name)
+		if i>tbl_info(tbl_info_index).num_of_fields-1 then
+			field_index=tbl_info(tbl_info_index).field_num_offset+i
+			tbl_field_find=EN_TBL_STATUS_UNKNOWN_FIELD
+		else
+			tbl_field_find=EN_TBL_STATUS_OK
+		end if
+		exit function	
+	end if
+	
+	for f=0 to tbl_info(tbl_info_index).num_of_fields-1
+		i=tbl_info(tbl_info_index).field_num_offset+f
+		if tbl_field_info(i).field_name=field_name then 
+			field_index=i
+			tbl_field_find=EN_TBL_STATUS_OK
+			exit function
+		end if
+	next f
+	tbl_field_find=EN_TBL_STATUS_UNKNOWN_FIELD
+end function
+
+'------------------------------------------------------------------------------
+sub tbl_check_for_missing_fields(curr_pos as word, line_end_pos as word)
+	if curr_pos=0 or curr_pos>line_end_pos then
+		#if TBL_DEBUG_PRINT
+			tbl_debugprint("table preparation filed; missing field")
+		#endif
+		'one of your descriptor lines has missing fields
+	end if
+end sub
+
+'------------------------------------------------------------------------------
+function tbl_check_key_violation(byref key_ptr as word) as no_yes
+	dim i as word
+	dim temp as string(TBL_MAX_RECORD_SIZE)
+	dim skeyfield, sfldval as string(TBL_MAX_FIELD_VALUE_LEN)
+	dim sz, b, daddr_offset, lower_bound as byte
+	dim daddr1,daddr2,dtemp as dword
+	
+	key_ptr=0
+	skeyfield=""
+	
+	lower_bound=tbl_info(tbl_info_index).field_num_offset
+	'construct key
+	if tbl_info(tbl_info_index).numkeyf>0 then
+		for i=lower_bound to lower_bound+tbl_info(tbl_info_index).numkeyf-1
+			sz=tbl_get_field_size(i)
+			temp=strgen(sz,chr(val(TBL_NULL)))
+			tbl_field_sg(tbl_field_info(i+tbl_fld_offset).field_name,sfldval,EN_TBL_GET)
+			if tbl_field_info(i+tbl_fld_offset).field_type=`S` then 
+				b=len(sfldval)
+				sfldval=chr(b)+sfldval
+			end if
+			if sfldval="" or sfldval=temp then goto tbl_key_violate
+			skeyfield=skeyfield+sfldval
+		next i
+
+		'search for same key
+		daddr_offset=1	'offset for active_flag(1byte)
+#if TBL_AGGREGATE_HASH
+	daddr_offset=daddr_offset+8		'offset for uid(4bytes) + offset for md5(4bytes)
+#endif
+	daddr1=1+daddr_offset
+find_key:	
+		daddr1=fd.find(daddr1,skeyfield,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+		if daddr1 > 0 then 'check if it's a deleted record
+			daddr2=fd.find(daddr1-daddr_offset,TBL_ACTIVE_FLAG,1,FORWARD,tbl_info(tbl_info_index).rec_size,PL_FD_FIND_EQUAL)
+			if daddr2=daddr1-daddr_offset then 
+				goto tbl_key_violate
+			else
+				daddr1=daddr1+tbl_info(tbl_info_index).rec_size
+				goto find_key
+			end if
+		end if
+	end if
+	tbl_check_key_violation=NO
+	exit function
+tbl_key_violate:
+	dtemp=tbl_info(tbl_info_index).rec_size
+	dtemp=daddr1/dtemp+1
+	key_ptr=dtemp
+	tbl_check_key_violation=YES
+end function
+
+'------------------------------------------------------------------------------
+function tbl_attributes_sg(byref tbl_file_name as string, attri_name as string(4), byref attri_val as string, op as en_tbl_rdwr) as pl_fd_status_codes
+	dim s as string(13)
+	dim hash as string(4)
+	dim ts as string(7)
+	dim rc as string(2)
+
+	if tbl_file_name="" then
+		tbl_attributes_sg=PL_FD_STATUS_NOT_FOUND
+		exit function
+	end if
+
+	s=fd.getattributes(tbl_file_name)
+	rc=mid(s,1,2)
+	ts=mid(s,3,7)
+	hash=mid(s,10,4)
+
+	if op=EN_TBL_GET then
+		select case attri_name
+		case "RC":
+			attri_val=rc
+		case "TS":
+			attri_val=ts			
+		case "HASH":
+			attri_val=hash
+		case else
+			attri_val=s
+		end select
+	else
+		if rc="" then rc=strgen(2,chr(TBL_NULL))
+		if ts="" then ts=strgen(7,chr(TBL_NULL))
+		if hash="" then hash=strgen(4,chr(TBL_NULL))
+		
+		select case attri_name
+		case "RC":
+			s=attri_val+ts+hash
+		case "TS":
+			s=rc+attri_val+hash
+		case "HASH":
+			s=rc+ts+attri_val
+		case else
+			s=strgen(11,chr(TBL_NULL))
+		end select
+		fd.setattributes(tbl_file_name,s)
+	end if
+	tbl_attributes_sg=fd.laststatus
+end function
+
+'------------------------------------------------------------------------------
+function tbl_active_rc_sg(byref rec_count as word,op as en_tbl_rdwr) as pl_fd_status_codes
+	dim s as string(2)
+	dim msb, lsb as byte
+	if op=EN_TBL_GET then
+		tbl_active_rc_sg=tbl_attributes_sg(tbl_selected_file_name,"RC",s,EN_TBL_GET)
+		msb=asc(left(s,1))
+		lsb=asc(right(s,1))
+		rec_count=msb*256+lsb
+	else
+		msb=rec_count/256
+		lsb=rec_count mod 256
+		s=chr(msb)+chr(lsb)
+		tbl_active_rc_sg=tbl_attributes_sg(tbl_selected_file_name,"RC",s,EN_TBL_SET)
+	end if
+end function
+
+'------------------------------------------------------------------------------
+#if TBL_AGGREGATE_HASH
+sub tbl_mod_hash(byref d as dword)
+'Update the hash value that is stored in the file attribute.
+
+	dim msw, lsw as word
+	dim hash_val as dword
+	dim hash as string(4)
+	
+	'read the current table hash from the file attribute
+	tbl_attributes_sg(tbl_selected_file_name,"HASH",hash,EN_TBL_GET)
+
+	'calculating new hash value
+	msw=asc(left(hash,1))*256+asc(mid(hash,2,1))
+	lsw=asc(mid(hash,3,1))*256+asc(mid(hash,4,1))
+	hash_val=msw*65536+lsw
+	hash_val=hash_val xor d
+	msw=hash_val/65536
+	lsw=hash_val mod 65536
+	hash=chr(msw/256)+chr(msw mod 256)+chr(lsw/256)+chr(lsw mod 256)
+	
+	'store the new hash value to the file attribute
+	tbl_attributes_sg(tbl_selected_file_name,"HASH",hash,EN_TBL_SET)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if TBL_AGGREGATE_HASH
+function tbl_generate_uid(byref id_string as string) as en_tbl_status_codes
+
+	dim result as en_tbl_status_codes
+	dim msw, lsw as word
+	dim l as long
+	
+	if id_string="" then
+		do
+			id_string=random(4)
+			msw=asc(left(id_string,1))*256+asc(mid(id_string,2,1))
+			lsw=asc(mid(id_string,3,1))*256+asc(mid(id_string,4,1))
+			l=msw*65536 + lsw
+			if l < 0 then l=l*-1
+			id_string=lstri(l)
+			result=tbl_field_sg("UID",id_string,EN_TBL_SET)
+		loop while result=EN_TBL_STATUS_KEY_VIOLATION
+	else
+		result=tbl_field_sg("UID",id_string,EN_TBL_SET)
+	end if
+	tbl_generate_uid=result
+	if tbl_generate_uid<>EN_TBL_STATUS_OK then 
+		callback_tbl_error(tbl_generate_uid)
+		#if TBL_DEBUG_PRINT
+			tbl_debug_print_error("tbl_generate_uid()",tbl_generate_uid)
+		#endif
+	end if	
+end function
+#endif
+
+'-------------------------------------------------------------
+function tbl_get_descriptor_field(line_end_pos as word, byref field_start_pos as word) as string
+'line_end_pos is an INPUT parameter, field_start_pos RETURNS the field position 
+
+	dim i as word
+	
+	do
+		if romfile.pointer>=line_end_pos then
+			'the field is missing
+			tbl_get_descriptor_field=""
+			field_start_pos=0
+			exit function
+		end if
+		
+		i=romfile.find(romfile.pointer,chr(TBL_FIELD_SEPARATOR),1)
+		field_start_pos=romfile.pointer
+		if i=0 or i>line_end_pos then
+			'no next field separator found on this line, so we assume the field goes to the end of the line
+			i=line_end_pos
+			tbl_get_descriptor_field=romfile.getdata(i-romfile.pointer)
+			romfile.pointer=line_end_pos+1
+		else
+			tbl_get_descriptor_field=romfile.getdata(i-romfile.pointer)
+			romfile.pointer=i+1
+		end if
+	loop while tbl_get_descriptor_field="" 		
+end function
+
+'------------------------------------------------------------------------------
+#if TBL_DEBUG_PRINT
+sub tbl_debug_print_error(byref debug_str as string,status_code as en_tbl_status_codes)
+
+	dim s as string
+	
+	select case status_code
+	case EN_TBL_STATUS_NOT_STARTED:			s=debug_str+ " ERROR: tbl_start() wasn't used or failed."
+	case EN_TBL_STATUS_OUT_OF_FILE_NUMBERS:	s=debug_str+ " ERROR: Out of file numbers."
+	case EN_TBL_STATUS_FAILURE:				s=debug_str+ " ERROR: Flash disk is not ready or disk operation has failed."
+	case EN_TBL_STATUS_UNKNOWN_TABLE:		s=debug_str+ " ERROR: Unknown table."
+	case EN_TBL_STATUS_UNKNOWN_FIELD:		s=debug_str+ " ERROR: Unknown field."
+	case EN_TBL_STATUS_UNKNOWN_FILE:		s=debug_str+ " ERROR: Unknown data file or no data file was selected."
+	case EN_TBL_STATUS_INVALID:				s=debug_str+ " ERROR: Invalid field value."
+	case EN_TBL_STATUS_FULL:				s=debug_str+ " ERROR: Max record number reached or the flash disk is full."
+	case EN_TBL_STATUS_NOT_FOUND:			s=debug_str+ " Record not found."
+	case EN_TBL_STATUS_KEY_VIOLATION:		s=debug_str+ " ERROR: Key field violation."
+	case EN_TBL_STATUS_DELETED:				s=debug_str+ " ERROR: This record is deleted (not active)."
+	case EN_TBL_STATUS_END_OF_TABLE:		s=debug_str+ " End of table."
+	case EN_TBL_STATUS_INV_PARAM:			s=debug_str+ " ERROR: Invalid parameter."
+	end select
+	tbl_debugprint(s)	
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if TBL_DEBUG_PRINT
+sub tbl_debugprint(byref print_data as string)
+	if tbl_do_not_debug_print=NO then sys.debugprint(TBL_STAMP+print_data+TBL_CR_LF)
+end sub
+#endif
+
+public sub tbl_set_to_clean_start(op as no_yes)
+	tbl_info(tbl_info_index).clean_start=op
+end sub

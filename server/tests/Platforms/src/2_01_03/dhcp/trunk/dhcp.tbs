@@ -1,0 +1,979 @@
+'***********************************************************************************************************
+'			DHCP LIBRARY
+'			(Works with NET, WLN)
+'***********************************************************************************************************
+
+include "global.tbh"  
+
+'------------------------------------------------------------------------------
+const DHCP_STAMP1="DHCP("
+const DHCP_STAMP2=")> "
+const DHCP_CR_LF=chr(13)+chr(10)
+const DHCP_MIN_BUFFER_SPACE=700	'necessary!
+const DHCP_SOCK_BUFF_PAGES=3	'necessary!
+const DHCP_INIT_SIGNATURE=&h3D4E
+const DHCP_SOCK_GET_SIGNATURE="DHCP"
+const DHCP_WLN_EXCHANGE_DELAY_CONST=4
+
+#if NET_AVAILABLE=1 and WLN_AVAILABLE=1
+	const NUM_INTERFACES=2
+#else
+	const NUM_INTERFACES=1
+#endif
+
+'------------------------------------------------------------------------------
+enum en_dhcp_phases
+	DHCP_PHASE_DISCOVER,
+	DHCP_PHASE_DISCOVER_REPLY,
+	DHCP_PHASE_REQUEST,
+	DHCP_PHASE_REQUEST_REPLY,
+	DHCP_PHASE_IDLE,
+	DHCP_PHASE_OFF
+end enum
+
+'------------------------------------------------------------------------------
+declare sub dhcp_proc_one_interface(interface as pl_sock_interfaces)
+declare sub dhcp_error(interface as pl_sock_interfaces)
+declare function dhcp_sock_open(interface as pl_sock_interfaces,phase as en_dhcp_phases) as ok_ng
+declare sub dhcp_sock_close()
+declare sub send_dhcp(byref obtained_ip as string(16),byref device_name as string(32),interface as pl_sock_interfaces)
+declare sub dhcp_check_if_all_finished()
+declare sub discard_sockets(interface as pl_sock_interfaces)
+declare sub dhcp_init()
+declare sub dhcp_debug_print_status(interface as pl_sock_interfaces,status as en_dhcp_status_codes)
+declare sub dhcp_debugprint(interface as pl_sock_interfaces,byref print_data as string)
+
+'------------------------------------------------------------------------------
+dim dhcp_sock as byte
+dim dhcp_phase(NUM_INTERFACES) as en_dhcp_phases
+dim dhcp_renew(NUM_INTERFACES) as no_yes
+dim dhcp_i as byte
+dim device_name as string(16)
+dim dhcp_server_ip(NUM_INTERFACES) as string(16)
+dim dhcp_obtained_ip(NUM_INTERFACES) as string(16)
+dim dhcp_obtained_gateway(NUM_INTERFACES) as string(16)
+dim dhcp_obtained_netmask(NUM_INTERFACES) as string(16)
+dim dhcp_obtained_lease_time(NUM_INTERFACES) as dword
+dim dhcp_timer(NUM_INTERFACES) as dword 
+dim dhcp_retry_ctr(NUM_INTERFACES) as byte
+dim dhcp_interface_token as pl_sock_interfaces
+dim dhcp_current_interface as byte
+dim dhcp_init_flag as word
+dim dhcp_host_name(NUM_INTERFACES) as string(DHCP_MAX_HOST_NAME_LEN)
+#if DHCP_DEBUG_PRINT
+	dim dhcp_media_linked(NUM_INTERFACES) as no_yes 
+#endif
+#if WLN_AVAILABLE
+	dim dhcp_wln_exchange_delay as byte
+#endif
+dim dhcp_ingnore_link_disconnects(NUM_INTERFACES) as no_yes
+
+'==============================================================================
+public function dhcp_get_info(info_element as dhcp_info_elements, byref extra_data as string) as string
+'Returns library-specific information for the requested info element
+
+	dhcp_get_info=""
+	select case info_element
+	case DHCP_INFO_ELEMENT_REQUIRED_BUFFERS:
+		dhcp_get_info=str(DHCP_SOCK_BUFF_PAGES*2)
+	
+	end select
+end function
+
+'--------------------------------------------------------------------
+public function dhcp_start(interface as pl_sock_interfaces, byref requested_ip as string, byref host_name as string) as en_dhcp_status_codes
+'API procedure, starts DHCP client on the specified network interface.
+
+	if dhcp_init_flag<>DHCP_INIT_SIGNATURE then
+		dhcp_init()
+		dhcp_init_flag=DHCP_INIT_SIGNATURE
+	end if
+
+	dhcp_start=DHCP_STATUS_OK
+
+	#if DHCP_DEBUG_PRINT
+		dhcp_debugprint(interface,"---START---")
+	#endif
+
+	'we only need to obtain a socket once
+	if dhcp_sock>=sock.numofsock then
+		dhcp_sock=sock_get(DHCP_SOCK_GET_SIGNATURE)
+	end if
+	
+	if dhcp_sock>=sock.numofsock then
+		#if DHCP_DEBUG_PRINT
+			dhcp_debug_print_status(interface,DHCP_STATUS_OUT_OF_SOCKETS)
+			dhcp_debugprint(interface,"---FAILURE---")
+		#endif
+		dhcp_start=DHCP_STATUS_OUT_OF_SOCKETS
+		exit function
+	end if
+	
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			goto dhcp_start_continue
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			goto dhcp_start_continue
+		end if
+	#endif
+
+	#if DHCP_DEBUG_PRINT
+		dhcp_debug_print_status(interface,DHCP_STATUS_INVALID_INTERFACE)
+		dhcp_debugprint(interface,"---FAILURE---")
+	#endif
+	dhcp_start=DHCP_STATUS_INVALID_INTERFACE
+	exit function 'invalid interface specified
+
+dhcp_start_continue:
+	if NUM_INTERFACES=1 then
+		dhcp_i=0
+	else
+		dhcp_i=interface-1
+	end if
+
+	if len(ddval(requested_ip))=4 then
+		dhcp_obtained_ip(dhcp_i)=requested_ip
+	else
+		dhcp_obtained_ip(dhcp_i)=""
+	end if
+	
+	dhcp_host_name(dhcp_i)=host_name
+
+	if dhcp_phase(dhcp_i)=DHCP_PHASE_OFF then
+		dhcp_timer(dhcp_i)=1
+		dhcp_retry_ctr(dhcp_i)=DHCP_MAX_RETRIES
+		dhcp_phase(dhcp_i)=DHCP_PHASE_DISCOVER
+	else
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"Already started")
+		#endif
+	end if
+end function
+
+'------------------------------------------------------------------------------
+public function dhcp_stop(interface as pl_sock_interfaces) as en_dhcp_status_codes
+'API procedure, stops DHCP client on the specified network interface.
+
+	if dhcp_init_flag<>DHCP_INIT_SIGNATURE then
+		dhcp_init()
+		dhcp_init_flag=DHCP_INIT_SIGNATURE
+	end if
+
+	dhcp_stop=DHCP_STATUS_OK
+
+	#if DHCP_DEBUG_PRINT
+		dhcp_debugprint(interface,"---STOP---")
+	#endif
+
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			goto dhcp_stop_continue
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			goto dhcp_stop_continue
+		end if
+	#endif
+
+	#if DHCP_DEBUG_PRINT
+		dhcp_debug_print_status(interface,DHCP_STATUS_INVALID_INTERFACE)
+		dhcp_debugprint(interface,"Did not stop")
+	#endif
+	dhcp_stop=DHCP_STATUS_INVALID_INTERFACE
+	exit function 'invalid interface specified
+
+dhcp_stop_continue:
+	if NUM_INTERFACES=1 then
+		dhcp_i=0
+	else
+		dhcp_i=interface-1
+	end if
+
+	dhcp_timer(dhcp_i)=0
+	dhcp_phase(dhcp_i)=DHCP_PHASE_OFF
+end function
+
+'------------------------------------------------------------------------------
+public sub dhcp_set_link_disconnect_behavior(interface as pl_sock_interfaces, behavior as no_yes)
+'API procedure, sets the behavior in case a network interface becomes disconnected
+'(Ethernet cable unplugged or Wi-Fi disassociated). Behavior=NO means that when the link is
+'reestablished the DHCP will be repeated for this interface. YES means that reestablishing the link
+'will not lead to the DHCP restart.
+	dim dhcp_i as byte
+	
+	if NUM_INTERFACES=1 then
+		dhcp_i=0
+	else
+		dhcp_i=interface-1
+	end if
+	dhcp_ingnore_link_disconnects(dhcp_i)=behavior
+end sub
+
+'------------------------------------------------------------------------------
+public sub dhcp_proc_timer()
+'Event procedure, call it from the on_sys_timer() event handler.
+
+	if dhcp_init_flag<>DHCP_INIT_SIGNATURE then
+		exit sub
+	end if
+
+	sock.num=dhcp_sock
+
+	dhcp_current_interface=dhcp_current_interface+1
+	if dhcp_current_interface>=2 then
+		dhcp_current_interface=0
+	end if
+	
+	#if NET_AVAILABLE
+		if dhcp_current_interface=0 then
+			dhcp_proc_one_interface(PL_SOCK_INTERFACE_NET)
+			exit sub
+		end if
+	#endif
+	
+	#if WLN_AVAILABLE
+		if dhcp_current_interface=1 then
+			dhcp_proc_one_interface(PL_SOCK_INTERFACE_WLN)
+			exit sub
+		end if
+	#endif
+end sub
+
+'------------------------------------------------------------------------------
+sub dhcp_proc_one_interface(interface as pl_sock_interfaces)
+'Event procedure, call it from the on_sock_data_arrival() event handler.
+
+	if NUM_INTERFACES=1 then
+		dhcp_i=0
+	else
+		dhcp_i=interface-1
+	end if
+
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			if dhcp_phase(dhcp_i)<>DHCP_PHASE_OFF then
+				if net.linkstate=PL_NET_LINKSTAT_NOLINK then
+					if dhcp_ingnore_link_disconnects(dhcp_i)<>NO then exit sub
+					
+					dhcp_phase(dhcp_i)=DHCP_PHASE_IDLE
+					dhcp_renew(dhcp_i)=NO
+					dhcp_timer(dhcp_i)=1
+					dhcp_retry_ctr(dhcp_i)=DHCP_MAX_RETRIES
+					#if DHCP_DEBUG_PRINT
+						dhcp_media_linked(dhcp_i)=NO
+					#endif
+					exit sub
+				else
+					#if DHCP_DEBUG_PRINT
+						if dhcp_media_linked(dhcp_i)=NO then
+							dhcp_debugprint(interface,"Ethernet cable plugged in -- DHCP (re)started")
+						end if
+						dhcp_media_linked(dhcp_i)=YES
+					#endif
+				end if
+			end if
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			if dhcp_phase(dhcp_i)<>DHCP_PHASE_OFF then
+				if wln_check_association()=PL_WLN_NOT_ASSOCIATED then
+					if dhcp_ingnore_link_disconnects(dhcp_i)<>NO then exit sub
+					
+					dhcp_wln_exchange_delay=DHCP_WLN_EXCHANGE_DELAY_CONST
+					dhcp_phase(dhcp_i)=DHCP_PHASE_IDLE
+					dhcp_renew(dhcp_i)=NO
+					dhcp_timer(dhcp_i)=1
+					dhcp_retry_ctr(dhcp_i)=DHCP_MAX_RETRIES
+					#if DHCP_DEBUG_PRINT
+						dhcp_media_linked(dhcp_i)=NO
+					#endif
+					exit sub
+				else
+					if dhcp_wln_exchange_delay>0 then
+						dhcp_wln_exchange_delay=dhcp_wln_exchange_delay-1
+						exit sub
+					end if
+					
+					#if DHCP_DEBUG_PRINT
+						if dhcp_media_linked(dhcp_i)=NO then
+							dhcp_debugprint(interface,"Wi-Fi interface associated with the AP -- DHCP (re)started")
+						end if
+						dhcp_media_linked(dhcp_i)=YES
+					#endif
+				end if
+			end if
+		end if
+	#endif
+
+	if dhcp_timer(dhcp_i)=0 then
+		exit sub
+	else
+		dhcp_timer(dhcp_i)=dhcp_timer(dhcp_i)-1
+		if dhcp_timer(dhcp_i)>0 then
+			exit sub
+		end if
+	end if
+	
+	#if NET_AVAILABLE and WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			if dhcp_interface_token=PL_SOCK_INTERFACE_WLN and dhcp_phase(PL_SOCK_INTERFACE_NET-1)<>DHCP_PHASE_OFF then
+				if dhcp_timer(PL_SOCK_INTERFACE_NET-1)=0 then
+					dhcp_timer(PL_SOCK_INTERFACE_NET-1)=1
+				end if
+				exit sub
+			end if
+		else
+			if dhcp_interface_token=PL_SOCK_INTERFACE_NET and dhcp_phase(PL_SOCK_INTERFACE_WLN-1)<>DHCP_PHASE_OFF then
+				if dhcp_timer(PL_SOCK_INTERFACE_WLN-1)=0 then
+					dhcp_timer(PL_SOCK_INTERFACE_WLN-1)=1
+				end if
+				exit sub
+			end if
+		end if
+	#endif
+
+	select case dhcp_phase(dhcp_i)
+		
+	case DHCP_PHASE_IDLE:
+		if dhcp_renew(dhcp_i)=NO then
+			dhcp_phase(dhcp_i)=DHCP_PHASE_DISCOVER
+			goto label1
+		else
+			#if DHCP_DEBUG_PRINT
+				dhcp_debugprint(interface,"Time to renew the lease")
+			#endif
+			dhcp_phase(dhcp_i)=DHCP_PHASE_REQUEST
+			goto label2
+		end if
+
+	case DHCP_PHASE_DISCOVER:
+label1:	if dhcp_sock_open(interface,DHCP_PHASE_DISCOVER)<>OK then
+			dhcp_error(interface)
+			exit sub
+		end if
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"TX discovery message")
+		#endif
+		send_dhcp(dhcp_obtained_ip(dhcp_i),device_name,interface)
+		dhcp_phase(dhcp_i)=DHCP_PHASE_DISCOVER_REPLY
+		dhcp_timer(dhcp_i)=DHCP_WAIT_TIME
+		exit sub
+	
+	case DHCP_PHASE_DISCOVER_REPLY:
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"ERROR: Timeout waiting for offer message")
+		#endif
+		dhcp_error(interface)
+		exit sub
+		
+	case DHCP_PHASE_REQUEST:
+label2:	if dhcp_sock_open(interface,DHCP_PHASE_REQUEST)<>OK then
+			dhcp_error(interface)
+			exit sub
+		end if
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"TX request message")
+		#endif
+		send_dhcp(dhcp_obtained_ip(dhcp_i),device_name,interface)
+		dhcp_phase(dhcp_i)=DHCP_PHASE_REQUEST_REPLY
+		dhcp_timer(dhcp_i)=DHCP_WAIT_TIME
+		exit sub
+		
+	case DHCP_PHASE_REQUEST_REPLY:
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"ERROR: Timeout waiting for confirmation message")
+		#endif
+		dhcp_error(interface)
+		exit sub
+		
+	end select
+end sub
+
+'------------------------------------------------------------------------------
+public sub dhcp_proc_data()
+	dim interface as pl_sock_interfaces
+	dim s as string
+	dim s2 as string(32)
+	dim x,f as byte
+	dim message_type as byte
+	dim t1_found as no_yes
+	dim mac as string(6)
+
+	for f=0 to NUM_INTERFACES-1
+		if dhcp_init_flag=DHCP_INIT_SIGNATURE and dhcp_phase(f)<>DHCP_PHASE_OFF then
+			goto dhcp_is_active
+		end if
+	next f
+	exit sub
+
+dhcp_is_active:
+	if sock.num<>dhcp_sock then
+		exit sub
+	end if
+
+	s=sock.getdata(236) 'read all the data up to a magic cookie
+	
+	'verify opcode: must be "reply" (2)
+	'verify hardware type: must be "ethernet" (1)
+	'verify hardware address length: must be (6)
+	if ddstr(mid(s,1,3))<>"2.1.6" then
+		goto dhcp_proc_data_error
+	end if
+
+	'verify transaction ID (must match our last 4 digits of MAC address)
+	#if NET_AVAILABLE
+		mac=ddval(net.mac)
+		if mid(s,5,4)=right(mac,4) then
+			interface=PL_SOCK_INTERFACE_NET
+			goto decode_packet
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		mac=ddval(wln.mac)
+		if mid(s,5,4)=right(mac,4) then
+			interface=PL_SOCK_INTERFACE_WLN
+			goto decode_packet
+		end if
+	#endif
+
+	goto dhcp_proc_data_error 
+
+decode_packet:
+	if NUM_INTERFACES=1 then
+		dhcp_i=0
+	else
+		dhcp_i=interface-1
+	end if
+
+	'branch according to the phase
+	select case dhcp_phase(dhcp_i) 
+	case DHCP_PHASE_DISCOVER_REPLY:
+		'make sure IP-address being offered is valid
+		'first number cannot exceed 223
+		if asc(mid(s,17,1))>223 then
+			goto dhcp_proc_data_error
+		end if
+		
+		'last number cannot be 0 or 255
+		x=asc(mid(s,20,1))
+		if x=0 or x=255 then
+			goto dhcp_proc_data_error
+		end if
+		
+		'IP-address being offered is correct- extract it!
+		dhcp_obtained_ip(dhcp_i)=ddstr(mid(s,17,4))
+	
+	case DHCP_PHASE_REQUEST_REPLY:
+		'Make sure that the IP-address the DHCP supplied now (ACK) is the same as in OFFER message
+		'(or the same we've been using if we are extending the lease)
+		s2=ddstr(mid(s,17,4))
+		if dhcp_obtained_ip(dhcp_i)<>s2 then
+			goto dhcp_proc_data_error
+		end if
+
+	case else:
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"INFO: RX unexpected message (wasn't expecting anything at the moment)")
+		#endif
+		goto dhcp_proc_data_error
+		
+	end select
+
+	'This part is common for all types of replies received from the DHCP server.
+	'Extract and verify our own MAC (must be returned by the server)
+	if mid(s,29,6)<>mac then
+			goto dhcp_proc_data_error
+	end if	
+		
+	'Read magic cookie and options
+	s=sock.getdata(255) 
+	
+	'Check magic cookie
+	if ddstr(mid(s,1,4))<>"99.130.83.99" then
+		goto dhcp_proc_data_error
+	end if	
+
+	dhcp_obtained_lease_time(dhcp_i)=4294967295 'first, assume max lease time
+	t1_found=NO
+
+	'Look through options and extract the ones we need. Only one option-
+	'message type is REALLY a mast
+	for f=5 to len(s)
+		select case asc(mid(s,f,1))
+		case 255: 'reached the end of all options
+			goto exit_options
+		
+		case 0: 'this is a "padding"- just skip it
+			goto next_option		
+
+		case 53: 'OK, we HAD to have this option (message type)- make sure its length is 1
+			if asc(mid(s,f+1,1))<>1 then
+				goto dhcp_proc_data_error
+			end if	
+			'now get the message type and see if it is correct
+			message_type=asc(mid(s,f+2,1))
+			select case dhcp_phase(dhcp_i)
+			case DHCP_PHASE_DISCOVER_REPLY:
+				if message_type<>2 then
+					goto dhcp_proc_data_error
+				end if
+			
+			case DHCP_PHASE_REQUEST_REPLY:
+				if message_type<>5 then
+					goto dhcp_proc_data_error
+				end if
+			
+			case else:
+
+			end select
+			f=f+2
+				
+		case 1: 'netmask option!- make sure its length is 5
+			if asc(mid(s,f+1,1))<>4 then
+				goto dhcp_proc_data_error
+			end if
+			dhcp_obtained_netmask(dhcp_i)=ddstr(mid(s,f+2,4))
+			f=f+5								
+
+		case 3: 'default gateway IP option!- there can be N gateways, length must be 4*n
+			x=asc(mid(s,f+1,1))
+			if x<4 or x-(x/4)*4<>0 then
+				goto dhcp_proc_data_error
+			end if
+			dhcp_obtained_gateway(dhcp_i)=ddstr(mid(s,f+2,4))
+			f=f+1+x								
+
+		case 51: 'offered lease time
+			'only process this if no T1 option was encountered yet
+			if t1_found=NO then
+				goto get_lease
+			end if
+			f=f+5
+		
+		case 59: 'T1- renewal time
+			t1_found=YES
+get_lease:	if asc(mid(s,f+1,1))<>4 then
+				goto dhcp_proc_data_error
+			end if
+
+			'renewal time is a 4-byte value (in seconds)
+			dhcp_obtained_lease_time(dhcp_i)= asc(mid(s,f+2,1))*16777216+asc(mid(s,f+3,1))*65536+asc(mid(s,f+4,1))*256+asc(mid(s,f+5,1))
+			f=f+5
+		
+		case 54: 'server identifier option
+			if asc(mid(s,f+1,1))<>4 then
+				goto dhcp_proc_data_error
+			end if
+			dhcp_server_ip(dhcp_i)=ddstr(mid(s,f+2,4))
+			f=f+5		
+			
+		case else: 'some other option: just skip it
+			x=asc(mid(s,f+1,1))
+			f=f+x+1			
+		
+		end select
+next_option:	
+	next f
+
+exit_options:	
+	'packet decoded successfully
+	select case dhcp_phase(dhcp_i)
+	case DHCP_PHASE_DISCOVER_REPLY:
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"RX offer message")
+		#endif
+		dhcp_phase(dhcp_i)=DHCP_PHASE_REQUEST
+		dhcp_timer(dhcp_i)=1
+		dhcp_sock_close()
+		
+	case DHCP_PHASE_REQUEST_REPLY:
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"RX confirmation message")
+		#endif
+		'DHCP interaction completed successfully
+		dhcp_phase(dhcp_i)=DHCP_PHASE_IDLE
+		dhcp_timer(dhcp_i)=(dhcp_obtained_lease_time(dhcp_i)/10)*9
+		dhcp_sock_close()
+		dhcp_check_if_all_finished()
+		#if DHCP_DEBUG_PRINT
+			dhcp_debugprint(interface,"---OK(ip: "+dhcp_obtained_ip(dhcp_i)+", gateway: "+dhcp_obtained_gateway(dhcp_i)+", netmask: "+dhcp_obtained_netmask(dhcp_i)+", lease: "+lstr(dhcp_obtained_lease_time(dhcp_i))+" sec.)---")
+		#endif
+		callback_dhcp_ok(dhcp_renew(dhcp_i),interface,dhcp_obtained_ip(dhcp_i),dhcp_obtained_gateway(dhcp_i),dhcp_obtained_netmask(dhcp_i),dhcp_obtained_lease_time(dhcp_i))
+		sock.num=dhcp_sock
+		dhcp_renew(dhcp_i)=YES
+	end select
+	exit sub
+
+dhcp_proc_data_error:
+	#if DHCP_DEBUG_PRINT
+		dhcp_debugprint(interface,"INFO: RX unexpected, invalid, or unrelated message (it was discarded)")
+	#endif
+end sub
+
+'------------------------------------------------------------------------------
+sub dhcp_error(interface as pl_sock_interfaces)
+	'DHCP error
+	dhcp_sock_close()
+
+	if dhcp_phase(dhcp_i)<>DHCP_PHASE_OFF then
+		dhcp_phase(dhcp_i)=DHCP_PHASE_IDLE
+		dhcp_check_if_all_finished()
+	end if
+
+	if dhcp_retry_ctr(dhcp_i)>0 then
+		dhcp_timer(dhcp_i)=((asc(random(1))) mod DHCP_MAX_RETRY_DELAY)+1
+		dhcp_retry_ctr(dhcp_i)=dhcp_retry_ctr(dhcp_i)-1
+	else	
+		dhcp_retry_ctr(dhcp_i)=DHCP_MAX_RETRIES
+		dhcp_timer(dhcp_i)=DHCP_POST_FAIL_DELAY 'DHCP failed, try again in 3 mins
+		#if DHCP_DEBUG_PRINT
+			dhcp_debug_print_status(interface,DHCP_STATUS_FAILURE)
+		#endif
+		callback_dhcp_failure(interface,DHCP_STATUS_FAILURE)
+		sock.num=dhcp_sock
+	end if
+end sub
+
+'------------------------------------------------------------------------------
+function dhcp_sock_open(interface as pl_sock_interfaces, phase as en_dhcp_phases) as ok_ng
+	dim x as byte
+	dim i as word
+	
+	dhcp_interface_token=interface
+	sock.num=dhcp_sock
+	
+	'for DHCP DISCOVER, we need to have the IP address at 0.0.0.0
+	if phase=DHCP_PHASE_DISCOVER then
+		#if NET_AVAILABLE
+			if interface=PL_SOCK_INTERFACE_NET then
+				if net.ip<>"0.0.0.0" then
+					callback_dhcp_pre_clear_ip(PL_SOCK_INTERFACE_NET)
+					sock.num=dhcp_sock
+					sock.inconenabledmaster=NO
+					discard_sockets(PL_SOCK_INTERFACE_NET)
+					net.ip="0.0.0.0"
+					sock.inconenabledmaster=YES
+				end if
+			end if
+		#endif
+
+		#if WLN_AVAILABLE
+			if interface=PL_SOCK_INTERFACE_WLN then
+				if wln.ip<>"0.0.0.0" then
+					callback_dhcp_pre_clear_ip(PL_SOCK_INTERFACE_WLN)
+					sock.num=dhcp_sock
+					sock.inconenabledmaster=NO
+					discard_sockets(PL_SOCK_INTERFACE_WLN)
+					wln.ip="0.0.0.0"
+					sock.inconenabledmaster=YES
+				end if
+			end if
+		#endif
+	end if
+	
+	'arrange buffer space
+	if sock.rxbuffsize<DHCP_MIN_BUFFER_SPACE or sock.txbuffsize<DHCP_MIN_BUFFER_SPACE then
+		sock.rxbuffrq(0)
+		sock.txbuffrq(0)
+		sys.buffalloc
+
+		if sys.freebuffpages<DHCP_SOCK_BUFF_PAGES*2 then
+			if sys.freebuffpages>DHCP_SOCK_BUFF_PAGES*2 then
+				x=DHCP_SOCK_BUFF_PAGES*2
+			else
+				x=DHCP_SOCK_BUFF_PAGES*2-sys.freebuffpages
+			end if
+			callback_dhcp_pre_buffrq(x)
+			sock.num=dhcp_sock
+		end if
+		
+		sock.rxbuffrq(DHCP_SOCK_BUFF_PAGES)
+		sock.txbuffrq(DHCP_SOCK_BUFF_PAGES)
+		sys.buffalloc
+		if sock.rxbuffsize<DHCP_MIN_BUFFER_SPACE or sock.txbuffsize<DHCP_MIN_BUFFER_SPACE then
+			#if DHCP_DEBUG_PRINT
+				dhcp_debug_print_status(interface,DHCP_STATUS_INSUFFICIENT_BUFFER_SPACE)
+			#endif
+			dhcp_sock_open=NG
+			exit function
+		end if
+	end if
+
+	'setup the socket itself
+	sock.allowedinterfaces="WLN,NET"
+	sock.protocol=PL_SOCK_PROTOCOL_UDP
+	sock.targetport=67
+	sock.outport=68
+	sock.targetbcast=YES
+	sock.acceptbcast=YES
+	sock.connectiontout=600
+	sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+	sock.reconmode=PL_SOCK_RECONMODE_3
+	
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			sock.targetinterface=PL_SOCK_INTERFACE_NET
+		end if
+	#endif
+	
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			sock.targetinterface=PL_SOCK_INTERFACE_WLN
+		end if
+	#endif
+	
+	if sock.statesimple=PL_SSTS_CLOSED then
+		i=sys.timercount
+		sock.connect
+dhcp_1:
+		if sock.statesimple<>PL_SSTS_EST and sys.timercount-i<3 and sys.timercount>=i then
+			goto dhcp_1
+		end if
+	end if
+	dhcp_sock_open=OK
+end function
+
+'------------------------------------------------------------------------------
+sub dhcp_sock_close()
+	dim i as word
+	
+	i=sys.timercount
+	sock.discard
+	while sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i
+	wend
+	dhcp_interface_token=PL_SOCK_INTERFACE_NULL
+end sub
+
+'------------------------------------------------------------------------------
+sub dhcp_check_if_all_finished()
+	dim f as byte
+	
+	for f=0 to NUM_INTERFACES-1
+		if dhcp_phase(f)<>DHCP_PHASE_IDLE and dhcp_phase(f)<>DHCP_PHASE_OFF then
+			exit sub
+		end if
+	next f
+	
+	sock.num=dhcp_sock
+	sock.rxbuffrq(0)
+	sock.txbuffrq(0)
+	sys.buffalloc
+	callback_dhcp_buff_released()
+	sock.num=dhcp_sock
+end sub
+
+'------------------------------------------------------------------------------
+sub send_dhcp(byref obtained_ip as string(16),byref device_name as string(32), interface as pl_sock_interfaces)
+	dim s as string
+	dim mac as string(6)
+	dim ip as string(4)
+
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			mac=ddval(net.mac)
+			ip=ddval(net.ip)
+		end if
+	#endif
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			mac=ddval(wln.mac)
+			ip=ddval(wln.ip)
+		end if
+	#endif
+
+	'1.1.6.0- opcode=rq, hware type= Ethernet, hardware addr len= 6, hop count=0
+	s=ddval("1.1.6.0")
+	
+	'transaction ID- last 4 bytes of MAC address
+	s=s+right(mac,4)
+
+	'0.0- number of seconds
+	'128.0- set broadcast flag
+	s=s+ddval("0.0.128.0")
+
+	select case dhcp_phase(dhcp_i)
+	case DHCP_PHASE_DISCOVER:
+		'for DISCOVER message all fields until MAC-address are unused	
+		'set client ip, your ip, server ip, gateway ip all to zeroes.
+		s=s+strgen(16,chr(0))
+	
+	case DHCP_PHASE_REQUEST:
+		'our IP address and the field for server-suggested IP- fill with zeroes to avoid problems
+		s=s+strgen(8,chr(0))
+		
+		'supply IP-address of the server (we obtained from the OFFER message)- this is required
+		s=s+strgen(4,chr(0))
+	
+		'no need to set gateway IP
+		s=s+strgen(4,chr(0))
+	
+	case else:
+	end select
+	
+	s=s+mac 'client MAC
+
+	sock.setdata(s)
+	
+	'now we just need 204 empty bytes
+	s=strgen(202,chr(0))
+	sock.setdata(s)
+	
+	'continue...
+	s=ddval("99.130.83.99") 'magic cookie
+
+	select case dhcp_phase(dhcp_i)
+	case DHCP_PHASE_DISCOVER:
+		'53.1.1- set message type to DISCOVER
+		s=s+ddval("53.1.1")
+		
+		'116.1.1 - DHCP Auto Configuration
+		s=s+ddval("116.1.1")
+		
+		'61.7 - Client Identifier
+		s=s+ddval("61.7.1.")+mac
+	
+		'50.4- suggest our current IP only if IP was assigned already
+		if obtained_ip <> "" then 
+			s=s+ddval("50.4."+obtained_ip)	'suggest our current IP
+		else
+			s=s+ddval("50.4.")+ip
+		end if
+
+		'51.4.255.255.255.255- suggest maximum lease time
+		s=s+ddval("51.4.255.255.255.255")
+		
+		'55.2.1.3- provide a list of parameters we need
+		s=s+ddval("55.2.1.3")
+	
+	case DHCP_PHASE_REQUEST:
+		'53.1.3- set message type to REQUEST
+		s=s+ddval("53.1.3")
+		
+		'Our identifier
+		s=s+ddval("61.7.1")+mac
+		
+		'54.4- specify the DHCP server we are addressing
+		s=s+ddval("54.4")+ddval(dhcp_server_ip(dhcp_i))
+
+		'50.4- requested IP (this is the IP-address that the DHCP server has suggested)
+		s=s+ddval("50.4")+ddval(obtained_ip)	
+
+		'add host name option if not empty
+		if dhcp_host_name(dhcp_i)<>"" then
+			s=s+chr(12)+chr(len(dhcp_host_name(dhcp_i)))+dhcp_host_name(dhcp_i)
+		end if
+
+		'55.2.1.3- provide a list of parameters we need
+		s=s+ddval("55.2.1.3")
+	
+	case else:
+
+	end select
+
+	'add host name option if our owner name or device name is set
+	if device_name<>"" then
+		s=s+chr(12)+chr(len(device_name))+device_name
+	end if
+	
+	'end of all options and send!
+	'We pad the packet for compatibility to certain DHCP server that conforms to BOOTP packet size
+	sock.setdata(s+CHR(255)+strgen(319-len(s),CHR(0)))	
+	sock.send
+end sub
+
+'--------------------------------------------------------------------
+sub discard_sockets(interface as pl_sock_interfaces)
+	dim f,sock_bup as byte
+	dim i as word
+
+	sock_bup=sock.num
+
+	for f=0 to sock.numofsock-1
+		sock.num=f
+		if sock.currentinterface=interface and sock.statesimple<>PL_SSTS_CLOSED then
+			sock.discard
+		end if
+	next f
+
+	i=sys.timercount
+wait_discard:
+	for f=0 to sock.numofsock-1
+		sock.num=f
+		if sock.currentinterface=interface and sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i then
+			goto wait_discard
+		end if
+	next f
+	
+	sock.num=sock_bup
+end sub
+
+'----------------------------------------------------------------------------
+sub dhcp_init()
+	dim f as byte
+
+	dhcp_sock=255 'important!
+	for f=0 to NUM_INTERFACES-1
+		dhcp_phase(f)=DHCP_PHASE_OFF
+		dhcp_renew(f)=NO
+		dhcp_timer(f)=0
+		#if DHCP_DEBUG_PRINT
+			dhcp_media_linked(f)=YES 'correct, it is YES
+		#endif
+		dhcp_ingnore_link_disconnects(f)=NO
+	next f
+	dhcp_current_interface=0
+	
+	#if WLN_AVAILABLE
+		dhcp_wln_exchange_delay=DHCP_WLN_EXCHANGE_DELAY_CONST
+	#endif
+end sub
+
+'----------------------------------------------------------------------------
+#if DHCP_DEBUG_PRINT
+sub dhcp_debug_print_status(interface as pl_sock_interfaces,status as en_dhcp_status_codes)
+	dim s as string(64)
+	select case status
+	case DHCP_STATUS_OK: s="OK"
+	case DHCP_STATUS_OUT_OF_SOCKETS: s="out of sockets"
+	case DHCP_STATUS_INVALID_INTERFACE: s="invalid interface"
+	case DHCP_STATUS_INSUFFICIENT_BUFFER_SPACE: s="insufficient buffer space"
+	case DHCP_STATUS_FAILURE: s="DHCP process failed"
+	end select
+	dhcp_debugprint(interface,"ERROR: "+s)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if DHCP_DEBUG_PRINT
+sub dhcp_debugprint(interface as pl_sock_interfaces,byref print_data as string)
+	dim s as string(16)
+	
+	#if NET_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_NET then
+			s="net"
+			goto dhcp_debugprint_1
+		end if
+	#endif
+
+	#if WLN_AVAILABLE
+		if interface=PL_SOCK_INTERFACE_WLN then
+			s="wln"
+			goto dhcp_debugprint_1
+		end if
+	#endif
+	
+	s=str(interface)+"??"
+	
+dhcp_debugprint_1:	
+	sys.debugprint(DHCP_STAMP1+s+DHCP_STAMP2+print_data+DHCP_CR_LF)
+end sub
+#endif

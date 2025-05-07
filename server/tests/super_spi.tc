@@ -1,0 +1,266 @@
+//***********************************************************************************************************
+//			SUPER SPI
+//***********************************************************************************************************
+
+#include "global.th"
+
+#define SSPI_STAMP "SSPI> "
+#define SSPI_CR_LF chr(13)+chr(10)
+#define SSPI_MAX_SLOTS 16
+#define SSPI_UNUSED_SIGNATURE "----"
+#define SSPI_INIT_SIGNATURE 0x9503
+
+void sspi_init();
+void sspi_debugprint(string *print_data);
+
+no_yes sspi_in_use[SSPI_MAX_SLOTS];
+string<SSPI_MAX_SIGNATURE_LEN> sspi_user_signature[SSPI_MAX_SLOTS];
+spi_modes(SSPI_MAX_SLOTS) sspi_mode;
+unsigned int sspi_init_flag;
+unsigned char sspi_num;
+
+pl_io_num sspi_mosi[SSPI_MAX_SLOTS], sspi_miso[SSPI_MAX_SLOTS], sspi_scl[SSPI_MAX_SLOTS];
+
+//==============================================================================
+unsigned char sspi_register(string *signature, pl_io_num mosi, pl_io_num miso, pl_io_num scl, spi_modes mode, no_yes use_ssi) {
+unsigned char sspi_register;
+//Returns a free spi number or 255 if no free spi slots left.
+	unsigned char f;
+	if (sspi_init_flag != SSPI_INIT_SIGNATURE) {
+		sspi_init();
+		sspi_init_flag = SSPI_INIT_SIGNATURE;
+	}
+
+	for (f=0; f <= SSPI_MAX_SLOTS-1; f++) {
+		if (sspi_user_signature[f] == *signature) {
+			sspi_register = f;
+			return sspi_register;
+		}
+	}
+
+	if (use_ssi == NO) {
+register_normal_slot: 
+		for (f=4; f <= SSPI_MAX_SLOTS-1; f++) {
+			if (sspi_in_use[f] == NO) {
+				sspi_in_use[f] = YES;
+				sspi_user_signature[f] = *signature;
+				sspi_mode[f] = mode;
+				sspi_mosi[f] = mosi;
+				sspi_miso[f] = miso;
+				sspi_scl[f] = scl;
+				sspi_register = f;
+
+				io.num = scl;
+				if (mode>SPI_MODE_1) {
+					io.state = HIGH;
+				} else {
+					io.state = LOW;
+				}
+				io.enabled = YES;
+				io.num = mosi;
+				io.state = HIGH;
+				io.enabled = YES;
+				io.num = miso;
+				io.state = HIGH;
+				io.enabled = NO;
+				#if SSPI_DEBUG_PRINT
+					sspi_debugprint("'"+sspi_user_signature[f]+"' register spi #"+str(f));
+				#endif
+				return sspi_register;
+			}
+		}
+	} else {
+		// hi speed (SSI-based) mode
+		f = ssi_get(*signature);
+		if (f == 255) {
+			// could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
+			#if SSPI_DEBUG_PRINT
+				sspi_debugprint("could not register a spi hi-speed (SSI-based) mode, change to normal mode.");
+			#endif
+			goto register_normal_slot;
+		}
+
+		sspi_in_use[f] = YES;
+		sspi_user_signature[f] = *signature;
+		sspi_mosi[f] = mosi;
+		sspi_miso[f] = miso;
+		sspi_scl[f] = scl;
+		sspi_register = f;
+
+		io.num = scl;
+		io.state = HIGH;
+		io.enabled = YES;
+		io.num = mosi;
+		io.state = HIGH;
+		io.enabled = YES;
+		io.num = miso;
+		io.state = HIGH;
+		io.enabled = NO;
+
+		if (mode<=SPI_MODE_1) {
+			io.lineset(scl,LOW);
+		} else {
+			io.lineset(scl,HIGH);
+		}
+
+		#if SSPI_DEBUG_PRINT
+			sspi_debugprint("'"+sspi_user_signature[f]+"' register spi #"+str(f));
+		#endif
+		return sspi_register;
+	}
+	//no free spi slot found
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("'"+*signature+"' could not register a spi slot: no free slots left");
+	#endif
+	sspi_register = 255;
+	return sspi_register;
+}
+
+string sspi_who_uses(unsigned char num) {
+string sspi_who_uses;
+//Returns the signature of the specified socket's user.
+	if (sspi_init_flag != SSPI_INIT_SIGNATURE) {
+		sspi_init();
+		sspi_init_flag = SSPI_INIT_SIGNATURE;
+	}
+
+	if (sspi_in_use[num] == NO) {
+		sspi_who_uses = SSPI_UNUSED_SIGNATURE;
+	} else {
+		sspi_who_uses = sspi_user_signature[num];
+	}
+	return sspi_who_uses;
+}
+
+void sspi_release(unsigned char num) {
+//Releases the sspi (number).
+	if (sspi_init_flag != SSPI_INIT_SIGNATURE) {
+		sspi_init();
+		sspi_init_flag = SSPI_INIT_SIGNATURE;
+	}
+
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("'"+sspi_user_signature[num]+"' released slot #"+str(num));
+	#endif
+
+	sspi_in_use[num] = NO;
+	sspi_user_signature[num] = SSPI_UNUSED_SIGNATURE;
+
+	io.num = sspi_scl[num];
+	io.enabled = NO;
+	io.num = sspi_mosi[num];
+	io.enabled = NO;
+	io.num = sspi_miso[num];
+	io.enabled = NO;
+
+
+	sspi_scl[num] = PL_IO_NULL;
+	sspi_mosi[num] = PL_IO_NULL;
+	sspi_miso[num] = PL_IO_NULL;
+
+	if (num<=3) {
+		ssi_release(num);
+	}
+}
+
+void sspi_get(unsigned char num) {
+	sspi_num = num;
+	#if SSPI_DEBUG_PRINT
+		sspi_debugprint("#"+str(num)+" got slot");
+	#endif
+}
+
+void sspi_write(unsigned char data) {
+	unsigned char bitCnt;//Bits counter	
+	unsigned char compval;//Value to compare - MASK
+	bool BitData;//Comparison result (1 or 0)
+
+	if (sspi_num>3) {
+		compval = 0x80;//Initialize the MASK
+
+		io.num = sspi_scl[sspi_num];//Select SSI_CLK line
+
+		if (sspi_mode[sspi_num] == SPI_MODE_0 || sspi_mode[sspi_num] == SPI_MODE_2) {
+			io.state = HIGH;//Initialize the transmition
+		} else {
+			io.state = LOW;
+		}
+
+		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
+			BitData = data & compval;//Define the state of the bit(MSB-->LSB)
+			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
+
+			if ((BitData)) {
+				io.lineset(sspi_mosi[sspi_num],HIGH);//Bit is 1
+			} else {
+				io.lineset(sspi_mosi[sspi_num],LOW);//Bit is 0
+			}
+
+			//io.lineset(sspi_scl(sspi_num),HIGH)'Write the bit to SPI device
+			io.invert(sspi_scl[sspi_num]);
+			io.invert(sspi_scl[sspi_num]);
+		}
+	} else {
+		ssi.channel = sspi_num;
+		ssi.str(chr(data),PL_SSI_ACK_OFF);
+	}
+}
+
+unsigned char sspi_read() {
+unsigned char sspi_read;
+	unsigned char bitCnt;//Bit counter
+	unsigned char compval;//Value to compare - MASK
+
+	io.lineset(sspi_mosi[sspi_num],LOW);
+	if (sspi_num>3) {
+		sspi_read = 0;
+		compval = 0x80;//Initialize the MASK
+
+		for (bitCnt=0; bitCnt <= 7; bitCnt += 1) {
+			if (sspi_mode[sspi_num] == SPI_MODE_0 || sspi_mode[sspi_num] == SPI_MODE_2) {
+				io.lineset(sspi_scl[sspi_num],LOW);//Read one bit from SPI device
+			} else {
+				io.lineset(sspi_scl[sspi_num],HIGH);//Read one bit from SPI device
+			}
+
+			if ((io.lineget(sspi_miso[sspi_num]))) {//Devine the state of the bit
+				sspi_read = sspi_read | compval;//Store the value of the bit
+			}
+
+			compval = compval/2;//Move the comparision to the next bit(MSB-->LSB)
+			if (sspi_mode[sspi_num] == SPI_MODE_0 || sspi_mode[sspi_num] == SPI_MODE_2) {
+				io.lineset(sspi_scl[sspi_num],HIGH);//Clear the clock line (the data can change now...)
+			} else {
+				io.lineset(sspi_scl[sspi_num],LOW);//Clear the clock line (the data can change now...)
+			}
+		}
+
+		io.lineset(sspi_mosi[sspi_num],HIGH);
+		#if SSPI_DEBUG_PRINT
+			sspi_debugprint("spi read data:"+hex(sspi_read));
+		#endif
+	} else {
+		unsigned int tmp = 0;
+		ssi.channel = sspi_num;
+		tmp = ssi.value(0xFFFF,8);
+		sspi_read = tmp & 0x00FF;
+	}
+	return sspi_read;
+}
+
+void sspi_init() {
+	unsigned char f;
+	for (f=0; f <= SSPI_MAX_SLOTS-1; f++) {
+		sspi_in_use[f] = NO;
+		sspi_user_signature[f] = SSPI_UNUSED_SIGNATURE;
+		sspi_mosi[f] = PL_IO_NULL;
+		sspi_miso[f] = PL_IO_NULL;
+		sspi_scl[f] = PL_IO_NULL;
+	}
+}
+
+#if SSPI_DEBUG_PRINT
+void sspi_debugprint(string *print_data) {
+	sys.debugprint(SSPI_STAMP+*print_data+SSPI_CR_LF);
+}
+#endif

@@ -1,0 +1,292 @@
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'           EM1000 FAMILY -- COMMON PLATFORM STUFF
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+enum pl_io_num 
+    PL_IO_NUM_0,        '<b>PLATFORM CONSTANT. </b><br><br> 
+                        'General-purpose I/O line 0 (P0.0).
+
+    PL_IO_NUM_1,        '<b>PLATFORM CONSTANT. </b><br><br> 
+                        'General-purpose I/O line 1 (P0.1).
+
+    PL_IO_NUM_2,        '<b>PLATFORM CONSTANT. </b><br><br> 
+                        'General-purpose I/O line 2 (P0.2).
+
+    PL_IO_NUM_3,        '<b>PLATFORM CONSTANT. </b><br><br> 
+                        'General-purpose I/O line 3 (P0.3).
+
+    PL_IO_NUM_4,        '<b>PLATFORM CONSTANT. </b><br><br>
+                        'General-purpose I/O line 4 (P0.4).
+
+    PL_IO_NUM_5,        '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 5 (P0.5).
+
+    PL_IO_NUM_6,        '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 6 (P0.6).
+
+    PL_IO_NUM_7,        '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 7 (P0.7).
+
+    PL_IO_NUM_8_RX0,    '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 8 (P1.0), aslo the RX/W1in/din input of the serial port 0.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_9_TX0,    '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 9 (P1.1), also the TX/W1out/dout output of the serial port 0.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_10_RX1,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 10 (P1.2), aslo the RX/W1in/din input of the serial port 1.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_11_TX1,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 11 (P1.3), also the TX/W1out/dout output of the serial port 1.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_12_RX2,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 12 (P1.4), aslo the RX/W1in/din input of the serial port 2.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_13_TX2,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 13 (P1.5), also the TX/W1out/dout output of the serial port 2.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_14_RX3,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 14 (P1.6), aslo the RX/W1in/din input of the serial port 3.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an input. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_15_TX3,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 15 (P1.7), also the TX/W1out/dout output of the serial port 3.<br><br>
+                        'When this serial port is in the UART mode
+                        '(<font color="maroon"><b>ser.mode</b></font>= <font color="olive"><b>0- PL_SER_MODE_UART </b></font>) 
+                        'and is enabled
+                        '(<font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>1- YES</b></font>)
+                        'the line is automatically configured to be an output. Line configuration is still "manual" in all other cases.<br><br>
+                        'Closing the serial port or changing its mode to some other mode restores original configuration of the output buffer.              
+
+    PL_IO_NUM_16_INT0,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 16 (P2.0), also the interrupt line 0.
+
+    PL_IO_NUM_17_INT1,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 17 (P2.1), also the interrupt line 1.
+
+    PL_IO_NUM_18_INT2,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 18 (P2.2), also the interrupt line 2.
+
+    PL_IO_NUM_19_INT3,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 19 (P2.3), also the interrupt line 3.
+
+    PL_IO_NUM_20_INT4,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 20 (P2.4), also the interrupt line 4.
+
+    PL_IO_NUM_21_INT5,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 21 (P2.5), also the interrupt line 5.
+
+    PL_IO_NUM_22_INT6,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 22 (P2.6), also the interrupt line 6.
+
+    PL_IO_NUM_23_INT7,  '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 23 (P2.7), also the interrupt line 7.
+
+    PL_IO_NUM_24,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 24 (P3.0).
+
+    PL_IO_NUM_25,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 25 (P3.1).
+
+    PL_IO_NUM_26,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 26 (P3.2).
+
+    PL_IO_NUM_27,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 27 (P3.3).
+
+    PL_IO_NUM_28,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 28 (P3.4).
+
+    PL_IO_NUM_29,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 29 (P3.5).
+
+    PL_IO_NUM_30,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 30 (P3.6).
+
+    PL_IO_NUM_31,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 31 (P3.7).
+
+    PL_IO_NUM_32,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 32 (P4.0).
+
+    PL_IO_NUM_33,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 33 (P4.1).
+
+    PL_IO_NUM_34,       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 34 (P4.2).
+
+    PL_IO_NUM_35,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 35 (P4.3).
+
+    PL_IO_NUM_36,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 36 (P4.4).
+
+    PL_IO_NUM_37,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 37 (P4.5).
+
+    PL_IO_NUM_38,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 38 (P4.6).
+
+    PL_IO_NUM_39,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 39 (P4.7).
+
+    PL_IO_NUM_40,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 40 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_41,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 41 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_42,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 42 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_43,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 43 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_44,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 44 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_45_CO,    '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 45 (does not belong to any 8-bit port), also a square wave output controlled by the 
+                        'beep object. This output is primarily intended for driving a beeper (buzzer).<br><br>
+                        'When the beeper pattern starts playing, the line is configured as output automatically. When the beeper pattern
+                        'stops playing, the output returns to the input/output and high/low state that it had before the pattern started playing.
+
+    PL_IO_NUM_46,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 46 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_47,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 47 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_48       '<b>PLATFORM CONSTANT.</b><br><br> 
+                        'General-purpose I/O line 48 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_49,       '<b>PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 49 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_50,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 50 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_51,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 51 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_52,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 52 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_53,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 53 (does not belong to any 8-bit port).
+
+    PL_IO_NUM_54,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 54 (does not belong to any 8-bit port). Formerly DBGRX.
+
+    PL_IO_NUM_55,       'PLATFORM CONSTANT.</b><br><br>
+                        'General-purpose I/O line 55 (does not belong to any 8-bit port). Formerly DBGTX.
+
+    PL_IO_NULL          '<b>PLATFORM CONSTANT.</b><br><br>
+                        'This is a NULL line that does not physically exist.
+                        'The state of this line is always detected as LOW. Setting this line has no effect.  
+
+end enum
+
+'--------------------------------------------------------------------
+enum pl_io_port_num
+    PL_IO_PORT_NUM_0,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        '8-bit port 0, contains I/O lines 0-7.
+
+    PL_IO_PORT_NUM_1,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        '8-bit port 1, contains I/O lines 8-15.
+
+    PL_IO_PORT_NUM_2,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        '8-bit port 2, contains I/O lines 16-23.
+
+    PL_IO_PORT_NUM_3,   '<b>PLATFORM CONSTANT.</b><br><br> 
+                        '8-bit port 3, contains I/O lines 24-31.
+
+    PL_IO_PORT_NUM_4    '<b>PLATFORM CONSTANT.</b><br><br> 
+                        '8-bit port 4, contains I/O lines 32-39.
+end enum
+
+'--------------------------------------------------------------------
+enum pl_int_num 
+    PL_INT_NUM_0,      '<b>PLATFORM CONSTANT.</b><br><br> 
+                       'Interrupt line 0 (mapped to I/O line 16).
+
+    PL_INT_NUM_1,      '<b>PLATFORM CONSTANT.</b><br><br> 
+                       'Interrupt line 1 (mapped to I/O line 17).
+
+    PL_INT_NUM_2,      '<b>PLATFORM CONSTANT.</b><br><br> 
+                       'Interrupt line 2 (mapped to I/O line 18).
+
+    PL_INT_NUM_3,      '<b>PLATFORM CONSTANT.</b><br><br> 
+                       'Interrupt line 3 (mapped to I/O line 19).
+
+    PL_INT_NUM_4,      '<b>PLATFORM CONSTANT.</b><br><br>
+                       'Interrupt line 4 (mapped to I/O line 20).
+
+    PL_INT_NUM_5,      '<b>PLATFORM CONSTANT.</b><br><br>
+                       'Interrupt line 5 (mapped to I/O line 21).
+
+    PL_INT_NUM_6,      '<b>PLATFORM CONSTANT.</b><br><br>
+                       'Interrupt line 6 (mapped to I/O line 22).
+
+    PL_INT_NUM_7,      '<b>PLATFORM CONSTANT.</b><br><br>
+                       'Interrupt line 7 (mapped to I/O line 23).
+
+    PL_INT_NULL        '<b>PLATFORM CONSTANT.</b><br><br>
+                       'This is a NULL interrupt line that does not physically exist.
+end enum
+
+'--------------------------------------------------------------------
+include "GEN.tph"
+include "SYS-1xxx.tph"
+include "NET.tph"
+include "PPPOE.tph"
+include "IO-1xxx.tph"
+include "BEEP.tph"
+include "RTC.tph"
+include "LCD.tph"
+include "KP.tph"
+include "SSI.tph"
+include "FD.tph"

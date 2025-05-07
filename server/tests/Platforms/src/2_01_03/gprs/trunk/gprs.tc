@@ -1,0 +1,1930 @@
+//***********************************************************************************************************
+//		GPRS LIBRARY
+//		(Works with TELIT GC864 GPRS module)
+//***********************************************************************************************************
+
+#include "global.th"
+
+//##################################################
+
+//--------------------------------------------------------------------
+#define GPRS_MAX_APN_LEN 24
+#define GPRS_STAMP "GPRS> "
+#define GPRS_CR_LF chr(13)+chr(10)
+#define GPRS_REPLY_OK "OK"
+#define GPRS_REPLY_CONNECT "CONNECT"
+
+#define GPRS_PPP_BUFF_SIZE GPRS_PAYLOAD_SIZE+1
+#define GPRS_SER_BUFF_SIZE GPRS_PAYLOAD_SIZE*2+1
+#define GPRS_STD_TOUT 8
+#define GPRS_ECHO_TOUT 60
+#define GPRS_POST_RESET_TOUT 60
+#define GPRS_MAX_CMD_TRIES 5
+
+#define GPRS_PPP_ESC_CHAR 0x7D
+#define GPRS_PPP_ESC1 0x5E
+#define GPRS_PPP_REPL1 0x7E
+#define GPRS_PPP_ESC2 0x5D
+#define GPRS_PPP_REPL2 0x7D
+#define GPRS_PPP_XOR_MASK 0x20
+
+#define GPRS_GOOD_PPP_CS 0xF0B8
+
+#define GPRS_PPP_PROTO_LCP 0xC021
+#define GPRS_PPP_PROTO_PAP 0xC023
+#define GPRS_PPP_PROTO_IPCP 0x8021
+#define GPRS_PPP_PROTO_IP 0x0021
+
+#define GPRS_PPP_LCP_MESSAGE_02 2//I have no idea what it is
+#define GPRS_PPP_LCP_MESSAGE_AUTH 3
+#define GPRS_PPP_LCP_MESSAGE_MAGIC 5
+#define GPRS_PPP_LCP_MESSAGE_PFC 7
+#define GPRS_PPP_LCP_MESSAGE_AFC 8
+
+#define GPRS_PPP_IPCP_MESSAGE_IP 3
+#define GPRS_PPP_IPCP_MESSAGE_DNS 129
+#define GPRS_PPP_IPCP_MESSAGE_DNS2 131
+
+#define GPRS_LCP_CONFREQ_STR chr(0x02)+chr(0x06)+chr(0x0)+chr(0x0)+chr(0x0)+chr(0x0)
+#define GPRS_LCP_OPTION_PFC_STR chr(0x07)+chr(0x02)//used when constructing option reject
+#define GPRS_LCP_OPTION_AFC_STR chr(0x08)+chr(0x02)//used when constructing option reject
+
+
+#define GPRS_PAP_CONFREQ_STR chr(0x00)+chr(0x00)
+#define GPRS_CCP_CONFREQ_STR ""
+
+#define GPRS_IPCP_CONFREQ_STR chr(0x03)+chr(0x06)+chr(0x00)+chr(0x00)+chr(0x00)+chr(0x00)
+#define PING_STR "45 00 00 20 9a 00 00 00 20 01 00 00 00 00 00 00 00 00 00 00 08 00 30 39 02 00 01 00 61 62 63 64 "
+//                                             -cs-- --our ip--- --ping ip-- 
+
+#define GPRS_INIT_SIGNATURE 0x125D
+#define GPRS_MAX_CMD_REPLY_LEN 128
+
+//--------------------------------------------------------------------
+enum gprs_ppp_codes {
+	GPRS_PPP_CONFREQ=1,
+	GPRS_PPP_CONFACK,
+	GPRS_PPP_CONFNAK,
+	GPRS_PPP_CONFREJ,
+	GPRS_PPP_ECHOREQ=9,
+	GPRS_PPP_ID=12
+};
+
+enum gprs_phases {
+	GPRS_TOGGLE_POWER_1,
+	GPRS_PAUSE_1,
+	GPRS_PROBE_1,
+	GPRS_TOGGLE_POWER_2,
+	GPRS_PAUSE_2,
+	GPRS_PROBE_2,
+	GPRS_RESET_PULSE,
+	GPRS_POST_RESET,
+	GPRS_AT_AT,
+	GPRS_AT_IPR,
+	//GPRS_AT_ICF,
+	GPRS_AT_IFC,
+	GPRS_AT_CGDCONT,
+	GPRS_AT_CGQMIN,
+	GPRS_AT_DT,
+	GPRS_PPP_LCP,//this is where gprs_phase will be changed to GPRS_PH_PPP
+	GPRS_PPP_PAP,
+	GPRS_PPP_IPCP_1,
+	GPRS_PPP_IPCP_2,
+	GPRS_PPP_IPCP_3,
+	GPRS_PPP_PING,
+	GPRS_PPP_SESSION
+};
+
+enum gprs_lcp_parse_results {
+	GPRS_LCP_PARSE_RESULT_ACK,
+	GPRS_LCP_PARSE_RESULT_NAK,
+	GPRS_LCP_PARSE_RESULT_REJ,
+	GPRS_LCP_PARSE_RESULT_DISCARD
+};
+
+//--------------------------------------------------------------------
+void gprs_next_phase();
+void gprs_proc_timer_2();
+ok_ng gprs_parse_ping_reply();
+string gprs_parse_ppp_message();
+gprs_lcp_parse_results gprs_parse_lcp_message(string *lcp_message, unsigned int ppp_protocol, gprs_ppp_codes code, string *rej_str);
+void gprs_at_command(string *command, unsigned char delay);
+void gprs_ping_send();
+void gprs_ppp_send(unsigned int ppp_protocol, gprs_ppp_codes ppp_code, string *data, unsigned char ser_num, unsigned char delay);
+unsigned int gprs_update_fcs(string *dt);
+unsigned int gprs_fcs_value(unsigned char x);
+void gprs_insert_escape(string *command, unsigned char pos, unsigned char replacement_char);
+void gprs_start_over();
+void gprs_init();
+void gprs_eliminate_lf(string *s);
+void gprs_eliminate_double_cr(string *s);
+void gprs_debug_print_phase(gprs_phases gprs_phase);
+void gprs_ppp_decode(string *log_string, string *full_command);
+void gprs_debugprint(string *print_data);
+string gprs_print_hex(string *ss);
+
+//--------------------------------------------------------------------
+no_yes gprs_running;
+no_yes gprs_linkup_in_prog;
+gprs_phases gprs_phase;
+unsigned char gprs_tout_ctr;
+unsigned char gprs_cmd_try;
+string<GPRS_MAX_CMD_REPLY_LEN> gprs_cmd;
+string<GPRS_MAX_CMD_REPLY_LEN> gprs_reply;
+string<GPRS_MAX_CMD_REPLY_LEN> gprs_rej;
+string<4> gprs_ppp_peer_ip;
+string<4> gprs_ppp_ip;
+unsigned char gprs_msg_ser_num_out;
+no_yes gprs_our_request_confirmed, gprs_peer_request_confirmed;
+string<16> gprs_at_dt_command;
+unsigned int gprs_init_flag;
+unsigned char gprs_socket;
+string<GPRS_MAX_APN_LEN> gprs_apn;
+no_yes gprs_pap_required;
+string<16> gprs_username;
+string<16> gprs_password;
+
+#if GPRS_DEBUG_PRINT
+	no_yes gprs_dont_print_stop;
+#endif
+
+//====================================================================
+string gprs_get_info(gprs_info_elements info_element, string *extra_data) {
+string gprs_get_info;
+//API procedure, returns library-specific information according to the requested information element.
+
+	gprs_get_info = "";
+	switch (info_element) {
+	case GPRS_INFO_ELEMENT_REQUIRED_BUFFERS:
+
+		gprs_get_info = str(GPRS_PPP_BUFF_SIZE+GPRS_SER_BUFF_SIZE*2+2);
+		break;
+
+	}
+	return gprs_get_info;
+}
+
+//--------------------------------------------------------------------
+en_gprs_status_codes gprs_start(string *at_dt_command_param, string *apn, string *username, string *password) {
+en_gprs_status_codes gprs_start;
+//API procedure, starts the PPP login/configuration process.
+	unsigned char x;
+
+	if (gprs_init_flag != GPRS_INIT_SIGNATURE) {
+		gprs_init();
+		gprs_init_flag = GPRS_INIT_SIGNATURE;
+	}
+
+	gprs_at_dt_command = "DT"+*at_dt_command_param;
+	gprs_apn = *apn;
+	gprs_username = *username;
+	gprs_password = *password;
+
+	gprs_start = GPRS_STATUS_OK;
+
+	//is this process already going?
+	if (gprs_running != NO) {
+		#if GPRS_DEBUG_PRINT
+			gprs_debugprint("GPRS already started");
+		#endif
+		return gprs_start;
+	}
+
+	#if GPRS_DEBUG_PRINT
+		gprs_debugprint("---START---");
+	#endif
+
+	//handle memory buffers -- calculate memory requirements
+	x = val(gprs_get_info(GPRS_INFO_ELEMENT_REQUIRED_BUFFERS,""));
+	if (x>sys.freebuffpages) {
+		callback_gprs_pre_buffrq(x-sys.freebuffpages);
+
+		if (x>sys.freebuffpages) {
+			#if GPRS_DEBUG_PRINT
+				gprs_debugprint("ERROR: insufficient buffer space");
+			#endif
+			gprs_start = GPRS_STATUS_INSUFFICIENT_BUFFER_SPACE;
+			goto gprs_start_error;
+		}
+	}
+
+	//prepare PPP object's buffers
+	ser.num = GPRS_SER_PORT;
+
+	ser.enabled = NO;
+	ppp.portnum = GPRS_SER_PORT;
+	ppp.enabled = NO;
+	ppp.buffrq(GPRS_PPP_BUFF_SIZE);
+	ser.rxbuffrq(GPRS_SER_BUFF_SIZE);
+	ser.txbuffrq(GPRS_SER_BUFF_SIZE);
+	sys.buffalloc();
+
+	ser.txclear;
+	ser.baudrate = ser.div9600/(38400/9600);
+	ser.flowcontrol = ENABLED;
+	ser.rtsmap = GPRS_SER_PORT_RTSMAP;
+	ser.ctsmap = GPRS_SER_PORT_CTSMAP;
+	ser.enabled = YES;
+	io.num = ser.rtsmap;
+	io.enabled = YES;
+
+
+	//setup the socket for sending echo
+	gprs_socket = sock_get("GPRS");
+	sock.num = gprs_socket;
+	sock.rxbuffrq(1);
+	sock.txbuffrq(1);
+	sys.buffalloc();
+	sock.protocol = PL_SOCK_PROTOCOL_RAW;
+	sock.targetinterface = PL_SOCK_INTERFACE_PPP;
+	sock.allowedinterfaces = "PPP";
+	sock.inconmode = PL_SOCK_INCONMODE_NONE;
+	sock.reconmode = PL_SOCK_RECONMODE_3;
+
+	sock.targetbcast = YES;
+	sock.targetport = 0xC021;
+	sock.outport = sock.targetport;
+	sock.localportlist = str(sock.targetport);
+
+
+	#if GPRS_MODULE_EXTERNAL
+		#if GPRS_DEBUG_PRINT
+			gprs_debugprint("INFO: GPRS module is external, skipping 0-RESET and 1-POST RESET");
+		#endif
+		gprs_phase = GPRS_AT_AT;
+		gprs_tout_ctr = GPRS_STD_TOUT*8;//absolutely essential. Modem takes a log time to get ready.
+		gprs_debugprint("INFO: DELAY to allow the modem to recover");
+	#else
+		//Switch to GPRS
+		io.num = GPRS_SWITCH;
+		io.enabled = YES;
+		io.state = LOW;
+
+		//start the "power toggling" of the GPRS module
+		gprs_phase = GPRS_TOGGLE_POWER_1;
+		gprs_tout_ctr = GPRS_STD_TOUT;
+		io.num = GPRS_POWER;
+		io.state = HIGH;
+	#endif
+
+	//reset variables
+	gprs_cmd_try = 0;
+	gprs_ppp_ip = chr(0)+chr(0)+chr(0)+chr(0);
+	gprs_ppp_peer_ip = chr(0)+chr(0)+chr(0)+chr(0);
+	gprs_msg_ser_num_out = 0;
+	#if GPRS_DEBUG_PRINT
+		gprs_debug_print_phase(gprs_phase);
+	#endif
+
+	gprs_running = YES;
+	gprs_linkup_in_prog = YES;
+	gprs_pap_required = NO;
+	return gprs_start;
+
+gprs_start_error: 
+	#if GPRS_DEBUG_PRINT
+		gprs_debugprint("---FAILURE---");
+	#endif
+
+	#if GPRS_DEBUG_PRINT
+		gprs_dont_print_stop = YES;
+	#endif
+
+	gprs_stop();
+
+	#if GPRS_DEBUG_PRINT
+		gprs_dont_print_stop = NO;
+	#endif
+	return gprs_start;
+}
+
+//--------------------------------------------------------------------
+void gprs_stop() {
+//API procedure, stops (aborts) PPP link establishment or session.
+
+	if (gprs_init_flag != GPRS_INIT_SIGNATURE) {
+		gprs_init();
+		gprs_init_flag = GPRS_INIT_SIGNATURE;
+	}
+
+	#if GPRS_DEBUG_PRINT
+		if (gprs_dont_print_stop == NO) {
+			gprs_debugprint("---STOP---");
+		}
+	#endif
+
+	gprs_running = NO;
+	gprs_linkup_in_prog = NO;
+
+	ser.num = GPRS_SER_PORT;
+
+	//serial port can now be used for normal traffic again
+	ppp.enabled = NO;
+	ser.enabled = NO;
+
+	sock_release(gprs_socket);
+
+
+	//release buffer
+	ppp.buffrq(0);
+	ser.rxbuffrq(0);
+	ser.txbuffrq(0);
+	sys.buffalloc();
+}
+
+//--------------------------------------------------------------------
+void gprs_proc_sock_data() {
+//Event procedure, call it from the on_sock_data_arrival() event handler.	
+
+	string rx_data;
+
+	if (gprs_init_flag != GPRS_INIT_SIGNATURE || sock.num != gprs_socket) {
+		return;
+	}
+
+	rx_data = sock.getdata(255);
+	switch (asc(rx_data)) {
+	case 0x09:
+
+		//echo request
+		insert(rx_data,1,chr(0x0A));
+		break;//replace "conf-req" with "conf-ack" and send it back
+
+	case 0x0A:
+
+		//echo reply
+		#if GPRS_DEBUG_PRINT
+			gprs_debugprint("Echo reply");
+		#endif
+		gprs_cmd_try = 0;
+		break;
+
+	}
+}
+
+//--------------------------------------------------------------------
+void gprs_proc_ser_data() {
+//Event procedure, call it from the on_ser_data_arrival() event handler.	
+
+	unsigned char x;
+	unsigned int gprs_ppp_proto;
+	unsigned char msg_ser_num_in;
+
+	//is this GPRS port?
+	if (gprs_init_flag != GPRS_INIT_SIGNATURE || ser.num != GPRS_SER_PORT) {
+		return;
+	}
+
+	//init not in progress? -- just clear out the buffer
+	if (gprs_linkup_in_prog == NO) {
+		gprs_reply = ser.getdata(255);
+		return;
+	}
+
+	ser.num = GPRS_SER_PORT;
+	if (gprs_phase<GPRS_PPP_LCP) {
+		//--- AT COMMANDS ---
+
+		//general part for all AT replies
+		gprs_reply = gprs_reply+ser.getdata(255);
+
+		//correct reply will start with echoed command (but leftover garbage could be before it)
+		gprs_eliminate_lf(gprs_reply);//get rid of LFs
+		gprs_eliminate_double_cr(gprs_reply);//get rid of double CRs
+		gprs_eliminate_lf(gprs_cmd);//get rid of LFs
+		gprs_eliminate_double_cr(gprs_cmd);//get rid of double CRs
+
+		x = instr(1,gprs_reply,gprs_cmd,1);
+		if (x == 0) {
+			//this is essential, was added later. We may have so much leftover TCP garbage that nothing new fits in
+			if (len(gprs_reply) == GPRS_MAX_CMD_REPLY_LEN) {
+				gprs_reply = "";
+			}
+
+			//also added: modem may send info strings, which we must get rid of
+			x = instr(1,gprs_reply,chr(13),1);
+			while (x>0) {
+				gprs_reply = mid(gprs_reply,x+1,255);
+				x = instr(1,gprs_reply,chr(13),1);
+			}
+			return;
+		}
+
+		//remove garbage before the echo
+		gprs_reply = mid(gprs_reply,x,255);
+
+		//a full reply will contain two CRs (we already got rid of LFs)
+		if (instr(1,gprs_reply,chr(13),2) == 0) {
+			return;
+		}
+
+		//remove echo and all CR/LFs
+		gprs_reply = mid(gprs_reply,len(gprs_cmd)+1,len(gprs_reply)-len(gprs_cmd)-1);
+
+		#if GPRS_DEBUG_PRINT
+			gprs_debugprint("[AT__IN]: "+gprs_reply);
+		#endif
+
+		switch (gprs_phase) {
+
+		case GPRS_PROBE_1:
+case GPRS_PROBE_2:
+
+			//this is the reply to our AT command, so we now know that the module is ON
+			gprs_phase = GPRS_POST_RESET;
+			gprs_tout_ctr = GPRS_POST_RESET_TOUT;//override standard reset in gprs_next_phase()	
+			#if GPRS_DEBUG_PRINT
+				gprs_debug_print_phase(gprs_phase);
+				break;
+			#endif
+
+		case GPRS_AT_AT:
+
+			if (gprs_reply == GPRS_REPLY_OK) {
+				gprs_next_phase();
+			}
+			break;
+
+		case GPRS_AT_IPR:
+
+			if (gprs_reply == GPRS_REPLY_OK) {
+				gprs_next_phase();
+		}
+		break;
+
+		//case GPRS_AT_ICF:
+		//	if gprs_reply=GPRS_REPLY_OK then
+		//		gprs_next_phase()
+		//end if
+
+		case GPRS_AT_IFC:
+
+			if (gprs_reply == GPRS_REPLY_OK) {
+				gprs_next_phase();
+			}
+			break;
+
+		case GPRS_AT_CGDCONT:
+
+			if (gprs_reply == GPRS_REPLY_OK) {
+				gprs_next_phase();
+			}
+			break;
+
+		case GPRS_AT_CGQMIN:
+
+			if (gprs_reply == GPRS_REPLY_OK) {
+				gprs_next_phase();
+			}
+			break;
+
+		case GPRS_AT_DT:
+
+			if (gprs_reply == GPRS_REPLY_CONNECT) {
+				gprs_next_phase();
+			}
+			break;
+
+		}
+		gprs_reply = "";
+
+	} else {
+		//--- PPP EXCHANGE ---
+
+		//wait for the whole PPP message to assemble
+		gprs_reply = gprs_parse_ppp_message();
+		if (gprs_reply == "") {
+			return;
+		}
+
+		#if GPRS_DEBUG_PRINT
+			unsigned char f;
+			string log_string;
+			string<2> s;
+			log_string = "[PPP___IN]:";
+			for (f=1; f <= len(gprs_reply); f++) {
+				s = mid(hex(asc(mid(gprs_reply,f,1))),3,2);
+				if (len(s) == 1) { s = "0"+s;}
+				log_string = log_string+s+" ";
+			}
+			log_string = log_string+" ";
+			for (f=1; f <= len(gprs_reply); f++) {
+				s = mid(gprs_reply,f,1);
+				x = asc(s);
+				if (x<0x20 || x>0x7F) {
+					s = ".";
+				}
+				log_string = log_string+s;
+			}
+			gprs_ppp_decode(log_string,gprs_reply);
+			gprs_debugprint("RX "+log_string);
+		#endif
+
+		//verify length
+		if (asc(mid(gprs_reply,6,1)) != len(gprs_reply)-2) {
+			return;
+		}
+
+		//process PPP message
+		gprs_ppp_proto = asc(left(gprs_reply,1))*256+asc(mid(gprs_reply,2,1));
+		switch (gprs_ppp_proto) {
+		case GPRS_PPP_PROTO_LCP:
+
+			//branch according to the LCP message type
+			switch (asc(mid(gprs_reply,3,1))) {
+			case GPRS_PPP_CONFREQ:
+
+				msg_ser_num_in = asc(mid(gprs_reply,4,1));
+				gprs_reply = mid(gprs_reply,7,255);//leave requested items only
+
+
+
+
+				switch (gprs_parse_lcp_message(gprs_reply,GPRS_PPP_PROTO_LCP,GPRS_PPP_CONFREQ,gprs_rej)) {
+				case GPRS_LCP_PARSE_RESULT_ACK:
+
+					if (gprs_rej != "") {
+						//there are some options that need to be rejected
+						gprs_ppp_send(GPRS_PPP_PROTO_LCP,GPRS_PPP_CONFREJ,gprs_rej,msg_ser_num_in,GPRS_STD_TOUT);
+					} else {
+						gprs_ppp_send(GPRS_PPP_PROTO_LCP,GPRS_PPP_CONFACK,gprs_reply,msg_ser_num_in,GPRS_STD_TOUT);
+						gprs_peer_request_confirmed = YES;
+						if (gprs_our_request_confirmed == YES && gprs_phase == GPRS_PPP_LCP) {
+							if (gprs_pap_required == NO) { gprs_phase = gprs_phase+1;}//skip PAP
+							gprs_next_phase();
+						}
+					}
+					break;
+
+				case GPRS_LCP_PARSE_RESULT_NAK:
+case GPRS_LCP_PARSE_RESULT_REJ:
+case GPRS_LCP_PARSE_RESULT_DISCARD:
+
+					goto lcp_failed;
+					break;//simplified handling -- we don't try to negotiate further
+
+				}
+				break;
+
+			case GPRS_PPP_CONFACK:
+
+				//could only be acknowledging what we asked for
+				gprs_our_request_confirmed = YES;
+				if (gprs_peer_request_confirmed == YES && gprs_phase == GPRS_PPP_LCP) {
+					if (gprs_pap_required == NO) { gprs_phase = gprs_phase+1;}//skip PAP
+					gprs_next_phase();
+				}
+				break;
+
+			case GPRS_PPP_CONFNAK:
+case GPRS_PPP_CONFREJ:
+
+				//could only be rejecting what we asked for
+				goto lcp_failed;
+				break;
+
+			}
+			break;
+
+		case GPRS_PPP_PROTO_PAP:
+
+			switch (asc(mid(gprs_reply,3,1))) {
+			case GPRS_PPP_CONFACK:
+
+				if (gprs_phase == GPRS_PPP_PAP) {
+					gprs_ppp_send(GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFREQ,GPRS_IPCP_CONFREQ_STR,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+					gprs_next_phase();
+				}
+				break;
+
+			case GPRS_PPP_CONFNAK:
+
+				goto lcp_failed;
+				break;
+
+			}
+			break;
+
+		case GPRS_PPP_PROTO_IPCP:
+
+			//branch according to the IPCP message type
+			switch (asc(mid(gprs_reply,3,1))) {
+			case GPRS_PPP_CONFREQ:
+
+				msg_ser_num_in = asc(mid(gprs_reply,4,1));
+				gprs_reply = mid(gprs_reply,7,255);//leave requested items only
+				switch (gprs_parse_lcp_message(gprs_reply,GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFREQ,gprs_rej)) {
+				case GPRS_LCP_PARSE_RESULT_ACK:
+
+					gprs_ppp_send(GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFACK,gprs_reply,msg_ser_num_in,GPRS_STD_TOUT);
+
+					if (gprs_phase == GPRS_PPP_IPCP_1) {
+						gprs_next_phase();
+					}
+					break;
+
+				case GPRS_LCP_PARSE_RESULT_NAK:
+case GPRS_LCP_PARSE_RESULT_REJ:
+case GPRS_LCP_PARSE_RESULT_DISCARD:
+
+					goto lcp_failed;
+					break;//simplified handling -- we don't try to negotiate further
+
+				}
+				break;
+
+			case GPRS_PPP_CONFNAK:
+
+				gprs_reply = mid(gprs_reply,7,255);//leave requested items only
+				gprs_parse_lcp_message(gprs_reply,GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFACK,gprs_rej);
+				if (gprs_phase == GPRS_PPP_IPCP_2) {
+					gprs_next_phase();
+				}
+				break;
+
+			case GPRS_PPP_CONFACK:
+
+				gprs_reply = mid(gprs_reply,7,255);//leave requested items only
+				gprs_parse_lcp_message(gprs_reply,GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFACK,gprs_rej);
+				if (gprs_phase == GPRS_PPP_IPCP_3) {
+					gprs_next_phase();
+					#if GPRS_SEND_PING == 0
+						#if GPRS_DEBUG_PRINT
+							gprs_debugprint("ping skipped");
+						#endif
+						gprs_next_phase();
+					#endif
+
+				}
+				break;
+
+			case GPRS_PPP_CONFREJ:
+
+				//could only be rejecting what we asked for
+lcp_failed: 
+					gprs_debugprint("---FAILURE---");
+				#endif
+				callback_gprs_failure();
+				gprs_start_over();
+				break;
+
+			}
+			break;
+
+		case GPRS_PPP_PROTO_IP:
+
+			if (gprs_parse_ping_reply() == OK) {
+				gprs_next_phase();
+			}
+			break;
+
+		}
+	}
+}
+
+//--------------------------------------------------------------------
+void gprs_proc_timer() {
+//Event procedure, call it from the on_sys_timer() event handler.	
+
+	if (gprs_init_flag != GPRS_INIT_SIGNATURE || (gprs_linkup_in_prog == NO && gprs_phase != GPRS_PPP_SESSION)) {
+		return;
+	}
+
+	if (gprs_phase == GPRS_TOGGLE_POWER_1 || gprs_phase == GPRS_PAUSE_1 || gprs_phase == GPRS_TOGGLE_POWER_2 || gprs_phase == GPRS_PAUSE_2) {
+		if (gprs_tout_ctr == 0) {
+				if (gprs_phase == GPRS_TOGGLE_POWER_1 || gprs_phase == GPRS_TOGGLE_POWER_2) {
+					#if GPRS_MODULE_EXTERNAL == 0
+						io.num = GPRS_POWER;
+						io.state = LOW;
+					#endif
+
+					gprs_phase = gprs_phase+1;
+					gprs_tout_ctr = GPRS_STD_TOUT;
+					#if GPRS_DEBUG_PRINT
+						gprs_debug_print_phase(gprs_phase);
+					#endif
+				} else {
+					ser.num = GPRS_SER_PORT;
+					gprs_phase = gprs_phase+1;
+					gprs_tout_ctr = GPRS_STD_TOUT;
+					#if GPRS_DEBUG_PRINT
+						gprs_debug_print_phase(gprs_phase);
+					#endif
+					gprs_at_command("",GPRS_STD_TOUT);
+				}
+
+		} else {
+			gprs_tout_ctr = gprs_tout_ctr-1;
+		}
+	} else if (gprs_phase == GPRS_RESET_PULSE || gprs_phase == GPRS_POST_RESET) {
+		if (gprs_tout_ctr == 0) {
+				if (gprs_phase == GPRS_RESET_PULSE) {
+					gprs_phase = gprs_phase+1;
+					gprs_tout_ctr = GPRS_POST_RESET_TOUT;//override standard reset in gprs_next_phase()	
+					#if GPRS_DEBUG_PRINT
+						gprs_debug_print_phase(gprs_phase);
+					#endif
+				} else {
+					gprs_phase = gprs_phase+1;
+					gprs_tout_ctr = 1;
+					#if GPRS_DEBUG_PRINT
+						gprs_debug_print_phase(gprs_phase);
+					#endif
+				}
+
+		} else {
+			gprs_tout_ctr = gprs_tout_ctr-1;
+		}
+	} else {
+		gprs_proc_timer_2();
+	}
+}
+
+//--------------------------------------------------------------------
+void gprs_next_phase() {
+	gprs_phase = gprs_phase+1;
+	gprs_tout_ctr = 0;
+	gprs_reply = "";
+	gprs_cmd_try = 0;
+	gprs_our_request_confirmed = NO;
+	gprs_peer_request_confirmed = NO;
+
+	#if GPRS_DEBUG_PRINT
+		gprs_debug_print_phase(gprs_phase);
+	#endif
+
+	gprs_proc_timer_2();
+}
+
+//--------------------------------------------------------------------
+void gprs_proc_timer_2() {
+	string<16> temp_str;
+
+	if (gprs_tout_ctr == 0) {
+		ser.num = GPRS_SER_PORT;
+
+		if (gprs_cmd_try>=GPRS_MAX_CMD_TRIES) {
+			#if GPRS_DEBUG_PRINT
+				gprs_debugprint("---LINK FAILED---");
+			#endif
+			callback_gprs_failure();
+			gprs_start_over();
+			return;
+		}
+
+		if (gprs_phase<GPRS_PPP_LCP) {
+			//--- AT COMMANDS ---
+
+			switch (gprs_phase) {
+			case GPRS_PROBE_1:
+
+				io.num = GPRS_POWER;
+				io.state = HIGH;
+				gprs_phase = gprs_phase+1;
+				gprs_tout_ctr = GPRS_STD_TOUT;
+				break;
+
+			case GPRS_PROBE_2:
+
+				#if GPRS_DEBUG_PRINT
+					gprs_debugprint("---LINK FAILED---");
+				#endif
+				callback_gprs_failure();
+				gprs_start_over();
+				break;
+
+			case GPRS_AT_AT:
+
+				//send out "AT"
+				gprs_at_command("",GPRS_STD_TOUT);
+				break;
+
+			case GPRS_AT_IPR:
+
+				gprs_at_command("+IPR=38400",GPRS_STD_TOUT);
+				break;
+
+			//case GPRS_AT_ICF:
+			//	gprs_at_command("+ICF=3",GPRS_STD_TOUT)
+
+			case GPRS_AT_IFC:
+
+				gprs_at_command("+IFC=2,2",GPRS_STD_TOUT);
+				break;
+
+			case GPRS_AT_CGDCONT:
+
+				gprs_at_command("+CGDCONT=1,"+chr(`"`)+"IP"+chr(`"`)+","+chr(`"`)+gprs_apn+chr(`"`),GPRS_STD_TOUT);
+				break;
+
+			case GPRS_AT_CGQMIN:
+
+				gprs_at_command("+CGQMIN=1,0,0,3,0,0",GPRS_STD_TOUT);
+				break;
+
+			case GPRS_AT_DT:
+
+				gprs_at_command(gprs_at_dt_command,GPRS_STD_TOUT);
+				break;
+
+			}
+
+		} else {
+			//--- PPP EXCHANGE ---
+
+			switch (gprs_phase) {
+			case GPRS_PPP_LCP:
+
+				if (gprs_our_request_confirmed == NO) {
+					gprs_ppp_send(GPRS_PPP_PROTO_LCP,GPRS_PPP_CONFREQ,GPRS_LCP_CONFREQ_STR,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+				} else {
+					gprs_tout_ctr = GPRS_STD_TOUT;
+					gprs_cmd_try = gprs_cmd_try+1;
+				}
+				break;
+
+			case GPRS_PPP_PAP:
+
+				temp_str = chr(len(gprs_username))+gprs_username+chr(len(gprs_password))+gprs_password;
+				gprs_ppp_send(GPRS_PPP_PROTO_PAP,GPRS_PPP_CONFREQ,temp_str,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+				break;
+
+			case GPRS_PPP_IPCP_1:
+
+				gprs_tout_ctr = GPRS_STD_TOUT;
+				gprs_cmd_try = gprs_cmd_try+1;
+				gprs_ppp_send(GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFREQ,GPRS_IPCP_CONFREQ_STR,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+				break;
+
+			case GPRS_PPP_IPCP_2:
+
+				gprs_ppp_send(GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFREQ,GPRS_IPCP_CONFREQ_STR,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+				break;
+
+			case GPRS_PPP_IPCP_3:
+
+				temp_str = GPRS_IPCP_CONFREQ_STR;
+				insert(temp_str,3,gprs_ppp_ip);
+				gprs_ppp_send(GPRS_PPP_PROTO_IPCP,GPRS_PPP_CONFREQ,temp_str,gprs_msg_ser_num_out,GPRS_STD_TOUT);
+				break;
+
+			case GPRS_PPP_PING:
+
+				#if GPRS_SEND_PING
+					gprs_ping_send();
+					break;
+				#endif
+
+			case GPRS_PPP_SESSION:
+
+				if (gprs_linkup_in_prog) {
+					gprs_linkup_in_prog = NO;
+					#if GPRS_DEBUG_PRINT
+						gprs_debugprint("---LINKED---");
+					#endif
+					callback_gprs_ok();
+					ppp.portnum = GPRS_SER_PORT;
+					ppp.ip = ddstr(gprs_ppp_ip);
+					ppp.enabled = YES;
+				}
+
+				//send echo request
+				#if GPRS_DEBUG_PRINT
+					gprs_debugprint("Echo request");
+				#endif
+
+				sock.num = gprs_socket;
+				if (sock.statesimple == PL_SSTS_CLOSED) {
+					sock.connect();
+				}
+				sock.setdata(chr(0x09)+chr(0x04)+chr(0x00)+chr(0x04));//echo request command
+				sock.send();
+
+				gprs_tout_ctr = GPRS_ECHO_TOUT;
+				gprs_cmd_try = gprs_cmd_try+1;
+				break;
+
+			}
+		}
+	} else {
+		gprs_tout_ctr = gprs_tout_ctr-1;
+	}
+}
+
+//--------------------------------------------------------------------
+ok_ng gprs_parse_ping_reply() {
+ok_ng gprs_parse_ping_reply;
+	unsigned long cs;
+	unsigned int w;
+	unsigned char f;
+
+	gprs_reply = mid(gprs_reply,3,255);
+	cs = 0;
+	for (f=0; f <= 20/2-1; f++) {
+		w = asc(mid(gprs_reply,f*2+1,1))*256+asc(mid(gprs_reply,f*2+2,1));
+		cs = cs+w;
+	}
+
+	if (cs>65535) {
+		cs = (cs & 0xFFFF)+cs/65536;
+	}
+
+	if (cs != 0xFFFF) {
+		gprs_parse_ping_reply = NG;
+		return gprs_parse_ping_reply;
+	}
+
+	if (mid(gprs_reply,13,4) != ddval(GPRS_PING_IP)) {
+		gprs_parse_ping_reply = NG;
+		return gprs_parse_ping_reply;
+	}
+
+	gprs_parse_ping_reply = OK;
+	return gprs_parse_ping_reply;
+}
+
+//--------------------------------------------------------------------
+string gprs_parse_ppp_message() {
+string gprs_parse_ppp_message;
+	unsigned int rxlen;
+	unsigned char f, x;
+
+	rxlen = instr(1,ser.peekdata(255),chr(GPRS_PPP_REPL1),2);
+	if (rxlen == 0) {
+		gprs_parse_ppp_message = "";
+		return gprs_parse_ppp_message;
+	}
+
+	//we now have a PPP message encaplulated in GPRS_PPP_REPL1
+	ser.getdata(1);//get rid of the first GPRS_PPP_REPL1
+
+	//remove escapes (restore packet)
+	gprs_parse_ppp_message = "";
+	for (f=1; f <= rxlen-2; f++) {
+		if (asc(ser.peekdata(1)) == GPRS_PPP_ESC_CHAR) {
+			//we have escape character next
+			if (ser.rxlen>2) {
+				x = asc(ser.getdata(1));//we discard this
+				f = f+1;
+				x = asc(ser.getdata(1));
+				switch (x) {
+				case GPRS_PPP_ESC1:
+
+					x = GPRS_PPP_REPL1;
+					break;
+				case GPRS_PPP_ESC2:
+
+					x = GPRS_PPP_REPL2;
+					break;
+				default:
+					x = x ^ GPRS_PPP_XOR_MASK;break;
+				}
+				gprs_parse_ppp_message = gprs_parse_ppp_message+chr(x);
+			}
+		} else {
+			//this is not an escape character
+			gprs_parse_ppp_message = gprs_parse_ppp_message+ser.getdata(1);
+		}
+	}
+
+	ser.getdata(1);//get rid of the last GPRS_PPP_REPL1
+
+	if (gprs_update_fcs(gprs_parse_ppp_message) != GPRS_GOOD_PPP_CS) {
+		gprs_parse_ppp_message = "";
+		return gprs_parse_ppp_message;
+	}
+	gprs_parse_ppp_message = left(gprs_parse_ppp_message,len(gprs_parse_ppp_message)-2);
+
+	if (asc(left(gprs_parse_ppp_message,1)) != 0xFF || asc(mid(gprs_parse_ppp_message,2,1)) != 0x03) {
+		gprs_parse_ppp_message = "";
+		return gprs_parse_ppp_message;
+	}
+	gprs_parse_ppp_message = right(gprs_parse_ppp_message,len(gprs_parse_ppp_message)-2);
+	return gprs_parse_ppp_message;
+}
+
+//--------------------------------------------------------------------
+gprs_lcp_parse_results gprs_parse_lcp_message(string *lcp_message, unsigned int ppp_protocol, gprs_ppp_codes code, string *rej_str) {
+gprs_lcp_parse_results gprs_parse_lcp_message;
+	unsigned char option_length;
+	string<128> lcp_message_copy;
+
+	*rej_str = "";
+	lcp_message_copy = *lcp_message;
+	while (lcp_message_copy != "") {
+
+		//check the length of the next option
+		option_length = asc(mid(lcp_message_copy,2,1));
+		if (option_length>len(lcp_message_copy)) {
+			gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_DISCARD;
+			return gprs_parse_lcp_message;
+		}
+
+		if (ppp_protocol == GPRS_PPP_PROTO_LCP) {
+			switch (asc(left(lcp_message_copy,1))) {
+			case GPRS_PPP_LCP_MESSAGE_02:
+
+			break;
+				//---
+
+			case GPRS_PPP_LCP_MESSAGE_AUTH:
+
+				if (asc(mid(lcp_message_copy,3,1))*256+asc(mid(lcp_message_copy,4,1)) != GPRS_PPP_PROTO_PAP) {
+					gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_NAK;
+					return gprs_parse_lcp_message;
+				}
+				gprs_pap_required = YES;
+				break;
+
+			case GPRS_PPP_LCP_MESSAGE_MAGIC:
+
+			break;
+				//---
+
+			case GPRS_PPP_LCP_MESSAGE_PFC:
+
+				*rej_str = *rej_str+GPRS_LCP_OPTION_PFC_STR;
+				break;
+
+			case GPRS_PPP_LCP_MESSAGE_AFC:
+
+				*rej_str = *rej_str+GPRS_LCP_OPTION_AFC_STR;
+				break;
+
+			default://unrecognized stuff
+				gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_REJ;
+				return gprs_parse_lcp_message;break;
+
+			}
+		} else {//must be IPCP
+			switch (asc(left(lcp_message_copy,1))) {
+			case GPRS_PPP_IPCP_MESSAGE_IP:
+
+				if (option_length != 6) {
+					gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_NAK;
+					return gprs_parse_lcp_message;
+				}
+				if (code == GPRS_PPP_CONFREQ) {
+					gprs_ppp_peer_ip = right(lcp_message_copy,4);
+				} else {
+					gprs_ppp_ip = right(lcp_message_copy,4);
+				}
+				break;
+
+			case GPRS_PPP_IPCP_MESSAGE_DNS:
+case GPRS_PPP_IPCP_MESSAGE_DNS2:
+
+			break;
+				//---
+
+			default://unrecognized stuff
+				gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_REJ;
+				return gprs_parse_lcp_message;break;
+
+			}
+		}
+
+
+		lcp_message_copy = mid(lcp_message_copy,option_length+1,255);
+	}
+	gprs_parse_lcp_message = GPRS_LCP_PARSE_RESULT_ACK;
+	return gprs_parse_lcp_message;
+}
+
+//--------------------------------------------------------------------
+void gprs_at_command(string *command, unsigned char delay) {
+	gprs_cmd = "AT"+*command;
+
+	#if GPRS_DEBUG_PRINT
+		gprs_debugprint("[AT_OUT]: "+gprs_cmd);
+	#endif
+
+	gprs_cmd = gprs_cmd+GPRS_CR_LF;
+
+	ser.setdata(gprs_cmd);
+	ser.send();
+	gprs_tout_ctr = delay;
+	gprs_cmd_try = gprs_cmd_try+1;
+}
+
+//--------------------------------------------------------------------
+void gprs_ping_send() {
+	unsigned char f;
+	unsigned int w;
+	unsigned long cs;
+
+	gprs_cmd = "";
+	for (f=0; f <= len(PING_STR)/3-1; f++) {
+		gprs_cmd = gprs_cmd+chr(val("0x"+mid(PING_STR,f*3+1,3)));
+	}
+
+	insert(gprs_cmd,13,gprs_ppp_ip);
+	insert(gprs_cmd,17,ddval(GPRS_PING_IP));
+
+	cs = 0;
+	for (f=0; f <= 20/2-1; f++) {
+		w = asc(mid(gprs_cmd,f*2+1,1))*256+asc(mid(gprs_cmd,f*2+2,1));
+		cs = cs+w;
+	}
+	if (cs>65535) {
+		cs = (cs & 0xFFFF)+cs/65536;
+	}
+	cs = 0xFFFF-cs;
+
+	insert(gprs_cmd,11,chr(cs/256));
+	insert(gprs_cmd,12,chr(cs));
+
+	gprs_ppp_send(GPRS_PPP_PROTO_IP,0,gprs_cmd,0,GPRS_STD_TOUT);
+}
+
+//--------------------------------------------------------------------
+void gprs_ppp_send(unsigned int ppp_protocol, gprs_ppp_codes ppp_code, string *data, unsigned char ser_num, unsigned char delay) {
+	unsigned char f, x;
+	unsigned int i;
+	string<128> full_command;
+
+	if (ppp_protocol == GPRS_PPP_PROTO_IP) {
+		full_command = chr(ppp_protocol/256)+chr(ppp_protocol)+*data;
+	} else {
+		full_command = chr(ppp_protocol/256)+chr(ppp_protocol)+chr(ppp_code)+chr(ser_num)+chr(0x00)+chr(len(*data)+4)+*data;
+	}
+
+	#if GPRS_DEBUG_PRINT
+		string log_string;
+		string<2> s;
+
+		log_string = "[PPP_OUT]: ";
+		for (f=1; f <= len(full_command); f++) {
+			s = mid(hex(asc(mid(full_command,f,1))),3,2);
+			if (len(s) == 1) { s = "0"+s;}
+			log_string = log_string+s+" ";
+		}
+		log_string = log_string+" ";
+		for (f=1; f <= len(full_command); f++) {
+			s = mid(full_command,f,1);
+			x = asc(s);
+			if (x<0x20 || x>0x7F) {
+				s = ".";
+			}
+			log_string = log_string+s;
+		}
+		gprs_ppp_decode(log_string,full_command);
+		gprs_debugprint("TX "+log_string);
+	#endif
+
+	full_command = chr(0xFF)+chr(0x03)+full_command;
+	i = gprs_update_fcs(full_command);
+	i = i ^ 0xFFFF;
+	full_command = full_command+chr(i)+chr(i/256);
+
+	for (f=1; f <= len(full_command); f++) {
+		x = asc(mid(full_command,f,1));
+		switch (x) {
+		case 0x7E:
+
+			gprs_insert_escape(full_command,f,0x5E);
+			f = f+1;
+			break;
+		case 0x7D:
+
+			gprs_insert_escape(full_command,f,0x5D);
+			f = f+1;
+			break;
+		default:
+			if (x<0x20) {
+				gprs_insert_escape(full_command,f,x ^ 0x20);
+				f = f+1;
+			}break;
+		}
+	}
+
+	full_command = chr(0x7E)+full_command+chr(0x7E);
+	ser.setdata(full_command);
+	ser.send();
+
+	//we restart delay timer only if this is our command (REQ), not our reply
+	if (ppp_protocol == GPRS_PPP_PROTO_IP || ppp_code == GPRS_PPP_CONFREQ) {
+		gprs_tout_ctr = delay;
+		gprs_msg_ser_num_out = gprs_msg_ser_num_out+1;
+	}
+
+	gprs_cmd_try = gprs_cmd_try+1;
+}
+
+//--------------------------------------------------------------------
+unsigned int gprs_update_fcs(string *dt) {
+unsigned int gprs_update_fcs;
+	unsigned char f;
+
+	gprs_update_fcs = 0xFFFF;
+	for (f=1; f <= len(dt); f++) {
+		gprs_update_fcs = (gprs_update_fcs/256) ^ gprs_fcs_value((gprs_update_fcs ^ asc(mid(*dt,f,1))) & 0xFF);
+	}
+	return gprs_update_fcs;
+}
+
+//--------------------------------------------------------------------
+unsigned int gprs_fcs_value(unsigned char x) {
+unsigned int gprs_fcs_value;
+	unsigned char f;
+
+	gprs_fcs_value = x;
+	for (f=0; f <= 7; f++) {
+		if ((gprs_fcs_value && 1) == 1) {
+			gprs_fcs_value = (gprs_fcs_value/2) ^ 0x8408;
+		} else {
+			gprs_fcs_value = gprs_fcs_value/2;
+		}
+	}
+	return gprs_fcs_value;
+}
+
+//--------------------------------------------------------------------
+void gprs_insert_escape(string *command, unsigned char pos, unsigned char replacement_char) {
+	*command = left(*command,pos-1)+chr(0x7D)+chr(replacement_char)+right(*command,len(*command)-pos);
+}
+
+//--------------------------------------------------------------------
+void gprs_start_over() {
+	unsigned int i;
+	string<10> s;
+
+	ppp.enabled = NO;
+	gprs_linkup_in_prog = YES;
+	gprs_cmd_try = 0;
+
+	#if GPRS_DEBUG_PRINT
+		gprs_debugprint("---TRY AGAIN---");
+	#endif
+
+	#if GPRS_MODULE_EXTERNAL
+		#if GPRS_DEBUG_PRINT
+			gprs_debugprint("INFO: GPRS module is external, skipping 0-RESET and 1-POST RESET");
+		#endif
+
+		ser.flowcontrol = PL_SER_FC_DISABLED;
+		i = sys.timercount;
+		//this is a fixed delay of at least 1 second
+		while (sys.timercount-i<3) {
+		}
+		//escape sequence
+		ser.setdata("+++");
+		ser.send();
+		//this is a fixed delay of at least 1 second
+		while (sys.timercount-i<3) {
+		}
+		ser.rxclear;
+		gprs_at_command("+CFUN=1,1",GPRS_STD_TOUT);
+		//wait for OK (but limit the time we are waiting)
+		i = sys.timercount;
+		while (ser.rxlen == 0 && sys.timercount-i<6) {
+		}
+		while (ser.rxlen>0) {
+			s = ser.getdata(255);
+		}
+
+		gprs_phase = GPRS_AT_AT;
+		gprs_tout_ctr = GPRS_STD_TOUT*8;//absolutely essential. Modem takes a log time to get ready.
+		gprs_debugprint("INFO: DELAY to allow the modem to recover");
+
+	#else
+		//Switch to GPRS
+		io.num = GPRS_SWITCH;
+		io.enabled = YES;
+		io.state = LOW;
+
+		gprs_phase = GPRS_TOGGLE_POWER_1;
+		gprs_tout_ctr = GPRS_STD_TOUT;
+		io.num = GPRS_POWER;
+		io.state = HIGH;
+
+		#if GPRS_DEBUG_PRINT
+			gprs_debug_print_phase(gprs_phase);
+		#endif
+	#endif
+
+}
+
+//--------------------------------------------------------------------
+void gprs_init() {
+//Call this first to initialize this library to a safe idle state.
+
+	ppp.enabled = NO;
+	gprs_running = NO;
+	gprs_linkup_in_prog = NO;
+	gprs_socket = sock_get("GPRS");
+	gprs_apn = "";
+	gprs_username = "";
+	gprs_password = "";
+
+	#if GPRS_DEBUG_PRINT
+		gprs_dont_print_stop = NO;
+	#endif
+
+	//put the module in reset
+	#if GPRS_MODULE_EXTERNAL == 0
+		io.num = GPRS_RESET;
+		io.state = LOW;
+		io.enabled = YES;
+
+		io.num = GPRS_POWER;
+		io.state = HIGH;
+		io.enabled = YES;
+	#endif
+}
+
+void gprs_eliminate_lf(string *s) {
+		unsigned char f;
+		string<1> c;
+		string<GPRS_MAX_CMD_REPLY_LEN> so;
+
+		so = "";
+		for (f=1; f <= len(s); f++) {
+			c = mid(*s,f,1);
+			if (c != chr(10)) {
+				so = so+c;
+			}
+		}
+		*s = so;
+}
+
+void gprs_eliminate_double_cr(string *s) {
+		unsigned char f;
+		string<1> c;
+		string<GPRS_MAX_CMD_REPLY_LEN> so;
+		no_yes cr_encountered = NO;
+
+		so = "";
+		for (f=1; f <= len(s); f++) {
+			c = mid(*s,f,1);
+			if (c != chr(13) || cr_encountered == NO) {
+				so = so+c;
+			}
+
+			if (c == chr(13)) {
+				cr_encountered = YES;
+			} else {
+				cr_encountered = NO;
+			}
+		}
+		*s = so;
+}
+
+//--------------------------------------------------------------------
+#if GPRS_DEBUG_PRINT
+void gprs_debug_print_phase(gprs_phases phase) {
+	string<64> s;
+
+	switch (phase) {
+	case GPRS_TOGGLE_POWER_1:
+s = "TOGGLE POWER (1)";
+	break;
+	case GPRS_PAUSE_1:
+s = "PAUSE (1)";
+	break;
+	case GPRS_PROBE_1:
+s = "PROBE (1)";
+	break;
+	case GPRS_TOGGLE_POWER_2:
+s = "TOGGLE POWER (2)";
+	break;
+	case GPRS_PAUSE_2:
+s = "PAUSE (2)";
+	break;
+	case GPRS_PROBE_2:
+s = "PROBE (2)";
+	break;
+	case GPRS_RESET_PULSE:
+s = "RESET";
+	break;
+	case GPRS_POST_RESET:
+s = "POST RESET (wait for GPRS to 'recover')";
+	break;
+	case GPRS_AT_AT:
+s = "AT";
+	break;
+	case GPRS_AT_IPR:
+s = "IPR";
+	break;
+	//case GPRS_AT_ICF: s="ICF"
+	case GPRS_AT_IFC:
+s = "Q3";
+	break;
+	case GPRS_AT_CGDCONT:
+s = "CGDCONT";
+	break;
+	case GPRS_AT_CGQMIN:
+s = "CGQMIN";
+	break;
+	case GPRS_AT_DT:
+s = "DT";
+	break;
+	case GPRS_PPP_LCP:
+s = "LCP(main)";
+	break;
+	case GPRS_PPP_PAP:
+s = "PAP";
+	break;
+	case GPRS_PPP_IPCP_1:
+s = "IPCP_1 (wait REQ)";
+	break;
+	case GPRS_PPP_IPCP_2:
+s = "IPCP_2 (send REQ and expect NAK)";
+	break;
+	case GPRS_PPP_IPCP_3:
+s = "IPCP_3 (send REQ and expect ACK)";
+	break;
+	case GPRS_PPP_PING:
+s = "PING";
+	break;
+	case GPRS_PPP_SESSION:
+s = "SESSION (linked up)";
+	break;
+	}
+	gprs_debugprint("PHASE: "+str(phase)+"-"+s);
+}
+#endif
+
+#if GPRS_DEBUG_PRINT
+void gprs_ppp_decode(string *log_string, string *full_command) {
+	unsigned int proto, i;
+	unsigned char pos, f, code, otype, olen;
+	unsigned int flen;
+	string<3> s;
+
+	*log_string = "";
+
+	proto = asc(mid(*full_command,1,1))*256+asc(mid(*full_command,2,1));
+	switch (proto) {
+	case 0xC021:
+
+		*log_string = *log_string+" LCP/";
+		break;
+
+	case 0xC023:
+
+		*log_string = *log_string+" PAP/";
+		break;
+
+	case 0x8021:
+
+		*log_string = *log_string+" IPCP/";
+		break;
+
+	case 0x0021:
+
+		*log_string = *log_string+"ARP";
+		break;
+
+	default:
+		*log_string = *log_string+" proto_"+mid(hex(proto),3,255)+"/";break;
+
+	}
+
+	pos = 3;
+
+	switch (proto) {
+
+	case 0xC021:
+//----- LCP -----
+		while (pos<=len(*full_command)) {
+			code = asc(mid(*full_command,pos,1));
+			switch (code) {
+			case 1:
+*log_string = *log_string+"CONF-REQ";
+			break;
+			case 2:
+*log_string = *log_string+"CONF-ACK";
+			break;
+			case 3:
+*log_string = *log_string+"CONF-NAK";
+			break;
+			case 4:
+*log_string = *log_string+"CONF-REJ";
+			break;
+			case 5:
+*log_string = *log_string+"TERM-REQ";
+			break;
+			case 6:
+*log_string = *log_string+"TERM-ACK";
+			break;
+			case 7:
+*log_string = *log_string+"CODE-REJ";
+			break;
+			case 8:
+*log_string = *log_string+"PROT-REJ";
+			break;
+			case 9:
+*log_string = *log_string+"ECHO-REQ";
+			break;
+			case 10:
+*log_string = *log_string+"ECHO-RPL";
+			break;
+			case 11:
+*log_string = *log_string+"DISC-REQ";
+			break;
+			default:*log_string = *log_string+"code_"+str(code);break;
+			}
+
+			pos = pos+1;
+			*log_string = *log_string+" #"+str(asc(mid(*full_command,pos,1)));
+
+			pos = pos+1;
+			flen = asc(mid(*full_command,pos,1))*256+asc(mid(*full_command,pos+1,1));
+
+			pos = pos+2;
+			if (flen>4) {
+				flen = flen-4;
+				*log_string = *log_string+" "+str(flen)+": [";
+				f = 1;
+				while (f<flen) {
+					*log_string = *log_string+"(";
+					otype = asc(mid(*full_command,pos,1));
+					switch (otype) {
+					case 0:
+*log_string = *log_string+"rsrvd";
+					break;
+					case 1:
+*log_string = *log_string+"m-r-u";
+					break;//maximum-receive-unit
+					case 2:
+*log_string = *log_string+"a-ccm";
+					break;//async-control-character-map
+					case 3:
+*log_string = *log_string+"au-pr";
+					break;//authentication-type (protocol)
+					case 4:
+*log_string = *log_string+"qu-pr";
+					break;//quality-protocol
+					case 5:
+*log_string = *log_string+"magic";
+					break;//magic-number
+					case 6:
+*log_string = *log_string+"l-q-m";
+					break;//link-quality-monitoring
+					case 7:
+*log_string = *log_string+"p-f-c";
+					break;//protocol-field-compression
+					case 8:
+*log_string = *log_string+"a-f-c";
+					break;//address-and-control-field-compression
+					case 9:
+*log_string = *log_string+"fcs-a";
+					break;//FCS-alternatives
+					case 10:
+*log_string = *log_string+"s-d-p";
+					break;//self-describing-padding 
+					case 13:
+*log_string = *log_string+"cback";
+					break;//callback
+					case 15:
+*log_string = *log_string+"c-fra";
+					break;//compaund-frames
+
+					default:*log_string = *log_string+"option_"+str(otype);break;
+					}
+
+					pos = pos+1;
+					f = f+1;
+					olen = asc(mid(*full_command,pos,1));
+
+					pos = pos+1;
+					f = f+1;
+					if (olen>=2) {
+						olen = olen-2;
+						if (olen>0) {
+							*log_string = *log_string+" "+str(olen)+": ";
+						}
+
+						switch (otype) {
+						case 0:
+
+						break;
+
+						case 1:
+
+							*log_string = *log_string+str(asc(mid(*full_command,pos,1))*256+asc(mid(*full_command,pos+1,1)));
+							break;
+
+						case 2:
+
+							*log_string = *log_string+gprs_print_hex(mid(*full_command,pos,1))+","+gprs_print_hex(mid(*full_command,pos+1,1))+","+gprs_print_hex(mid(*full_command,pos+2,1))+","+gprs_print_hex(mid(*full_command,pos+3,1));
+							break;
+
+						case 3:
+
+							i = hex(asc(mid(*full_command,pos,1))*256+asc(mid(*full_command,pos+1,1)));
+							if (i == GPRS_PPP_PROTO_PAP) {
+								*log_string = *log_string+"PAP";
+							} else {
+								*log_string = *log_string+mid(hex(i),3,255)+"(?)";
+							}
+							break;
+
+						case 4:
+
+						break;
+
+						case 5:
+
+							*log_string = *log_string+gprs_print_hex(mid(*full_command,pos,1))+"-"+gprs_print_hex(mid(*full_command,pos+1,1))+"-"+gprs_print_hex(mid(*full_command,pos+2,1))+"-"+gprs_print_hex(mid(*full_command,pos+3,1));
+							break;
+
+						case 7:
+
+						break;
+
+						case 8:
+
+						break;
+
+						case 9:
+
+						break;
+
+						case 10:
+
+						break;
+
+						case 13:
+
+						break;
+
+						case 15:
+
+						break;
+
+						default:break;
+
+						}
+
+						pos = pos+olen;
+						f = f+olen;
+					} else {
+						*log_string = *log_string+" error!";
+					}
+
+					*log_string = *log_string+")";
+				}
+				*log_string = *log_string+"]";
+
+			} else {
+				*log_string = *log_string+" error!";
+			}
+		}
+		break;
+
+
+	case 0xC023:
+//------ PAP -----
+		code = asc(mid(*full_command,pos,1));
+		switch (code) {
+		case 1:
+*log_string = *log_string+"AUTH-REQ";
+		break;
+		case 2:
+*log_string = *log_string+"AUTH-ACK";
+		break;
+		case 3:
+*log_string = *log_string+"AUTH-NAK";
+		break;
+		default:*log_string = *log_string+"code_"+str(code);break;
+		}
+
+		pos = pos+1;
+		*log_string = *log_string+" #"+str(asc(mid(*full_command,pos,1)));
+
+		pos = pos+1;
+		flen = asc(mid(*full_command,pos,1))*256+asc(mid(*full_command,pos+1,1));
+
+		pos = pos+2;
+
+		switch (code) {
+		case 1:
+
+			if (flen>4) {
+				flen = flen-4;
+				*log_string = *log_string+" "+str(flen)+": [";
+				f = 1;
+				while (f<=flen) {
+					*log_string = *log_string+"(";
+					olen = asc(mid(*full_command,pos,1));
+					pos = pos+1;
+					f = f+1;
+					if (olen>=1) {
+						olen = olen-1;
+						if (olen>0) {
+							*log_string = *log_string+" "+str(olen)+": ";
+
+						}
+					}
+
+					*log_string = *log_string+")";
+				}
+				*log_string = *log_string+"]";
+
+			} else {
+				*log_string = *log_string+" error!";
+			}
+			break;
+
+		case 2:
+case 3:
+
+			if (flen>1) {
+				flen = flen-1;
+				*log_string = *log_string+" "+str(flen)+": [";
+				olen = asc(mid(*full_command,pos,1));
+				pos = pos+1;
+				f = f+1;
+				if (olen>=1) {
+					*log_string = *log_string+" "+str(olen)+": ";
+					*log_string = *log_string+mid(*full_command,pos,olen);
+				}
+				*log_string = *log_string+"]";
+			} else {
+				*log_string = *log_string+" error!";
+			}
+			break;
+
+		default:break;
+		}
+		break;
+
+
+	case 0x8021:
+//----- IPCP -----
+		while (pos<=len(*full_command)) {
+			code = asc(mid(*full_command,pos,1));
+			switch (code) {
+			case 1:
+*log_string = *log_string+"CONF-REQ";
+			break;
+			case 2:
+*log_string = *log_string+"CONF-ACK";
+			break;
+			case 3:
+*log_string = *log_string+"CONF-NAK";
+			break;
+			case 4:
+*log_string = *log_string+"CONF-REJ";
+			break;
+			case 5:
+*log_string = *log_string+"TERM-REQ";
+			break;
+			case 6:
+*log_string = *log_string+"TERM-ACK";
+			break;
+			case 7:
+*log_string = *log_string+"CODE-REJ";
+			break;
+			case 8:
+*log_string = *log_string+"PROT-REJ";
+			break;
+			case 9:
+*log_string = *log_string+"ECHO-REQ";
+			break;
+			case 10:
+*log_string = *log_string+"ECHO-RPL";
+			break;
+			case 11:
+*log_string = *log_string+"DISC-REQ";
+			break;
+			default:*log_string = *log_string+"code_"+str(code);break;
+			}
+
+			pos = pos+1;
+			*log_string = *log_string+" #"+str(asc(mid(*full_command,pos,1)));
+
+			pos = pos+1;
+			flen = asc(mid(*full_command,pos,1))*256+asc(mid(*full_command,pos+1,1));
+
+			pos = pos+2;
+			if (flen>4) {
+				flen = flen-4;
+				*log_string = *log_string+" "+str(flen)+": [";
+				f = 1;
+				while (f<flen) {
+					*log_string = *log_string+"(";
+					otype = asc(mid(*full_command,pos,1));
+					switch (otype) {
+					case 1:
+*log_string = *log_string+"ip-ss";
+					break;//ip-addresses (obsolete)
+					case 2:
+*log_string = *log_string+"i-c-p";
+					break;//ip-compression-protocol
+					case 3:
+*log_string = *log_string+"ip-ad";
+					break;//ip-address
+					default:*log_string = *log_string+"option_"+str(otype);break;
+					}
+
+					pos = pos+1;
+					f = f+1;
+					olen = asc(mid(*full_command,pos,1));
+
+					pos = pos+1;
+					f = f+1;
+					if (olen>=2) {
+						olen = olen-2;
+						if (olen>0) {
+							*log_string = *log_string+" "+str(olen)+": ";
+						}
+
+						switch (otype) {
+						case 2:
+
+							*log_string = *log_string+gprs_print_hex(mid(*full_command,pos,1))+" "+gprs_print_hex(mid(*full_command,pos+1,1));
+							break;
+
+						case 3:
+
+							*log_string = *log_string+str(asc(mid(*full_command,pos,1)))+"."+str(asc(mid(*full_command,pos+1,1)))+"."+str(asc(mid(*full_command,pos+2,1)))+"."+str(asc(mid(*full_command,pos+3,1)));
+							break;
+
+						case 4:
+
+						break;
+
+						case 5:
+
+						break;
+
+						case 7:
+
+						break;
+
+						case 8:
+
+						break;
+
+						case 9:
+
+						break;
+
+						case 10:
+
+						break;
+
+						case 13:
+
+						break;
+
+						case 15:
+
+						break;
+
+						default:break;
+
+						}
+
+						pos = pos+olen;
+						f = f+olen;
+					} else {
+						*log_string = *log_string+" error!";
+					}
+
+					*log_string = *log_string+")";
+				}
+				*log_string = *log_string+"]";
+
+			} else {
+				*log_string = *log_string+" error!";
+			}
+		}
+		break;
+
+	default:break;
+
+	}
+
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if GPRS_DEBUG_PRINT
+string gprs_print_hex(string *ss) {
+string gprs_print_hex;
+	string s;
+	unsigned char f;
+
+	gprs_print_hex = "";
+	for (f=1; f <= len(ss); f++) {
+		s = mid(hex(asc(mid(*ss,f,1))),3,2);
+		if (len(s) == 1) { s = "0"+s;}
+		gprs_print_hex = gprs_print_hex+s;
+	}
+	return gprs_print_hex;
+}
+#endif
+
+//------------------------------------------------------------------------------
+#if GPRS_DEBUG_PRINT
+void gprs_debugprint(string *print_data) {
+
+	sys.debugprint(GPRS_STAMP+*print_data+GPRS_CR_LF);
+}
+#endif
+
+//##################################################

@@ -1,0 +1,115 @@
+'***********************************************************************************************************
+'			SSI CHANNEL ALLOCATION LIBRARY
+'***********************************************************************************************************
+
+include "global.tbh"
+
+'--------------------------------------------------------------------
+const SSI_STAMP="SSI> "
+const SSI_CR_LF=chr(13)+chr(10)
+const SSI_MAX_CHANNELS=4
+const SSI_UNUSED_SIGNATURE="----"
+const SSI_INIT_SIGNATURE=&h1252
+
+'--------------------------------------------------------------------
+declare sub ssi_init()
+declare sub ssi_debugprint(byref print_data as string)
+
+'--------------------------------------------------------------------
+dim ssi_in_use(SSI_MAX_CHANNELS) as no_yes
+dim ssi_user_signature(SSI_MAX_CHANNELS) as string(SSI_MAX_SIGNATURE_LEN)
+dim ssi_init_flag as word
+
+'==============================================================================
+public function ssi_get(byref signature as string) as byte
+'Returns a free SSI channel number or 255 if no free channels left.
+
+	dim f as byte
+
+	if ssi_init_flag<>SSI_INIT_SIGNATURE then
+		ssi_init()
+		ssi_init_flag=SSI_INIT_SIGNATURE
+	end if
+	
+	for f=0 to SSI_MAX_CHANNELS-1
+		if ssi_in_use(f)=NO then
+			ssi_in_use(f)=YES
+			ssi_user_signature(f)=signature
+			ssi_get=f
+			#if SSI_DEBUG_PRINT
+				ssi_debugprint("'"+ssi_user_signature(f)+"' got SSI channel #"+str(f))
+			#endif
+			exit function
+		end if
+	next f
+
+	'no free SSI channels found
+	#if SSI_DEBUG_PRINT
+		ssi_debugprint("'"+signature+"' could not get an SSI channel: no free channels left")
+	#endif
+	ssi_get=255
+end function
+
+'--------------------------------------------------------------------
+public function ssi_who_uses(ssi_num as byte) as string
+'Returns the signature of the specified SSI channel's user.
+
+	if ssi_init_flag<>SSI_INIT_SIGNATURE then
+		ssi_init()
+		ssi_init_flag=SSI_INIT_SIGNATURE
+	end if
+
+	if ssi_in_use(ssi_num)=NO then
+		ssi_who_uses=SSI_UNUSED_SIGNATURE
+	else
+		ssi_who_uses=ssi_user_signature(ssi_num)
+	end if
+end function
+
+'--------------------------------------------------------------------
+public sub ssi_release(ssi_num as byte)
+'Releases the SSI channel (number), restores the channel's properties to their default states.
+	dim ssi_bup as byte
+	dim i as word
+
+	if ssi_init_flag<>SSI_INIT_SIGNATURE then
+		ssi_init()
+		ssi_init_flag=SSI_INIT_SIGNATURE
+	end if
+
+	ssi_bup=ssi.channel
+	ssi.channel=ssi_num
+
+	'restore this SSI channel to its default state (except mapping)
+	ssi.enabled=NO
+	ssi.baudrate=1
+	ssi.direction=PL_SSI_DIRECTION_RIGHT
+	ssi.mode=PL_SSI_MODE_0
+	ssi.zmode=PL_SSI_ZMODE_ALWAYS_ENABLED
+	
+	#if SSI_DEBUG_PRINT
+		ssi_debugprint("'"+ssi_user_signature(ssi_num)+"' released SSI channel #"+str(ssi_num))
+	#endif
+	
+	ssi_in_use(ssi_num)=NO
+	ssi_user_signature(ssi_num)=SSI_UNUSED_SIGNATURE
+	ssi.channel=ssi_bup
+end sub
+
+'------------------------------------------------------------------------------
+sub ssi_init()
+	dim f as byte
+	
+	for f=0 to SSI_MAX_CHANNELS-1
+		ssi_in_use(f)=NO
+		ssi_user_signature(f)=SSI_UNUSED_SIGNATURE
+	next f
+end sub
+
+'------------------------------------------------------------------------------
+#if SSI_DEBUG_PRINT
+sub ssi_debugprint(byref print_data as string)
+
+	sys.debugprint(SSI_STAMP+print_data+SSI_CR_LF)
+end sub
+#endif

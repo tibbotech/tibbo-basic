@@ -1,0 +1,1866 @@
+'***********************************************************************************************************
+'			WI-FI LIBRARY
+'			(Works with GA1000)
+'***********************************************************************************************************
+
+#if WLN_AVAILABLE '##################################################
+
+include "global.tbh"
+
+'------------------------------------------------------------------------------
+const WLN_BUFFER_PAGES=5
+const WLN_INIT_SIGNATURE=&h1B2C
+const WLN_SOCK_GET_SIGNATURE_WPA="WWPA"
+const WLN_ASSOCIATION_HOLDOFF_CONST=6 'waiting time in (0.5 sec intervals) until we will try to scan/associate again
+const WLN_STAMP="WLN> "
+const WLN_CR_LF=chr(13)+chr(10)
+
+#if GA1000 
+	
+	const WLN_FIRMWARE_FILE="ga1000fw.bin"
+	const WLN_SOCK_GET_SIGNATURE_KAL="WKAL"
+	const SHA1_MAC_LEN=20
+	const LABEL1="Pairwise key expansion"+chr(&h0)
+	const IEEE802_1X_TYPE_EAPOL_KEY=3
+	const WPA_HEADER=chr(1)+chr(IEEE802_1X_TYPE_EAPOL_KEY)
+	const WLN_WPA_HANDSHAKE_TIMEOUT=20
+	const NULL_64=chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)
+	const NULL_32=chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)
+	const NULL_16=chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)+chr(0)
+	const NULL_2=chr(0)+chr(0)
+	const CH36_64=chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)+chr(54)
+	const CH5C_64=chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)+chr(92)
+	const CYPHER_TKIP=chr(&h00)+chr(&h0F)+chr(&hAC)+chr(&h02)
+	const CYPHER_AES=chr(&h00)+chr(&h0F)+chr(&hAC)+chr(&h04)
+
+'------------------------------------------------------------------------------
+	enum en_wln_wpa_key_types
+		WLN_WPA_KEY_HMAC_MD5_RC4,
+		WLN_WPA_KEY_HMAC_SHA1_AES
+	end enum
+
+'------------------------------------------------------------------------------
+
+	declare sub wln_sha1_prf(byref pmk as string, byref label as string, byref data1 as string, byref buf as string, buf_len as byte)
+	declare sub wln_wpa_pmk_to_ptk(byref pmk as string, byref label as string, byref addr1 as string, byref addr2 as string, byref nonce1 as string, byref nonce2 as string, byref ptk as string)
+	declare sub wln_wpa_supplicant_process_1_of_4(byref snonce as string, byref anonce as string, byref ptk as string)
+	declare sub wln_hmac_sha1_vector(byref key as string, byref addr_element as string, byref mac as string, pos as byte)
+	declare sub wln_hmac_md5_vector(byref key as string, num_elem as byte, byref addr_element as string, byref mac as string, pos as byte)
+	declare function wln_md5_vector(byref key as string, byref data as string) as string
+	declare function wln_sha1_vector(byref key as string, byref data as string) as string
+	declare sub wln_wpa_supplicant_send_2_of_4(ver as byte, byref key_len as string, byref replay_counter as string, byref snonce as string, byref mic_key as string)
+	declare function wln_wpa_supplicant_process_3_of_4(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string,byref ptk as string)  as boolean
+	declare sub wln_wpa_supplicant_send_4_of_4(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string)
+	declare sub wln_wpa_supplicant_process_1_of_2(key_info as word, byref key_iv as string, byref ptk as string, byref gtk as string)
+	declare sub wln_wpa_supplicant_send_2_of_2(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string)
+	declare function wln_aes_unwrap(byref aes_kek as string, byref aes_cipher as string, byref aes_plain as string, n as byte) as boolean
+	declare function wln_wpa_supplicant_parse_ies(byref key_data as string) as string
+	declare sub wln_pbkdf2_sha1_f(byref passphrase as string, byref ssid as string, pass as byte, iterations as word, count as byte, byref digest as string)
+
+#endif
+
+declare function wln_prepare_security(security_mode as pl_wln_security_modes,byref key as string) as en_wln_status_codes
+declare function wln_start_scan() as ok_ng
+declare function wln_rescan() as en_wln_status_codes
+declare sub wln_debug_print_status(status as en_wln_status_codes)
+declare sub wln_debugprint(byref print_data as string)
+
+
+'----------------------------------------------------------------
+'Krack Works on being able  to trick us to reinstall the same key protentially resetting the encryption engine
+'We avoid this by only setting the key once during the 3rd step of the handshake
+'We avoid this by only setting the group key if the replay counter is larger then the last one' 
+dim last_replay_counter as string(8)
+dim wpa_should_set_key as boolean
+dim zero_replay_count_data(8) as byte
+
+'------------------------------------------------------------------------------
+dim wln_security_mode as pl_wln_security_modes
+dim wln_key as string(32)
+
+#if WLN_KEEP_ALIVE
+	dim wln_keep_alive_tmr as byte
+	dim wln_keep_alive_socket as byte
+	dim wln_keep_alive_ctr as word
+#endif
+
+	dim wln_wpa_socket as byte
+	dim wln_mac_binary as string(6)
+	dim wln_bssid_binary as string(6)
+	dim wpa_mode as pl_wln_wpa_modes
+	dim wln_ap_name as string(32)
+	dim wln_scan_and_assoc_in_prog as no_yes
+	dim wln_init_flag as word
+	dim wln_associated as pl_wln_check_association_retval
+	
+#if GA1000
+	#if WLN_WPA
+		dim wln_wpa_key_type as en_wln_wpa_key_types
+		dim wln_mic_key as string(16)
+		dim wln_g_ptk as string(64)
+		dim wln_g_key_iv as string(16)
+		dim wln_wpa_handshake_timer as byte
+		dim wln_g_group_cipher as byte
+	#endif
+#endif
+
+#if WLN_DEBUG_PRINT
+	dim wln_dont_print_stop as no_yes
+#endif
+
+dim wln_rescan_in_prog as no_yes
+dim wln_association_holdoff_timer as byte
+dim wln_rescan_requested as no_yes
+dim wln_updaterssi_requested as no_yes
+dim wln_active_scan as no_yes
+public dim wln_module_type as pl_wln_module_types
+dim wln_rescan_tmr as byte
+'==============================================================================
+public function wln_get_info(info_element as wln_info_elements, byref extra_data as string) as string
+'Returns library-specific information for the requested info element
+	dim security_mode as pl_wln_security_modes
+	dim x as byte
+
+	wln_get_info=""
+	security_mode=val(extra_data)
+	select case info_element
+	case WLN_INFO_ELEMENT_REQUIRED_BUFFERS:
+		x=WLN_BUFFER_PAGES
+		
+		#if WLN_KEEP_ALIVE
+			x=x+1
+		#endif
+		
+		#if WLN_WPA
+			if security_mode=WLN_SECURITY_MODE_WPA1 or security_mode=WLN_SECURITY_MODE_WPA2 then
+				x=x+2
+			end if
+		#endif
+		wln_get_info=str(x)
+	
+	end select
+end function
+
+'--------------------------------------------------------------------
+public function wln_start(byref ap_name as string,security_mode as pl_wln_security_modes,byref key as string,domain as pl_wln_domains,active_scan as no_yes, scanfilter as pl_wln_scan_filter) as en_wln_status_codes
+	dim x as byte
+	#if GA1000
+		zero_replay_count_data(0) = 0
+		zero_replay_count_data(1) = 0
+		zero_replay_count_data(2) = 0
+		zero_replay_count_data(3) = 0
+		zero_replay_count_data(4) = 0
+		zero_replay_count_data(5) = 0
+		zero_replay_count_data(6) = 0
+		zero_replay_count_data(7) = 1
+	#endif
+	
+	if wln_init_flag<>WLN_INIT_SIGNATURE then
+		wln_init()
+		wln_init_flag=WLN_INIT_SIGNATURE
+	end if
+
+	wln_start=WLN_STATUS_OK
+	wln_rescan_tmr=0
+	wln_ap_name=ap_name
+	wln_security_mode=security_mode
+	wln_key=key
+	wln_active_scan=active_scan
+	wln.scanfilter=scanfilter
+
+	if wln.enabled=YES then
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("Already started")
+		#endif
+		exit function
+	end if
+
+	#if WLN_DEBUG_PRINT
+		wln_debugprint("---START---")
+	#endif
+
+	wln.domain=domain
+
+	'obtain necessary sockets
+	#if WLN_KEEP_ALIVE
+		wln_keep_alive_socket=sock_get(WLN_SOCK_GET_SIGNATURE_KAL)
+		if wln_keep_alive_socket>=sock.numofsock then
+			wln_start=WLN_STATUS_OUT_OF_SOCKETS
+			goto wln_start_error
+		end if
+	#endif
+	
+	#if WLN_WPA and GA1000
+		if security_mode=WLN_SECURITY_MODE_WPA1 or security_mode=WLN_SECURITY_MODE_WPA2 then
+			wln_wpa_socket=sock_get(WLN_SOCK_GET_SIGNATURE_WPA)		
+			if wln_wpa_socket>=sock.numofsock then
+				wln_start=WLN_STATUS_OUT_OF_SOCKETS
+				goto wln_start_error
+			end if
+		end if
+	#endif
+	
+	x=wln_get_info(WLN_INFO_ELEMENT_REQUIRED_BUFFERS,str(security_mode))
+		
+	if x>sys.freebuffpages then
+		callback_wln_pre_buffrq(x-sys.freebuffpages)
+		
+		if x>sys.freebuffpages then
+			wln_start=WLN_STATUS_INSUFFICIENT_BUFFER_SPACE
+			goto wln_start_error
+		end if
+	end if
+
+
+	#if WLN_WPA and GA1000
+		if security_mode=WLN_SECURITY_MODE_WPA1 or security_mode=WLN_SECURITY_MODE_WPA2 then
+			sock.num=wln_wpa_socket
+			sock.rxbuffrq(1)
+			sock.txbuffrq(1)
+			sock.protocol=PL_SOCK_PROTOCOL_RAW
+			sock.localportlist="34958"
+			sock.allowedinterfaces="WLN"
+			sock.inconmode=PL_SOCK_INCONMODE_ANY_IP_ANY_PORT
+			sock.reconmode=PL_SOCK_RECONMODE_3
+		end if
+	#endif
+
+	#if WLN_KEEP_ALIVE
+		sock.num=wln_keep_alive_socket
+		sock.txbuffrq(1)
+		sock.protocol=PL_SOCK_PROTOCOL_UDP
+		sock.targetport=65534
+		sock.targetbcast=YES
+		sock.targetip="255.255.255.255"
+		sock.targetinterface=PL_SOCK_INTERFACE_WLN
+		sock.connectiontout=600
+		wln_keep_alive_tmr=0
+		wln_keep_alive_ctr=0
+	#endif
+
+	wln.buffrq(WLN_BUFFER_PAGES)
+	sys.buffalloc
+	#if GA1000
+		if wln_module_type =  PL_WLN_MODULE_TYPE_GA1000 then
+			romfile.open(WLN_FIRMWARE_FILE)
+			if romfile.size=0 then
+				wln_start=WLN_STATUS_MISSING_FIRMWARE_FILE
+				goto wln_start_error
+			end if
+			if wln.boot(romfile.offset)<>OK then
+				wln_start=WLN_STATUS_BOOT_FAILURE
+				goto wln_start_error
+			end if
+		else
+	#endif
+	if wln.boot(0)<>OK then
+		wln_start=WLN_STATUS_BOOT_FAILURE
+		goto wln_start_error
+	end if
+
+	#if GA1000
+		end if
+	#endif
+	#if WLN_WPA
+		wln_mac_binary=ddval(wln.mac)
+	#endif
+	
+	wln_start=wln_prepare_security(security_mode,key)
+	if wln_start<>WLN_STATUS_OK then goto wln_start_error
+
+	wln_association_holdoff_timer=1 'will start scanning and associating on the next timer event
+	exit function
+
+wln_start_error:
+	#if WLN_DEBUG_PRINT
+		wln_debug_print_status(wln_start)
+		wln_debugprint("---FAILURE---")
+	#endif
+	
+	#if WLN_DEBUG_PRINT
+		wln_dont_print_stop=YES
+	#endif
+	
+	wln_stop()
+
+	#if WLN_DEBUG_PRINT
+		wln_dont_print_stop=NO
+	#endif
+end function
+
+'----------------------------------------------------------------------------
+public function wln_change(byref ap_name as string,security_mode as pl_wln_security_modes,byref key as string) as en_wln_status_codes
+
+	if wln_init_flag<>WLN_INIT_SIGNATURE then
+		wln_init()
+		wln_init_flag=WLN_INIT_SIGNATURE
+	end if
+
+	wln_change=WLN_STATUS_OK
+
+	#if WLN_DEBUG_PRINT
+		wln_debugprint("---CHANGE---")
+	#endif
+
+	wln_ap_name=ap_name
+	wln_security_mode=security_mode
+	wln_key=key
+	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+
+	if wln.enabled=NO then
+		wln_change=WLN_STATUS_NOT_STARTED
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("Not yet started")
+		#endif
+		exit function
+	end if
+
+	if wln.task<>PL_WLN_TASK_IDLE then
+		wln_change=WLN_STATUS_BUSY
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("WLN library is busy and this call can't be executed at this time.")
+		#endif
+		exit function
+	end if
+
+	if wln_prepare_security(security_mode,key)<>WLN_STATUS_OK then goto wln_change_error
+
+	wln.disassociate
+	exit function
+
+wln_change_error:
+	#if WLN_DEBUG_PRINT
+		wln_debug_print_status(wln_change)
+		wln_debugprint("---FAILURE---")
+	#endif
+	
+	#if WLN_DEBUG_PRINT
+		wln_dont_print_stop=YES
+	#endif
+	
+	wln_stop()
+
+	#if WLN_DEBUG_PRINT
+		wln_dont_print_stop=NO
+	#endif
+end function
+
+'----------------------------------------------------------------------------
+public sub wln_stop()
+	dim i as word
+	
+	if wln_init_flag<>WLN_INIT_SIGNATURE then
+		wln_init()
+		wln_init_flag=WLN_INIT_SIGNATURE
+	end if
+	
+	#if WLN_DEBUG_PRINT
+		if wln_dont_print_stop=NO then
+			wln_debugprint("---STOP---")
+		end if
+	#endif
+
+	'just in case something was going on
+	while wln.task<>PL_WLN_TASK_IDLE
+	wend
+
+	wln_scan_and_assoc_in_prog=NO
+	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+	wln.disable()
+	while wln.enabled=YES
+	wend	 
+	wln_reset()	 
+ 
+	'deallocate buffers and release sockets
+	#if WLN_KEEP_ALIVE
+		if wln_keep_alive_socket<sock.numofsock then
+			sock.num=wln_keep_alive_socket
+			sock.discard
+
+			i=sys.timercount
+wait_close_kal_socket:
+			if sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i then
+			goto wait_close_kal_socket
+			end if
+
+			sock_release(sock.num)
+			wln_keep_alive_socket=255
+			
+			sock.txbuffrq(0)
+		end if
+	#endif
+
+	#if GA1000
+		#if WLN_WPA
+			if wln.getmoduletype= PL_WLN_MODULE_TYPE_GA1000 then
+				if wln_wpa_socket<sock.numofsock then
+					sock.num=wln_wpa_socket
+					sock.discard
+
+					i=sys.timercount
+	wait_close_wpa_socket:
+					if sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<3 and sys.timercount>=i then
+					goto wait_close_wpa_socket
+					end if
+					
+					sock_release(sock.num)
+					wln_wpa_socket=255
+					
+					sock.rxbuffrq(0)
+					sock.txbuffrq(0)
+				end if	
+			end if
+		#endif	
+	#endif	
+
+	wln.buffrq(0)
+	sys.buffalloc
+end sub
+
+'----------------------------------------------------------------------------
+function wln_rescan() as en_wln_status_codes
+	
+	if wln_init_flag<>WLN_INIT_SIGNATURE then
+		wln_init()
+		wln_init_flag=WLN_INIT_SIGNATURE
+	end if
+
+	wln_rescan=WLN_STATUS_OK
+
+	#if WLN_DEBUG_PRINT
+		if wln_active_scan=NO then
+			wln_debugprint("---PASSIVE RESCAN---")
+		else
+			wln_debugprint("---ACTIVE RESCAN---")
+		end if
+	#endif
+
+	if wln.enabled=NO then
+		wln_rescan=WLN_STATUS_NOT_STARTED
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("Not yet started")
+		#endif
+		exit function
+	end if
+
+	if wln.task<>PL_WLN_TASK_IDLE then
+		wln_rescan=WLN_STATUS_BUSY
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("WLN library is busy and this call can't be executed at this time.")
+		#endif
+		exit function
+	end if
+
+	if wln_active_scan=NO then
+		wln.scan(wln_ap_name)
+	else
+		wln.activescan(wln_ap_name)
+	end if
+
+	wln_rescan_in_prog=YES
+end function
+
+#if SYS_VER = 1000  or PLATFORM_ID=EM500W 
+'----------------------------------------------------------------------------
+sub wln_delay_ms(ms as dword)
+	dim delay as dword = ms * 3
+	while delay > 0
+			delay=delay-1
+	wend	
+end sub
+
+#else
+
+'----------------------------------------------------------------------------
+sub wln_delay_ms(ms as dword)
+	dim delay as dword
+    delay = sys.timercountms
+    if delay + ms < delay then 
+        delay = delay + ms
+        while sys.timercountms < delay
+	    wend
+    else 
+        while sys.timercountms - delay < ms
+	    wend
+    end if
+	
+end sub
+
+#endif 
+
+'-----------------------------------------------------------------------------
+sub wln_start_rescan()
+	wln_rescan_requested=YES
+end sub
+
+'----------------------------------------------------------------------------
+sub wln_update_rssi()
+	wln_updaterssi_requested=YES
+end sub
+
+'----------------------------------------------------------------------------
+function wln_check_association() as pl_wln_check_association_retval
+	wln_check_association=wln_associated
+end function
+
+'----------------------------------------------------------------------------
+public sub wln_proc_timer()
+	dim wln_result as en_wln_status_codes
+	
+	if wln_init_flag<>WLN_INIT_SIGNATURE or wln.enabled=NO then
+		exit sub
+	end if
+
+	if wln.associationstate=PL_WLN_NOT_ASSOCIATED then
+		if wln_scan_and_assoc_in_prog=NO then
+			if wln_association_holdoff_timer>0 then
+				wln_association_holdoff_timer=wln_association_holdoff_timer-1
+				if wln_association_holdoff_timer=0 then
+					wln_start_scan()
+					wln_association_holdoff_timer=WLN_ASSOCIATION_HOLDOFF_CONST
+				end if
+			end if
+		end if
+	end if
+
+	if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
+		if wln.task=PL_WLN_TASK_IDLE then
+			if wln_rescan_requested<>NO then
+				wln_rescan()
+				wln_rescan_requested=NO
+			else if wln_updaterssi_requested<>NO then
+				'wln.updaterssi()
+				wln_updaterssi_requested=NO
+			end if
+		end if
+	end if
+
+	if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
+		#if WLN_KEEP_ALIVE
+			if wln_keep_alive_tmr>0 then
+				wln_keep_alive_tmr=wln_keep_alive_tmr-1
+				if wln_keep_alive_tmr=0 then
+					sock.num=wln_keep_alive_socket
+					if sock.statesimple=PL_SSTS_CLOSED then
+						sock.connect
+						while sock.statesimple<>PL_SSTS_EST
+						wend
+					end if
+					sock.setdata("WLN KEEPALIVE FOR MAC="+wln.mac+" (msg #"+str(wln_keep_alive_ctr)+")")
+					sock.send
+					wln_keep_alive_tmr=WLN_KEEP_ALIVE_TOUT
+					#if WLN_DEBUG_PRINT
+						wln_debugprint("TX keepalive #"+str(wln_keep_alive_ctr))
+					#endif
+					wln_keep_alive_ctr=wln_keep_alive_ctr+1
+				end if
+			end if
+		#endif	
+	else
+	#if GA1000
+		#if WLN_WPA
+			if wln.getmoduletype = PL_WLN_MODULE_TYPE_GA1000 then
+				if wln.associationstate=PL_WLN_ASSOCIATED then
+					if wln_wpa_handshake_timer>0 then
+						wln_wpa_handshake_timer=wln_wpa_handshake_timer-1
+						if wln_wpa_handshake_timer=0 then
+							if wln.disassociate()<>ACCEPTED then
+								wln_scan_and_assoc_in_prog=NO
+								wln_result=WLN_STATUS_UNEXPECTED_ERROR
+								#if WLN_DEBUG_PRINT
+									wln_debug_print_status(wln_result)
+								#endif
+							end if
+						end if
+					end if
+				end if
+			end if
+		#endif
+	#endif
+	end if
+end sub
+
+'----------------------------------------------------------------------------
+#if GA1000
+	#if WLN_WPA
+		public function compare_replay_counters(byref replay_counter1 as string, byref replay_counter2 as string) as integer
+		
+		dim i as integer
+		dim result as integer
+		
+		result = 0
+		
+		for i=1 to 8
+			dim rc1 as  string = mid(replay_counter1, i, 1)
+			dim rc2 as  string = mid(replay_counter2, i, 1)  
+			if  rc1 > rc2 then 
+				compare_replay_counters = 1
+				Exit For
+			else if  rc1 < rc2 then 
+				compare_replay_counters = -1
+				Exit For
+			else 
+				compare_replay_counters = 0
+			end if  
+		next i
+		
+		end function
+	#endif 
+
+'----------------------------------------------------------------------------
+public sub wln_proc_data()
+#if WLN_WPA
+	if wln.getmoduletype= PL_WLN_MODULE_TYPE_GA1000  then
+		dim rx_data as string
+		dim anonce, snonce, gtk as string(32)
+		dim ver, x as byte
+		dim key_len as string(2)
+		dim replay_counter as string(8)
+		dim ptk_kek as string(16)
+		dim key_info,keydatalen as word
+		dim plain as string
+		dim encrypt_key as string(128)	
+		dim kde_gtk as string(34)
+		dim wpakey as string(32)
+		dim stemp1,stemp2 as string(8)
+		
+		if mid(wln.scanresultwpainfo,7,4)=CYPHER_TKIP then
+			wln_g_group_cipher=PL_WLN_WPA_ALGORITHM_TKIP
+		end if
+		
+		if mid(wln.scanresultwpainfo,7,4)=CYPHER_AES then
+			wln_g_group_cipher=PL_WLN_WPA_ALGORITHM_AES
+		end if
+		
+		if wln_init_flag<>WLN_INIT_SIGNATURE or sock.num<>wln_wpa_socket then
+			exit sub
+		end if
+
+		rx_data=sock.getdata(255)
+		
+		'packet type should be "3" (EAPOL-Key)
+		stemp1=mid(rx_data,2,1)
+		if asc(stemp1)<>3 then
+			exit sub
+		end if
+
+		'descriptor type must be 254 - RSN Key Descriptor
+		stemp1=mid(rx_data,5,1)
+		stemp2=mid(rx_data,5,1)
+		if asc(stemp1)<>254 and asc(stemp2)<>2 then 
+			exit sub
+		end if
+		'check key information
+		stemp1=mid(rx_data,6,1)
+		stemp2=mid(rx_data,7,1)
+		key_info=asc(stemp1)*256+asc(stemp2)
+		if (key_info and 1)<>0 then
+			wln_wpa_key_type=WLN_WPA_KEY_HMAC_MD5_RC4
+		else if (key_info and 2)<>0 then
+			wln_wpa_key_type=WLN_WPA_KEY_HMAC_SHA1_AES
+		else
+			'unsupported
+		end if
+
+		'bit 7 or 13 must be set
+		if (key_info and &h80)=0 and (key_info and &h2000)=0 then
+			exit sub
+		end if
+		
+		'bit 0-2 of key_info is key descriptor version
+		
+		ver=(key_info and &b111)
+		
+		'byte 8,9 is key length
+		key_len=mid(rx_data,8,2)
+			
+		'byte 10 to 17 is replay_counter
+		replay_counter=mid(rx_data,10,8)
+			
+		
+		'Need to ensure the replay counter is increasing
+		if compare_replay_counters(replay_counter, last_replay_counter) > 0 then
+
+			if wln_security_mode=WLN_SECURITY_MODE_WPA2 and (key_info and &h1000)<>0 then
+				stemp1=mid(rx_data,98,1)
+				stemp2=mid(rx_data,99,1)
+				keydatalen=asc(stemp1)*256+asc(stemp2)
+				if ver=2 then
+					if (keydatalen mod 8)<>0 then
+						exit sub
+					end if
+					keydatalen=keydatalen-8
+					ptk_kek=mid(wln_g_ptk,17,16)
+					x=len(rx_data)
+					encrypt_key=mid(rx_data,100,x-99)
+					if wln_aes_unwrap(ptk_kek,encrypt_key,plain,keydatalen/8)=false then
+						exit sub
+				end if
+				insert(rx_data,98,chr(keydatalen/256))
+				insert(rx_data,99,chr(keydatalen mod 256))
+			end if
+		end if
+
+		'for bit 3, 1=Pairwise, 0=Group key
+		if (key_info and &h8)<>0 then
+			if (key_info and &h100)<>0 then
+				kde_gtk=wln_wpa_supplicant_parse_ies(plain)
+				#if WLN_DEBUG_PRINT
+					wln_debugprint("Pairwise step 3/4")
+				#endif			
+				dim key_was_set as boolean
+				key_was_set = wln_wpa_supplicant_process_3_of_4(key_info,ver,replay_counter,wln_mic_key,wln_g_ptk)
+				if key_was_set AND kde_gtk<>"" then
+					if (wln_g_group_cipher<>PL_WLN_WPA_ALGORITHM_TKIP) then
+						wpakey=right(kde_gtk,16) 
+						wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_AES,wpakey,PL_WLN_WPA_CAST_MULTICAST)					
+					else
+						wpakey=right(kde_gtk,32)
+						stemp1=mid(wpakey,17,8)
+						stemp2=mid(wpakey,25,8)
+						insert(wpakey,17,stemp2)
+						insert(wpakey,25,stemp1)				
+						wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,wpakey,PL_WLN_WPA_CAST_MULTICAST) ''<<<<<<<<<<<@@@@@	
+					end if
+					
+					wln_associated=WLN_ASSOCIATION_RETVAL_YES
+					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
+					callback_wln_ok()
+					#if WLN_KEEP_ALIVE=1
+						wln_keep_alive_tmr=WLN_KEEP_ALIVE_TOUT
+					#endif
+					#if WLN_DEBUG_PRINT
+						wln_debugprint("---ASSOCIATED (WPA2-PSK)---")
+					#endif				
+				end if			
+			else
+				#if WLN_DEBUG_PRINT
+					wln_debugprint("Pairwise step 1/4")
+				#endif		
+				'''''' Security Issue Fix. This value must always be initialized randomly  
+				anonce=mid(rx_data,18,32)
+				'''''' Security Issue Fix. This value must always be initialized randomly  
+				snonce=random(32)			
+				wln_wpa_supplicant_process_1_of_4(snonce,anonce,wln_g_ptk)
+				wln_mic_key=left(wln_g_ptk,16)
+				#if WLN_DEBUG_PRINT
+					wln_debugprint("Pairwise step 2/4")
+				#endif			
+				wln_wpa_supplicant_send_2_of_4(ver,key_len,replay_counter,snonce,wln_mic_key)			
+			end if	
+		else
+			if (key_info and &h100)<>0 then			
+				if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+					wln_g_key_iv=mid(rx_data,50,16)
+					gtk=mid(rx_data,100,32)
+					ptk_kek=mid(wln_g_ptk,17,16)
+				else
+					kde_gtk=wln_wpa_supplicant_parse_ies(plain)
+				end	if
+				
+				#if WLN_DEBUG_PRINT
+					wln_debugprint("Group key step 1/2")
+				#endif			
+				
+				if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+					wln_wpa_supplicant_process_1_of_2(key_info,wln_g_key_iv,ptk_kek,gtk)
+				else
+					if kde_gtk<>"" then					
+						if (wln_g_group_cipher<>PL_WLN_WPA_ALGORITHM_TKIP) then
+							wpakey=right(kde_gtk,16)
+							wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_AES,wpakey,PL_WLN_WPA_CAST_MULTICAST)					
+						else
+							wpakey=right(kde_gtk,32)
+							stemp1=mid(wpakey,17,8)
+							stemp2=mid(wpakey,25,8)
+							insert(wpakey,17,stemp2)
+							insert(wpakey,25,stemp1)					
+							wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,wpakey,PL_WLN_WPA_CAST_MULTICAST) ''<<<<<<<<<<<@@@@@	
+						end if					
+					end if						
+				end if
+				
+				wln_mic_key=left(wln_g_ptk,16)
+				#if WLN_DEBUG_PRINT
+					wln_debugprint("Group key step 2/2")
+				#endif			
+				wln_wpa_supplicant_send_2_of_2(key_info,ver,replay_counter,wln_mic_key)
+
+					if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+					wln_associated=WLN_ASSOCIATION_RETVAL_YES
+					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
+					callback_wln_ok()
+				end if
+
+					#if WLN_DEBUG_PRINT
+					if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+						wln_debugprint("---ASSOCIATED(WPA1-PSK)---")
+					else
+						wln_debugprint("---GROUP KEY UPDATED(WPA2-PSK)---")
+					end if
+				#endif			
+				#if WLN_KEEP_ALIVE=1
+					wln_keep_alive_tmr=WLN_KEEP_ALIVE_TOUT
+				#endif			
+			end if
+		end if
+		last_replay_counter = replay_counter
+		end if	
+	end if
+#endif
+end sub
+#else 
+public sub wln_proc_data()
+end sub
+#endif
+'----------------------------------------------------------------------------
+public sub wln_proc_task_complete(completed_task as pl_wln_tasks)
+	dim wln_result as en_wln_status_codes
+	dim current_rssi,scan_rssi as byte
+	dim different_ap as no_yes
+
+	if wln_init_flag<>WLN_INIT_SIGNATURE or wln.enabled=NO then
+		exit sub
+	end if
+
+	wln_result=WLN_STATUS_OK
+	
+	select case completed_task
+	case PL_WLN_TASK_SCAN,PL_WLN_TASK_ACTIVESCAN:
+		if wln_rescan_in_prog=YES then
+			wln_rescan_in_prog=NO
+			if wln.associationstate=PL_WLN_NOT_ASSOCIATED then
+				current_rssi=0
+			else
+				current_rssi=wln.rssi
+			end if
+			
+			if wln.scanresultssid<>wln_ap_name then
+				scan_rssi=0
+			else
+				scan_rssi=wln.scanresultrssi
+			end if
+			
+			if ddval(wln.scanresultbssid)=wln_bssid_binary then
+				different_ap=NO
+			else
+				different_ap=YES
+			end if
+			
+			callback_wln_rescan_result(current_rssi,scan_rssi,different_ap)
+			exit sub
+		end if
+		
+		'was looking for AP
+		if instr(1,wln.scanresultssid,wln_ap_name,1)=0 then
+			wln_result=WLN_STATUS_SCANNING_FAILURE
+			goto finish
+		end if
+		
+		wln_bssid_binary=ddval(wln.scanresultbssid)
+		
+		'For WEP mode, security key must be set EACH TIME before the association
+		select case wln_security_mode
+		case WLN_SECURITY_MODE_WEP64:
+			if wln.setwep(wln_key,PL_WLN_WEP_MODE_64)<>ACCEPTED then
+				wln_result=WLN_STATUS_UNEXPECTED_ERROR
+				goto finish
+			end if
+			
+		case WLN_SECURITY_MODE_WEP128:
+			if wln.setwep(wln_key,PL_WLN_WEP_MODE_128)<>ACCEPTED then
+				wln_result=WLN_STATUS_UNEXPECTED_ERROR
+				goto finish
+			end if
+		
+		#if WLN_WPA			
+			'WA2000 Note: We need security not to be reset to make the module more responsive. 				
+			case WLN_SECURITY_MODE_WPA1:
+				if wln.getmoduletype =  PL_WLN_MODULE_TYPE_WA2000 then
+					if wln.setwpa(PL_WLN_WPA_WPA1_PSK,PL_WLN_WPA_ALGORITHM_TKIP,wln_key,PL_WLN_WPA_CAST_MULTICAST)<>ACCEPTED then
+						wln_result=WLN_STATUS_UNEXPECTED_ERROR
+						goto finish			
+					end if
+				end if
+			case WLN_SECURITY_MODE_WPA2
+				if wln.getmoduletype= PL_WLN_MODULE_TYPE_WA2000 then
+					if wln.setwpa(PL_WLN_WPA_WPA2_PSK,PL_WLN_WPA_ALGORITHM_AES,wln_key,PL_WLN_WPA_CAST_MULTICAST)<>ACCEPTED then
+						wln_result=WLN_STATUS_UNEXPECTED_ERROR
+						goto finish			
+					end if
+				end if
+		#endif		
+		
+		case else:
+			if wln.setwep("",PL_WLN_WEP_MODE_DISABLED)<>ACCEPTED then
+				wln_result=WLN_STATUS_UNEXPECTED_ERROR
+				goto finish
+			end if
+		end select
+
+		'start association
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("ASSOCIATE with "+wln_ap_name+" (bssid: "+wln.scanresultbssid+", ch: "+str(wln.scanresultchannel)+")")
+		#endif
+
+		wln_associated=WLN_ASSOCIATION_RETVAL_INPROG
+		callback_wln_starting_association()
+		if wln.associate(wln.scanresultbssid,wln_ap_name,wln.scanresultchannel,wln.scanresultbssmode)<>ACCEPTED then
+			wln_result=WLN_STATUS_UNEXPECTED_ERROR
+			goto finish
+		end if
+		exit sub
+
+	case PL_WLN_TASK_ASSOCIATE:
+		if wln.associationstate=PL_WLN_ASSOCIATED then
+		
+			#if WLN_WPA	
+				if wln_security_mode=WLN_SECURITY_MODE_WPA1 or wln_security_mode=WLN_SECURITY_MODE_WPA2 then
+                    if wln.getmoduletype =  PL_WLN_MODULE_TYPE_GA1000 then
+#if WLN_DEBUG_PRINT
+                        'GA1000 Note The handshake timer is only available in WLN_WPA for the GA1000
+					    wln_debugprint("Pre-associated for WPA1/2-PSK, starting handshake")                        
+#endif					
+#if GA1000
+						wln_wpa_handshake_timer=WLN_WPA_HANDSHAKE_TIMEOUT
+#endif
+                    else 
+#if WLN_DEBUG_PRINT                        
+					    wln_debugprint("---ASSOCIATED(WPA1 or WPA2)---")
+#endif                     
+                        'WA2000 is already associated at this stage. The wln_associated value is set after wpa for GA1000
+                        wln_associated=WLN_ASSOCIATION_RETVAL_YES 
+					    callback_wln_ok() 
+                    end if 
+					goto finish
+				end if
+			#endif
+			
+			#if WLN_KEEP_ALIVE=1
+				wln_keep_alive_tmr=WLN_KEEP_ALIVE_TOUT
+			#endif
+			
+			#if WLN_DEBUG_PRINT
+				wln_debugprint("---ASSOCIATED(WEP64, WEP128, or no security)---")
+			#endif
+			wln_associated=WLN_ASSOCIATION_RETVAL_YES
+			wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
+			callback_wln_ok()
+			goto finish
+		else
+			wln_result=WLN_STATUS_ASSOCIATION_FAILURE
+			goto finish
+		end if
+	
+	case PL_WLN_TASK_DISASSOCIATE:
+		wln_result=WLN_STATUS_DISASSOCIATION
+		goto finish
+	
+	case else
+		exit sub
+	end select
+
+finish:
+	wln_scan_and_assoc_in_prog=NO
+	if wln_result<>WLN_STATUS_OK then
+		#if WLN_DEBUG_PRINT
+			wln_debug_print_status(wln_result)
+		#endif
+		wln_associated=WLN_ASSOCIATION_RETVAL_NO
+		callback_wln_failure(wln_result)
+	end if
+end sub
+
+'----------------------------------------------------------------------------
+public sub wln_proc_event(wln_event as pl_wln_events)
+
+	if wln_init_flag<>WLN_INIT_SIGNATURE or wln.enabled=NO then
+		exit sub
+	end if
+
+	wln_scan_and_assoc_in_prog=NO
+	if wln_event=PL_WLN_EVENT_DISASSOCIATED then
+		#if WLN_DEBUG_PRINT
+			wln_debug_print_status(WLN_STATUS_DISASSOCIATION)
+		#endif
+
+		if wln_associated=WLN_ASSOCIATION_RETVAL_YES then
+			wln_associated=WLN_ASSOCIATION_RETVAL_NO
+			callback_wln_failure(WLN_STATUS_DISASSOCIATION)
+		else
+			callback_wln_failure(WLN_STATUS_ASSOCIATION_FAILURE) 'means we've been kicked out during WPA handshake
+		end if
+		
+		last_replay_counter = "\x00\x00\x00\x00\x00\x00\x00\x00"
+	end if
+end sub
+
+
+'------------------------------------------------------------------------------
+public sub wln_check_for_better_ap(rssi_lvl as byte)
+	dim i as byte
+	dim sock_backup as byte
+	dim ongoing_connection as no_yes
+	
+	sock_backup=sock.num
+	if wln_check_association()<>WLN_ASSOCIATION_RETVAL_YES then
+		wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
+	else
+		'when we are associated...
+		if wln_rescan_tmr>0 then
+			wln_rescan_tmr=wln_rescan_tmr-1
+			if wln_rescan_tmr=0 then
+				ongoing_connection=NO
+				for i=0 to sock.numofsock
+					sock.num=i
+					if sock.statesimple=PL_SSTS_EST and sock.currentinterface=PL_SOCK_INTERFACE_WLN then
+						ongoing_connection=YES
+						exit for
+					end if
+				next i
+
+				if ongoing_connection=YES then
+					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_CONNECT
+					if wln.rssi>=rssi_lvl then
+						goto finish
+					else
+						goto rescan 'if TCP established we rescan only if current signal is weak
+					end if
+				else	
+					wln_rescan_tmr=WLN_RESCAN_TMR_CTR_NO_CONNECT
+rescan:				
+					callback_wln_rescan_for_better_ap()
+					wln_start_rescan() 'if TCP not established we rescan periodically no matter whata
+				end if
+			end if
+		end if
+	end if
+finish:
+	sock.num=sock_backup
+end sub
+
+'----------------------------------------------------------------------------
+function wln_start_scan() as ok_ng
+	dim res as accepted_rejected
+	
+	wln_start_scan=NG
+	
+	if wln.enabled<>YES then exit function
+	if wln_scan_and_assoc_in_prog=YES then exit function
+	if wln.task<>PL_WLN_TASK_IDLE then exit function
+	
+	if wln_active_scan=NO then
+		res=wln.scan(wln_ap_name)
+	else
+		res=wln.activescan(wln_ap_name)
+	end if
+	
+	if res=ACCEPTED then
+		#if WLN_DEBUG_PRINT
+			if wln_active_scan=NO then
+				wln_debugprint("PASSIVE SCAN for "+wln_ap_name)
+			else
+				wln_debugprint("ACTIVE SCAN for "+wln_ap_name)
+			end if
+		#endif
+		wln_scan_and_assoc_in_prog=YES
+		wln_start_scan=OK
+	else
+		#if WLN_DEBUG_PRINT
+			wln_debugprint("Wi-Fi is busy, waiting...")
+		#endif
+		wln_start_scan=NG
+	end if		
+end function
+
+
+
+'----------------------------------------------------------------------------
+function wln_prepare_security(security_mode as pl_wln_security_modes,byref key as string) as en_wln_status_codes
+	dim algorithm as integer 
+	
+
+	wln_prepare_security=WLN_STATUS_OK
+
+	#if WLN_WPA
+
+		select case security_mode
+		case WLN_SECURITY_MODE_WPA1:
+			wpa_mode=PL_WLN_WPA_WPA1_PSK
+			algorithm = PL_WLN_WPA_ALGORITHM_TKIP
+		case WLN_SECURITY_MODE_WPA2:
+			wpa_mode=PL_WLN_WPA_WPA2_PSK
+			algorithm = PL_WLN_WPA_ALGORITHM_AES
+		case else:
+			wpa_mode=PL_WLN_WPA_DISABLED
+		end select
+		#if WLN_AVAILABLE = 1
+				wln.setwpa(wpa_mode,0,"",0)
+		#endif 
+		
+	#else
+
+		wpa_mode=PL_WLN_WPA_DISABLED
+	#endif
+
+	last_replay_counter = "\x00\x00\x00\x00\x00\x00\x00\x00"
+	wpa_should_set_key = false
+	
+	select case security_mode
+	case WLN_SECURITY_MODE_DISABLED: 
+		'---
+		
+	#if WLN_WPA
+		case WLN_SECURITY_MODE_WPA1,WLN_SECURITY_MODE_WPA2:
+			'---
+	#endif		
+		
+	case WLN_SECURITY_MODE_WEP64:
+		if len(key)<>10 then
+			wln_prepare_security=WLN_STATUS_INVALID_WEP_KEY
+			exit function
+		end if
+		
+	case WLN_SECURITY_MODE_WEP128:
+		if len(key)<>26 then
+			wln_prepare_security=WLN_STATUS_INVALID_WEP_KEY
+			exit function
+		end if
+	
+	case else:
+		wln_prepare_security=WLN_STATUS_INVALID_SECURITY_MODE
+		exit function
+			
+	end select
+end function
+
+'------------------------------------------------------------------------------
+
+#if WLN_WPA
+public function wln_wpa_mkey_get(byref password as string, byref ssid as string) as string
+	#if GA1000
+	dim count as dword
+	dim pos, plen, left1 as byte
+	dim digest,s as string(SHA1_MAC_LEN)
+	dim buf as string(32)
+	dim f as byte
+	buf=""
+	count=0
+	left1=32
+	pos=1
+	for f=0 to 1
+		count=count+1
+		wln_pbkdf2_sha1_f(password, ssid, f, 4096, count,digest)
+		if left1>SHA1_MAC_LEN then
+			plen=SHA1_MAC_LEN
+		else
+			plen=left1
+		end if
+		s=left(digest,plen)
+		insert(buf,pos,s)
+		pos=pos+plen
+		left1=left1-plen
+	next f
+	wln_wpa_mkey_get=buf
+	callback_wln_mkey_progress_update(100)
+	#else 
+	wln_wpa_mkey_get = password
+	#endif 
+end function
+#endif
+
+#if GA1000
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_wpa_supplicant_process_1_of_4(byref snonce as string, byref anonce as string, byref ptk as string)
+			dim addr1, addr2 as string(32)
+			dim temp1,temp2 as string(8)
+
+			addr1=wln_mac_binary
+			addr2=wln_bssid_binary
+			wln_wpa_pmk_to_ptk(wln_key,LABEL1,addr1,addr2,snonce,anonce,ptk)
+
+			temp1=right(ptk,8)
+			temp2=mid(ptk,49,8)
+			insert(ptk,49,temp1)
+			insert(ptk,57,temp2)
+			wpa_should_set_key = true 
+		end sub
+		#endif
+
+		'------------------------------------------------------------------------------
+		#if WLN_WPA
+		sub wln_wpa_pmk_to_ptk(byref pmk as string, byref label as string, byref addr1 as string,byref addr2 as string, byref nonce1 as string, byref nonce2 as string, byref ptk as string)
+			dim data1 as string(128)
+
+			if addr1<addr2 then
+				data1=addr1+addr2
+			else
+				data1=addr2+addr1
+			end if
+			
+			if nonce1<nonce2 then
+				data1=data1+nonce1+nonce2
+			else
+				data1=data1+nonce2+nonce1
+			end if
+			wln_sha1_prf(pmk,label,data1,ptk,64)
+			
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_sha1_prf(byref pmk as string, byref label as string, byref data1 as string, byref buf as string, buf_len as byte)
+			dim len1(3) as byte
+			dim counter as byte
+			dim pos, plen as byte
+			dim s as string(20) 
+			dim s1 as string
+			
+			len1(0)=len(label)
+			len1(1)=len(data1)
+			len1(2)=1
+			
+			pos=1
+			counter=0
+				
+			while pos<buf_len
+				s1=label+data1+chr(counter)
+				plen=buf_len-pos+1
+				if plen>=SHA1_MAC_LEN then
+					wln_hmac_sha1_vector(pmk,s1,buf,pos)
+					pos=pos+SHA1_MAC_LEN
+				else
+					wln_hmac_sha1_vector(pmk,s1,s,0)
+					s=left(s,plen)
+					insert(buf,pos,s)
+					exit sub
+				end if
+				counter=counter+1
+			wend	
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_hmac_sha1_vector(byref key as string, byref addr_element as string, byref mac as string, pos as byte)
+
+			dim k_pad, stemp,null_str as string(64)
+			dim tk1, tk2 as string(20)
+			dim l as byte
+			
+			l=64-len(key)
+			null_str=left(NULL_64,l)
+			k_pad=key+null_str
+			
+			stemp=CH36_64
+			k_pad=strxor(k_pad,stemp)
+			
+			tk1=wln_sha1_vector(k_pad, addr_element)
+			
+			k_pad=key+null_str
+			
+			
+			stemp=CH5C_64
+			k_pad=strxor(k_pad,stemp)
+			
+			tk2=wln_sha1_vector(k_pad,tk1)
+			insert(mac,pos,tk2)
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		function wln_sha1_vector(byref key as string, byref data as string) as string
+
+			dim s as string
+			dim hash as string
+			dim l as byte 
+			
+			s=key
+			l=len(s)
+			hash=sha1(s,"",SHA1_UPDATE,0)
+
+			s=data
+			l=l+len(s)
+			hash=sha1(s,hash,SHA1_FINISH,l)
+
+			wln_sha1_vector=hash
+		end function
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_wpa_supplicant_send_2_of_4(ver as byte, byref key_len as string, byref replay_counter as string, byref snonce as string, byref mic_key as string)
+			dim length as word
+			dim lsb, msb as byte
+			dim reply as string
+			dim key_info as word
+			dim mac as string(16)
+			dim stemp as string(32)
+			dim mac_pos as byte
+			dim info_header, info_length as string(1)
+			dim scanresultwpainfo as string(96)
+			
+			
+			'header(4)
+			scanresultwpainfo=wln.scanresultwpainfo
+			
+			length=len(scanresultwpainfo)-2+95
+			msb=length/256
+			lsb=length mod 256
+
+			reply=WPA_HEADER+chr(msb)+chr(lsb)
+			
+			'key_type(1)
+			if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+				reply=reply+chr(&hFE)
+
+			else
+				reply=reply+chr(&h2)
+			end if
+			
+			'key_info(2)
+			key_info=ver+&h8+&h100
+			msb=key_info/256
+			lsb=key_info mod 256
+			reply=reply+chr(msb)+chr(lsb)
+			
+			'key_length(2)
+			reply=reply+key_len
+			
+			'replay_counter(8)
+			reply=reply+replay_counter
+			
+			'key_nonce(32)
+			reply=reply+snonce
+			
+			'key_iv(16), key_rsc(8), key_id(8)
+			stemp=NULL_32
+			reply=reply+stemp
+			
+			'mac(16)
+			mac_pos=len(reply)+1
+			mac=NULL_16
+			reply=reply+mac
+			
+			'key_data_length(2)
+			length=len(scanresultwpainfo)-2
+			msb=length/256
+			lsb=length mod 256
+			reply=reply+chr(msb)+chr(lsb)
+			
+			'WPA info
+			info_header=left(scanresultwpainfo,1)
+			info_length=mid(scanresultwpainfo,3,1)
+			reply=reply+info_header+info_length+mid(scanresultwpainfo,5,asc(info_length))
+
+			
+			'overwrite mac (82 to 98)
+			if ver=1 then
+				wln_hmac_md5_vector(mic_key,1,reply,mac,0)
+			else
+				wln_hmac_sha1_vector(mic_key,reply,mac,0)
+			end if
+			length=len(reply)
+			stemp=right(reply,length-mac_pos-16+1)
+			reply=left(reply,mac_pos-1)
+			reply=reply+left(mac,16)+stemp
+			
+			sock.setdata(reply)
+			sock.send
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_hmac_md5_vector(byref key as string, num_elem as byte, byref addr_element as string, byref mac as string, pos as byte)
+			dim k_pad, stemp, null_str as string(64)
+			dim tk1, tk2 as string(20)
+			dim l as byte
+			
+			l=64-len(key)
+			null_str=left(NULL_64,l)
+			k_pad=key+null_str
+			
+			stemp=CH36_64
+			k_pad=strxor(k_pad,stemp)
+
+			tk1=wln_md5_vector(k_pad, addr_element)	
+			k_pad=key+null_str
+
+			stemp=CH5C_64
+			k_pad=strxor(k_pad,stemp)
+			
+			tk2=wln_md5_vector(k_pad,tk1)
+			insert(mac,pos,tk2)
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		function wln_md5_vector(byref key as string, byref data as string) as string
+			dim hash as string(16)
+			dim l as byte
+			
+			l=len(key)
+			hash=md5(key,"",MD5_UPDATE,0)
+			
+			l=l+len(data)
+			hash=md5(data,hash,MD5_FINISH,l)
+
+			wln_md5_vector=hash
+		end function
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		function wln_wpa_supplicant_process_3_of_4(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string,byref ptk as string) as boolean
+			dim s as string(32)
+			dim key_was_set as boolean
+			key_was_set = false
+			
+			mic_key=left(ptk,16)
+			#if WLN_DEBUG_PRINT
+				wln_debugprint("Pairwise step 4/4")
+			#endif	
+			wln_wpa_supplicant_send_4_of_4(key_info,ver,replay_counter,mic_key)
+			if (key_info and &h40)<>0 then
+				if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+					s=right(ptk,32)
+					wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,s,PL_WLN_WPA_CAST_UNICAST)
+				else
+
+					'--------------------------------------------------------------------------------
+					'Fix #1 for Krack attack. Ensure the key is only installed once. 
+					if wpa_should_set_key = true then
+					s=mid(ptk,33,16)
+					wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_AES,s,PL_WLN_WPA_CAST_UNICAST)
+						wpa_should_set_key = false
+						key_was_set = true
+				end if
+			end if
+			end if
+
+			wln_wpa_supplicant_process_3_of_4 = key_was_set
+		end function
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_wpa_supplicant_send_4_of_4(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string)
+			dim length as word
+			dim lsb, msb as byte
+			dim reply as string
+			dim mac as string(16)
+			dim stemp as string(32)
+			dim mac_pos as byte
+			
+			'header(4)
+			length=95
+			msb=length/256
+			lsb=length mod 256
+			reply=WPA_HEADER+chr(msb)+chr(lsb)
+			
+			'key_type(1)
+			if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+				reply=reply+chr(&hFE)
+			else
+				reply=reply+chr(&h02)
+			end if
+				
+			'key_info(2)
+			key_info=key_info and &h200
+			key_info=key_info+ver+&h8+&h100
+			msb=key_info/256
+			lsb=key_info mod 256
+			reply=reply+chr(msb)+chr(lsb)
+			
+			'key_length(2)
+			reply=reply+NULL_2
+			
+			'replay_counter(8)
+			reply=reply+replay_counter
+			
+			'key_nonce(32)
+			stemp=NULL_32
+			reply=reply+stemp
+			
+			'key_iv(16), key_rsc(8), key_id(8)
+			stemp=NULL_32
+			reply=reply+stemp
+			
+			'mac(16)
+			mac_pos=len(reply)+1
+			mac=NULL_16
+			reply=reply+mac
+			
+			'key_data_length(2)
+			reply=reply+NULL_2
+
+			'overwrite mac
+			if ver=1 then
+				wln_hmac_md5_vector(mic_key,1,reply,mac,0)
+			else
+				wln_hmac_sha1_vector(mic_key,reply,mac,0)
+			end if
+			length=len(reply)
+			stemp=right(reply,length-mac_pos-16+1)
+			reply=left(reply,mac_pos-1)
+			reply=reply+left(mac,16)+stemp
+			
+			sock.setdata(reply)
+			sock.send
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_wpa_supplicant_process_1_of_2(key_info as word, byref key_iv as string, byref ptk as string, byref gtk as string)
+			dim gd_keyidx as byte
+			dim ek as string(32)
+			dim stemp1, stemp2 as string(8)
+			
+			gd_keyidx=key_info and &h30
+			gd_keyidx=gd_keyidx/&h10
+			
+			ek=left(key_iv,16)+right(ptk,16)
+			
+			gtk=rc4(ek,256,gtk)
+			
+			stemp1=mid(gtk,17,8)
+			stemp2=mid(gtk,25,8)
+			insert(gtk,17,stemp2)
+			insert(gtk,25,stemp1)
+			
+			wln.setwpa(wpa_mode,PL_WLN_WPA_ALGORITHM_TKIP,gtk,PL_WLN_WPA_CAST_MULTICAST)	
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_wpa_supplicant_send_2_of_2(key_info as word, ver as word, byref replay_counter as string, byref mic_key as string)
+			dim length as word
+			dim lsb, msb as byte
+			dim reply as string
+			dim mac as string(16)
+			dim stemp as string(32)
+			dim mac_pos as byte
+			
+			'header(4)
+			length=95
+			msb=length/256
+			lsb=length mod 256
+			reply=chr(&h1)+chr(IEEE802_1X_TYPE_EAPOL_KEY)+chr(msb)+chr(lsb)
+			
+			'key_type(1)
+			if wln_security_mode=WLN_SECURITY_MODE_WPA1 then
+				reply=reply+chr(&hFE)
+			else
+				reply=reply+chr(&h02)
+			end if
+			
+			
+			'key_info(2)
+			key_info=key_info and &h30
+			key_info=key_info+ver+&h200+&h100
+			msb=key_info/256
+			lsb=key_info mod 256
+			reply=reply+chr(msb)+chr(lsb)
+			
+			'key_length(2)
+			reply=reply+NULL_2
+			
+			'replay_counter(8)
+			reply=reply+replay_counter
+			
+			'key_nonce(32)
+			stemp=NULL_32
+			reply=reply+stemp
+			
+			'key_iv(16), key_rsc(8), key_id(8)
+			stemp=NULL_32
+			reply=reply+stemp
+			
+			'mac(16)
+			mac_pos=len(reply)+1
+			mac=NULL_16
+			reply=reply+mac
+			
+			'key_data_length(2)
+			reply=reply+NULL_2
+				
+			'overwrite mac
+			if ver=1 then
+				wln_hmac_md5_vector(mic_key,1,reply,mac,0)
+			else
+				wln_hmac_sha1_vector(mic_key,reply,mac,0)
+			end if	
+			length=len(reply)
+			stemp=right(reply,length-mac_pos-16+1)
+			reply=left(reply,mac_pos-1)
+			reply=reply+mac+stemp
+			
+			sock.setdata(reply)
+			sock.send
+		end sub
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		function wln_aes_unwrap(byref aes_kek as string, byref aes_cipher as string, byref aes_plain as string, n as byte) as boolean
+			dim a as string(8)
+			dim b as string(16)
+			dim r, k, l, i, j as byte
+			
+			a=left(aes_cipher,8)
+			insert(aes_plain,1,mid(aes_cipher,9,8*n))
+
+			j=6
+			while j>0
+				j=j-1
+				r=(n-1)*8
+				i=n+1
+				while i>1
+					i=i-1
+					b=a
+					k=n*j+i
+					l=asc(mid(b,8,1))
+					k=k xor l
+					insert(b,8,chr(k))
+					insert(b,9,mid(aes_plain,r+1,8))
+					b=aes128dec(aes_kek,b)
+					a=left(b,8)
+					insert(aes_plain,r+1,right(b,8))
+					r=r-8
+				wend
+			wend
+
+			for i=0 to 7
+				if mid(a,i,1)<>chr(&ha6) then 
+					wln_aes_unwrap=false
+					exit function
+				end if
+			next i
+			wln_aes_unwrap=true
+		end function
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		function wln_wpa_supplicant_parse_ies(byref key_data as string) as string
+			dim pos, data_len as byte
+			dim header as string(1)
+			dim rsn_group_key_data as string(4)
+			
+			pos=0
+			data_len=0	
+			do
+				data_len=asc(mid(key_data,pos+2,1))	
+				header=mid(key_data,pos+1,1)
+				
+				if data_len=0 and header=chr(&hdd) then exit do
+				if header=chr(&hdd) then
+					rsn_group_key_data=mid(key_data,pos+3,4)
+					if data_len>4 and rsn_group_key_data=chr(&h00)+chr(&h0F)+chr(&hAC)+chr(&h01) then
+						wln_wpa_supplicant_parse_ies=mid(key_data,pos+7,data_len-4)
+						exit function
+					end if
+				end if
+				
+				pos=pos+data_len+2
+				if pos>=len(key_data) then exit do
+			loop while true
+			wln_wpa_supplicant_parse_ies=""
+		end function
+		#endif
+
+		'--------------------------------------------------------------------------------------------- 
+		#if WLN_WPA
+		sub wln_pbkdf2_sha1_f(byref passphrase as string, byref ssid as string, pass as byte, iterations as word, count as byte, byref digest as string)
+			dim tmp, tmp2 as string(20)
+			dim addr_element as string(36)
+			dim i as word
+			dim count_buf as string(4)
+			dim progress_ctr as word
+			
+			progress_ctr=pass*4096
+
+			count_buf=chr(&h0)+chr(&h0)+chr(&h0)+chr(count)
+			addr_element=ssid+count_buf
+			wln_hmac_sha1_vector(passphrase ,addr_element,tmp,0)
+			
+			digest=tmp
+			
+			for i=1 to iterations-1
+				wln_hmac_sha1_vector(passphrase,tmp,tmp2,0)
+
+				tmp=tmp2
+				digest=strxor(digest,tmp2)
+				
+				progress_ctr=progress_ctr+1
+				if progress_ctr mod 82=0 then
+					callback_wln_mkey_progress_update(progress_ctr/82)
+				end if
+			next i
+		end sub
+	#endif
+#endif
+
+
+#if PLATFORM_ID=EM510W 
+
+'----------------------------------------------------------------------------
+sub wln_init_gpio()
+	'map interface lines (on platforms with fixed mapping this will have no effect and do no harm)
+	'WA2000 Will remap DI as output and DO as input and clock as input as required. 
+	
+ 	io.num=wln.clkmap
+	io.enabled=YES
+	io.state = 1
+	
+	 
+	io.num=wln.csmap
+	io.enabled=YES
+	io.state = 0
+	
+	 
+	io.num=wln.domap
+	io.enabled=YES
+	io.state = 0
+	
+	
+end sub
+
+sub wln_reset()
+	io.lineset(wln.csmap,LOW)
+	io.lineset(wln.domap,HIGH)
+	wln_delay_ms(1)
+	io.lineset(wln.csmap,HIGH)	
+	io.lineset(wln.domap,LOW)	
+end sub
+
+#else 
+
+'----------------------------------------------------------------------------
+sub wln_init_gpio()
+	'map interface lines (on platforms with fixed mapping this will have no effect and do no harm)
+	'WA2000 Will remap DI as output and DO as input and clock as input as required. 
+	wln.csmap=WLN_CS
+	io.num=WLN_CS
+	io.enabled=YES
+	wln.dimap=WLN_DI
+	wln.domap=WLN_DO
+	io.num=WLN_DO
+	io.enabled=YES
+	wln.clkmap=WLN_CLK
+	io.num=WLN_CLK
+	io.enabled=YES
+	io.num=WLN_RST
+	io.enabled=YES
+end sub
+
+sub wln_reset()
+	#if WLN_RESET_MODE 
+		io.lineset(wln.csmap,HIGH)
+		io.lineset(wln.clkmap,LOW)
+		io.lineset(wln.clkmap,HIGH)		
+	#else 
+		'there is a dedicated reset line
+		io.num=WLN_RST
+		io.state=LOW
+		wln_delay_ms(1)
+		io.state=HIGH
+	#endif
+end sub
+
+#endif 
+
+'----------------------------------------------------------------------------
+sub wln_init()
+'upload the firmware for wifi module and setup WEP
+	
+	wln_scan_and_assoc_in_prog=NO
+	wln_associated=WLN_ASSOCIATION_RETVAL_NO
+	wln_rescan_in_prog=NO
+	wln_rescan_requested=NO
+	wln_updaterssi_requested=NO
+	
+	#if WLN_DEBUG_PRINT
+		wln_dont_print_stop=NO
+	#endif
+	
+	wln.disable()
+	while wln.enabled=YES
+	wend
+	
+	wln_init_gpio()	
+	wln_reset()
+	wln_module_type = wln.getmoduletype
+ 
+	#if WLN_KEEP_ALIVE
+		wln_keep_alive_socket=255
+	#endif
+
+	#if WLN_WPA	
+		wln_wpa_socket=255
+		wln_key=""
+	#endif
+end sub
+
+
+#if SYS_VER = 1000 or PLATFORM_ID=EM500W  'T1000 Based Devices and EM500W
+
+#if PLATFORM_ID=EM1000N or PLATFORM_ID=EM1001N or PLATFORM_ID=EM1202N or PLATFORM_ID=EM1206N or PLATFORM_ID=TPP2N or PLATFORM_ID=TPP3N or PLATFORM_ID=DS1101N or PLATFORM_ID=DS1102N
+#else 
+'These syscalls are not supported on T1000 devices except for the following specific platforms. This shim allows the wln library to work.  
+
+'----------------------------------------------------------------------------
+function wln.getmoduletype() as pl_wln_module_types
+    wln.getmoduletype=PL_WLN_MODULE_TYPE_GA1000
+end function
+
+'----------------------------------------------------------------------------
+sub wln.disable()
+end sub
+
+#endif
+
+#endif
+
+
+'----------------------------------------------------------------------------
+#if WLN_DEBUG_PRINT
+sub wln_debug_print_status(status as en_wln_status_codes)
+	dim s as string(64)
+	select case status
+	case WLN_STATUS_OK: s="OK"
+	case WLN_STATUS_OUT_OF_SOCKETS: s="ERROR: out of sockets"
+	case WLN_STATUS_INSUFFICIENT_BUFFER_SPACE: s="ERROR: insufficient buffer space"
+#if GA1000 
+	case WLN_STATUS_MISSING_FIRMWARE_FILE: s="ERROR: missing '"+WLN_FIRMWARE_FILE+"' firmware file"
+#endif
+case WLN_STATUS_BOOT_FAILURE: s="ERROR: boot failure"
+	case WLN_STATUS_INVALID_SECURITY_MODE: s="ERROR: incorrect security mode"
+	case WLN_STATUS_INVALID_WEP_KEY: s="ERROR: incorrect WEP key length"
+	case WLN_STATUS_SCANNING_FAILURE: s="Access point not found"
+	case WLN_STATUS_ASSOCIATION_FAILURE: s="Association failure"
+	case WLN_STATUS_DISASSOCIATION: s="Disassociation (or link loss)"
+	case WLN_STATUS_UNEXPECTED_ERROR: s="ERROR: unexpected error (Wi-Fi module is busy when it shoudn't be)"
+	end select
+
+	wln_debugprint(s)
+end sub
+#endif
+
+'------------------------------------------------------------------------------
+#if WLN_DEBUG_PRINT
+sub wln_debugprint(byref print_data as string)
+	#if WLN_DEBUG_REDIR
+		callback_wln_debugprint(print_data)
+	#else
+		sys.debugprint(WLN_STAMP+print_data+WLN_CR_LF)
+	#endif
+end sub
+#endif
+
+#endif '#############################################################

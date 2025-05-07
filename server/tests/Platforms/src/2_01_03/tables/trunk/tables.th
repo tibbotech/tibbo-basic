@@ -1,0 +1,179 @@
+//***********************************************************************************************************
+//			TABLES LIBRARY
+//***********************************************************************************************************
+
+#ifndef TBL_DEBUG_PRINT
+	#define TBL_DEBUG_PRINT 0
+#endif
+
+#ifndef TBL_AGGREGATE_HASH
+	#define TBL_AGGREGATE_HASH 0
+#endif
+
+#ifndef TBL_DESCRIPTOR_FILE
+	#define TBL_DESCRIPTOR_FILE "tables.txt"
+#endif
+
+#ifndef TBL_MAX_TABLE_NAME_LEN
+	#define TBL_MAX_TABLE_NAME_LEN 2
+#endif
+
+#ifndef TBL_MAX_FILE_NAME_LEN
+	#define TBL_MAX_FILE_NAME_LEN 42
+#endif
+
+#ifndef TBL_MAX_NUM_TABLES
+	#define TBL_MAX_NUM_TABLES 1
+#endif
+
+#ifndef TBL_MAX_FIELD_NAME_LEN
+	#define TBL_MAX_FIELD_NAME_LEN 2
+#endif
+
+#ifndef TBL_MAX_TOTAL_NUM_FIELDS
+	#define TBL_MAX_TOTAL_NUM_FIELDS 1
+#endif
+
+#ifndef TBL_MAX_RECORD_SIZE
+	#define TBL_MAX_RECORD_SIZE 2 'must be a power-of-two value
+#endif
+
+#ifndef TBL_ADJUST_LIST_WHEN_FULL
+	#define TBL_ADJUST_LIST_WHEN_FULL 1
+#endif
+
+#ifndef TBL_DISCARD_OLD_RECORD_WHEN_FULL
+	#define TBL_DISCARD_OLD_RECORD_WHEN_FULL 0
+#endif
+
+//must include time library
+	#define TBL_TIME_TYPE_INCLUDED 1
+#endif
+
+#define PL_FD_FIND_PARTIAL_EQUAL 7//extending the fd.find mode
+//--------------------------------------------------------------------------------
+enum en_tbl_search_direction {
+	EN_TBL_SEARCH_DOWN,
+	EN_TBL_SEARCH_UP
+};
+
+enum en_tbl_rdwr {
+	EN_TBL_GET,//Read operation
+	EN_TBL_SET//Write operation
+};
+
+enum en_tbl_status_codes {
+	EN_TBL_STATUS_OK,//Operation completed successfully
+	EN_TBL_STATUS_NOT_STARTED,
+	EN_TBL_STATUS_OUT_OF_FILE_NUMBERS,//Need to open a file and there are no free file numbers left
+	EN_TBL_STATUS_WRONG_DEFINE,//Wrong #define value
+	EN_TBL_STATUS_WRONG_DESCRIPTOR,//Wrong descriptor file data
+	EN_TBL_STATUS_UNKNOWN_FILE,
+	EN_TBL_STATUS_FAILURE,//Low-level failure (for example fd. error) or record checksum error
+	EN_TBL_STATUS_UNKNOWN_TABLE,//Unknown table
+	EN_TBL_STATUS_UNKNOWN_FIELD,//Unknown field
+	EN_TBL_STATUS_INVALID,//Invalid field value
+	EN_TBL_STATUS_FULL,//max record number reached or disk is full
+	EN_TBL_STATUS_NOT_FOUND,//record not found
+	EN_TBL_STATUS_KEY_VIOLATION,//key field violation
+	EN_TBL_STATUS_DELETED,//this record is deleted (not active)
+	EN_TBL_STATUS_END_OF_TABLE,//end of table
+	EN_TBL_STATUS_INV_PARAM//invalid parameter
+};
+
+enum en_tbl_struct {
+	EN_TBL_STRUCT_LIST,
+	EN_TBL_STRUCT_TABLE
+};
+
+enum en_tbl_date_time_format {
+	EN_TBL_DT_DATE,//YYYYMMDD (year,month,date)
+	EN_TBL_DT_TIME1,//hhmm (hour,minutes)
+	EN_TBL_DT_TIME2,//hhmmss (hour,minutes,second)
+	EN_TBL_DT_TIME3,//hhmmssmls (hour,minutes,second,milsecond)
+	EN_TBL_DT_DATE_TIME1,//YYYYMMDDhhmm (year,month,date,hour,minutes)
+	EN_TBL_DT_DATE_TIME2,//YYYYMMDDhhmmss (year,month,date,hour,minutes,second)
+	EN_TBL_DT_ALL//YYYYMMDDhhmmssmls (year,month,date,hour,minutes,second,milsecond)
+};
+
+enum en_tbl_record_states {
+	EN_TBL_RECORD_DELETED,
+	EN_TBL_RECORD_ACTIVE,
+	EN_TBL_RECORD_BOTH
+};
+
+enum en_tbl_modified_operation {
+	EN_TBL_MODIFIED_ADD,
+	EN_TBL_MODIFIED_DELETE,
+	EN_TBL_MODIFIED_UNDELETE,
+	EN_TBL_MODIFIED_EDIT,
+	EN_TBL_MODIFIED_REPLACE,
+	EN_TBL_MODIFIED_CLEAR
+};
+//--------------------------------------------------------------------------------
+struct tbl_field_type {
+	string<TBL_MAX_FIELD_NAME_LEN> field_name;
+	unsigned char field_type;
+	unsigned long p1;
+	unsigned long p2;
+	no_yes key;
+	unsigned int romaddr_def;
+};
+
+struct tbl_type {
+	string<TBL_MAX_TABLE_NAME_LEN> table_name;
+	unsigned int maxrecs;
+	unsigned char numkeyf;
+	en_tbl_struct struct;
+	unsigned char rec_size;
+	unsigned int field_num_offset;
+	unsigned char num_of_fields;
+	no_yes clean_start;
+};
+
+struct struct_tbl_timestamp {
+	unsigned int ts_daycount;
+	unsigned int ts_mincount;
+	unsigned char ts_seconds;
+	unsigned int ts_milsec;
+};
+
+//--------------------------------------------------------------------------------
+en_tbl_status_codes tbl_start();
+
+en_tbl_status_codes tbl_get_table_info(string *table_name_or_num, tbl_type *table_metadata);
+unsigned char tbl_get_num_fields(string *table_name_or_num);
+en_tbl_status_codes tbl_get_field_info(string *table_name_or_num, unsigned char field_index, tbl_field_type *field_metadata);
+en_tbl_status_codes tbl_get_field_def(string *table_name_or_num, string *field_name, string *def_value);
+unsigned char tbl_get_max_field_size(string *table_name_or_num);
+en_tbl_status_codes tbl_replace(string *old_file_name, string *new_file_name);
+en_tbl_status_codes tbl_select(string *table_name_or_num, string *file_name);
+en_tbl_status_codes tbl_select_for_read(string *table_name_or_num, string *file_name);
+
+	en_tbl_status_codes tbl_clear();
+	string tbl_get_hash();
+	en_tbl_status_codes tbl_record_sg(unsigned int *rec_num, en_tbl_rdwr op);
+	en_tbl_status_codes tbl_record_add(string<32> uid);
+	en_tbl_status_codes tbl_record_edit(unsigned int *rec_num);
+	en_tbl_status_codes tbl_record_read_active(unsigned int *rec_num);
+	en_tbl_status_codes tbl_record_delete(unsigned int *rec_num);
+	en_tbl_status_codes tbl_record_undelete(unsigned int *rec_num);
+	en_tbl_status_codes tbl_record_find(en_tbl_record_states record_type, string *search_data, string *field_name, unsigned int *rec_num, en_tbl_search_direction direction, pl_fd_find_modes find_method);
+	en_tbl_status_codes tbl_multi_field_record_find(en_tbl_record_states record_type, string *search_data, string *starting_field, unsigned int *rec_num, en_tbl_search_direction direction, pl_fd_find_modes find_method);
+	en_tbl_status_codes tbl_get_num_records(unsigned int *num_of_records, no_yes include_deleted);
+	en_tbl_status_codes tbl_timestamp_sg(struct_tbl_timestamp *timestamp, en_tbl_rdwr op);
+	string tbl_get_file_name();
+	string tbl_get_table_name();
+	no_yes tbl_is_record_deleted(unsigned int rec_num);
+	en_tbl_status_codes tbl_close(string *file_name);//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	en_tbl_status_codes tbl_field_sg(string *field_name, string *field_value, en_tbl_rdwr op);
+	string tbl_field_get(string *field_name);
+	void tbl_field_set(string *field_name, string *field_value);
+	no_yes tbl_is_current_record_deleted();
+	void tbl_set_to_clean_start(no_yes op);
+
+void callback_tbl_error(en_tbl_status_codes status);
+no_yes callback_tbl_fail_to_open(string *filename, pl_fd_status_codes status, unsigned char filenum);
+void callback_tbl_field_error(string *file_name, string *field_name, en_tbl_status_codes tbl_result);
+void callback_tbl_modified(string *file_name, en_tbl_modified_operation modified_operation);
