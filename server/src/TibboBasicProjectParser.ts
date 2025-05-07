@@ -404,7 +404,10 @@ class ParserListener extends TibboBasicParserListener {
     enterEnumerationStmt_Constant(ctx) {
         const enumName = ctx.parentCtx.children[1].symbol.text.toLowerCase();
         const name = ctx.children[0].symbol.text.toLowerCase();
-        const value = (this.parser.enums[enumName].members.length).toString().toLowerCase();
+        let value = (this.parser.enums[enumName].members.length).toString().toLowerCase();
+        if (ctx.children.length >= 3) {
+            value = ctx.children[2].getText().toLowerCase();
+        }
 
         this.parser.enums[enumName].members.push({
             name: name,

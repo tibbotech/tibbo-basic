@@ -733,7 +733,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                         for (let i = 0; i < enumItem.members.length; i++) {
                             if (text.toLowerCase() == enumItem.members[i].name.toLowerCase()) {
                                 result.value = '```tibbo-basic\n';
-                                result.value += 'enum ' + enumItem.name.toUpperCase() + '\n';
+                                result.value += `enum ${enumItem.name.toUpperCase()} = ${enumItem.members[i].value}\n`;
                                 result.value += '```\n';
 
                                 result.value += getComments(enumItem.members[i].comments);
