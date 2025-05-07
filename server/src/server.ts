@@ -39,7 +39,7 @@ import ini = require('ini');
 import TibboBasicPreprocessor from './TibboBasicPreprocessor';
 import TibboBasicProjectParser from './TibboBasicProjectParser';
 import { CommonToken } from 'antlr4';
-import { TBVariable, TBParameter, TBObject, TBObjectFunction, TBObjectProperty, TBSymbolType, TBRange } from './types';
+import { TBVariable, TBParameter, TBObject, TBFunction, TBObjectProperty, TBSymbolType, TBRange } from './types';
 // import TurndownService = require('turndown');
 import { TerminalNode } from 'antlr4/tree/Tree';
 import { TextDocument, Position } from 'vscode-languageserver-textdocument';
@@ -300,7 +300,7 @@ function validateTextDocument() {
             projectParser.parseFile(currentFilePath, text);
         }
     }
-    
+
     if (updated) {
         notifyDiagnostics();
         getProjectStructure();
@@ -466,7 +466,7 @@ connection.onCompletion(
                                 suggestions.push({
                                     label: func.name,
                                     kind: CompletionItemKind.Function,
-                                    data: getCommentString(func.comments)
+                                    data: getCommentString(func.comments ? func.comments : [])
                                 });
                             });
                             obj.properties.forEach(prop => {
@@ -626,7 +626,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                             result.value += '```tibbo-basic\n';
                             result.value += `${obj.name}.${func.name}\n`;
                             result.value += '```\n'; ''
-                            result.value += getComments(func.comments);
+                            result.value += getComments(func.comments ? func.comments : []);
                         }
                         else if (prop != undefined) {
                             result.value += '```tibbo-basic\n';
@@ -647,7 +647,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                         result.value = '```tibbo-basic\n';
                         result.value += `dim ${varD.name}${lengthField} as ${varD.dataType}`;
                         result.value += '\n```\n';
-                        result.value += getComments(varD.comments);
+                        result.value += getComments(varD.comments ? varD.comments : []);
                     }
                 }
                 if (result.value != '') {
@@ -675,13 +675,13 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     if (func.location != undefined) {
                         result.value = '```tibbo-basic\n';
                         result.value += `sub ${func.name}(${func.parameters.map(param => {
-                            return `${param.byref ? 'byref' : ''} ${param.name} as ${param.dataType}`
+                            return `${param.byRef ? 'byref' : ''} ${param.name} as ${param.dataType}`
                         }).join(',')})`;
                         if (func.dataType != undefined) {
                             result.value += ` as ${func.dataType}`;
                         }
                         result.value += '\n```\n'
-                        result.value += getComments(func.comments);
+                        result.value += getComments(func.comments ? func.comments : []);
                     }
                 }
                 else if (projectParser.consts[text] != undefined) {
@@ -702,7 +702,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     const syscall = projectParser.syscalls[text];
                     result.value = '```tibbo-basic\n';
                     result.value += `syscall ${syscall.name}(${syscall.parameters.map(param => {
-                        return `${param.byref ? 'byref' : ''} ${param.name} as ${param.dataType}`
+                        return `${param.byRef ? 'byref' : ''} ${param.name} as ${param.dataType}`
                     }).join(',')})`
                     if (syscall.dataType != '') {
                         result.value += ` as ${syscall.dataType}`;
@@ -743,7 +743,7 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
                     }
                 }
 
-                
+
                 break;
         }
     }
@@ -1007,7 +1007,7 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                                     returnValue = objFunc.dataType;
                                     info.documentation = {
                                         kind: MarkupKind.Markdown,
-                                        value: getComments(objFunc.comments)
+                                        value: objFunc.comments ? getComments(objFunc.comments) : ''
                                     };
                                 }
                             }
@@ -1032,7 +1032,7 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                             }
                             info.documentation = {
                                 kind: MarkupKind.Markdown,
-                                value: getComments(func.comments)
+                                value: func.comments ? getComments(func.comments) : ''
                             };
                         }
                         if (found) {
@@ -1041,7 +1041,7 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null |
                             if (methodParams.length > 0) {
                                 for (let i = 0; i < methodParams.length; i++) {
                                     const param = methodParams[i];
-                                    const str = `${param.byref ? 'byref ' : ''}${param.name} as ${param.dataType}`;
+                                    const str = `${param.byRef ? 'byref ' : ''}${param.name} as ${param.dataType}`;
                                     info.label += str;
                                     info.parameters.push({
                                         label: [strIndex, strIndex + str.length],
@@ -1139,7 +1139,7 @@ connection.onRenameRequest((params: RenameParams): WorkspaceEdit | null | undefi
 connection.onReferences((params: ReferenceParams) => {
     const result: Location[] = [];
     const document = documents.get(params.textDocument.uri);
-    let refs: TBRange[] = [];
+    let refs: TBRange[] | undefined = [];
     if (document) {
         const offset = document.offsetAt(params.position);
         const filePath = getFileName(params.textDocument.uri);
@@ -1164,17 +1164,19 @@ connection.onReferences((params: ReferenceParams) => {
             }
         }
     }
-    for (let i = 0; i < refs.length; i++) {
-        const ref = refs[i];
-        result.push({
-            uri: getFileUrl(ref.startToken.source[1].name),
-            range: {
-                start: { line: ref.startToken.line - 1, character: ref.startToken.column },
-                // end: doc.positionAt(parserError.symbol.stop)
-                end: { line: ref.stopToken.line - 1, character: ref.stopToken.column + (ref.stopToken.stop - ref.stopToken.start) + 1 }
-            }
+    if (refs) {
+        for (let i = 0; i < refs.length; i++) {
+            const ref = refs[i];
+            result.push({
+                uri: getFileUrl(ref.startToken.source[1].name),
+                range: {
+                    start: { line: ref.startToken.line - 1, character: ref.startToken.column },
+                    // end: doc.positionAt(parserError.symbol.stop)
+                    end: { line: ref.stopToken.line - 1, character: ref.stopToken.column + (ref.stopToken.stop - ref.stopToken.start) + 1 }
+                }
 
-        });
+            });
+        }
     }
 
     return result;
@@ -1305,7 +1307,10 @@ function getVariable(variableName: string, filePath: string, offset: number): TB
     return varD;
 }
 
-function getCommentString(comments: Array<CommonToken>) {
+function getCommentString(comments: Array<CommonToken> | undefined) {
+    if (comments == undefined) {
+        return '';
+    }
     const result = comments.map(comment => {
         return comment.text.substring(1);
     }).join('\n');
@@ -1405,7 +1410,7 @@ function notifyDiagnostics() {
         }
 
         for (const funcName in projectParser.functions) {
-            if (projectParser.functions[funcName].references.length == 0 && projectParser.functions[funcName].declaration != undefined) {
+            if (projectParser.functions[funcName].references?.length == 0 && projectParser.functions[funcName].declaration != undefined) {
                 if (projectParser.events[funcName] != undefined) {
                     continue;
                 }
@@ -1508,7 +1513,7 @@ function getObjectAtToken(token: any): TBObject | undefined {
     return undefined;
 }
 
-function getObjectFunction(obj: TBObject, functionName: string): TBObjectFunction | undefined {
+function getObjectFunction(obj: TBObject, functionName: string): TBFunction | undefined {
     for (let i = 0; i < obj.functions.length; i++) {
         if (obj.functions[i].name == functionName) {
             return obj.functions[i];

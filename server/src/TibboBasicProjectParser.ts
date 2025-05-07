@@ -158,7 +158,9 @@ export default class TibboBasicProjectParser {
             items.forEach(prop => {
                 for (let i = 0; i < prop.length; i++) {
                     const item = prop[i];
-                    item.comments = this.findComments(item.location.stopToken);
+                    if (item.location) {
+                        item.comments = this.findComments(item.location.stopToken);
+                    }
                 }
             });
             this.objects[key].comments = this.findComments(this.objects[key].location.stopToken);
@@ -319,10 +321,12 @@ export default class TibboBasicProjectParser {
                         delete this.functions[key];
                     }
                 }
-                for (let i = 0; i < func.references.length; i++) {
-                    if (func.references[i].startToken.source[1].name == filePath) {
-                        func.references.splice(i, 1);
-                        i--;
+                if (func.references) {
+                    for (let i = 0; i < func.references.length; i++) {
+                        if (func.references[i].startToken.source[1].name == filePath) {
+                            func.references.splice(i, 1);
+                            i--;
+                        }
                     }
                 }
             }
@@ -428,6 +432,7 @@ class ParserListener extends TibboBasicParserListener {
                     },
                     parameters: [],
                     dataType: '',
+                    variables: [],
                     comments: []
                 });
             }
@@ -629,10 +634,14 @@ class ParserListener extends TibboBasicParserListener {
             references: [],
             comments: []
         };
+        // if its a setter function, dont add the variable
+        if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_propertySetStmt) {
+            return;
+        }
         const param = {
             name: ctx.name.text,
             dataType: valueType,
-            byref: ctx.byref != null
+            byRef: ctx.byRef != null
         };
         this.parser.addVariable(variable);
         if (ctx.parentCtx.parentCtx.ruleIndex == TibboBasicParser.RULE_subStmt) {
@@ -820,6 +829,7 @@ class ParserListener extends TibboBasicParserListener {
                     name: name,
                     parameters: [],
                     comments: [],
+                    variables: [],
                     references: []
                 }
             }

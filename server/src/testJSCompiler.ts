@@ -1,14 +1,15 @@
 import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
+import { TibboBasicTranspiler } from './TibboBasicTranspiler';
 import fs = require('fs');
-import TibboBasicJavascriptCompiler from './TibboBasicJavascriptCompiler';
+import { TibboBasicJavascriptCompiler } from './TibboBasicJavascriptCompiler';
 import ini = require('ini');
 import TibboBasicPreprocessor from './TibboBasicPreprocessor';
 import { Worker } from 'worker_threads';
-const { resolve } = require('path');
-const { readdir } = require('fs').promises;
 
-const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
+const supportedFileTypes = ['.tbs', '.tbh', '.tph', '.xtxt'];
+
+// import { gotojs } from './goto';
+// const { gotojs } = require('./goto');
 
 
 
@@ -32,16 +33,18 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
 
 (async function start() {
     try {
-        const workspaceRoot = path.join(__dirname, '..', 'tests', 'jstest');
+        const workspaceRoot = path.join(__dirname, '..', 'tests', 'jstest2');
         const tprPath = path.join(workspaceRoot, 'MyDevice.tpr');
         const tpr = ini.parse(fs.readFileSync(tprPath, 'utf-8'));
         const max = 999;
         const dirName = path.dirname(tprPath);
         let PLATFORMS_PATH = path.join(__dirname, '..', 'tests', 'Platforms');
-        let needsUpdate = true;
+        if (fs.existsSync(path.join(workspaceRoot, 'Platforms'))) {
+            PLATFORMS_PATH = path.join(workspaceRoot, 'Platforms');
+        }
         const preprocessor = new TibboBasicPreprocessor(workspaceRoot, PLATFORMS_PATH);
-        const files: string[] = [];
-        // preprocessor.parsePlatforms();
+        const files: any[] = [];
+        preprocessor.parsePlatforms();
         // for (let i = 0; i < preprocessor.filePriorities.length; i++) {
         //     const priority = preprocessor.filePriorities[i];
         //     const file = preprocessor.files[priority];
@@ -63,18 +66,27 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
                 if (tpr[entryName]['location'] == 'commonlib') {
                     directory = PLATFORMS_PATH;
                 }
-                filePath = preprocessor.parseFile(directory, originalFilePath, needsUpdate);
+                filePath = preprocessor.parseFile(directory, originalFilePath, false);
 
                 const fileContents = preprocessor.files[filePath];
-                files.push(fileContents);
+                files.push({
+                    name: originalFilePath,
+                    contents: fileContents
+                });
             }
             else {
                 break;
             }
         }
+        // const inputcode = fs.readFileSync(path.join(__dirname, '..', 'testgoto.js'), 'utf-8');
+        // const outputcode = gotojs(inputcode);
+        // console.log(outputcode);
+
 
         const compiler = new TibboBasicJavascriptCompiler();
         const output = compiler.compile(files);
+
+        fs.writeFileSync(path.join(__dirname, '..', 'main.js'), output);
 
         const worker = new Worker(output, { eval: true });
         await new Promise<void>((resolve, reject) => {
@@ -84,7 +96,6 @@ const supportedFileTypes = ['.tbs', '.tbh', '.tph'];
             }, 3000);
         });
 
-        // fs.writeFileSync(path.join(__dirname, '..', '..', 'main.js'), output);
     }
     catch (ex) {
         console.log(ex);

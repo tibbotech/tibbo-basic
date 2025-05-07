@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import path = require('path');
-import TibboBasicTranspiler from './TibboBasicTranspiler';
+import { TibboBasicTranspiler } from './TibboBasicTranspiler';
 import fs = require('fs');
 const { resolve } = require('path');
 const { readdir } = require('fs').promises;
@@ -8,7 +9,7 @@ const { readdir } = require('fs').promises;
 
 
 
-let files = [
+const files = [
     path.join(__dirname, '..', 'tests', 'global.tbh'),
     path.join(__dirname, '..', 'tests', 'main.tbs'),
     path.join(__dirname, '..', 'tests', 'device.tbs'),
@@ -21,9 +22,9 @@ let files = [
     // path.join(__dirname, '..', 'tests', 'Platforms/src/2_01_03/settings/trunk/settings.tbs'),
 ];
 
-async function getFiles(dir) {
+async function getFiles(dir: string) {
     const dirents = await readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(dirents.map((dirent) => {
+    const files = await Promise.all(dirents.map((dirent: any) => {
         const res = resolve(dir, dirent.name);
         return dirent.isDirectory() ? getFiles(res) : res;
     }));

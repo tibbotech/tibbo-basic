@@ -8,38 +8,29 @@ export interface TBDefine {
 
 export interface TBVariable {
     name: string,
-    value: string,
+    value?: string,
     dataType: string,
     length: string,
     location: TBRange,
     declaration?: TBRange,
-    comments: Array<CommonToken>,
+    comments?: Array<CommonToken>,
     parentScope?: TBScope,
     references: Array<TBRange>
 }
 
 export interface TBParameter {
     name: string,
-    byref: boolean,
+    byRef: boolean,
     dataType: string
 }
 
 export interface TBObject {
     name: string,
     properties: Array<TBObjectProperty>,
-    functions: Array<TBObjectFunction>,
+    functions: Array<TBFunction>,
     location: TBRange,
     comments: Array<CommonToken>,
-    events: Array<TBEvent>
-}
-
-export interface TBObjectFunction {
-    name: string,
-    syscall?: TBSyscall,
-    parameters: Array<TBParameter>,
-    dataType: string,
-    location: TBRange,
-    comments: Array<CommonToken>,
+    events: Array<TBEvent>,
 }
 
 export interface TBObjectProperty {
@@ -107,11 +98,13 @@ export interface TBEnum {
 export interface TBFunction {
     name: string,
     parameters: Array<TBParameter>,
+    syscall?: TBSyscall,
     dataType?: string,
     location?: TBRange,
     declaration?: TBRange,
-    comments: Array<CommonToken>,
-    references: Array<TBRange>
+    comments?: Array<CommonToken>,
+    variables: Array<TBVariable>,
+    references?: Array<TBRange>
 }
 
 export interface TBConst {
@@ -136,7 +129,7 @@ export interface TBType {
     name: string,
     members: Array<TBVariable>,
     location: TBRange,
-    comments: Array<CommonToken>,
+    comments: Array<CommonToken>,   
 }
 
 export interface TBEnumEntry {

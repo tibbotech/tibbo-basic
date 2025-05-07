@@ -6,45 +6,39 @@ const startSimulator = (app) => {
         mainApp.on_sys_timer();
     }, sys.onsystimerperiod * 10);
     mainApp.on_sys_init();
-}
+};
 
 const stopSimulator = (app) => {
     clearInterval(app.timer);
-}
+};
 
-const TiOS = function() {
-    this.on_sys_init = function () {
 
-    }
-    this.on_sys_timer = function () {
-
-    }
-
-    this.on_button_pressed = function () {
-
-    }
-}
-
-const bt = {}
-const wln = {}
-const tpram = {}
-const fd = {}
-const ssi = {}
-const kp = {}
-const lcd = {}
-const rtc = {}
-const beep = {}
-const io = {}
-const pppoe = {}
-const net = {}
-const sys = {}
-const stor = {}
-const sock = {}
-const ser = {}
-const romfile = {}
-const ppp = {}
-const pat = {}
-const button = {}
+const bt = {};
+const wln = {};
+const tpram = {};
+const fd = {
+    files: {},
+};
+const ssi = {};
+const kp = {};
+const lcd = {};
+const rtc = {};
+const beep = {};
+const io = {};
+const pppoe = {};
+const net = {};
+const sys = {};
+const stor = {};
+const sock = {};
+const ser = {};
+const romfile = {
+    files: {},
+    currentFile: undefined,
+    currentPointer: 0,
+};
+const ppp = {};
+const pat = {};
+const button = {};
 const PL_BT_FC_ENABLED = 1;
 const PL_BT_FC_DISABLED = 0;
 const PL_BT_EVENT_DISABLED = 3;
@@ -452,7 +446,9 @@ const LOW = 0;
 const ENABLED = 1;
 const DISABLED = 0;
 const YES = 1;
+const yes = 1;
 const NO = 0;
+const no = 0;
 const PL_ON = 1;
 const PL_OFF = 0;
 const PL_INT_NULL = 8;
@@ -528,25 +524,47 @@ const PL_SOCK_INTERFACE_WLN = 2;
 const PL_SOCK_INTERFACE_NET = 1;
 const PL_SOCK_INTERFACE_NULL = 0;
 
-function val( sourcestr) {}
-function lval( sourcestr) {}
+function val( sourcestr) {
+    return parseInt(sourcestr);
+}
+function lval( sourcestr) {
+    return parseInt(sourcestr);
+}
 function str( num) {
     return num.toString();
 }
-function lstr( num) {}
+function lstr( num) {
+    return num.toString();
+}
 function stri( num) {}
 function lstri( num) {}
 function hex( num) {}
 function lhex( num) {}
 function bin( num) {}
 function lbin( num) {}
-function left( sourcestr,  len) {}
-function right( sourcestr,  len) {}
-function mid( sourcestr,  frompos,  len) {}
-function len( sourcestr) {}
-function instr( frompos,  sourcestr,  substr,  num) {}
+function left( sourcestr,  len) {
+    return sourcestr.substr(0, len);
+}
+function right( sourcestr,  len) {
+    return sourcestr.substr(sourcestr.length - len);
+}
+function mid( sourcestr,  frompos,  len) {
+    return sourcestr.substr(frompos, len);
+}
+function len( sourcestr) {
+    return sourcestr.length;
+}
+function instr( frompos,  sourcestr,  substr,  num) {
+    let pos = sourcestr.indexOf(substr, frompos);
+    if (pos == -1) {
+        pos = 255;
+    }
+    return pos;
+}
 function asc( sourcestr) {}
-function chr( asciicode) {}
+function chr( asciicode) {
+    return String.fromCharCode(asciicode);
+}
 function ddstr( str) {}
 function ddval( str) {}
 function strgen( len,  substr) {}
@@ -1263,7 +1281,23 @@ Object.defineProperty(ppp, 'ip', {
 //Resource files are ideal for storing permanent data that never changes.
 
 //--------------------------------------------------------------------
-romfile.find = function( frompos,  substr,  num) {}
+romfile.find = function( frompos,  substr,  num) {
+    if (romfile.currentFile === undefined || romfile.files[romfile.currentFile] === undefined) {
+        return 255;
+    }
+    let count = 0;
+    let cindex = 0;
+    let index = 0;
+    const fromposReal = frompos - 1;
+    while (count < num) {
+        cindex = romfile.files[romfile.currentFile].indexOf(substr, fromposReal);
+        if (cindex === -1) {
+            return 0;
+        }
+        count++;
+    }
+    return cindex + 1;
+};
 //<b>METHOD. [LEGACY]</b><br><br> 
 //Locates the Nth occurrence of a substring within the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
 //<br><br>
@@ -1296,7 +1330,14 @@ romfile.find32 = function( frompos,  substr,  num) {}
 //<b>Num </b>-- substring occurrence to search for.
 
 //--------------------------------------------------------------------
-romfile.getdata = function( maxinplen) {}
+romfile.getdata = function( maxinplen) {
+    if (romfile.currentFile === undefined || romfile.files[romfile.currentFile] === undefined) {
+        return "";
+    }
+    const retStr = romfile.files[romfile.currentFile].substr(romfile.currentPointer - 1, maxinplen);
+    romfile.currentPointer += maxinplen;
+    return retStr;
+};
 //<b>METHOD. </b><br><br> 
 //Reads the specified amount of bytes (characters) from the currently opened resource file, from the location pointed at by the file pointer (romfile.pointer32).
 //<br><br>
@@ -1323,7 +1364,13 @@ Object.defineProperty(romfile, 'offset', {
 
 
 //--------------------------------------------------------------------
-romfile.open = function( filename) {}
+romfile.open = function( filename) {
+    if (romfile.files[filename] == undefined) {
+        romfile.files[filename] = '';
+    }
+    romfile.currentPointer = 1;
+    romfile.currentFile = filename;
+};
 //<b>METHOD. </b><br><br> 
 //Opens or re-opens a resource file.
 //<br><br>
@@ -1337,8 +1384,10 @@ romfile.open = function( filename) {}
 
 //--------------------------------------------------------------------
 Object.defineProperty(romfile, 'pointer', { 
-            get() { return 0; },
-            set() {  } 
+            get() { return romfile.currentPointer; },
+            set(pos) { 
+                romfile.currentPointer = Number(pos);
+             } 
         });
 //<b>PROPERTY (WORD) [LEGACY]. </b><br><br>
 //Sets/returns the current pointer position in the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
@@ -1359,8 +1408,10 @@ Object.defineProperty(romfile, 'pointer', {
 
 //--------------------------------------------------------------------
 Object.defineProperty(romfile, 'pointer32', { 
-            get() { return 0; },
-            set() {  } 
+            get() { return romfile.currentPointer; },
+            set(pos) { 
+                romfile.currentPointer = Number(pos);
+            } 
         });
 //<b>PROPERTY (DWORD). </b><br><br>
 //Sets/returns the current pointer position in the currently opened resource file.
@@ -1379,7 +1430,15 @@ Object.defineProperty(romfile, 'pointer32', {
 
 //--------------------------------------------------------------------
 Object.defineProperty(romfile, 'size', { 
-            get() { return 0; },
+            get() {
+                if (romfile.currentFile === undefined) {
+                    return 0;
+                }
+                if (romfile.files[romfile.currentFile] === undefined) {
+                    return 0;
+                }
+                return romfile.files[romfile.currentFile].length;
+             },
             set() {  } 
         });
 //<b>R/O PROPERTY (DWORD). </b><br><br>
@@ -4050,7 +4109,9 @@ Object.defineProperty(sys, 'freebuffpages', {
 
 
 //--------------------------------------------------------------------
-sys.halt = function() {}
+sys.halt = function() {
+    debugger;
+}
 //<b>METHOD. </b><br><br>
 //Stops your program execution (halts VM). In the debug mode (<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>
 //1- PL_SYS_MODE_DEBUG</b></font>) causes the same result as when you press PAUSE in TIDE during the debug session. <br><br>
@@ -4628,26 +4689,26 @@ Object.defineProperty(io, 'portenabled', {
 
 
 //--------------------------------------------------------------------
-io.invert = function( num) {}
+io.invert = function( num) {};
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, inverts the state of this line (reads its current state and writes an opposite state into the output buffer).
 //<br><br>
 //The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
 
 //--------------------------------------------------------------------
-io.lineget = function( num) {}
+io.lineget = function( num) {};
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, returns this line's state.
 
 //--------------------------------------------------------------------
-io.lineset = function( num,  state) {}
+io.lineset = function( num,  state) {};
 //<b>METHOD.</b><br><br>
 //For the I/O line specified by the num argument, sets the state of this line's output buffer.
 //The line must be configured as output (io.enabled= 1- YES) for this method to have any effect.
 
 //--------------------------------------------------------------------
 
-io.portget = function( num) {}
+io.portget = function( num) {};
 //<b>METHOD.</b><br><br>
 //For the 8-bit I/O port specified by the num argument, returns this port's state.
 //<br><br>
@@ -4656,7 +4717,7 @@ io.portget = function( num) {}
 
 //--------------------------------------------------------------------
 
-io.portset = function( num,  state) {}
+io.portset = function( num,  state) {};
 //<b>METHOD.</b><br><br>
 //For the 8-bit I/O port specified by the num argument, sets the state of this port's output buffers.
 //<br><br>
@@ -6997,7 +7058,12 @@ fd.formatj = function( totalsize,  maxstoredfiles,  maxjournalsectors) {}
 //fd.ready
 
 //--------------------------------------------------------------------
-fd.getattributes = function( name) {}
+fd.getattributes = function( name) {
+    if (fd.files[name] === undefined) {
+        return '';
+    }
+    return fd.files[name];
+}
 //<b>METHOD. </b><br><br>
 //Returns the attributes string for a file with the specified file name. Affects the state of fd.laststatus.
 //<br><br>
@@ -7257,7 +7323,9 @@ Object.defineProperty(fd, 'sector', {
 
 
 //--------------------------------------------------------------------
-fd.setattributes = function( name,  attr) {}
+fd.setattributes = function( name,  attr) {
+    fd.files[name] = attr;
+}
 //<b>METHOD. </b><br><br>
 //Sets the attributes string for a file with the specified file name.
 //<br><br>
@@ -7512,7 +7580,7 @@ Object.defineProperty(fd, 'errordata', {
 
 //--------------------------------------------------------------------
 Object.defineProperty(fd, 'transactioncapacityremaining', { 
-            get() { return 0; },
+            get() { return 16; },
             set() {  } 
         });
 //<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0 (0 sectors).</b><br><br>
