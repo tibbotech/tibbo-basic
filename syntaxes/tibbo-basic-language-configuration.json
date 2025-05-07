@@ -11,7 +11,7 @@
 		{ "open": "{", "close": "}" },
 		{ "open": "[", "close": "]" },
 		{ "open": "(", "close": ")" },
-		{ "open": "sub", "close": "end sub" },
+		// { "open": "sub", "close": "end sub" },
 		{ "open": "\"", "close": "\"", "notIn": ["string"] }
 	],
 	"autoCloseBefore": ";:.,=}])>` \n\t",
