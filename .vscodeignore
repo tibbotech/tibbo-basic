@@ -26,3 +26,4 @@ server/**
 !server/node_modules/await-notify/**
 !server/node_modules/ini/**
 !server/language/**
+tests/**
