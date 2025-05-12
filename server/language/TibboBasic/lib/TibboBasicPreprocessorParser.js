@@ -1,9 +1,7 @@
-// Generated from /Users/jimmyhu/Projects/TIDEDesktopService/language/TibboBasic/TibboBasicPreprocessorParser.g4 by ANTLR 4.8
+// Generated from TibboBasicPreprocessorParser.g4 by ANTLR 4.8
 // jshint ignore: start
 var antlr4 = require('antlr4/index');
 var TibboBasicPreprocessorParserListener = require('./TibboBasicPreprocessorParserListener').TibboBasicPreprocessorParserListener;
-var TibboBasicPreprocessorParserVisitor = require('./TibboBasicPreprocessorParserVisitor').TibboBasicPreprocessorParserVisitor;
-
 var grammarFileName = "TibboBasicPreprocessorParser.g4";
 
 
@@ -229,14 +227,6 @@ PreprocessorContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessor(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 
 
@@ -344,14 +334,6 @@ LineContext.prototype.exitRule = function(listener) {
 	}
 };
 
-LineContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitLine(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 
 
@@ -431,14 +413,6 @@ TextContext.prototype.exitRule = function(listener) {
 	}
 };
 
-TextContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitText(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 
 
@@ -516,14 +490,6 @@ CodeLineContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitCodeLine(this);
 	}
-};
-
-CodeLineContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitCodeLine(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -615,14 +581,6 @@ PreprocessorDefContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorDefContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorDef(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 function PreprocessorErrorContext(parser, ctx) {
 	DirectiveContext.call(this, parser);
@@ -658,14 +616,6 @@ PreprocessorErrorContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorErrorContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorError(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 function PreprocessorUndefContext(parser, ctx) {
 	DirectiveContext.call(this, parser);
@@ -699,14 +649,6 @@ PreprocessorUndefContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessorUndef(this);
 	}
-};
-
-PreprocessorUndefContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorUndef(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -752,14 +694,6 @@ PreprocessorConditionalContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorConditionalContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorConditional(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 function PreprocessorPragmaContext(parser, ctx) {
 	DirectiveContext.call(this, parser);
@@ -793,14 +727,6 @@ PreprocessorPragmaContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessorPragma(this);
 	}
-};
-
-PreprocessorPragmaContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorPragma(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -842,14 +768,6 @@ PreprocessorDefineContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorDefineContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorDefine(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 function PreprocessorEndConditionalContext(parser, ctx) {
 	DirectiveContext.call(this, parser);
@@ -879,14 +797,6 @@ PreprocessorEndConditionalContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessorEndConditional(this);
 	}
-};
-
-PreprocessorEndConditionalContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorEndConditional(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -1090,14 +1000,6 @@ PreprocessorIncludeContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorIncludeContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorInclude(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 
 TibboBasicPreprocessorParser.Include_fileContext = Include_fileContext;
@@ -1174,14 +1076,6 @@ Directive_textContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitDirective_text(this);
 	}
-};
-
-Directive_textContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitDirective_text(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -1320,14 +1214,6 @@ PreprocessorBinaryContext.prototype.exitRule = function(listener) {
 	}
 };
 
-PreprocessorBinaryContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorBinary(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
-};
-
 
 function PreprocessorConstantContext(parser, ctx) {
 	Preprocessor_expressionContext.call(this, parser);
@@ -1357,14 +1243,6 @@ PreprocessorConstantContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessorConstant(this);
 	}
-};
-
-PreprocessorConstantContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorConstant(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -1404,14 +1282,6 @@ PreprocessorConditionalSymbolContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessorConditionalSymbol(this);
 	}
-};
-
-PreprocessorConditionalSymbolContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessorConditionalSymbol(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 
@@ -1611,14 +1481,6 @@ Preprocessor_itemContext.prototype.exitRule = function(listener) {
     if(listener instanceof TibboBasicPreprocessorParserListener ) {
         listener.exitPreprocessor_item(this);
 	}
-};
-
-Preprocessor_itemContext.prototype.accept = function(visitor) {
-    if ( visitor instanceof TibboBasicPreprocessorParserVisitor ) {
-        return visitor.visitPreprocessor_item(this);
-    } else {
-        return visitor.visitChildren(this);
-    }
 };
 
 

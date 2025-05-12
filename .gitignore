@@ -4,3 +4,4 @@ client/server
 .vscode-test
 *.vsix
 .DS_Store
+.venv

@@ -197,6 +197,7 @@ expression
     | expression op=(LEQ | GEQ | LT | GT) expression
     | expression op=(NEQ | EQ) expression
     | expression op=(SHL | SHR | NOT | AND | XOR | OR) expression
+    | expression LPAREN expression RPAREN
     | LPAREN expression RPAREN
     ;
 

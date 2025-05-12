@@ -1,4 +1,4 @@
-// Generated from /Users/jimmyhu/Projects/TIDEDesktopService/language/TibboBasic/TibboBasicPreprocessorParser.g4 by ANTLR 4.8
+// Generated from TibboBasicPreprocessorParser.g4 by ANTLR 4.8
 // jshint ignore: start
 var antlr4 = require('antlr4/index');
 
