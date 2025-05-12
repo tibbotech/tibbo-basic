@@ -27,3 +27,4 @@ server/**
 !server/node_modules/ini/**
 !server/language/**
 tests/**
+.venv/**
