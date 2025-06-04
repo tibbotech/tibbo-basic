@@ -230,7 +230,7 @@ variableStmt : visibility? DIM variableListStmt;
 
 variableListStmt : variableListItem (COMMA variableListItem?)* variableType=asTypeClause (EQ (expression | arrayLiteral))?;
 
-variableListItem: IDENTIFIER (LPAREN literal RPAREN)? ;
+variableListItem: IDENTIFIER (LPAREN literal (COMMA literal)* RPAREN)? ;
 
 //variableSubStmt : ambiguousIdentifier (LPAREN ambiguousIdentifier RPAREN)? (asTypeClause)? (WS? EQ WS? expression)?;
 
