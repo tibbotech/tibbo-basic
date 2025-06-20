@@ -402,7 +402,7 @@ var serializedATN = ["\u0003\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964",
     "\u0002\u0002\u0002\u0238\u023b\u0003\u0002\u0002\u0002\u0239\u0237\u0003",
     "\u0002\u0002\u0002\u0239\u023a\u0003\u0002\u0002\u0002\u023aO\u0003",
     "\u0002\u0002\u0002\u023b\u0239\u0003\u0002\u0002\u0002\u023c\u0241\u0005",
-    "T+\u0002\u023d\u023e\u0005R*\u0002\u023e\u023f\u0005X-\u0002\u023f\u0241",
+    "T+\u0002\u023d\u023e\u0005R*\u0002\u023e\u023f\u0005T+\u0002\u023f\u0241",
     "\u0003\u0002\u0002\u0002\u0240\u023c\u0003\u0002\u0002\u0002\u0240\u023d",
     "\u0003\u0002\u0002\u0002\u0241Q\u0003\u0002\u0002\u0002\u0242\u0243",
     "\t\u000b\u0002\u0002\u0243S\u0003\u0002\u0002\u0002\u0244\u0245\b+\u0001",
@@ -5380,10 +5380,6 @@ UnaryExpressionContext.prototype.unaryOperator = function() {
     return this.getTypedRuleContext(UnaryOperatorContext,0);
 };
 
-UnaryExpressionContext.prototype.primaryExpression = function() {
-    return this.getTypedRuleContext(PrimaryExpressionContext,0);
-};
-
 UnaryExpressionContext.prototype.enterRule = function(listener) {
     if(listener instanceof TibboBasicParserListener ) {
         listener.enterUnaryExpression(this);
@@ -5421,7 +5417,7 @@ TibboBasicParser.prototype.unaryExpression = function() {
             this.state = 571;
             this.unaryOperator();
             this.state = 572;
-            this.primaryExpression();
+            this.postfixExpression(0);
             break;
 
         }

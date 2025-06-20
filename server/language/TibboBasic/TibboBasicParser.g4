@@ -203,11 +203,11 @@ expression
 
 unaryExpression
     : postfixExpression
-    | unaryOperator primaryExpression
+    | unaryOperator postfixExpression
     ;
 
 unaryOperator
-    : '-'
+    : MINUS
     | NOT
     ;
 
@@ -274,7 +274,7 @@ lineLabel : IDENTIFIER COLON;
 literal
     : HEXLITERAL
     | BINLITERAL
-    | ('+' | '-')? ( INTEGERLITERAL+ '.' )? INTEGERLITERAL
+    | (PLUS | MINUS)? ( INTEGERLITERAL+ '.' )? INTEGERLITERAL
     | STRINGLITERAL
     | TemplateStringLiteral
     | TRUE
