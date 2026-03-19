@@ -27,6 +27,7 @@ export default class TibboBasicPreprocessor {
     files: { [filename: string]: string } = {};
     filePriorities: string[] = [];
     originalFiles: { [filename: string]: string } = {};
+    private parseStack: Set<string> = new Set();
 
     constructor(projectPath: string, platformsPath: string) {
         let tprPath = '';
@@ -79,6 +80,10 @@ export default class TibboBasicPreprocessor {
         if (this.files[filePath] && !update) {
             return filePath;
         }
+        if (this.parseStack.has(filePath)) {
+            return filePath;
+        }
+        this.parseStack.add(filePath);
         let deviceRootFile = '';
         if (this.originalFiles[filePath] == undefined) {
             this.filePriorities.push(filePath);
@@ -101,13 +106,14 @@ export default class TibboBasicPreprocessor {
         // lexer.addErrorListener(errorListener);
         parser.removeErrorListeners();
         parser.addErrorListener(errorListener);
-        const tree = parser.preprocessor();
-
-        const preprocessor = new PreprocessorListener(filePath, this, chars);
-        antlr4.tree.ParseTreeWalker.DEFAULT.walk(preprocessor, tree);
-        if (errorListener.errors.length > 0) {
-            // console.log(errorListener.errors);
+        try {
+            const tree = parser.preprocessor();
+            const preprocessor = new PreprocessorListener(filePath, this, chars);
+            antlr4.tree.ParseTreeWalker.DEFAULT.walk(preprocessor, tree);
+        } catch (e) {
+            console.error(`Failed to parse file: ${filePath}`);
         }
+        this.parseStack.delete(filePath);
         return filePath;
     }
 }

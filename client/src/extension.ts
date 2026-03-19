@@ -8,6 +8,7 @@ import {
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
+import * as fs from 'fs';
 
 let client: LanguageClient;
 let platformsPath: string | undefined = '';
@@ -26,10 +27,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const serverModule = context.asAbsolutePath(
 		path.join('server', 'out', 'server.js')
 	);
-	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+	const runOptions = { execArgv: ['--stack-size=4096'] };
+	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009', '--stack-size=4096'] };
 
 	const serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
+		run: { module: serverModule, transport: TransportKind.ipc, options: runOptions },
 		debug: {
 			module: serverModule,
 			transport: TransportKind.ipc,
@@ -40,6 +42,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	platformsPath = vscode.workspace.getConfiguration().get('tide.platformsPath');
 	if (platformsPath == '') {
 		platformsPath = path.join(extDir, 'Platforms');
+	}
+
+	if (!platformsPath || !fs.existsSync(platformsPath)) {
+		platformsPath = path.resolve(__dirname, '..', '..', 'platforms', 'Platforms');
 	}
 
 	const clientOptions: LanguageClientOptions = {

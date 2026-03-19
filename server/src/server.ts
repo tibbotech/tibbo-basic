@@ -113,6 +113,7 @@ connection.onInitialize(async (params: InitializeParams) => {
                 PLATFORMS_PATH = params.initializationOptions.platformsPath;
             }
         }
+        
     }
 
     if (workspaceRoot) {
