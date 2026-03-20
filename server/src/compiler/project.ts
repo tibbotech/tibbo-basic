@@ -139,46 +139,59 @@ export class ProjectCompiler {
         const TibboBasicPreprocessor = require('../TibboBasicPreprocessor').default;
         const preprocessor = new TibboBasicPreprocessor(this.projectPath, this.platformsPath);
 
-        // 1. Parse platform headers to get all defines, syscalls, objects, types, enums
         preprocessor.parsePlatforms();
 
-        // 2. Parse project header files (global.tbh, etc.)
         const headerFiles = this.config.sourceFiles.filter(f => f.type === 'header');
         for (const hf of headerFiles) {
             preprocessor.parseFile(this.projectPath, hf.path, true);
         }
 
-        // 3. Parse project source files (main.tbs, device.tbs, boot.tbs, etc.)
         const sourceFiles = this.config.sourceFiles.filter(f => f.type === 'basic');
         for (const sf of sourceFiles) {
             preprocessor.parseFile(this.projectPath, sf.path, true);
         }
 
-        // 4. Collect all preprocessed file contents
         for (const [filePath, content] of Object.entries(preprocessor.files as Record<string, string>)) {
             this.preprocessedFiles.set(filePath, content);
         }
 
-        // 5. Build a single combined AST from all preprocessed files
-        const combinedSource = this.buildCombinedSource(preprocessor);
+        // Build shared header source from platform and .tbh files
+        const headerSource = this.buildHeaderSource(preprocessor);
 
-        // 6. Compile the combined source with platform flags
         const flags = this.getCompilerFlags();
         const maxEventNumber = this.platformConfig.maxEventNumber;
-        const result = compile(combinedSource, {
-            fileName: this.config.name || 'project',
-            flags,
-            maxEventNumber,
-            platformSize: this.platformConfig.platformId,
-        });
-
         const objs = new Map<string, Buffer>();
-        objs.set(this.config.name + '.obj', result.obj);
+        const allErrors: Diagnostic[] = [];
+        const allWarnings: Diagnostic[] = [];
 
-        // 7. Build UUID for build ID
+        // Compile each .tbs file separately into its own OBJ
+        for (const sf of sourceFiles) {
+            const resolvedPath = preprocessor.parseFile(this.projectPath, sf.path, false);
+            const fileContent = preprocessor.files[resolvedPath] as string || '';
+            if (!fileContent || fileContent.replace(/\s/g, '').length === 0) continue;
+
+            const headerLineCount = headerSource.split('\n').length;
+            const perFileSource = this.expandDefines(
+                headerSource + '\n' + fileContent,
+                preprocessor.defines,
+            );
+
+            const baseName = path.basename(sf.path);
+            const result = compile(perFileSource, {
+                fileName: baseName,
+                flags,
+                maxEventNumber,
+                platformSize: this.platformConfig.platformId,
+                headerLineCount,
+            });
+
+            objs.set(baseName + '.obj', result.obj);
+            allErrors.push(...result.errors);
+            allWarnings.push(...result.warnings);
+        }
+
         const buildId = this.generateBuildId();
 
-        // 8. Link into .tpc with proper options
         const linkerOptions: LinkerOptions = {
             projectName: this.config.name || 'project',
             buildId,
@@ -187,20 +200,46 @@ export class ProjectCompiler {
             platformSize: this.platformConfig.platformId,
             stackSize: 15,
             localAllocSize: 0,
+            maxEventNumber: maxEventNumber + 1,
             flags,
         };
-        const linkResult = link(
-            [{ name: this.config.name + '.obj', data: result.obj }],
-            {},
-            linkerOptions,
-        );
+        const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
+        const linkResult = link(objBuffers, {}, linkerOptions);
 
         return {
             tpc: linkResult.errors.length === 0 ? linkResult.tpc : null,
             objs,
-            errors: [...result.errors, ...linkResult.errors],
-            warnings: [...result.warnings, ...linkResult.warnings],
+            errors: [...allErrors, ...linkResult.errors],
+            warnings: [...allWarnings, ...linkResult.warnings],
         };
+    }
+
+    private buildHeaderSource(preprocessor: any): string {
+        const parts: string[] = [];
+        const processedPaths = new Set<string>();
+        const sourceFileBasenames = new Set(
+            this.config.sourceFiles
+                .filter(f => f.type === 'basic')
+                .map(f => path.basename(f.path)),
+        );
+
+        for (const filePath of preprocessor.filePriorities as string[]) {
+            if (processedPaths.has(filePath)) continue;
+            processedPaths.add(filePath);
+
+            const basename = path.basename(filePath);
+            // Skip .tbs source files -- those are compiled separately
+            if (sourceFileBasenames.has(basename)) continue;
+
+            const content = preprocessor.files[filePath] as string;
+            if (!content) continue;
+            const trimmed = content.replace(/\s/g, '');
+            if (trimmed.length === 0) continue;
+
+            parts.push(content);
+        }
+
+        return parts.join('\n');
     }
 
     private buildCombinedSource(preprocessor: any): string {

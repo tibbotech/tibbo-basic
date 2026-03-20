@@ -33,8 +33,8 @@ export const BINARY_OPS: Record<string, BinaryOpInfo> = {
     'and': { opcodeWord: OP.OPCODE_AND, opcodeShort: OP.OPCODE_AND, syscallDword: '__and32',  commutative: true },
     'or':  { opcodeWord: OP.OPCODE_OR,  opcodeShort: OP.OPCODE_OR,  syscallDword: '__or32',   commutative: true },
     'xor': { opcodeWord: OP.OPCODE_XOR, opcodeShort: OP.OPCODE_XOR, syscallDword: '__xor32',  commutative: true },
-    'shl': { opcodeWord: OP.OPCODE_SHL, opcodeShort: OP.OPCODE_SHL, syscallDword: '__shl32',  commutative: false },
-    'shr': { opcodeWord: OP.OPCODE_SHR, opcodeShort: OP.OPCODE_SHR, syscallDword: '__shr32',  commutative: false },
+    'shl': { opcodeWord: OP.OPCODE_SHL, opcodeShort: OP.OPCODE_SHL, syscallDword: '__shl32', commutative: false },
+    'shr': { opcodeWord: OP.OPCODE_SHR, opcodeShort: OP.OPCODE_SHR, syscallDword: '__shr32', commutative: false },
 };
 
 // Comparison operator dispatch tables
@@ -90,9 +90,7 @@ export function getCmpOpInfo(op: string, signed: boolean): CmpOpInfo | undefined
 }
 
 export function needsSyscall(type: DataType, op: string): boolean {
-    if (isFloat(type)) return true;
-    if (type.size >= 4) return true;
-    return false;
+    return isFloat(type);
 }
 
 export function getSyscallName(type: DataType, op: string): string | undefined {

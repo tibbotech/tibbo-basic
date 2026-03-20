@@ -14,7 +14,10 @@ export interface LinkerOptions {
     platformSize?: number;
     stackSize?: number;
     localAllocSize?: number;
+    globalAllocSize?: number;
+    maxEventNumber?: number;
     flags?: number;
+    fixedTimestamp?: Date;
 }
 
 interface ObjFile {
@@ -58,6 +61,12 @@ interface LinkedReference {
     offset: number;
 }
 
+interface RDataReloc {
+    codeOffset: number;
+    refType: number;
+    rdataTarget: number;
+}
+
 export class Linker {
     private diagnostics: DiagnosticCollection;
     private options: LinkerOptions;
@@ -70,8 +79,10 @@ export class Linker {
     private symbolOffsets = new Map<string, number>();
     private eventEntries: { codeAddress: number; dataAddress: number }[] = [];
     private eventEntryCount = 0;
+    private rdataRelocs: RDataReloc[] = [];
     private flags = 0;
     private totalGlobalSize = 0;
+    private maxLocalAllocSize = 0;
 
     constructor(diagnostics: DiagnosticCollection, options: LinkerOptions = {}) {
         this.diagnostics = diagnostics;
@@ -197,7 +208,104 @@ export class Linker {
             }
         }
 
+        // Build EventDir from Functions section (events defined via TOBJ_FUNCTION_ENTRY)
+        this.linkFunctions(obj, codeBase);
+
+        // Process RDataDir for RData relocations
+        this.linkRDataDir(obj, codeBase, initBase, rdataBase);
+
         this.totalGlobalSize += obj.header.globalAllocSize;
+        if (obj.header.localAllocSize > this.maxLocalAllocSize) {
+            this.maxLocalAllocSize = obj.header.localAllocSize;
+        }
+    }
+
+    private linkFunctions(obj: ObjFile, codeBase: number): void {
+        const funcData = obj.sections[TObjSection.Functions]?.data;
+        if (!funcData || funcData.length === 0) return;
+
+        let pos = 0;
+        while (pos + 17 <= funcData.length) {
+            const flags = funcData.readUInt8(pos); pos += 1;
+            const _nameRef = funcData.readUInt32LE(pos); pos += 4;
+            const addrIdx = funcData.readUInt32LE(pos); pos += 4;
+            const eventIdx = funcData.readUInt32LE(pos); pos += 4;
+            const calleeCount = funcData.readUInt32LE(pos); pos += 4;
+
+            pos += calleeCount * 4;
+
+            if (!(flags & 1)) continue; // TOBJ_FUN_EVENT
+
+            // Resolve code address from the Addresses section
+            const addrData = obj.sections[TObjSection.Addresses]?.data;
+            if (!addrData) continue;
+
+            let addrPos = 0;
+            let curIdx = 0;
+            let codeAddress = MAXDWORD;
+            while (addrPos < addrData.length) {
+                if (addrPos + 17 > addrData.length) break;
+                const aFlags = addrData.readUInt8(addrPos);
+                const _aTag = addrData.readUInt32LE(addrPos + 1);
+                const aAddr = addrData.readUInt32LE(addrPos + 5);
+                const _aBase = addrData.readUInt32LE(addrPos + 9);
+                const aRefCount = addrData.readUInt32LE(addrPos + 13);
+                addrPos += 17 + aRefCount * 5;
+
+                if (curIdx === addrIdx) {
+                    if (aFlags & TObjAddressFlags.Code) {
+                        codeAddress = aAddr + codeBase;
+                    } else {
+                        codeAddress = aAddr;
+                    }
+                    break;
+                }
+                curIdx++;
+            }
+
+            if (codeAddress !== MAXDWORD) {
+                if (eventIdx + 1 > this.eventEntryCount) {
+                    this.eventEntryCount = eventIdx + 1;
+                }
+                this.eventEntries[eventIdx] = {
+                    codeAddress,
+                    dataAddress: 0, // set during emit
+                };
+            }
+        }
+    }
+
+    private linkRDataDir(obj: ObjFile, codeBase: number, initBase: number, rdataBase: number): void {
+        const rdataDirData = obj.sections[TObjSection.RDataDir]?.data;
+        if (!rdataDirData || rdataDirData.length === 0) return;
+
+        let pos = 0;
+        while (pos + 12 <= rdataDirData.length) {
+            const rdataOff = rdataDirData.readUInt32LE(pos); pos += 4;
+            const _rdataSize = rdataDirData.readUInt32LE(pos); pos += 4;
+            const refCount = rdataDirData.readUInt32LE(pos); pos += 4;
+
+            const mergedRDataOffset = rdataOff + rdataBase;
+
+            for (let r = 0; r < refCount; r++) {
+                if (pos + 5 > rdataDirData.length) break;
+                const refType = rdataDirData.readUInt8(pos); pos += 1;
+                const refFrom = rdataDirData.readUInt32LE(pos); pos += 4;
+
+                let adjustedFrom = refFrom;
+                if (refType === TObjRefType.Code) {
+                    adjustedFrom += codeBase;
+                } else if (refType === TObjRefType.Init) {
+                    adjustedFrom += initBase;
+                }
+
+                this.rdataRelocs.push({
+                    codeOffset: adjustedFrom,
+                    refType,
+                    rdataTarget: mergedRDataOffset,
+                });
+            }
+        }
     }
 
     private linkAddresses(obj: ObjFile, codeBase: number, initBase: number): void {
@@ -258,6 +366,11 @@ export class Linker {
     }
 
     private emit(): Buffer {
+        // Add RET at end of init section (init code needs to return after running)
+        if (this.mergedInit.length > 0) {
+            this.mergedInit.push(0x1F); // OPCODE_RET
+        }
+
         // Relocate: prepend init to code
         const initSize = this.mergedInit.length;
         const fullCode = [...this.mergedInit, ...this.mergedCode];
@@ -281,7 +394,7 @@ export class Linker {
             }
         }
 
-        // Apply fixups
+        // Apply address fixups
         const useCode24 = !!(this.flags & TObjHeaderFlags.Code24);
         const addrSize = useCode24 ? 3 : 2;
 
@@ -297,6 +410,22 @@ export class Linker {
                             fullCode[offset + 2] = (addr.address >> 16) & 0xFF;
                         }
                     }
+                }
+            }
+        }
+
+        // Apply RData relocations: adjust RData offsets in code after init prepend
+        for (const reloc of this.rdataRelocs) {
+            let offset = reloc.codeOffset;
+            if (reloc.refType === TObjRefType.Code) {
+                offset += initSize;
+            }
+            // Init refs already have correct offsets (init is at the start of fullCode)
+            if (offset + addrSize <= fullCode.length) {
+                fullCode[offset] = reloc.rdataTarget & 0xFF;
+                fullCode[offset + 1] = (reloc.rdataTarget >> 8) & 0xFF;
+                if (useCode24 && offset + 2 < fullCode.length) {
+                    fullCode[offset + 2] = (reloc.rdataTarget >> 16) & 0xFF;
                 }
             }
         }
@@ -318,7 +447,7 @@ export class Linker {
         const buildIdOff = binSymStrings.add(buildId);
         const firmwareVerOff = binSymStrings.add(firmwareVer);
 
-        const now = new Date();
+        const now = this.options.fixedTimestamp ?? new Date();
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const day = dayNames[now.getDay()];
@@ -338,9 +467,13 @@ export class Linker {
         const eventW = new BinaryWriter();
         const platformSize = this.options.platformSize ?? 0;
         const stackSize = this.options.stackSize ?? 0;
-        const totalDataSize = this.totalGlobalSize + platformSize + stackSize;
+        const globalAllocSize = this.options.globalAllocSize ?? this.totalGlobalSize;
+        const totalDataSize = globalAllocSize + platformSize + stackSize;
 
-        for (let i = 0; i < this.eventEntryCount; i++) {
+        const maxEventNumber = this.options.maxEventNumber ?? 0;
+        const eventDirSize = Math.max(this.eventEntryCount, maxEventNumber);
+
+        for (let i = 0; i < eventDirSize; i++) {
             const entry = this.eventEntries[i];
             if (entry) {
                 eventW.writeDword(entry.codeAddress);
@@ -380,21 +513,21 @@ export class Linker {
 
         const fileSize = currentOffset + 8; // + terminator
 
-        // Empty sections share offset with code section start
-        const emptyOffset = codeOffset;
+        // Empty sections: Init uses offset 0 (merged into Code), others share RData offset
+        const emptyDataOffset = rdataOffset;
 
         const offsets: number[] = new Array(sectionCount).fill(0);
         const sizes: number[] = new Array(sectionCount).fill(0);
 
-        offsets[TObjSection.Code] = codeOffset;         sizes[TObjSection.Code] = codeBuffer.length;
-        offsets[TObjSection.Init] = codeOffset;          sizes[TObjSection.Init] = 0;
-        offsets[TObjSection.RData] = rdataOffset;        sizes[TObjSection.RData] = rdataBuffer.length;
-        offsets[TObjSection.FileData] = emptyOffset;     sizes[TObjSection.FileData] = 0;
-        offsets[TObjSection.Symbols] = symbolsOffset;    sizes[TObjSection.Symbols] = symbolsBuffer.length;
-        offsets[TObjSection.ResFileDir] = emptyOffset;   sizes[TObjSection.ResFileDir] = 0;
-        offsets[TObjSection.EventDir] = eventDirOffset;  sizes[TObjSection.EventDir] = eventDirBuffer.length;
-        offsets[TObjSection.LibFileDir] = emptyOffset;   sizes[TObjSection.LibFileDir] = 0;
-        offsets[TObjSection.Extra] = extraOffset;        sizes[TObjSection.Extra] = extraBuffer.length;
+        offsets[TObjSection.Code] = codeOffset;             sizes[TObjSection.Code] = codeBuffer.length;
+        offsets[TObjSection.Init] = 0;                      sizes[TObjSection.Init] = 0;
+        offsets[TObjSection.RData] = rdataOffset;            sizes[TObjSection.RData] = rdataBuffer.length;
+        offsets[TObjSection.FileData] = emptyDataOffset;     sizes[TObjSection.FileData] = 0;
+        offsets[TObjSection.Symbols] = symbolsOffset;        sizes[TObjSection.Symbols] = symbolsBuffer.length;
+        offsets[TObjSection.ResFileDir] = emptyDataOffset;   sizes[TObjSection.ResFileDir] = 0;
+        offsets[TObjSection.EventDir] = eventDirOffset;      sizes[TObjSection.EventDir] = eventDirBuffer.length;
+        offsets[TObjSection.LibFileDir] = emptyDataOffset;   sizes[TObjSection.LibFileDir] = 0;
+        offsets[TObjSection.Extra] = extraOffset;            sizes[TObjSection.Extra] = extraBuffer.length;
 
         const localAllocSize = this.options.localAllocSize ?? 0;
         const mergedFlags = this.flags | (this.options.flags ?? 0);
@@ -410,7 +543,7 @@ export class Linker {
 
         // ALLOC_INFO
         w.writeDword(platformSize);
-        w.writeDword(this.totalGlobalSize);
+        w.writeDword(globalAllocSize);
         w.writeDword(stackSize);
         w.writeDword(localAllocSize);
 

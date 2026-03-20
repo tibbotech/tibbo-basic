@@ -19,6 +19,7 @@ export interface CompileOptions {
     flags?: number;
     maxEventNumber?: number;
     platformSize?: number;
+    headerLineCount?: number;
 }
 
 export interface CompileResult {
@@ -98,6 +99,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     generator.emitter.setUseData32(useData32);
     if (options.platformSize != null) {
         generator.setPlatformSize(options.platformSize);
+    }
+    if (options.headerLineCount != null) {
+        generator.setHeaderLineCount(options.headerLineCount);
     }
     generator.generate(ast);
 
