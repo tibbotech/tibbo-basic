@@ -5,3 +5,9 @@ client/server
 *.vsix
 .DS_Store
 .venv
+tide/
+tests/MyDeviceTestHello/
+tests/MyDeviceTestHello2/
+
+
+
