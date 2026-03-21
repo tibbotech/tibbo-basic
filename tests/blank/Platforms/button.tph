@@ -1,0 +1,50 @@
+'**************************************************************************************************
+'       BUTTON object
+'**************************************************************************************************
+
+object button
+'All programmable boards, programmable serial controllers, and Tibbo Project System (TPS) devices offered by Tibbo feature a button referred to as the "setup" or "MD" button ("MD" stands for "mode").
+'<br><br>
+'All programmable Tibbo modules have a line for connecting this button externally.
+'<br><br>
+'When a programmable Tibbo device is executing a Tibbo BASIC/C application, the MD button can be used as a general-purpose input button.
+
+'--------------------------------------------------------------------
+property button.pressed
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the current button state.
+'<br><br>
+'This property reflects the immediate state of the hardware at the very moment the property is read -- no "debouncing" performed.
+    get = syscall(1) as no_yes
+end property
+
+'--------------------------------------------------------------------
+property button.time
+'<b>R/O PROPERTY (BYTE).</b><br><br>
+'Returns the time (in 0.5 second intervals) elapsed since the button was last pressed or released (whichever happened more recently).
+'<br><br>
+'This property will only show a meaningful value when read inside the on_button_pressed or on_button_released event handler.
+'<br><br>
+'The value of this property maxes out at 255 (127.5 seconds).
+'<br><br>
+'The elapsed time is not counted while the execution of your application is paused (during debugging).
+    get = syscall(21) as byte
+end property
+
+'--------------------------------------------------------------------
+event(31) on_button_pressed
+'<b>EVENT of the button object. </b><br><br> 
+'Generated when the MD button on your device is pressed (MD line goes LOW).
+'<br><br>
+'Multiple on_button_pressed events may be waiting in the event queue.
+'<br><br>
+'You can check the time elapsed since the preceding on_button_released event (or execution start) by reading the value of the button.time read-only property.
+
+'--------------------------------------------------------------------
+event(16) on_button_released
+'<b>EVENT of the button object. </b><br><br> 
+'Generated when the MD button on your device is released (MD line goes HIGH).
+'<br><br>
+'Multiple on_button_released events may be waiting in the event queue.
+'<br><br>
+'You can check the time elapsed since the preceding on_button_pressed event by reading the value of the button.time read-only property.

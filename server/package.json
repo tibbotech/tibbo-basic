@@ -5,10 +5,14 @@
     "publisher": "Tibbo",
     "description": "Tibbo Basic Language Server",
     "main": "./out/server.js",
+    "bin": {
+        "compile-project": "./out/compiler/compile-project.js"
+    },
     "scripts": {
         "build": "tsc",
         "watch": "tsc -w",
-        "test": "jest"
+        "test": "jest",
+        "compile": "node out/compiler/compile-project.js"
     },
     "author": {
         "name": "Jimmy Hu",

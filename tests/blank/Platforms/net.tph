@@ -1,0 +1,116 @@
+'**************************************************************************************************
+'       NET (Ethernet network) object
+'**************************************************************************************************
+
+#define NET_AVAILABLE 1
+
+object net
+'The net object represents an Ethernet interface of your device. This object only specifies various parameters related
+'to the Ethernet interface (IP address, default gateway IP, netmask, etc.) and is not responsible for
+'sending/transmitting network data. The latter is the job of the sock object.
+
+'--------------------------------------------------------------------
+event(7)  on_net_link_change
+'<b>EVENT of the net object.  </b><br><br> 
+'Generated when the state of the physical link of Ethernet port changes.
+'<br><br>
+'This event does not "bring" with it new link state at the time of event generation. Current link state can be queried through the
+'<font color="maroon"><b>net.linkstate </b></font> property.
+'<br><br>
+'Multiple <font color="teal"><b>on_net_link_change </b></font> 
+'events may be waiting in the event queue. Using doevents statement in the event handler for this event or the body of any procedure in the related
+'call chain may lead to the skipping (loss) of identical events waiting in the queue. This will happen when the 
+'<font color="teal"><b>on_net_link_change </b></font>
+'event is taken off the queue in the cause of the doevents execution related to the same event taken off the queue earlier.
+
+'--------------------------------------------------------------------
+#if PLATFORM_ID<>LTPP3
+event(14) on_net_overrun
+'<b>EVENT of the net object. </b><br><br> 
+'Generated when overflow occurs on the internal RX buffer of the Network Interface Controller (NIC) IC.
+'<br><br>
+'Another <font color="teal"><b>on_net_overrun </b></font>
+'event is never generated until the previous one is processed.
+'<br><br>
+'Notice, that this event signifies the overrun of the hardware RX buffer of the NIC itself. This has nothing to do with the overrun of RX
+'buffers of individual sockets (see
+'<font color="teal"><b>on_sock_overrun </b></font>event).
+#endif
+
+'--------------------------------------------------------------------
+property net.mac
+'<b>R/O PROPERTY (STRING), DEFAULT VALUE= "as preset during device production". </b><br><br>
+'Returns current MAC (hardware Ethernet) address of the device. You cannot use the <font color="maroon"><b>net.mac </b></font>property to set the new MAC
+'address, but this address can be changed indirectly, by writing to a special area of the EEPROM (see <font color="maroon"><b>stor.setdata </b></font>and
+'<font color="maroon"><b>stor.base</b></font>s).
+    get = syscall(194,"39.TDL"+) as string
+end property
+
+'--------------------------------------------------------------------
+property net.ip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "1.0.0.1". </b><br><br>
+'Sets/returns the IP address of the Ethernet interface of your device.<br><br>
+'This property can only be written to when no socket is engaged in communications over the Ethernet interface, i.e. there is no socket
+'for which <font color="maroon"><b>sock.statesimple </b></font>is <u>not </u> equal to <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> and
+'<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
+#if PLATFORM_ID=LTPP3 or PLATFORM_ID=SIMULATOR
+'<br><br>
+'<b>To avoid conflicts, do not assign an IP address that is used by your computer's network interface.<b>
+#endif
+'<br><br>
+'See also <font color="maroon"><b>net.gatewayip </b></font> and <font color="maroon"><b>net.netmask</b></font>.
+    get = syscall(195,"39.TDL"+) as string
+    set = syscall(196,"40.TDL"+) (byref ipstr as string)
+end property
+
+'--------------------------------------------------------------------
+property net.netmask
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'Sets/returns the netmask of the Ethernet interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communications over the Ethernet interface, i.e. there is no socket
+'for which <font color="maroon"><b>sock.statesimple </b></font>is <u>not </u> equal to <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> and
+'<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
+'<br><br>
+'See also <font color="maroon"><b>net.ip </b></font>and <font color="maroon"><b>net.gatewayip</b></font>.
+    get = syscall(197,"39.TDL"+) as string
+    set = syscall(198,"40.TDL"+) (byref netmaskstr as string)
+end property
+
+'--------------------------------------------------------------------
+property net.gatewayip
+'<b>PROPERTY (STRING), DEFAULT VALUE= "0.0.0.0". </b><br><br>
+'Sets/returns the IP address of the default gateway for the Ethernet interface of your device.
+'<br><br>
+'This property can only be written to when no socket is engaged in communications over the Ethernet interface, i.e. there is no socket
+'for which <font color="maroon"><b>sock.statesimple </b></font>is <u>not </u> equal to <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> and
+'<font color="maroon"><b>sock.currentinterface</b></font>= <font color="olive"><b>1- PL_INTERFACE_NET</b></font>.
+'<br><br>
+'See also <font color="maroon"><b>net.ip </b></font>and <font color="maroon"><b>net.netmask</b></font>.
+    get = syscall(199,"39.TDL"+) as string
+    set = syscall(200,"40.TDL"+) (byref gatewayip as string)
+end property
+
+'--------------------------------------------------------------------
+property net.failure
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- NO (no failure). </b><br><br>
+'Reports whether the Network Interface Controller (NIC) IC has failed: <font color="olive"><b>0- NO </b></font>(no failure), 
+'<font color="olive"><b>1- YES </b></font>(NIC failure).
+    get = syscall(201) as no_yes
+end property
+
+'--------------------------------------------------------------------
+enum pl_net_linkstate
+    PL_NET_LINKSTAT_NOLINK,    '<b>PLATFORM CONSTANT. </b><br><br> No physical Ethernet link exists at the moment (the Ethernet port of the device is not connected to a hub).
+    PL_NET_LINKSTAT_10BASET,   '<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 10Mbit/sec. 
+    PL_NET_LINKSTAT_100BASET   '<b>PLATFORM CONSTANT. </b><br><br> The Ethernet port of the device is linked to a hub (or directly to another device) at 100Mbit/sec.
+end enum
+
+property net.linkstate
+'<b>R/O PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0- PL_NET_LINKSTAT_NOLINK (no link). </b><br><br>
+'Returns current link status of the Ethernet port of the device: <font color="olive"><b>0- PL_NET_LINKSTAT_NOLINK </b></font>(no link),
+'<font color="olive"><b>1- PL_NET_LINKSTAT_10BASET </b></font>(linked at 10Mbit/s), <font color="olive"><b>2- PL_NET_LINKSTAT_100BASET 
+'</b></font>(linked at 100Mbit/s).<br><br>
+'See also <font color="teal"><b>on_net_link_change </b></font>event.
+    get = syscall(202,"41.TDL"+) as pl_net_linkstate
+end property

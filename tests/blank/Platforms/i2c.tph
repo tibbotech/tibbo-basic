@@ -1,0 +1,91 @@
+'**************************************************************************************************
+'       I2C object
+'**************************************************************************************************
+
+#define I2C_AVAILABLE 1
+
+object i2c
+
+'--------------------------------------------------------------------
+enum i2c_ack_nack
+	ACK=0, '<b>PLATFORM CONSTANT. </b><br><br> Acknowledge bit.
+	NACK=1 '<b>PLATFORM CONSTANT. </b><br><br> Nack bit.
+end enum 
+
+'--------------------------------------------------------------------
+enum i2c_state
+	I2C_IDLE=0,	'<b>PLATFORM CONSTANT. </b><br><br> There are no active I2C transactions.
+	I2C_STARTED=1, '<b>PLATFORM CONSTANT. </b><br><br> The START condition has been set.
+	I2C_STRETCHING_ERROR=2, '<b>PLATFORM CONSTANT. </b><br><br> A clock stretching error has been encountered.
+	I2C_ARBITRATION_ERROR=3	'<b>PLATFORM CONSTANT. </b><br><br> An arbitration error has been encountered.
+end enum
+
+'--------------------------------------------------------------------
+property i2c.num
+'<b>PROPERTY (BYTE). DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the currently selected I2C channel (channels are enumerated from 0).
+    get = syscall(878) as byte
+    set = syscall(879) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property !i2c.baudrate
+'syscall not used maybe should be timeout? 
+	get = syscall(880) as byte
+	set = syscall(881) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property i2c.sdamap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the I/O line that will act as the SDA line of the currently selected I2C channel (selection is made through i2c.channel).
+    get = syscall(882) as pl_io_num
+    set = syscall(883) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property i2c.sclmap
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the I/O line that will act as the SCL line of the currently selected I2C channel (selection is made through i2c.channel).
+    get = syscall(884) as pl_io_num
+    set = syscall(885) (value as pl_io_num)
+end property
+
+'--------------------------------------------------------------------
+property i2c.enabled
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
+'Enables/disables the currently selected I2C channel (selection is made through i2c.channel).
+    get = syscall(886) as no_yes
+    set = syscall(887) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+syscall(888) i2c.start
+'<b>METHOD.</b><br><br>
+'Sets the START condition on the currently selected I2C channel (selection is made through i2c.channel).
+
+'--------------------------------------------------------------------
+syscall(889) i2c.stop
+'<b>METHOD.</b><br><br>
+'Sets the STOP condition on the currently selected I2C channel (selection is made through i2c.channel).
+
+'--------------------------------------------------------------------
+syscall(890) i2c.write(b as byte) as i2c_ack_nack
+'<b>METHOD.</b><br><br>
+'Writes one byte to the currently selected I2C channel (selection is made through i2c.channel).<br><br>
+'Returns: An acknowledgment bit (enum i2c_ack_nack):<br>
+'0 - ACK: The data byte was received successfully.<br>
+'1 - NACK: The data byte was not received successfully<br>
+
+'--------------------------------------------------------------------
+syscall(891) i2c.read(ack_bit as i2c_ack_nack) as byte
+'<b>METHOD.</b><br><br>
+'Reads one byte from the currently selected I2C channel (selection is made through i2c.channel).
+'The parameter is the acknowledge bit to send to the target I2C peripheral after reading 8 bits of data(enum i2c_ack_nack):<br><br>
+
+'--------------------------------------------------------------------
+property i2c.state
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- I2C_IDLE.</b><br><br>
+'Returns the state (enum i2c_state) of the currently selected I2C channel (selection is made through i2c.channel).
+	    get = syscall(892) as i2c_state
+end property

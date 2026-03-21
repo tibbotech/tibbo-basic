@@ -149,11 +149,14 @@ export class TObjWriter {
             w.writeBytes(sections[i]);
         }
 
-        // Compute checksum
+        // Checksum (16-bit word-level sum, matching reference C++ compiler)
         const result = w.toBuffer();
         let checksum = 0;
-        for (let i = 0; i < result.length; i++) {
-            checksum = (checksum + result[i]) & 0xFFFF;
+        for (let i = 0; i + 1 < result.length; i += 2) {
+            checksum = (checksum + result.readUInt16LE(i)) & 0xFFFF;
+        }
+        if (result.length % 2 !== 0) {
+            checksum = (checksum + result[result.length - 1]) & 0xFFFF;
         }
         checksum = (~checksum + 1) & 0xFFFF;
         result[6] = checksum & 0xFF;

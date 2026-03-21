@@ -511,7 +511,9 @@ export class Linker {
         const codeOffset = currentOffset;
         currentOffset += codeBuffer.length;
 
-        const fileSize = currentOffset + 8; // + terminator
+        const ALIGNMENT = 128;
+        const rawSize = currentOffset + 8; // + terminator
+        const fileSize = Math.ceil(rawSize / ALIGNMENT) * ALIGNMENT;
 
         // Empty sections: Init uses offset 0 (merged into Code), others share RData offset
         const emptyDataOffset = rdataOffset;
@@ -568,15 +570,24 @@ export class Linker {
         w.writeBytes(rdataBuffer);
         w.writeBytes(codeBuffer);
 
+        // Zero-pad to aligned file size minus terminator
+        const paddingNeeded = fileSize - 8 - w.length;
+        for (let i = 0; i < paddingNeeded; i++) {
+            w.writeByte(0);
+        }
+
         // Terminator
         w.writeDword(fileSize);
         w.writeDword(TOBJ_SIGNATURE_BIN);
 
-        // Checksum
+        // Checksum (16-bit word-level sum, matching reference C++ compiler)
         const result = w.toBuffer();
         let checksum = 0;
-        for (let i = 0; i < result.length; i++) {
-            checksum = (checksum + result[i]) & 0xFFFF;
+        for (let i = 0; i + 1 < result.length; i += 2) {
+            checksum = (checksum + result.readUInt16LE(i)) & 0xFFFF;
+        }
+        if (result.length % 2 !== 0) {
+            checksum = (checksum + result[result.length - 1]) & 0xFFFF;
         }
         checksum = (~checksum + 1) & 0xFFFF;
         result[6] = checksum & 0xFF;

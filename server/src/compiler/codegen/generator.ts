@@ -360,7 +360,7 @@ export class PCodeGenerator {
 
                 if (isString(dt)) {
                     const strType = dt as StringDataType;
-                    this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(strType.maxLength << 8);
                     this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
                     this.emitter.emitDataAddress(addr);
@@ -1332,7 +1332,7 @@ export class PCodeGenerator {
                     if (paramDt && isString(paramDt)) {
                         const strType = paramDt as StringDataType;
                         const paramAddr = param.address ?? 0;
-                        this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_IMMEDIATE);
+                        this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
                         this.emitter.emitWord(strType.maxLength << 8);
                         this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
                         this.emitter.emitDataAddress(paramAddr);

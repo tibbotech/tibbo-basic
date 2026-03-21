@@ -119,10 +119,10 @@ export class ByteEmitter {
         const offset = this.rdata.length;
         const len = str.length;
         this.rdata.push(len & 0xFF);
+        this.rdata.push(len & 0xFF);
         for (let i = 0; i < len; i++) {
             this.rdata.push(str.charCodeAt(i) & 0xFF);
         }
-        this.rdata.push(0);
         const entry: RDataEntry = { offset, size: len + 2, references: [] };
         this.rdataEntries.push(entry);
         return offset;

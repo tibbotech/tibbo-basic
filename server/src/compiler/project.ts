@@ -71,6 +71,11 @@ export function parseProjectFile(tprPath: string): ProjectConfig {
     return config;
 }
 
+export interface ProjectCompilerOptions {
+    fixedBuildId?: string;
+    fixedTimestamp?: Date;
+}
+
 export class ProjectCompiler {
     private projectPath: string;
     private platformsPath: string;
@@ -79,11 +84,13 @@ export class ProjectCompiler {
     private diagnostics: DiagnosticCollection;
     private preprocessedFiles = new Map<string, string>();
     private allDeclarations: TopLevelDeclaration[] = [];
+    private options: ProjectCompilerOptions;
 
-    constructor(projectPath: string, platformsPath?: string) {
+    constructor(projectPath: string, platformsPath?: string, options?: ProjectCompilerOptions) {
         this.projectPath = projectPath;
         this.platformsPath = platformsPath || path.join(projectPath, 'Platforms');
         this.diagnostics = new DiagnosticCollection();
+        this.options = options || {};
 
         const tprPath = this.findTprFile();
         this.config = parseProjectFile(tprPath);
@@ -190,7 +197,7 @@ export class ProjectCompiler {
             allWarnings.push(...result.warnings);
         }
 
-        const buildId = this.generateBuildId();
+        const buildId = this.options.fixedBuildId ?? this.generateBuildId();
 
         const linkerOptions: LinkerOptions = {
             projectName: this.config.name || 'project',
@@ -198,10 +205,11 @@ export class ProjectCompiler {
             firmwareVer: this.platformConfig.version,
             configStr: this.platformConfig.configStr,
             platformSize: this.platformConfig.platformId,
-            stackSize: 15,
+            stackSize: 0,
             localAllocSize: 0,
             maxEventNumber: maxEventNumber + 1,
             flags,
+            fixedTimestamp: this.options.fixedTimestamp,
         };
         const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
         const linkResult = link(objBuffers, {}, linkerOptions);

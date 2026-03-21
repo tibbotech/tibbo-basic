@@ -1,0 +1,13 @@
+[project]
+name=empty_basic_project
+output=output.tpc
+debug=on
+address=0.0.0.0.0.0
+[file1]
+path=main.tbs
+type=basic
+opened=active
+[file2]
+path=global.tbh
+type=header
+opened=yes

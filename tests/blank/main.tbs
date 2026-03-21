@@ -1,0 +1,7 @@
+include "global.tbh"
+
+dim aa as string="hello"
+'====================================================================
+sub on_sys_init()
+	sys.debugprint(aa)
+end sub
