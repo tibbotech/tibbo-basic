@@ -4,32 +4,189 @@ import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
 import { link } from '../../src/compiler/index';
 import { LinkerOptions } from '../../src/compiler/linker/linker';
 
-const TEST_PROJECT_PATH = path.resolve(__dirname, '../../../tests/MyDeviceTestHello');
-const EXPECTED_TPC_PATH = path.join(TEST_PROJECT_PATH, 'MyDeviceTestHello___1.0.0.tpc');
+const TESTS_ROOT = path.resolve(__dirname, '../../../tests');
 
-describe('Project file parser', () => {
-    it('should parse .tpr file correctly', () => {
-        const tprPath = path.join(TEST_PROJECT_PATH, 'project.tpr');
-        const config = parseProjectFile(tprPath);
+function strLenAt(buf: Buffer, base: number, off: number): number {
+    let len = 0;
+    while (base + off + len < buf.length && buf[base + off + len] !== 0) len++;
+    return len;
+}
 
+/**
+ * Compare two TPC buffers, masking out build ID, timestamp, and checksum
+ * which are expected to differ between builds. Returns the list of
+ * byte offsets that still differ after masking.
+ */
+function compareTpcMasked(actual: Buffer, expected: Buffer): number[] {
+    if (actual.length !== expected.length) {
+        return [-1]; // sentinel for size mismatch
+    }
+
+    const maskedExpected = Buffer.from(expected);
+    const maskedActual = Buffer.from(actual);
+
+    // Checksum (bytes 6-7)
+    maskedExpected.writeUInt16LE(0, 6);
+    maskedActual.writeUInt16LE(0, 6);
+
+    // Header timestamp: daysSince2000 (44-45) and minutesOfDay (46-47)
+    maskedExpected.writeUInt16LE(0, 44);
+    maskedActual.writeUInt16LE(0, 44);
+    maskedExpected.writeUInt16LE(0, 46);
+    maskedActual.writeUInt16LE(0, 46);
+
+    // Build ID and timestamp strings live in the Symbols section.
+    // Header offset 36 = buildIdOff (offset within Symbols).
+    // Extra section (section 8) first dword = timeStrOff (offset within Symbols).
+    const symbolsSectionOff = expected.readUInt32LE(48 + 4 * 8);
+    const buildIdStrOff = expected.readUInt32LE(36);
+    const extraSectionOff = expected.readUInt32LE(48 + 8 * 8);
+    const timeStrOff = expected.readUInt32LE(extraSectionOff);
+
+    // Mask build ID string
+    const buildIdAbsOff = symbolsSectionOff + buildIdStrOff;
+    const maxBuildIdLen = Math.max(
+        strLenAt(expected, symbolsSectionOff, buildIdStrOff),
+        strLenAt(actual, symbolsSectionOff, buildIdStrOff)
+    );
+    for (let i = 0; i < maxBuildIdLen; i++) {
+        if (buildIdAbsOff + i < maskedExpected.length) maskedExpected[buildIdAbsOff + i] = 0;
+        if (buildIdAbsOff + i < maskedActual.length) maskedActual[buildIdAbsOff + i] = 0;
+    }
+
+    // Mask timestamp string
+    const timeAbsOff = symbolsSectionOff + timeStrOff;
+    const maxTimeLen = Math.max(
+        strLenAt(expected, symbolsSectionOff, timeStrOff),
+        strLenAt(actual, symbolsSectionOff, timeStrOff)
+    );
+    for (let i = 0; i < maxTimeLen; i++) {
+        if (timeAbsOff + i < maskedExpected.length) maskedExpected[timeAbsOff + i] = 0;
+        if (timeAbsOff + i < maskedActual.length) maskedActual[timeAbsOff + i] = 0;
+    }
+
+    const diffs: number[] = [];
+    for (let i = 0; i < maskedExpected.length; i++) {
+        if (maskedExpected[i] !== maskedActual[i]) {
+            diffs.push(i);
+        }
+    }
+    return diffs;
+}
+
+function logTpcDiffs(actual: Buffer, expected: Buffer, diffs: number[]): void {
+    console.log(`Expected TPC size: ${expected.length}`);
+    console.log(`Produced TPC size: ${actual.length}`);
+
+    if (actual.length !== expected.length) {
+        console.log('Size mismatch - skipping detailed byte comparison');
+        return;
+    }
+
+    const sections = ['Code', 'Init', 'RData', 'FileData', 'Symbols', 'ResFileDir', 'EventDir', 'LibFileDir', 'Extra'];
+    for (let i = 0; i < 9; i++) {
+        const expOff = expected.readUInt32LE(48 + i * 8);
+        const expSize = expected.readUInt32LE(52 + i * 8);
+        const gotOff = actual.readUInt32LE(48 + i * 8);
+        const gotSize = actual.readUInt32LE(52 + i * 8);
+        if (expSize !== gotSize || expOff !== gotOff) {
+            console.log(`  ${sections[i]}: exp=(off=${expOff},sz=${expSize}) got=(off=${gotOff},sz=${gotSize})`);
+        }
+    }
+
+    if (diffs.length > 0) {
+        console.log(`Unexpected diffs at ${diffs.length} byte(s):`);
+        for (const off of diffs.slice(0, 20)) {
+            console.log(`  0x${off.toString(16)}: expected=0x${expected[off].toString(16).padStart(2, '0')} actual=0x${actual[off].toString(16).padStart(2, '0')}`);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Blank project
+// ---------------------------------------------------------------------------
+
+describe('Blank project', () => {
+    const PROJECT_PATH = path.join(TESTS_ROOT, 'blank');
+    const EXPECTED_TPC_PATH = path.join(PROJECT_PATH, 'blank.tpc');
+    let result: ReturnType<ProjectCompiler['compile']>;
+
+    beforeAll(() => {
+        const compiler = new ProjectCompiler(PROJECT_PATH);
+        result = compiler.compile();
+    });
+
+    it('should parse the .tpr file', () => {
+        const config = parseProjectFile(path.join(PROJECT_PATH, 'blank.tpr'));
+        expect(config.name).toBe('blank');
+        expect(config.output).toBe('blank.tpc');
+        expect(config.debug).toBe(true);
+        expect(config.platform).toBe('TPP2W(G2)');
+        expect(config.sourceFiles.length).toBe(2);
+
+        const basicFiles = config.sourceFiles.filter(f => f.type === 'basic');
+        const headerFiles = config.sourceFiles.filter(f => f.type === 'header');
+        expect(basicFiles.length).toBe(1);
+        expect(headerFiles.length).toBe(1);
+        expect(basicFiles[0].path).toBe('main.tbs');
+        expect(headerFiles[0].path).toBe('global.tbh');
+    });
+
+    it('should compile without errors', () => {
+        if (result.errors.length > 0) {
+            console.log('Compilation errors:');
+            for (const err of result.errors.slice(0, 50)) {
+                console.log(`  ${err.location.file}:${err.location.line}:${err.location.column}: ${err.message}`);
+            }
+        }
+        expect(result.errors).toHaveLength(0);
+    });
+
+    it('should produce one OBJ file', () => {
+        expect(result.objs.size).toBe(1);
+        expect(result.objs.has('main.tbs.obj')).toBe(true);
+    });
+
+    it('should produce a valid .tpc with TBIN signature', () => {
+        expect(result.tpc).not.toBeNull();
+        expect(result.tpc!.toString('ascii', 0, 4)).toBe('TBIN');
+    });
+
+    it('should match reference TPC (only build ID and timestamp differ)', () => {
+        const expected = fs.readFileSync(EXPECTED_TPC_PATH);
+        expect(result.tpc).not.toBeNull();
+
+        const diffs = compareTpcMasked(result.tpc!, expected);
+        if (diffs.length > 0) logTpcDiffs(result.tpc!, expected, diffs);
+        expect(result.tpc!.length).toBe(expected.length);
+        expect(diffs).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// MyDeviceTestHello project
+// ---------------------------------------------------------------------------
+
+describe('MyDeviceTestHello project', () => {
+    const PROJECT_PATH = path.join(TESTS_ROOT, 'MyDeviceTestHello');
+    const EXPECTED_TPC_PATH = path.join(PROJECT_PATH, 'MyDeviceTestHello___1.0.0.tpc');
+    let result: ReturnType<ProjectCompiler['compile']>;
+
+    beforeAll(() => {
+        const compiler = new ProjectCompiler(PROJECT_PATH);
+        result = compiler.compile();
+    });
+
+    it('should parse the .tpr file', () => {
+        const config = parseProjectFile(path.join(PROJECT_PATH, 'project.tpr'));
         expect(config.name).toBe('MyDeviceTestHello___1.0.0');
         expect(config.output).toBe('MyDeviceTestHello___1.0.0.tpc');
         expect(config.debug).toBe(true);
         expect(config.platform).toBe('TPP2W(G2)');
         expect(config.sourceFiles.length).toBeGreaterThan(0);
-
-        const basicFiles = config.sourceFiles.filter(f => f.type === 'basic');
-        const headerFiles = config.sourceFiles.filter(f => f.type === 'header');
-        expect(basicFiles.length).toBeGreaterThan(0);
-        expect(headerFiles.length).toBeGreaterThan(0);
     });
-});
 
-describe('MyDeviceTestHello Integration Test', () => {
-    it('should compile the test project without fatal errors', () => {
-        const compiler = new ProjectCompiler(TEST_PROJECT_PATH);
-        const result = compiler.compile();
-
+    it('should compile without fatal errors', () => {
         if (result.errors.length > 0) {
             console.log('Compilation errors:');
             for (const err of result.errors.slice(0, 50)) {
@@ -49,80 +206,82 @@ describe('MyDeviceTestHello Integration Test', () => {
             }
             console.log(`  Total warnings: ${result.warnings.length}`);
         }
-
         expect(result.objs.size).toBeGreaterThanOrEqual(1);
     });
 
-    it('should have en_td_timezones in combined source', () => {
-        const compiler = new ProjectCompiler(TEST_PROJECT_PATH);
-        const result = compiler.compile();
-        // The error at line 9208 says "Unknown type: en_td_timezones"
-        // Check if the type resolves
-        expect(result.errors.length).toBeLessThanOrEqual(1);
+    it('should produce a valid .tpc with TBIN signature', () => {
+        expect(result.tpc).not.toBeNull();
+        expect(result.tpc!.toString('ascii', 0, 4)).toBe('TBIN');
     });
 
-    it('should produce a valid .tpc binary', () => {
-        const compiler = new ProjectCompiler(TEST_PROJECT_PATH);
-        const result = compiler.compile();
-
+    it('should match reference TPC (only build ID and timestamp differ)', () => {
+        const expected = fs.readFileSync(EXPECTED_TPC_PATH);
         expect(result.tpc).not.toBeNull();
-        if (result.tpc) {
-            // Check TBIN signature
-            const sig = result.tpc.toString('ascii', 0, 4);
-            expect(sig).toBe('TBIN');
-            expect(result.tpc.length).toBeGreaterThan(0);
+
+        const diffs = compareTpcMasked(result.tpc!, expected);
+        if (diffs.length > 0) logTpcDiffs(result.tpc!, expected, diffs);
+        expect(result.tpc!.length).toBe(expected.length);
+        expect(diffs).toHaveLength(0);
+    });
+
+    it('should produce 8 OBJ files', () => {
+        const OBJ_NAMES = [
+            'main.tbs.obj', 'device.tbs.obj', 'boot.tbs.obj', 'time.tbs.obj',
+            'sock.tbs.obj', 'datetime.tbs.obj', 'utils.tbs.obj', 'dhcp.tbs.obj',
+        ];
+        expect(result.objs.size).toBe(8);
+        for (const name of OBJ_NAMES) {
+            expect(result.objs.has(name)).toBe(true);
         }
     });
 
-    it('should match the expected .tpc output', () => {
-        const expectedTpc = fs.readFileSync(EXPECTED_TPC_PATH);
-        const compiler = new ProjectCompiler(TEST_PROJECT_PATH);
-        const result = compiler.compile();
+    describe('per-file OBJ Code section sizes', () => {
+        const REF_OBJ_DIR = path.join(PROJECT_PATH, 'tmp');
+        const HEADER_SIZE = 48;
+        const OBJ_NAMES = [
+            'main.tbs.obj', 'device.tbs.obj', 'boot.tbs.obj', 'time.tbs.obj',
+            'sock.tbs.obj', 'datetime.tbs.obj', 'utils.tbs.obj', 'dhcp.tbs.obj',
+        ];
+        const SECTION_NAMES = [
+            'Code', 'Init', 'RData', 'FileData', 'Symbols', 'ResFileDir', 'EventDir', 'LibFileDir', 'Extra',
+            'Addresses', 'Functions', 'Scopes', 'Variables', 'Objects', 'Syscalls', 'Types', 'RDataDir', 'LineInfo', 'LibNameDir', 'IncNameDir',
+        ];
 
-        expect(result.tpc).not.toBeNull();
-        if (result.tpc) {
-            console.log(`Expected TPC size: ${expectedTpc.length}`);
-            console.log(`Produced TPC size: ${result.tpc.length}`);
+        for (const objName of OBJ_NAMES) {
+            it(`should match Code section size for ${objName}`, () => {
+                const ref = fs.readFileSync(path.join(REF_OBJ_DIR, objName));
+                const gen = result.objs.get(objName)!;
 
-            const sections = ['Code', 'Init', 'RData', 'FileData', 'Symbols', 'ResFileDir', 'EventDir', 'LibFileDir', 'Extra'];
-            console.log('Section comparison:');
-            for (let i = 0; i < 9; i++) {
-                const expOff = expectedTpc.readUInt32LE(48 + i * 8);
-                const expSize = expectedTpc.readUInt32LE(52 + i * 8);
-                const gotOff = result.tpc.readUInt32LE(48 + i * 8);
-                const gotSize = result.tpc.readUInt32LE(52 + i * 8);
-                const match = expSize === gotSize ? 'OK' : `DIFF(${expSize - gotSize})`;
-                console.log(`  ${sections[i]}: expected=(off=${expOff},sz=${expSize}) got=(off=${gotOff},sz=${gotSize}) ${match}`);
-            }
+                const refCodeSize = ref.readUInt32LE(HEADER_SIZE + 0 * 8 + 4);
+                const genCodeSize = gen.readUInt32LE(HEADER_SIZE + 0 * 8 + 4);
 
-            const expectedSig = expectedTpc.toString('ascii', 0, 4);
-            const producedSig = result.tpc.toString('ascii', 0, 4);
-            expect(producedSig).toBe(expectedSig);
+                const refInitSize = ref.readUInt32LE(HEADER_SIZE + 1 * 8 + 4);
+                const genInitSize = gen.readUInt32LE(HEADER_SIZE + 1 * 8 + 4);
 
-            if (result.tpc.length === expectedTpc.length) {
-                let firstDiff = -1;
-                for (let i = 0; i < expectedTpc.length; i++) {
-                    if (result.tpc[i] !== expectedTpc[i]) {
-                        firstDiff = i;
-                        break;
+                console.log(`${objName}: Code exp=${refCodeSize} got=${genCodeSize} (${refCodeSize === genCodeSize ? 'OK' : 'DIFF(' + (refCodeSize - genCodeSize) + ')'}), Init exp=${refInitSize} got=${genInitSize}`);
+
+                for (let i = 0; i < 20; i++) {
+                    const rOff = HEADER_SIZE + i * 8;
+                    if (rOff + 8 > ref.length || rOff + 8 > gen.length) break;
+                    const rSz = ref.readUInt32LE(rOff + 4);
+                    const gSz = gen.readUInt32LE(rOff + 4);
+                    if (rSz !== gSz) {
+                        console.log(`  ${SECTION_NAMES[i] || i}: ref=${rSz} gen=${gSz} DIFF(${rSz - gSz})`);
                     }
                 }
-                if (firstDiff >= 0) {
-                    console.log(`First byte difference at offset 0x${firstDiff.toString(16)}`);
-                    console.log(`  Expected: ${expectedTpc.slice(firstDiff, firstDiff + 16).toString('hex')}`);
-                    console.log(`  Produced: ${result.tpc.slice(firstDiff, firstDiff + 16).toString('hex')}`);
-                }
-                expect(firstDiff).toBe(-1);
-            } else {
-                console.log('Size mismatch - not performing byte comparison');
-                expect(result.tpc.length).toBe(expectedTpc.length);
-            }
+            });
         }
     });
 });
 
+// ---------------------------------------------------------------------------
+// Linker: reference OBJ linking for MyDeviceTestHello
+// ---------------------------------------------------------------------------
+
 describe('Linker: Reference OBJ linking', () => {
-    const REF_OBJ_DIR = path.join(TEST_PROJECT_PATH, 'tmp');
+    const PROJECT_PATH = path.join(TESTS_ROOT, 'MyDeviceTestHello');
+    const EXPECTED_TPC_PATH = path.join(PROJECT_PATH, 'MyDeviceTestHello___1.0.0.tpc');
+    const REF_OBJ_DIR = path.join(PROJECT_PATH, 'tmp');
     const OBJ_LINK_ORDER = [
         'main.tbs.obj', 'device.tbs.obj', 'boot.tbs.obj', 'time.tbs.obj',
         'sock.tbs.obj', 'datetime.tbs.obj', 'utils.tbs.obj', 'dhcp.tbs.obj',
@@ -151,94 +310,12 @@ describe('Linker: Reference OBJ linking', () => {
         }));
 
         const result = link(objBuffers, {}, REF_LINKER_OPTIONS);
-
         expect(result.errors).toHaveLength(0);
 
         const produced = result.tpc;
-        console.log(`Expected TPC size: ${expectedTpc.length}`);
-        console.log(`Produced TPC size: ${produced.length}`);
-
-        const sections = ['Code', 'Init', 'RData', 'FileData', 'Symbols', 'ResFileDir', 'EventDir', 'LibFileDir', 'Extra'];
-        console.log('Section comparison:');
-        for (let i = 0; i < 9; i++) {
-            const expOff = expectedTpc.readUInt32LE(48 + i * 8);
-            const expSize = expectedTpc.readUInt32LE(52 + i * 8);
-            const gotOff = produced.readUInt32LE(48 + i * 8);
-            const gotSize = produced.readUInt32LE(52 + i * 8);
-            const sizeMatch = expSize === gotSize;
-            const offMatch = expOff === gotOff;
-            console.log(`  ${sections[i]}: exp=(off=${expOff},sz=${expSize}) got=(off=${gotOff},sz=${gotSize}) ${sizeMatch ? 'SIZE_OK' : 'SIZE_DIFF(' + (expSize - gotSize) + ')'} ${offMatch ? 'OFF_OK' : 'OFF_DIFF(' + (expOff - gotOff) + ')'}`);
-        }
-
-        if (produced.length === expectedTpc.length) {
-            let firstDiff = -1;
-            for (let i = 0; i < expectedTpc.length; i++) {
-                if (produced[i] !== expectedTpc[i]) {
-                    firstDiff = i;
-                    break;
-                }
-            }
-            if (firstDiff >= 0) {
-                console.log(`\nFirst byte difference at offset 0x${firstDiff.toString(16)} (${firstDiff})`);
-                console.log(`  Expected: ${expectedTpc.slice(firstDiff, firstDiff + 16).toString('hex')}`);
-                console.log(`  Produced: ${produced.slice(firstDiff, firstDiff + 16).toString('hex')}`);
-            }
-            expect(firstDiff).toBe(-1);
-        } else {
-            expect(produced.length).toBe(expectedTpc.length);
-        }
+        const diffs = compareTpcMasked(produced, expectedTpc);
+        if (diffs.length > 0) logTpcDiffs(produced, expectedTpc, diffs);
+        expect(produced.length).toBe(expectedTpc.length);
+        expect(diffs).toHaveLength(0);
     });
-});
-
-describe('Per-file OBJ comparison', () => {
-    const REF_OBJ_DIR = path.join(TEST_PROJECT_PATH, 'tmp');
-    const OBJ_NAMES = [
-        'main.tbs.obj', 'device.tbs.obj', 'boot.tbs.obj', 'time.tbs.obj',
-        'sock.tbs.obj', 'datetime.tbs.obj', 'utils.tbs.obj', 'dhcp.tbs.obj',
-    ];
-    const SECTION_NAMES = ['Code', 'Init', 'RData', 'FileData', 'Symbols', 'ResFileDir', 'EventDir', 'LibFileDir', 'Extra',
-        'Addresses', 'Functions', 'Scopes', 'Variables', 'Objects', 'Syscalls', 'Types', 'RDataDir', 'LineInfo', 'LibNameDir', 'IncNameDir'];
-
-    let compiledObjs: Map<string, Buffer>;
-
-    beforeAll(() => {
-        const compiler = new ProjectCompiler(TEST_PROJECT_PATH);
-        const result = compiler.compile();
-        compiledObjs = result.objs;
-    });
-
-    it('should produce 8 OBJ files', () => {
-        expect(compiledObjs.size).toBe(8);
-        for (const name of OBJ_NAMES) {
-            expect(compiledObjs.has(name)).toBe(true);
-        }
-    });
-
-    for (const objName of ['main.tbs.obj', 'device.tbs.obj', 'boot.tbs.obj', 'time.tbs.obj',
-        'sock.tbs.obj', 'datetime.tbs.obj', 'utils.tbs.obj', 'dhcp.tbs.obj']) {
-        it(`should match Code section size for ${objName}`, () => {
-            const HEADER_SIZE = 48;
-            const ref = fs.readFileSync(path.join(REF_OBJ_DIR, objName));
-            const gen = compiledObjs.get(objName)!;
-
-            const refCodeSize = ref.readUInt32LE(HEADER_SIZE + 0 * 8 + 4);
-            const genCodeSize = gen.readUInt32LE(HEADER_SIZE + 0 * 8 + 4);
-
-            const refInitSize = ref.readUInt32LE(HEADER_SIZE + 1 * 8 + 4);
-            const genInitSize = gen.readUInt32LE(HEADER_SIZE + 1 * 8 + 4);
-
-            console.log(`${objName}: Code exp=${refCodeSize} got=${genCodeSize} (${refCodeSize === genCodeSize ? 'OK' : 'DIFF(' + (refCodeSize - genCodeSize) + ')'}), Init exp=${refInitSize} got=${genInitSize}`);
-
-            // Log all section sizes for reference
-            for (let i = 0; i < 20; i++) {
-                const rOff = HEADER_SIZE + i * 8;
-                if (rOff + 8 > ref.length || rOff + 8 > gen.length) break;
-                const rSz = ref.readUInt32LE(rOff + 4);
-                const gSz = gen.readUInt32LE(rOff + 4);
-                if (rSz !== gSz) {
-                    console.log(`  ${SECTION_NAMES[i] || i}: ref=${rSz} gen=${gSz} DIFF(${rSz - gSz})`);
-                }
-            }
-        });
-    }
 });
