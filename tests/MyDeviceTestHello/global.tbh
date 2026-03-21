@@ -1,0 +1,72 @@
+'DEFINES-------------------------------------------------------------
+
+#define INTERFACE_SWITCHING 1
+#define DEFAULT_INTERFACE PL_SOCK_INTERFACE_NULL
+
+#define WLN_AVAILABLE 0
+#define SOCK_MAX_SIGNATURE_LEN 10
+#define SSI_MAX_SIGNATURE_LEN 32
+#define SI2C_MAX_SIGNATURE_LEN 32
+#define SSPI_MAX_SIGNATURE_LEN 32
+#define SUPPORTS_TLS 1
+#define DHCP_DEBUG_PRINT 1
+#define DHCP_POST_FAIL_DELAY 30
+#define DHCP_WAIT_TIME 8
+
+
+
+
+const FIRMWARE_VERSION="{MyDeviceTestHello 1.0.0}"
+
+const MAX_NUM_INTERFACES=4
+
+const APP_VERSION="1.0.0"
+const APP_ID="69bd5e5823ed4639c1bbe12b"
+
+
+
+'INCLUDES------------------------------------------------------------
+
+
+include "libraries/time/time.tbh"
+include "libraries/sock/sock.tbh"
+include "libraries/time/datetime.tbh"
+include "libraries/utils/utils.tbh"
+include "libraries/dhcp/dhcp.tbh"
+
+
+'DECLARATIONS--------------------------------------------------------
+
+declare function datetime_timestamp_seconds(timestamp as dword) as float            
+declare function datetime_timestamp_mins(timestamp as dword) as dword
+declare function datetime_mins_to_timestamp(mins as word) as dword
+
+
+declare sub interface_set(interface as pl_sock_interfaces, state as no_yes)
+declare sub callback_system_error(byref tag as string, byref message as string)
+
+declare interface_ready(MAX_NUM_INTERFACES) as no_yes
+
+declare DEVICE_NAME as string(50)
+
+declare TIOS_VERSION as string(30)
+declare MAC_ADDRESS as string(20)
+
+declare APP_TIMEZONE as en_td_timezones
+declare APP_LATITUDE as float
+declare APP_LONGITUDE as float
+
+
+
+declare current_interface as pl_sock_interfaces
+
+declare sub change_current_interface(new_interface as pl_sock_interfaces)
+declare sub close_interface_sockets(interface as pl_sock_interfaces)
+
+declare device_net_ip as string(16)
+declare device_net_mask as string(16)
+declare device_net_gateway as string(16)
+declare net_dhcp_enabled as boolean
+
+
+declare sub boot()

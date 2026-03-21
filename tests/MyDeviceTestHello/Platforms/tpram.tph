@@ -1,0 +1,42 @@
+'**************************************************************************************************
+'       TPRAM (Tamper-proof non-volatile RAM) object
+'**************************************************************************************************
+
+#define TPRAM_AVAILABLE 0
+
+object tpram
+
+'--------------------------------------------------------------------
+property tpram.triggerpolarity
+    get = syscall(618) as ris_fal
+    set = syscall(619) (value as ris_fal)
+end property
+
+'--------------------------------------------------------------------
+property tpram.tamperdetection
+    get = syscall(620) as dis_en
+    set = syscall(621) (value as dis_en)
+end property
+
+'--------------------------------------------------------------------
+property tpram.timestamping
+    get = syscall(622) as dis_en
+    set = syscall(623) (value as dis_en)
+end property
+
+'--------------------------------------------------------------------
+property tpram.capacity
+    get = syscall(624) as word
+end property
+
+'--------------------------------------------------------------------
+syscall(625) tpram.getdata(startaddr as word, len as byte) as string
+'<b>METHOD. </b><br><br> 
+
+'--------------------------------------------------------------------
+syscall (626) tpram.setdata(byref datatoset as string, startaddr as word) as byte
+'<b>METHOD. </b><br><br> 
+
+'--------------------------------------------------------------------
+syscall(627) tpram.gettimestamp(byref daycount as word, byref mincount as word, byref seconds as byte, byref overflow as no_yes) as no_yes
+

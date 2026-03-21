@@ -1,0 +1,27 @@
+include ".\io-1xxx.tph"
+
+property io.intcount
+'io.intcount property.
+    get = syscall(894) as word
+    set = syscall(895) (intcount as word )
+end property
+
+
+property io.intedge
+'io.intedge property.
+    get = syscall(896) as byte
+    set = syscall(897) (edge as byte)
+end property
+
+
+property io.intstate
+'io.intstate property.
+    get = syscall(898) as byte
+end property
+
+
+property io.intmode
+'io.intmode property.
+    get = syscall(899) as byte
+    set = syscall(900) (mode as byte)
+end property

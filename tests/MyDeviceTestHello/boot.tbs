@@ -1,0 +1,77 @@
+include "global.tbh"
+
+
+
+sub boot()
+
+    ' Set the timezone to UTC-12:00
+    APP_TIMEZONE="0"
+    datetime_tz_offset=APP_TIMEZONE
+    APP_LATITUDE=0
+    datetime_lat=APP_LATITUDE
+    APP_LONGITUDE=0
+    datetime_lng=APP_LONGITUDE
+current_interface = PL_SOCK_INTERFACE_NULL
+    sys.onsystimerperiod=50
+    #IF SYS_VER <> 1000 AND WATCHDOG_ENABLED
+        sys.wdenabled=YES
+        sys.wdautoreset=DISABLED
+        sys.wdperiod=1000
+    #ENDIF
+
+    dim f as byte
+    for f=0 to MAX_NUM_INTERFACES-1
+        interface_ready(f)=NO
+    next f
+
+    beep.divider = 11111
+
+    'Ethernet setup
+    '================================================================
+    device_net_ip = "192.168.1.101"
+    device_net_mask = "255.255.255.0"
+    device_net_gateway = "192.168.1.1"
+    
+    dim dhcp_enabled as string(1) = 1
+
+    if dhcp_enabled = "1" then
+        net_dhcp_enabled = true
+    else
+        net_dhcp_enabled = false
+    end if
+    
+
+    if net_dhcp_enabled = false then
+        net.ip=device_net_ip
+        net.netmask=device_net_mask
+        net.gatewayip=device_net_gateway
+    else
+        'ethernet dhcp
+        dhcp_start(PL_SOCK_INTERFACE_NET,device_net_ip,"")
+    end if
+    '-----------------------------------------------------------------
+
+
+TIOS_VERSION=mid(sys.version, 2,len(sys.version) - 2)
+
+
+#IF SYS_VER <> 1000 AND PLATFORM_ID<>EM510W
+if sys.extresettype=PL_SYS_EXT_RESET_TYPE_WATCHDOG then
+    sys.debugprint("System reset by watchdog\r\n")
+else if sys.extresettype=PL_SYS_EXT_RESET_TYPE_BROWNOUT then
+    sys.debugprint("System reset by brownout\r\n")
+end if
+#ENDIF
+
+
+    pat.play("B-B-B-",PL_PAT_CANINT)
+
+if net.linkstate<>PL_NET_LINKSTAT_NOLINK AND net_dhcp_enabled = false then
+    interface_set(PL_SOCK_INTERFACE_NET,YES)
+end if
+
+
+sys.debugprint("hello world"+ "\r\n")
+
+
+end sub

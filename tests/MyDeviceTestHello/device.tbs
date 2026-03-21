@@ -1,0 +1,215 @@
+include "global.tbh"
+
+
+
+
+function datetime_timestamp_seconds(timestamp as dword) as float
+    datetime_timestamp_seconds=datetime_timestamp_mins(timestamp) * 60 + (timestamp MOD 60)
+end function
+
+function datetime_timestamp_mins(timestamp as dword) as dword
+    dim days as word = 0
+    dim mins as word = 0
+    dim secs as byte = 0
+    dim mins_offset as integer=0
+    td_get_tzone_offset(APP_TIMEZONE,mins_offset)
+    datetime_from_timestamp(timestamp + mins_offset * 60, days, mins, secs)
+    datetime_timestamp_mins=mins
+end function
+
+function datetime_mins_to_timestamp(mins as word) as dword
+    dim datetime_days,datetime_minutes as word
+    dim datetime_secs as byte
+    dim timestamp as dword=datetime_current_timestamp()
+    datetime_from_timestamp(timestamp,datetime_days,datetime_minutes,datetime_secs)
+    datetime_minutes=mins
+    td_local_to_gmt(datetime_days,datetime_minutes,APP_TIMEZONE,PL_OFF)
+    datetime_mins_to_timestamp=datetime_to_timestamp(datetime_days,datetime_minutes,0)
+end function
+
+
+sub interface_set(interface as pl_sock_interfaces, state as no_yes)
+    dim best_interface as pl_sock_interfaces=DEFAULT_INTERFACE
+    dim cell_starting as boolean=false
+
+    if interface_ready(interface) <> state then
+        dim print_string as string(50) = ""
+        if interface=PL_SOCK_INTERFACE_NET then
+            print_string = print_string + "NET>"
+        else if interface=PL_SOCK_INTERFACE_WLN then
+            print_string = print_string + "WiFi>"
+        else if interface=PL_SOCK_INTERFACE_PPP then
+            print_string = print_string + "CELL>"
+        end if
+        if state=YES then
+            print_string = print_string + " enabled"
+            if interface=PL_SOCK_INTERFACE_NET then
+                print_string = print_string + ", IP: " + net.ip
+            else if interface=PL_SOCK_INTERFACE_WLN then
+            #IF WLN_AVAILABLE
+                print_string = print_string + ", IP: " + wln.ip
+            #ENDIF
+            else if interface=PL_SOCK_INTERFACE_PPP then
+                print_string = print_string + ", IP: " + ppp.ip
+            end if
+        else
+            print_string = print_string + " disabled"
+        end if
+
+        sys.debugprint(print_string + "\r\n")
+    end if
+    
+    if state = YES then
+        interface_ready(interface) = YES
+    else
+        interface_ready(interface) = NO
+    end if
+    #IF INTERFACE_SWITCHING
+    if interface_ready(PL_SOCK_INTERFACE_NET) = YES then
+        best_interface = PL_SOCK_INTERFACE_NET
+    else
+        #IF WLN_AVAILABLE
+            if interface_ready(PL_SOCK_INTERFACE_WLN) = YES then
+                best_interface = PL_SOCK_INTERFACE_WLN
+            end if
+        #ENDIF
+        if best_interface=PL_SOCK_INTERFACE_NULL then
+        #IF CELLULAR_AVAILABLE
+            if interface_ready(PL_SOCK_INTERFACE_PPP) = YES then
+                best_interface = PL_SOCK_INTERFACE_PPP
+                cell_started=false
+            else
+                cell_start()
+                cell_starting=true
+                cell_started=true
+            end if
+        #ENDIF
+        end if
+    end if
+    #IF CELLULAR_AVAILABLE
+    if best_interface<>PL_SOCK_INTERFACE_PPP AND cell_starting=false AND cell_sms_enabled=false then
+        cell_started=false
+        signal_strength_set(0)
+        cell_stop()
+        cell_started=false
+    end if
+    #ENDIF
+    #ENDIF
+
+    if interface_ready(best_interface)=NO then
+        best_interface=PL_SOCK_INTERFACE_NULL
+    end if
+    change_current_interface(best_interface)
+    
+end sub
+
+
+sub close_interface_sockets(interface as pl_sock_interfaces)
+    dim f,sock_num_bup as byte
+    dim i as word
+
+    sock_num_bup=sock.num
+
+    for f=0 to sock.numofsock-1
+        sock.num=f
+        if sock.targetinterface=interface then
+            sock.close()
+            sock.discard()
+        end if
+    next f
+
+    i=sys.timercount
+
+    wait_close_interface_sockets:
+    for f=0 to sock.numofsock-1
+        sock.num=f
+        if sock.targetinterface=interface and sock.statesimple<>PL_SSTS_CLOSED and sys.timercount-i<5 and sys.timercount>=i then
+            goto wait_close_interface_sockets
+        end if
+    next f
+
+    sock.num=sock_num_bup
+
+end sub
+
+sub callback_system_error(byref tag as string, byref message as string)
+    
+    #IFDEF RETARGET_DEBUG_PRINT
+        sys.trace("ERR-" + tag + ">" + message)
+    #ELSE
+        sys.debugprint("ERR-" + tag + ">" + message)
+    #ENDIF
+end sub
+ 
+
+sub change_current_interface(new_interface as pl_sock_interfaces)
+    if current_interface<>new_interface then
+        
+        
+        sock.inconenabledmaster=NO
+        close_interface_sockets(current_interface)
+
+        current_interface=new_interface        
+        
+        select case current_interface
+            case PL_SOCK_INTERFACE_NET: sys.debugprint("Set current interface to Ethernet\r\n") 
+        
+            case PL_SOCK_INTERFACE_WLN: sys.debugprint("Set current interface to Wi-Fi\r\n")
+        
+            case PL_SOCK_INTERFACE_PPP: sys.debugprint("Set current interface to Cellular\r\n")
+        end select
+        sock.inconenabledmaster=YES
+        if new_interface <> PL_SOCK_INTERFACE_NULL then
+            
+        end if
+    end if
+end sub
+
+sub callback_dhcp_ok(renew as no_yes, interface as pl_sock_interfaces, byref ip as string, byref gateway_ip as string, byref netmask as string, lease_time as dword)
+    
+    
+        if interface=PL_SOCK_INTERFACE_NET then
+            if renew=YES and net.ip<>ip then
+                'this is a lease renewal and the DHCP server has issues new IP
+                'it is better to reboot than deal with the implications of the changed IP
+                sys.reboot
+            end if
+    
+            #if DEV_DEBUG_PRINT
+                dev_debugprint("Ethernet DHCP OK ("+ip+")")
+            #endif
+    
+            if net.ip<>ip then
+                sock.inconenabledmaster=NO
+                close_interface_sockets(PL_SOCK_INTERFACE_NET)
+                net.ip=ip
+                if gateway_ip<>"" then net.gatewayip=gateway_ip
+                if netmask<>"" then net.netmask=netmask
+                sock.inconenabledmaster=YES
+            end if
+            
+            interface_set(PL_SOCK_INTERFACE_NET,YES)
+        end if
+                
+end sub
+        
+
+sub callback_dhcp_failure(interface as pl_sock_interfaces,failure_code as en_dhcp_status_codes)
+    
+end sub
+        
+
+sub callback_dhcp_pre_clear_ip(interface as pl_sock_interfaces)
+    
+end sub
+        
+
+sub callback_dhcp_pre_buffrq(required_buff_pages as byte)
+    
+end sub
+        
+
+sub callback_dhcp_buff_released()
+    
+end sub
+        

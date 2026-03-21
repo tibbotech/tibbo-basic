@@ -6,8 +6,8 @@ client/server
 .DS_Store
 .venv
 tide/
-tests/MyDeviceTestHello/
-tests/MyDeviceTestHello2/
+# tests/MyDeviceTestHello/
+
 
 
 

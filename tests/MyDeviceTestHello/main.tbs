@@ -1,0 +1,63 @@
+include "global.tbh"
+
+
+
+dim interface_ready(MAX_NUM_INTERFACES) as no_yes
+
+dim TIOS_VERSION as string(30)
+#IF PLATFORM_ID=WM2000 OR PLATFORM_ID=WS1102
+dim MAC_ADDRESS as string(20)=wln.mac
+#ELSE
+dim MAC_ADDRESS as string(20)=net.mac
+#ENDIF
+dim DEVICE_NAME as string(50)="MyDeviceTestHello"
+
+dim current_interface as pl_sock_interfaces
+
+dim APP_TIMEZONE as en_td_timezones
+dim APP_LATITUDE as float
+dim APP_LONGITUDE as float
+
+
+dim device_net_ip as string(16)
+dim device_net_mask as string(16)
+dim device_net_gateway as string(16)
+dim net_dhcp_enabled as boolean
+
+
+sub on_sys_init()
+    boot()
+end sub
+
+
+sub on_sys_timer()
+
+dim sys_timercountms as dword = sys.timercountms
+#IF SYS_VER <> 1000 AND WATCHDOG_ENABLED
+    sys.wdreset()
+#ENDIF
+
+    dhcp_proc_timer()
+
+end sub
+
+
+sub on_sock_data_arrival()
+    dhcp_proc_data()
+
+end sub
+
+
+sub on_net_link_change()
+
+    if net.linkstate=PL_NET_LINKSTAT_NOLINK then
+        interface_set(PL_SOCK_INTERFACE_NET,NO)
+        
+    else
+        if net_dhcp_enabled = false then
+            interface_set(PL_SOCK_INTERFACE_NET,YES)
+        end if
+    end if
+
+end sub
+

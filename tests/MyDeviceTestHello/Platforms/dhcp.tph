@@ -1,0 +1,21 @@
+'**************************************************************************************************
+'       Internal DHCP server support
+'**************************************************************************************************
+
+'---------------------------------------------------------------------
+event(35)  on_sys_dhcp_ok(renew as no_yes, interface as pl_sock_interfaces, ip as string(16), gateway_ip as string(16), netmask as string(16), lease_time as dword)
+'<b>EVENT of the sys object.</b></br><br>
+'Informs of the successful procurement of configuration parameters from the DHCP server.<br><br>
+'This event handler is generated when the DHCP negotiation is completed successfully.
+
+'---------------------------------------------------------------------
+event(36)  on_sys_dhcp_failure(interface as pl_sock_interfaces)
+'<b>EVENT of the sys object.</b></br><br>
+'Informs of the failure to procure configuration parameters from the DHCP server.<br><br>
+'This event handler is fired every time DHCP fails to obtain an IP address.<br><br>
+'TiOS' internal DHCP process will request a lease three times before reporting that it failed. 
+'The backoff time (i.e., the delay between lease requests) for the first three retries is 2, 4, and 8 seconds, respectively, 
+'meaning the first notification of failure will occur after approximately 14 seconds. <br>
+'The backoff time for the second round of retries is 16, 32, and 64 seconds, respectively, 
+'meaning the second notification of failure will occur about 112 seconds after the first <font color="teal"><b>on_sys_dhcp_failure</b></font> event is generated. <br>
+'Subsequent retries have a backoff time of 60 seconds, resulting in a 180-second period between <font color="teal"><b>on_sys_dhcp_failure</b></font> events.

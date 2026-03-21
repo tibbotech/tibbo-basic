@@ -1,0 +1,127 @@
+'**************************************************************************************************
+'       ROM (ROM file access) object
+'**************************************************************************************************
+
+object romfile
+'The romfile object allows you to access resource (fixed) files that you have added to your project.
+'Resource files appear under the "Resource Files" branch of your project tree.
+'Resource files are not processed by the compiler in any way, they are just added to the compiled project binary "as is".
+'<br><br>
+'Resource files are ideal for storing permanent data that never changes.
+
+'--------------------------------------------------------------------
+syscall(53,"16.TDL") romfile.find(frompos as dword, byref substr as string, num as word) as word
+'<b>METHOD. [LEGACY]</b><br><br> 
+'Locates the Nth occurrence of a substring within the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
+'<br><br>
+'Returns a <i>16-bit </i>value indicating the file position at which the specified occurrence of the substring was found or 0 if the specified occurrence wasn't found.
+'<b>The output is truncated to 16 bits. This is why this method will only work for files not exceeding 64K bytes.</b>
+'<br><br>
+'For this method to work, a resource file must first be successfully opened with romfile.open.
+'<br><br>
+'<b>Frompos </b>-- starting search position in the file. File positions are counted from 1.
+'<br><br>
+'<b>Substr </b>-- substring to search for.
+'<br><br>
+'<b>Num </b>-- substring occurrence to search for.
+'<br><br>
+'This method was preserved for compatibility with previously developed applications. You are recommended to use romfile.find32 -- it has no file size limitations. 
+
+'--------------------------------------------------------------------
+syscall(509,"16.TDL") romfile.find32(frompos as dword, byref substr as string, num as word) as dword
+'<b>METHOD. </b><br><br> 
+'Locates the Nth occurrence of a substring within the currently opened resource file.
+'<br><br>
+'Returns a <i>32-bit </i>value indicating the file position at which the specified occurrence of the substring was found or 0 if the specified occurrence wasn't found.
+'<br><br>
+'For this method to work, a resource file must first be successfully opened with romfile.open.
+'<br><br>
+'<b>Frompos </b>-- starting search position in the file. File positions are counted from 1.
+'<br><br>
+'<b>Substr </b>-- substring to search for.
+'<br><br>
+'<b>Num </b>-- substring occurrence to search for.
+
+'--------------------------------------------------------------------
+syscall(57,"17.TDL") romfile.getdata(maxinplen as byte) as string
+'<b>METHOD. </b><br><br> 
+'Reads the specified amount of bytes (characters) from the currently opened resource file, from the location pointed at by the file pointer (romfile.pointer32).
+'<br><br>
+'Returns a string containing a part of the resource file's data.
+'<br><br>
+'For this method to work, a resource file must first be successfully opened with romfile.open.
+'<br><br>
+'Invoking this method moves the current pointer position forward by the actual number of bytes read.
+'<br><br>
+'<b>Maxinplen </b>-- maximum number of characters to read from the file.
+'The length of the returned string is also limited by two other factors: the receiving string capacity, and the amount of remaining data in the file (romfile.size+1-romfile.pointer).
+
+'--------------------------------------------------------------------
+property romfile.offset
+'<b>R/O PROPERTY (DWORD)</b>.
+'<br><br>
+'For the currently opened resource file returns the absolute file offset of this file in the compiled project binary.
+'<br><br>
+'For this property to return meaningful data, a resource file must first be successfully opened with romfile.open.
+    get = syscall(61) as dword
+end property
+
+'--------------------------------------------------------------------
+syscall(52,"15.TDL") romfile.open(byref filename as string)
+'<b>METHOD. </b><br><br> 
+'Opens or re-opens a resource file.
+'<br><br>
+'After the file is successfully opened (or re-opened), romfile.offset and romfile.size will start to return meaningful values.
+'In addition, the file pointer (romfile.pointer, romfile.pointer32) will be set to 1.
+'It will also become possible to use romfile.find, romfile.find32, and romfile.getdata methods.
+'<br><br>
+'<b>Filename </b>-- name of the resource file to open. Files that can be opened with this method are those appearing under the "Resource Files" branch of your project tree. 
+'<br><br>
+'There is no method (or need) to explicitly close resource files. Only one resource file can be opened at any given time.
+
+'--------------------------------------------------------------------
+property romfile.pointer
+'<b>PROPERTY (WORD) [LEGACY]. </b><br><br>
+'Sets/returns the current pointer position in the currently opened resource file. <b>Will not work correctly for files exceeding 64K bytes.</b>
+'<br><br>
+'If no file is opened, the file is empty, or the file opening fails (because the file with the specified name does not exist), the pointer is set to 0.
+'For successfully opened non-empty resource files, the pointer value range is from 1 (first file position) to romfile.size+1 (past the last file position).
+'<br><br>
+'For this property to work, a non-empty resource file must first be successfully opened with romfile.open.
+'<br><br>
+'When a non-empty file is (re)opened with the romfile.open method, the pointer is reset to the first character of the file (position 1).
+'<br><br>
+'When you read from the file with romfile.getdata, the pointer is automatically moved forward by the number of bytes (characters) that have been read out.
+'<br><br>
+'This method was preserved for compatibility with previously developed applications. You are recommended to use romfile.pointer32 -- it has no file size limitations.
+    get = syscall(55) as word
+    set = syscall(56) (value as word)
+end property
+
+'--------------------------------------------------------------------
+property romfile.pointer32
+'<b>PROPERTY (DWORD). </b><br><br>
+'Sets/returns the current pointer position in the currently opened resource file.
+'<br><br>
+'If no file is opened, the file is empty, or the file opening fails (because the file with the specified name does not exist), the pointer is set to 0.
+'For successfully opened non-empty resource files, the pointer value range is from 1 (first file position) to romfile.size+1 (past the last file position).
+'<br><br>
+'For this property to work, a non-empty resource file must first be successfully opened with romfile.open.
+'<br><br>
+'When a non-empty file is (re)opened with the romfile.open method, the pointer is reset to the first character of the file (position 1).
+'<br><br>
+'When you read from the file with romfile.getdata, the pointer is automatically moved forward by the number of bytes (characters) that have been read out.
+    get = syscall(507,"17.TDL"+) as dword
+    set = syscall(508,"17.TDL"+) (value as dword)
+end property
+
+'--------------------------------------------------------------------
+property romfile.size
+'<b>R/O PROPERTY (DWORD). </b><br><br>
+'Returns the size of the currently opened resource file.
+'<br><br>
+'Zero size is returned if no file is opened of the file opening fails (because the file with the specified name does not exist). 
+'<br><br>
+'For this property to return meaningful data, a resource file must first be successfully opened with romfile.open.
+    get = syscall(54) as dword
+end property

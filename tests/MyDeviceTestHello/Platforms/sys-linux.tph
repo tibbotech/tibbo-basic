@@ -1,0 +1,172 @@
+object sys
+'This is the system object that loosely combines "general system" stuff such as initialization (boot) event, buffer
+'management, system timer, and some other miscellaneous properties and methods.
+
+'--------------------------------------------------------------------
+event(2)  on_sys_timer
+'<b>EVENT of the sys object. </b><br><br> Periodic event that is generated at intervals defined by the <font color="maroon"><b>sys.onsystimerperiod </b></font>property.
+'<br><br>
+'Multiple <font color="teal"><b>on_sys_timer </b></font> 
+'events may be waiting in the event queue. Using doevents statement in the event handler for this event or the body of any procedure in the related
+'call chain may lead to the skipping (loss) of identical events waiting in the queue. This will happen when the 
+'<font color="teal"><b>on_sys_timer </b></font>
+'event is taken off the queue in the cause of the doevents execution related to the same event taken off the queue earlier.
+'This is usually not a problem since this event is generated periodically anyway.
+'<br><br>
+'The <font color="teal"><b>on_sys_timer </b></font>
+'event is not generated when the program execution is PAUSED (in debug mode).
+
+'--------------------------------------------------------------------
+enum pl_sys_mode
+    PL_SYS_MODE_RELEASE,    '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Debugging is not possible, application execution starts immediately after device powers up. Severe errors
+                            'such as "divizion by zero" are ignored and do not stop execution.
+    PL_SYS_MODE_DEBUG       '<b>PLATFORM CONSTANT. </b><br><br> 
+                            'Debug mode in which it is possible to cross-debug the application (under the control of TIDE software). 
+                            'Application execution is not started automatically after the power up. Severe errors such as "divizion by 
+                            'zero" halt execution.
+end enum
+
+property sys.runmode
+'<b>R/O PROPERTY (ENUM, BYTE). </b><br><br>
+'Returns current run (execution) mode: <br><br>
+'<font color="olive"><b>0- PL_SYS_MODE_RELEASE </b></font>(release mode),<br> <font color="olive"><b>1- PL_SYS_MODE_DEBUG </b></font> 
+'(debug mode).
+    get = syscall(71) as pl_sys_mode
+end property
+
+'--------------------------------------------------------------------
+property sys.totalbuffpages
+'<b>R/O PROPERTY (WORD). </b><br><br>
+'Returns the total amount of memory pages available for buffers (one page= 256 bytes). This is calculated as total available variable memory
+'(RAM) minus whatever is required to store variables of the current project. <br><br>
+'See also <font color="maroon"><b>sys.buffalloc </b></font> and <font color="maroon"><b>sys.freebuffpages</b></font>.
+    get = syscall(83,"33.TDL"+) as word
+end property
+
+'--------------------------------------------------------------------
+property sys.freebuffpages
+'<b>R/O PROPERTY (WORD). </b><br><br>
+'Returns the number of free (not yet allocated) buffer pages (one page= 256 bytes). Only changes after the <font color="maroon"><b>
+'sys.buffalloc </b></font> method is used. Preparatory methods like <font color="maroon"><b>ser.rxbuffrq </b></font>do not influence what 
+'this property returns. <br><br>
+'See also <font color="maroon"><b>sys.totalbuffpages</b></font>.
+    get = syscall(84,"33.TDL"+) as word
+end property
+
+'--------------------------------------------------------------------
+syscall(69) sys.halt()
+'<b>METHOD. </b><br><br>
+'Stops your program execution (halts VM). In the debug mode (<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>
+'1- PL_SYS_MODE_DEBUG</b></font>) causes the same result as when you press PAUSE in TIDE during the debug session. <br><br>
+'In the release mode (<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>0- PL_SYS_MODE_RELEASE</b></font>) causes the 
+'device to halt (stop) execution. <br><br>
+'Once this method has been used, there is no way for your device to resume execution on its own. <br><br>
+'See also <font color="maroon"><b>sys.reboot</b></font>.
+
+'--------------------------------------------------------------------
+syscall(70) sys.reboot()
+'<b>METHOD. </b><br><br> 
+'Causes your device to reboot through internal reset. After the device reboots it will behave as after any other reboot: enter PAUSE 
+'mode if your program was compiled for debugging, or start execution if the program was compiled for release. <br><br>
+'The PLL mode will change after the reboot if you requested the changed through <font color="maroon"><b>sys.newpll </b></font>method.<br><br>
+'See also <font color="maroon"><b>sys.currentpll</b></font>, <font color="maroon"><b>sys.runmode</b></font>,
+'<font color="maroon"><b>sys.resettype</b></font>, and <font color="maroon"><b>sys.halt</b></font>.
+
+'--------------------------------------------------------------------
+syscall(82,"32.TDL") sys.buffalloc()
+'<b>METHOD. </b><br><br>
+'Allocates buffer memory as previously requested by "buffrq" methods of individual objects (such as <font color="maroon"><b>
+'ser.rxbuffrq</b></font>).<br><br>
+'This method takes significant amount of time (100s of milliseconds) to execute, during which time the device cannot receive network packets,
+'serial data, etc. For certain interfaces like serial ports some incoming data could be lost. <br><br>
+'Buffer (re)allocation for a specific object will only work if the corresponding object or part of the object to which this buffer belongs is 
+'idle. "Part" refers to a particular serial port of the ser object, or particular socket of the sock object, etc. to which the buffer you are
+'trying to change belongs. <br><br>
+'"Idle" means different things for different objects: <font color="maroon"><b>ser.enabled</b></font>= <font color="olive"><b>0- NO </b></font> 
+'for the serial port, <font color="maroon"><b> sock.statesimple</b></font>=  <font color="olive"><b>0- PL_SSTS_CLOSED </b></font> for the 
+'socket, etc.
+
+'--------------------------------------------------------------------
+property sys.version
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'Returns firmware (TiOS) version string. Example: "EM1000-1.20.00".
+    get = syscall(428,"74.TDL"+) as string
+end property
+
+'--------------------------------------------------------------------
+property sys.timercount
+'<b>R/O PROPERTY (WORD). </b><br><br>
+'Returns the time (in half-second intervals) elapsed since the device powered up. Once this timer reaches 65535 it rolls over to 0.<br><br>
+'See also <font color="teal"><b>on_sys_timer </b></font> event.
+    get = syscall(136) as word
+end property
+
+'--------------------------------------------------------------------
+property sys.timercount32
+'<b>R/O PROPERTY (DWORD). </b><br><br>
+'Returns the time (in half-second intervals) elapsed since the device powered up. Once this timer reaches &hFFFFFFFF it rolls over to 0.<br><br>
+'See also <font color="teal"><b>on_sys_timer </b></font> event.
+    get = syscall(594) as dword
+end property
+
+'--------------------------------------------------------------------
+property sys.timercountms
+'<b> PROPERTY (DWORD). </b><br><br>
+    get = syscall(595) as dword
+    set = syscall(596) (value as dword)
+end property
+
+'--------------------------------------------------------------------
+property sys.onsystimerperiod
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 50 (0.5 seconds). </b><br><br>
+'Defines, in 10ms increments, the period at which the <font color="teal"><b>on_sys_timer </b></font> event will be generated.
+    get = syscall(292) as byte
+    set = syscall(293) (value as byte)
+end property
+
+'--------------------------------------------------------------------
+property sys.serialnum
+'<b>R/O PROPERTY (STRING). </b><br><br>
+'Returns the 12-byte or 128-byte string containing the serial number of the device.
+'<br><br>
+'In the absense of the flash IC, the 12-byte processor ID serves as a serial number. This is a preprogrammed, unalterable ID string.
+'Using <font color="maroon"><b>sys.setserialnum </b></font> won't work. 
+'<br><br>
+'When the flash is installed the 128-byte serial number comes from the security register of the flash IC. 
+'The first 64 bytes of the security register are preprogrammed with a serial number,
+'and remaining 64 bytes are one-time programmable. Use the
+'<font color="maroon"><b>sys.setserialnum </b></font>
+'method to set the data.
+    get = syscall(255,"74.TDL"+) as string
+end property
+
+'--------------------------------------------------------------------
+syscall(543,"74.TDL") sys.debugprint(byref str as string)
+'<b>METHOD. </b><br><br>
+'Sends (prints) a string to the TIDE's console output.
+'<br><br>
+'This method only works when the
+'<font color="maroon"><b>sys.runmode</b></font>= <font color="olive"><b>1- PL_SYS_MODE_DEBUG</b></font>.
+'The method allows you to trace the execution of your debug application by
+'printing messages in the console output pane of TIDE. 
+
+'--------------------------------------------------------------------
+syscall(576,"101.TDL") !sys.profile() as string
+
+'--------------------------------------------------------------------
+syscall(95) !sys.nosw() as string
+
+'--------------------------------------------------------------------
+syscall(19) !sys.sw() as string
+
+'--------------------------------------------------------------------
+syscall(628) !sys.getbuffbasesize(buff_num as byte, byref base as dword, byref size as dword)
+
+'--------------------------------------------------------------------
+syscall(738) sys.exec(byref filename as string, byref args as string, byref env as string)
+'<b>METHOD. </b><br><br>
+'Executes the Linux program.<br><br>
+'<b>filename</b> must be either a binary executable, or a script. Specify only the full path.<br><br>
+'<b>args</b> is an string of arguments list passed to the new program.<br><br>
+'<b>env</b> is an string, conventionally of the form <i>key=value</i>, which are passed as environment to the new program. May be empty. To pass several parameters, separate them with spaces: <i>key1=value1 key2=value2</i>.

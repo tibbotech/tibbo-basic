@@ -1,0 +1,31 @@
+declare sub base64_encode(byref input_str as string, input_len as byte, byref result as string)
+declare sub base64_decode(byref input as string, byref result as string)
+
+#DEFINE FLOAT_MAX_STRING_LENGTH 25
+
+declare sub time_delay_ms(delay_ms as word)
+declare function abs(Value as real) as real
+declare function sgn(Value as real) as real
+declare function math_pow(base as integer, exp as integer) as real
+declare function math_hex_to_float(byref num as string(8)) as real
+declare function string_to_float(byref s as string) as float
+declare function ftofixed(r as real, decimals as byte) as string
+declare function hex_mac(byref mac as string) as string
+declare sub json_parser_init()
+declare function json_trim(s as string) as string
+declare function json_get_catcode(ch as string(1)) as byte
+declare function json_get_value(byref key as string, byref data as string) as string
+declare function escape_string(data as string) as string
+declare function unescape_string(data as string) as string
+declare function str_to_hex(hash as string) as string
+declare function trim_trailing_zeros(s as string(FLOAT_MAX_STRING_LENGTH)) as string(FLOAT_MAX_STRING_LENGTH)
+declare function float_to_shortest_decimal_precise(f as real) as string(FLOAT_MAX_STRING_LENGTH)
+declare function find_shortest_decimal(f as real) as string(FLOAT_MAX_STRING_LENGTH)
+declare function are_same_ieee754_value(a as real, b as real) as boolean
+declare function fallback_shortest_decimal(f as real) as string
+declare function test_round_trip_accuracy(original as real, decimal_str as string(FLOAT_MAX_STRING_LENGTH)) as boolean
+declare function truncate_last_digit(s as string(FLOAT_MAX_STRING_LENGTH)) as string(FLOAT_MAX_STRING_LENGTH)
+declare function round_up_last_digit(s as string(FLOAT_MAX_STRING_LENGTH)) as string(FLOAT_MAX_STRING_LENGTH)
+declare function str_uppercase(byref s as string) as string
+declare function str_lowercase(byref s as string) as string
+declare function flip_byte(data as byte) as byte
