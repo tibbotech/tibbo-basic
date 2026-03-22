@@ -517,6 +517,16 @@ export class PCodeGenerator {
             return;
         }
 
+        if (expr.kind === 'CallExpr') {
+            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
+                if (!isFirst) {
+                    this.emitLeaToArg(tempAddr, 1);
+                    this.emitSyscallByName('strcat');
+                }
+                return;
+            }
+        }
+
         if (isFirst && expr.kind !== 'CallExpr') {
             this.emitTempStringInit(tempAddr);
         }
@@ -536,14 +546,6 @@ export class PCodeGenerator {
                 const varSym = sym as VariableSymbol;
                 this.emitVarLeaArgAt(varSym, 1);
                 this.emitSyscallByName(isFirst ? 'strcpy' : 'strcat');
-            }
-        } else if (expr.kind === 'CallExpr') {
-            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
-                if (!isFirst) {
-                    this.emitLeaToArg(tempAddr, 1);
-                    this.emitSyscallByName('strcat');
-                }
-                return;
             }
         } else if (expr.kind === 'MemberExpr') {
             const sourceAddr = isFirst ? tempAddr : tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;

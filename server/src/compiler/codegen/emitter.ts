@@ -30,6 +30,7 @@ export class ByteEmitter {
     private labels = new Map<string, CodeLabel>();
     private dataLabels = new Map<string, DataLabel>();
     private rdataEntries: RDataEntry[] = [];
+    private rdataStringMap = new Map<string, number>();
     private lineInfo: LineInfoEntry[] = [];
     private emittingInit = false;
     private use24BitCode = false;
@@ -174,6 +175,8 @@ export class ByteEmitter {
     }
 
     addStringRData(str: string): number {
+        const existing = this.rdataStringMap.get(str);
+        if (existing !== undefined) return existing;
         const offset = this.rdata.length;
         const len = str.length;
         this.rdata.push(len & 0xFF);
@@ -183,6 +186,7 @@ export class ByteEmitter {
         }
         const entry: RDataEntry = { offset, size: len + 2, references: [] };
         this.rdataEntries.push(entry);
+        this.rdataStringMap.set(str, offset);
         return offset;
     }
 
