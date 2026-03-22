@@ -607,7 +607,7 @@ export class PCodeGenerator {
 
     private generateSub(decl: AST.SubDecl): void {
         const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
-        if (!sym || decl.body.length === 0) return;
+        if (!sym) return;
 
         const endLabel = this.makeLabel('sub_end');
         this.ctx.currentFunction = sym;
@@ -636,7 +636,7 @@ export class PCodeGenerator {
 
     private generateFunction(decl: AST.FunctionDecl): void {
         const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
-        if (!sym || decl.body.length === 0) return;
+        if (!sym) return;
 
         const endLabel = this.makeLabel('func_end');
         this.ctx.currentFunction = sym;
