@@ -434,6 +434,20 @@ export class PCodeGenerator {
         return offset;
     }
 
+    private tryFoldStrCall(expr: AST.CallExpr): string | null {
+        if (expr.callee.kind !== 'IdentifierExpr') return null;
+        const sym = this.symbols.current.lookup(expr.callee.name);
+        if (!sym || sym.kind !== SymbolKind.Syscall) return null;
+        const sc = sym as SyscallSymbol;
+        if (sc.name.toLowerCase() !== 'str') return null;
+        if (expr.args.length !== 1) return null;
+        const arg = expr.args[0];
+        if (arg.kind === 'IntegerLiteral' || arg.kind === 'HexLiteral') {
+            return String((arg as AST.IntegerLiteral).value);
+        }
+        return null;
+    }
+
     private emitStringCallResultToAddr(expr: AST.CallExpr, addr: number, isByRef = false): boolean {
         if (expr.callee.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.callee.name);
@@ -518,6 +532,18 @@ export class PCodeGenerator {
         }
 
         if (expr.kind === 'CallExpr') {
+            const folded = this.tryFoldStrCall(expr);
+            if (folded !== null) {
+                this.emitTempStringInit(tempAddr, folded.length);
+                this.emitter.emitByte(OP.OPCODE_LEA);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(folded);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName(isFirst ? 'strload' : 'strcat');
+                return;
+            }
             if (this.emitStringCallResultToAddr(expr, tempAddr)) {
                 if (!isFirst) {
                     this.emitLeaToArg(tempAddr, 1);
@@ -571,6 +597,22 @@ export class PCodeGenerator {
         }
 
         if (expr.kind === 'CallExpr') {
+            const folded = this.tryFoldStrCall(expr);
+            if (folded !== null) {
+                const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                this.emitTempStringInit(litAddr, folded.length);
+                this.emitter.emitByte(OP.OPCODE_LEA);
+                this.emitter.emitDataAddress(litAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(folded);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                this.emitLeaToArg(tempAddr, 0);
+                this.emitLeaToArg(litAddr, 1);
+                this.emitSyscallByName('strcat');
+                return;
+            }
             const callResultAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
             if (this.emitStringCallResultToAddr(expr, callResultAddr)) {
                 this.emitLeaToArg(tempAddr, 0);
