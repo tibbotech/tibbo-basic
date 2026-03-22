@@ -48,6 +48,7 @@ export class PCodeGenerator {
     private tempScratchBase = 0;
     private localVarLabelMap = new Map<VariableSymbol, string>();
     private callGraph = new Map<string, Set<string>>();
+    private functionTempBase = new Map<string, number>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -81,6 +82,13 @@ export class PCodeGenerator {
     }
 
     private getTempStringAddr(slot = 0): number {
+        const fn = this.ctx.currentFunction;
+        if (fn) {
+            const fnBase = this.functionTempBase.get(fn.name);
+            if (fnBase !== undefined) {
+                return fnBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            }
+        }
         return this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
     }
 
@@ -764,6 +772,7 @@ export class PCodeGenerator {
             const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
             if (!sym) continue;
 
+            const fnParamStart = paramOffset;
             for (let i = 0; i < sym.parameters.length; i++) {
                 const v = sym.parameters[i];
                 v.address = paramBase + paramOffset;
@@ -775,20 +784,33 @@ export class PCodeGenerator {
                 paramOffset += v.dataType?.size ?? 2;
             }
 
+            const hasCallees = (this.callGraph.get(fnName)?.size ?? 0) > 0;
+
             let localOffset = 0;
-            const localBase2 = paramBase + paramOffset;
-            let ordinal = sym.parameters.length + 1;
             for (const v of sym.localVariables) {
-                v.address = localBase2 + localOffset;
-                if (this.resolveDataAddresses) {
-                    const labelName = `?V:${v.name}:local(${sym.name}:${ordinal})`;
-                    this.localVarLabelMap.set(v, labelName);
-                    this.emitter.defineDataLabel(labelName, v.address);
-                }
-                ordinal++;
+                v.address = paramBase + paramOffset + localOffset;
                 localOffset += v.dataType?.size ?? 2;
             }
-            paramOffset += localOffset;
+
+            if (hasCallees) {
+                paramOffset += localOffset;
+            }
+
+            const decl = program.declarations.find(d =>
+                (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
+            );
+            if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
+                const perStmt = this.countTempVarsPerStatement(decl.body);
+                let maxSlots = 0;
+                for (const n of perStmt) {
+                    const concurrent = n >= 2 ? 2 : n;
+                    if (concurrent > maxSlots) maxSlots = concurrent;
+                }
+                if (maxSlots > 0) {
+                    const tempBase = paramBase + paramOffset + (hasCallees ? 0 : localOffset);
+                    this.functionTempBase.set(fnName, tempBase);
+                }
+            }
         }
         this.localAllocSize += paramOffset;
     }

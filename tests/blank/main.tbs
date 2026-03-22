@@ -5,7 +5,8 @@ dim aa as string
 sub finalthing(input as string)
     dim zz as byte=1
     sys.debugprint(input)
-    sys.debugprint(str(zz))
+    zz=zz+1
+    sys.debugprint(str(zz) + "asdf")
 end sub
 
 sub somethingelse(input as string)
