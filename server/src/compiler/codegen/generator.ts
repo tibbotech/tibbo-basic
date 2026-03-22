@@ -51,6 +51,7 @@ export class PCodeGenerator {
     private functionTempBase = new Map<string, number>();
     private liveReachable = new Set<string>();
     private preEvalMap = new Map<AST.CallExpr, number>();
+    private functionReturnPtrAddr = new Map<string, number>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -466,6 +467,58 @@ export class PCodeGenerator {
         const arg = expr.args[0];
         if (arg.kind !== 'IdentifierExpr' && arg.kind !== 'IntegerLiteral' && arg.kind !== 'HexLiteral') {
             result.push(expr);
+        }
+    }
+
+    private countFunctionPreEvalScalars(decl: AST.SubDecl | AST.FunctionDecl): number {
+        let maxScalars = 0;
+        for (const stmt of decl.body) {
+            const count = this.countPreEvalScalarsInStmt(stmt);
+            if (count > maxScalars) maxScalars = count;
+        }
+        return maxScalars;
+    }
+
+    private countPreEvalScalarsInStmt(stmt: AST.Statement): number {
+        let count = 0;
+        this.walkExpressionsInNode(stmt, (expr: AST.Expression) => {
+            if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+                const scalars = this.countComplexStrCallsInExpr(expr);
+                if (scalars > count) count = scalars;
+            }
+        });
+        return count;
+    }
+
+    private countComplexStrCallsInExpr(expr: AST.Expression): number {
+        if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+            return this.countComplexStrCallsInExpr(expr.left) + this.countComplexStrCallsInExpr(expr.right);
+        }
+        if (expr.kind !== 'CallExpr') return 0;
+        if (expr.callee.kind !== 'IdentifierExpr') return 0;
+        const name = expr.callee.name.toLowerCase();
+        if (name !== 'str') return 0;
+        if (expr.args.length < 1) return 0;
+        const arg = expr.args[0];
+        if ((arg.kind === 'IntegerLiteral' || arg.kind === 'HexLiteral')) return 0;
+        if (arg.kind === 'IdentifierExpr') return 0;
+        return 1;
+    }
+
+    private walkExpressionsInNode(node: unknown, visitor: (expr: AST.Expression) => void): void {
+        if (!node || typeof node !== 'object') return;
+        const n = node as Record<string, unknown>;
+        if (n.kind && typeof n.kind === 'string' && n.kind.endsWith('Expr')) {
+            visitor(n as unknown as AST.Expression);
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const item of child) this.walkExpressionsInNode(item, visitor);
+            } else if (child && typeof child === 'object') {
+                this.walkExpressionsInNode(child, visitor);
+            }
         }
     }
 
@@ -932,6 +985,7 @@ export class PCodeGenerator {
             if (!sym) continue;
 
             const isLive = this.liveReachable.has(fnName);
+            const isFuncWithReturn = sym.kind === SymbolKind.Function && !!sym.returnType;
 
             if (isLive) {
                 for (let i = 0; i < sym.parameters.length; i++) {
@@ -944,9 +998,16 @@ export class PCodeGenerator {
                     }
                     liveParamOffset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
                 }
+                if (isFuncWithReturn) {
+                    this.functionReturnPtrAddr.set(fnName, paramBase + liveParamOffset);
+                    liveParamOffset += 4;
+                }
             } else {
                 for (const p of sym.parameters) {
                     deadParamTotal += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+                }
+                if (isFuncWithReturn) {
+                    deadParamTotal += 4;
                 }
             }
 
@@ -955,11 +1016,17 @@ export class PCodeGenerator {
             let localOffset = 0;
             if (isLive) {
                 for (const v of sym.localVariables) {
+                    if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
+                        continue;
+                    }
                     v.address = paramBase + liveParamOffset + localOffset;
                     localOffset += v.dataType?.size ?? 2;
                 }
             } else {
                 for (const v of sym.localVariables) {
+                    if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
+                        continue;
+                    }
                     localOffset += v.dataType?.size ?? 2;
                 }
             }
@@ -986,6 +1053,10 @@ export class PCodeGenerator {
                     if (maxSlots > 0) {
                         const tempBase = paramBase + liveParamOffset + (hasCallees ? 0 : localOffset);
                         this.functionTempBase.set(fnName, tempBase);
+                        if (hasCallees) {
+                            const scalarCount = this.countFunctionPreEvalScalars(decl);
+                            liveParamOffset += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+                        }
                     }
                 }
             }
@@ -1401,6 +1472,18 @@ export class PCodeGenerator {
                 if (dt && isString(dt)) {
                     this.generateStringAssignment(varSym, value);
                     return;
+                }
+                const currentFn = this.ctx.currentFunction;
+                if (currentFn && currentFn.kind === SymbolKind.Function &&
+                    varSym.name.toLowerCase() === currentFn.name.toLowerCase()) {
+                    const retPtrAddr = this.functionReturnPtrAddr.get(currentFn.name);
+                    if (retPtrAddr !== undefined) {
+                        this.generateExpression(value);
+                        const storeOp = getStoreOpcode(dt ?? BUILTIN_TYPES.word);
+                        this.emitter.emitByte(storeOp | OP.OPCODE_INDIRECT);
+                        this.emitter.emitDataAddress(retPtrAddr);
+                        return;
+                    }
                 }
                 if (this.tryEmitPropertyGetterDirect(value, varSym.address ?? 0)) {
                     return;
@@ -2311,11 +2394,10 @@ export class PCodeGenerator {
             if (sym && (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub)) {
                 const fn = sym as FunctionSymbol;
                 this.emitFunctionCall(fn, expr.args);
-                const retVar = this.getFunctionReturnVar(fn);
-                if (fn.returnType && retVar?.address !== undefined && !isString(fn.returnType)) {
+                if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name)) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
                     this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(retVar.address);
+                    this.emitter.emitDataAddress(this.getTempStringAddr(0));
                 }
                 return;
             }
@@ -2428,6 +2510,13 @@ export class PCodeGenerator {
             this.emitter.emitDataAddress(param.address ?? 0);
         }
 
+        const retPtrAddr = this.functionReturnPtrAddr.get(fn.name);
+        if (retPtrAddr !== undefined) {
+            this.emitter.emitByte(OP.OPCODE_LEA);
+            this.emitter.emitDataAddress(this.getTempStringAddr(0));
+            this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
+            this.emitter.emitDataAddress(retPtrAddr);
+        }
         this.emitter.emitByte(OP.OPCODE_CALL | OP.OPCODE_DIRECT);
         this.emitter.emitLabelReference(fn.name);
     }
