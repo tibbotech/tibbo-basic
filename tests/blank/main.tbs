@@ -6,7 +6,7 @@ sub on_sys_init()
 	aa = "hello"
     dim bb as byte
     bb = 3
-	sys.debugprint(str(bb))
+	sys.debugprint(aa + str(bb))
     bb = bb + 3
     sys.debugprint(str(bb))
     pat.play("B-G-~",PL_PAT_CANINT)

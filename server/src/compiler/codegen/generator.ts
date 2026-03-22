@@ -499,6 +499,10 @@ export class PCodeGenerator {
             return;
         }
 
+        if (isFirst && expr.kind !== 'CallExpr') {
+            this.emitTempStringInit(tempAddr);
+        }
+
         this.emitter.emitByte(OP.OPCODE_LEA);
         this.emitter.emitDataAddress(tempAddr);
         this.emitSyscallArg(0);
@@ -546,6 +550,16 @@ export class PCodeGenerator {
             return;
         }
 
+        if (expr.kind === 'CallExpr') {
+            const callResultAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            if (this.emitStringCallResultToAddr(expr, callResultAddr)) {
+                this.emitLeaToArg(tempAddr, 0);
+                this.emitLeaToArg(callResultAddr, 1);
+                this.emitSyscallByName('strcat');
+                return;
+            }
+        }
+
         this.emitter.emitByte(OP.OPCODE_LEA);
         this.emitter.emitDataAddress(tempAddr);
         this.emitSyscallArg(0);
@@ -561,12 +575,6 @@ export class PCodeGenerator {
                 const varSym = sym as VariableSymbol;
                 this.emitVarLeaArgAt(varSym, 1);
                 this.emitSyscallByName('strcat');
-            }
-        } else if (expr.kind === 'CallExpr') {
-            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
-                this.emitLeaToArg(tempAddr, 1);
-                this.emitSyscallByName('strcat');
-                return;
             }
         } else if (expr.kind === 'MemberExpr') {
             const sourceAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
@@ -635,12 +643,16 @@ export class PCodeGenerator {
     }
 
     private computeTempStringSlots(program: AST.Program): number {
+        let maxSlots = 0;
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
-            if (this.exprTreeHasStringCall(decl.body)) return 1;
+            const perStmt = this.countTempVarsPerStatement(decl.body);
+            for (const n of perStmt) {
+                if (n > maxSlots) maxSlots = n;
+            }
         }
-        return 0;
+        return maxSlots;
     }
 
     private exprTreeHasStringCall(node: unknown): boolean {
@@ -686,17 +698,116 @@ export class PCodeGenerator {
         return false;
     }
 
+    private countTempVarsForCall(callExpr: AST.CallExpr): number {
+        let count = 0;
+        let params: VariableSymbol[] | undefined;
+
+        if (callExpr.callee.kind === 'IdentifierExpr') {
+            const sym = this.symbols.current.lookup(callExpr.callee.name);
+            if (sym?.kind === SymbolKind.Syscall) {
+                params = (sym as SyscallSymbol).parameters;
+            } else if (sym?.kind === SymbolKind.Function || sym?.kind === SymbolKind.Sub) {
+                params = (sym as FunctionSymbol).parameters;
+            }
+        } else if (callExpr.callee.kind === 'MemberExpr' && callExpr.callee.object.kind === 'IdentifierExpr') {
+            const objSym = this.symbols.current.lookup(callExpr.callee.object.name);
+            if (objSym?.kind === SymbolKind.Object) {
+                const fn = (objSym as ObjectSymbol).functions.get(callExpr.callee.property.toLowerCase());
+                if (fn) params = fn.parameters;
+            }
+        }
+
+        if (!params) return 0;
+
+        for (let i = 0; i < callExpr.args.length && i < params.length; i++) {
+            const param = params[i];
+            const arg = callExpr.args[i];
+            const paramDt = param.dataType;
+            const isStringParam = paramDt && isString(paramDt);
+            const isByRefParam = param.isByRef;
+
+            if (isByRefParam || isStringParam) {
+                if (arg.kind === 'IdentifierExpr') continue;
+                count++;
+                if (this.isStringExpression(arg) && arg.kind === 'BinaryExpr' && arg.op === AST.BinaryOp.Add) {
+                    count += this.countStringCallsInConcat(arg);
+                }
+            }
+        }
+        return count;
+    }
+
+    private countStringCallsInConcat(expr: AST.Expression): number {
+        if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+            return this.countStringCallsInConcat(expr.left) + this.countStringCallsInConcat(expr.right);
+        }
+        if (expr.kind === 'CallExpr' && this.isStringExpression(expr)) return 1;
+        return 0;
+    }
+
+    private countTempVarsInNode(node: unknown): number {
+        if (!node || typeof node !== 'object') return 0;
+        const n = node as Record<string, unknown>;
+        let count = 0;
+        if (n.kind === 'CallExpr') {
+            count += this.countTempVarsForCall(n as unknown as AST.CallExpr);
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const c of child) {
+                    count += this.countTempVarsInNode(c);
+                }
+            } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                count += this.countTempVarsInNode(child);
+            }
+        }
+        return count;
+    }
+
+    private countTempVarsPerStatement(stmts: AST.Statement[]): number[] {
+        const result: number[] = [];
+        for (const stmt of stmts) {
+            const n = this.countTempVarsInNode(stmt);
+            if (n > 0) result.push(n);
+            if (stmt.kind === 'IfStmt') {
+                result.push(...this.countTempVarsPerStatement(stmt.thenBody));
+                for (const br of stmt.elseIfBranches) result.push(...this.countTempVarsPerStatement(br.body));
+                if (stmt.elseBody) result.push(...this.countTempVarsPerStatement(stmt.elseBody));
+            } else if (stmt.kind === 'WhileStmt') {
+                result.push(...this.countTempVarsPerStatement(stmt.body));
+            } else if (stmt.kind === 'ForStmt') {
+                result.push(...this.countTempVarsPerStatement(stmt.body));
+            } else if (stmt.kind === 'DoLoopStmt') {
+                result.push(...this.countTempVarsPerStatement(stmt.body));
+            } else if (stmt.kind === 'SelectCaseStmt') {
+                for (const c of stmt.cases) result.push(...this.countTempVarsPerStatement(c.body));
+                if (stmt.defaultCase) result.push(...this.countTempVarsPerStatement(stmt.defaultCase));
+            }
+        }
+        return result;
+    }
+
     private registerTempVariables(program: AST.Program): void {
-        const TEMP_COUNT = 3;
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
 
+            const perStmt = this.countTempVarsPerStatement(decl.body);
+            const slotAssignments: number[] = [];
+            for (const stmtCount of perStmt) {
+                for (let s = 0; s < stmtCount; s++) {
+                    slotAssignments.push(s);
+                }
+            }
+
             const existingCount = fn.parameters.length + fn.localVariables.length;
-            for (let i = 0; i < TEMP_COUNT; i++) {
-                const addr = this.tempScratchBase;
+            for (let i = 0; i < slotAssignments.length; i++) {
+                const slot = slotAssignments[i];
+                const addr = this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
                 const ordinal = existingCount + i + 1;
                 const labelName = `?V:_tmp_${i + 1}:local(${fn.name}:${ordinal})`;
                 const tmpVar: VariableSymbol = {
