@@ -12,7 +12,8 @@
         "build": "tsc",
         "watch": "tsc -w",
         "test": "jest",
-        "compile": "node out/compiler/compile-project.js"
+        "compile": "node out/compiler/compile-project.js",
+        "dump-pdb": "node out/compiler/dump-pdb-instructions.js"
     },
     "author": {
         "name": "Jimmy Hu",
