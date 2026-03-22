@@ -248,6 +248,7 @@ export class ProjectCompiler {
         const allWarnings: Diagnostic[] = [];
         let totalGlobalAllocSize = 0;
         let maxLocalAllocSize = 0;
+        let maxStackSize = 0;
 
         // Compile each .tbs file separately into its own OBJ
         for (const sf of sourceFiles) {
@@ -282,6 +283,9 @@ export class ProjectCompiler {
             if (result.localAllocSize > maxLocalAllocSize) {
                 maxLocalAllocSize = result.localAllocSize;
             }
+            if (result.stackSize > maxStackSize) {
+                maxStackSize = result.stackSize;
+            }
         }
 
         for (const rf of resourceFiles) {
@@ -302,6 +306,9 @@ export class ProjectCompiler {
             totalGlobalAllocSize += result.globalAllocSize;
             if (result.localAllocSize > maxLocalAllocSize) {
                 maxLocalAllocSize = result.localAllocSize;
+            }
+            if (result.stackSize > maxStackSize) {
+                maxStackSize = result.stackSize;
             }
         }
 
@@ -330,7 +337,7 @@ export class ProjectCompiler {
                 debugObj = debugResult.obj;
             }
         }
-        const stackSize = 0;
+        const stackSize = maxStackSize;
         const linkedResources = this.config.sourceFiles
             .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')
             .map(f => ({

@@ -42,10 +42,12 @@ export class PCodeGenerator {
     private globalDataOffset = 0;
     private localAllocSize = 0;
     private platformSize = 0;
+    private stackSize = 0;
     private resolveDataAddresses = false;
     private headerLineCount = 0;
     private tempScratchBase = 0;
     private localVarLabelMap = new Map<VariableSymbol, string>();
+    private callGraph = new Map<string, Set<string>>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -74,6 +76,10 @@ export class PCodeGenerator {
         return this.localAllocSize;
     }
 
+    getStackSize(): number {
+        return this.stackSize;
+    }
+
     private getTempStringAddr(slot = 0): number {
         return this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
     }
@@ -92,11 +98,15 @@ export class PCodeGenerator {
     generate(program: AST.Program): void {
         this.buildSyscallMap();
         this.allocateGlobalVariables(program);
+        this.buildCallGraph(program);
+        this.stackSize = this.computeStackSize();
         this.allocateFunctionFrames(program);
 
         const tempStringSlots = this.computeTempStringSlots(program);
-        this.tempScratchBase = this.platformSize + this.globalDataOffset + this.localAllocSize;
+        this.tempScratchBase = this.platformSize + this.globalDataOffset + this.stackSize + this.localAllocSize;
         this.localAllocSize += tempStringSlots * 257;
+
+        this.allocateCalledFunctionParams(program);
 
         this.registerTempVariables(program);
 
@@ -620,19 +630,95 @@ export class PCodeGenerator {
         this.globalDataOffset = offset;
     }
 
+    private buildCallGraph(program: AST.Program): void {
+        this.callGraph.clear();
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            const calls = new Set<string>();
+            this.collectCalls(decl.body, calls);
+            this.callGraph.set(decl.name, calls);
+        }
+    }
+
+    private collectCalls(stmts: AST.Statement[], calls: Set<string>): void {
+        for (const stmt of stmts) {
+            this.collectCallsInNode(stmt, calls);
+        }
+    }
+
+    private collectCallsInNode(node: unknown, calls: Set<string>): void {
+        if (!node || typeof node !== 'object') return;
+        const n = node as Record<string, unknown>;
+        if (n.kind === 'CallExpr') {
+            const callee = n.callee as Record<string, unknown> | undefined;
+            if (callee?.kind === 'IdentifierExpr') {
+                const name = callee.name as string;
+                const sym = this.symbols.current.lookup(name);
+                if (sym && (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub)) {
+                    calls.add(name);
+                }
+            }
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const c of child) this.collectCallsInNode(c, calls);
+            } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                this.collectCallsInNode(child, calls);
+            }
+        }
+    }
+
+    private computeStackSize(): number {
+        const calledFunctions = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) calledFunctions.add(c);
+        }
+
+        let maxDepth = 0;
+        const visited = new Set<string>();
+        const getDepth = (name: string): number => {
+            if (visited.has(name)) return 0;
+            visited.add(name);
+            const calls = this.callGraph.get(name);
+            if (!calls || calls.size === 0) return 0;
+            let max = 0;
+            for (const c of calls) {
+                const d = 1 + getDepth(c);
+                if (d > max) max = d;
+            }
+            visited.delete(name);
+            return max;
+        };
+
+        for (const name of this.callGraph.keys()) {
+            const d = getDepth(name);
+            if (d > maxDepth) maxDepth = d;
+        }
+
+        return maxDepth * this.emitter.addressSize;
+    }
+
     private allocateFunctionFrames(program: AST.Program): void {
-        const localBase = this.platformSize + this.globalDataOffset;
+        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+
+        const calledFunctions = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) calledFunctions.add(c);
+        }
 
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
+            if (calledFunctions.has(decl.name)) continue;
             const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!sym) continue;
 
             let offset = 0;
             let ordinal = 1;
-            const allLocals = [...sym.parameters, ...sym.localVariables];
-            for (const v of allLocals) {
+            for (const v of sym.localVariables) {
                 v.address = localBase + offset;
                 if (this.resolveDataAddresses) {
                     const labelName = `?V:${v.name}:local(${sym.name}:${ordinal})`;
@@ -647,6 +733,52 @@ export class PCodeGenerator {
                 this.localAllocSize = offset;
             }
         }
+    }
+
+    private allocateCalledFunctionParams(program: AST.Program): void {
+        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const paramBase = localBase + this.localAllocSize;
+
+        const calledFunctions = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) calledFunctions.add(c);
+        }
+
+        let paramOffset = 0;
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            if (!calledFunctions.has(decl.name)) continue;
+            const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!sym) continue;
+
+            for (let i = 0; i < sym.parameters.length; i++) {
+                const v = sym.parameters[i];
+                v.address = paramBase + paramOffset;
+                if (this.resolveDataAddresses) {
+                    const labelName = `?A:${sym.name}:${i}`;
+                    this.localVarLabelMap.set(v, labelName);
+                    this.emitter.defineDataLabel(labelName, v.address);
+                }
+                paramOffset += v.dataType?.size ?? 2;
+            }
+
+            let localOffset = 0;
+            const localBase2 = paramBase + paramOffset;
+            let ordinal = sym.parameters.length + 1;
+            for (const v of sym.localVariables) {
+                v.address = localBase2 + localOffset;
+                if (this.resolveDataAddresses) {
+                    const labelName = `?V:${v.name}:local(${sym.name}:${ordinal})`;
+                    this.localVarLabelMap.set(v, labelName);
+                    this.emitter.defineDataLabel(labelName, v.address);
+                }
+                ordinal++;
+                localOffset += v.dataType?.size ?? 2;
+            }
+            paramOffset += localOffset;
+        }
+        this.localAllocSize += paramOffset;
     }
 
     private allocateLocals(_fn: FunctionSymbol): void {
@@ -803,43 +935,52 @@ export class PCodeGenerator {
     }
 
     private registerTempVariables(program: AST.Program): void {
+        let bestDecl: AST.SubDecl | AST.FunctionDecl | null = null;
+        let bestCount = 0;
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
-            const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
-            if (!fn || fn.isDeclare) continue;
-
             const perStmt = this.countTempVarsPerStatement(decl.body);
-            const slotAssignments: number[] = [];
-            for (const stmtCount of perStmt) {
-                for (let s = 0; s < stmtCount; s++) {
-                    slotAssignments.push(Math.min(s, 1));
-                }
+            const total = perStmt.reduce((a, b) => a + b, 0);
+            if (total > bestCount) {
+                bestCount = total;
+                bestDecl = decl;
             }
+        }
+        if (!bestDecl || bestCount === 0) return;
 
-            const existingCount = fn.parameters.length + fn.localVariables.length;
-            for (let i = 0; i < slotAssignments.length; i++) {
-                const slot = slotAssignments[i];
-                const addr = this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
-                const ordinal = existingCount + i + 1;
-                const labelName = `?V:_tmp_${i + 1}:local(${fn.name}:${ordinal})`;
-                const tmpVar: VariableSymbol = {
-                    name: `_tmp_${i + 1}`,
-                    kind: SymbolKind.Variable,
-                    dataType: BUILTIN_TYPES.string,
-                    location: { file: '', line: 0, column: 0 },
-                    isPublic: false,
-                    isDeclare: false,
-                    isByRef: false,
-                    isGlobal: false,
-                    isTemp: true,
-                    address: addr,
-                };
-                fn.localVariables.push(tmpVar);
-                this.localVarLabelMap.set(tmpVar, labelName);
-                this.emitter.defineDataLabel(labelName, addr);
+        const fn = this.symbols.lookupGlobal(bestDecl.name) as FunctionSymbol | undefined;
+        if (!fn || fn.isDeclare) return;
+
+        const perStmt = this.countTempVarsPerStatement(bestDecl.body);
+        const slotAssignments: number[] = [];
+        for (const stmtCount of perStmt) {
+            for (let s = 0; s < stmtCount; s++) {
+                slotAssignments.push(Math.min(s, 1));
             }
-            break;
+        }
+
+        const existingCount = fn.parameters.length + fn.localVariables.length;
+        for (let i = 0; i < slotAssignments.length; i++) {
+            const slot = slotAssignments[i];
+            const addr = this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const ordinal = existingCount + i + 1;
+            const labelName = `?V:_tmp_${i + 1}:local(${fn.name}:${ordinal})`;
+            const tmpVar: VariableSymbol = {
+                name: `_tmp_${i + 1}`,
+                kind: SymbolKind.Variable,
+                dataType: BUILTIN_TYPES.string,
+                location: { file: '', line: 0, column: 0 },
+                isPublic: false,
+                isDeclare: false,
+                isByRef: false,
+                isGlobal: false,
+                isTemp: true,
+                address: addr,
+            };
+            fn.localVariables.push(tmpVar);
+            this.localVarLabelMap.set(tmpVar, labelName);
+            this.emitter.defineDataLabel(labelName, addr);
         }
     }
 
@@ -1990,27 +2131,42 @@ export class PCodeGenerator {
             if (paramDt && isString(paramDt)) {
                 const strType = paramDt as StringDataType;
                 const paramAddr = param.address ?? 0;
-                this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
-                this.emitter.emitWord(strType.maxLength << 8);
-                this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(paramAddr);
 
-                if (argExpr.kind === 'StringLiteral') {
-                    const rdataOff = this.emitter.addStringRData(argExpr.value);
-                    this.emitLeaArg(paramAddr);
-                    this.emitRDataLoad(rdataOff);
-                    this.emitSyscallArg(1);
-                    this.emitSyscallByName('strload');
-                } else if (argExpr.kind === 'IdentifierExpr') {
-                    const srcSym = this.symbols.current.lookup(argExpr.name);
-                    if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
-                        const src = srcSym as VariableSymbol;
-                        this.emitLeaArg(paramAddr);
-                        this.emitVarLeaArgAt(src, 1);
-                        this.emitSyscallByName('strcpy');
-                    }
+                if (this.isStringExpression(argExpr) && argExpr.kind === 'BinaryExpr' && argExpr.op === AST.BinaryOp.Add) {
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitStringExprToTemp(argExpr, tempAddr, true);
+                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(strType.maxLength << 8);
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(paramAddr);
+                    this.emitLeaToArg(paramAddr, 0);
+                    this.emitLeaToArg(tempAddr, 1);
+                    this.emitSyscallByName('strcpy');
                 } else {
-                    this.generateStringAssignment({ address: paramAddr, dataType: paramDt, kind: SymbolKind.Variable, isByRef: false, isGlobal: false, name: '', scope: '' } as unknown as VariableSymbol, argExpr);
+                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(strType.maxLength << 8);
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(paramAddr);
+
+                    if (argExpr.kind === 'StringLiteral') {
+                        const rdataOff = this.emitter.addStringRData(argExpr.value);
+                        this.emitLeaArg(paramAddr);
+                        this.emitRDataLoad(rdataOff);
+                        this.emitSyscallArg(1);
+                        this.emitSyscallByName('strload');
+                    } else if (argExpr.kind === 'IdentifierExpr') {
+                        const srcSym = this.symbols.current.lookup(argExpr.name);
+                        if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                            const src = srcSym as VariableSymbol;
+                            this.emitLeaArg(paramAddr);
+                            this.emitVarLeaArgAt(src, 1);
+                            this.emitSyscallByName('strcpy');
+                        }
+                    } else if (argExpr.kind === 'CallExpr' && this.isStringExpression(argExpr)) {
+                        this.emitStringCallResultToAddr(argExpr, paramAddr);
+                    } else {
+                        this.generateStringAssignment({ address: paramAddr, dataType: paramDt, kind: SymbolKind.Variable, isByRef: false, isGlobal: false, name: '', scope: '' } as unknown as VariableSymbol, argExpr);
+                    }
                 }
                 continue;
             }

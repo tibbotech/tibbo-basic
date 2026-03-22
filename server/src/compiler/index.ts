@@ -47,6 +47,7 @@ export interface CompileResult {
     warnings: Diagnostic[];
     globalAllocSize: number;
     localAllocSize: number;
+    stackSize: number;
 }
 
 export interface LinkOptions {
@@ -144,7 +145,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         headerLineCount: options.headerLineCount,
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
-        stackSize: options.stackSize ?? 0,
+        stackSize: generator.getStackSize(),
         fileData: options.fileData,
         resourceEntries: options.resourceEntries,
         sourceMap: options.sourceMap,
@@ -160,6 +161,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         warnings: diagnostics.getWarnings(),
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
+        stackSize: generator.getStackSize(),
     };
 }
 

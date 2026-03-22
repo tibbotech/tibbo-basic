@@ -151,6 +151,22 @@ export class TObjWriter {
                 if (scope.endAddress != null) scope.endAddress += initSize;
             }
             codeData = Buffer.concat([initData, Buffer.from([0x1F]), codeData]);
+
+            for (const label of emitter.getLabels().values()) {
+                if (!label.defined || !label.isCode) continue;
+                for (const ref of label.references) {
+                    const off = ref.offset;
+                    if (off + 3 <= codeData.length) {
+                        const cur = emitter.isCode24
+                            ? codeData[off] | (codeData[off + 1] << 8) | (codeData[off + 2] << 16)
+                            : codeData[off] | (codeData[off + 1] << 8);
+                        const adj = cur + initSize;
+                        codeData[off] = adj & 0xFF;
+                        codeData[off + 1] = (adj >> 8) & 0xFF;
+                        if (emitter.isCode24) codeData[off + 2] = (adj >> 16) & 0xFF;
+                    }
+                }
+            }
         }
 
         // Build section buffers
@@ -161,7 +177,7 @@ export class TObjWriter {
         sections[TObjSection.RData] = rdata;
         sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
         sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
-        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0));
+        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
         sections[TObjSection.LibFileDir] = Buffer.alloc(0);
         sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
         sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
@@ -356,7 +372,23 @@ export class TObjWriter {
             const idx = addrIndex++;
 
             const isLocal = name.includes(':local(');
-            if (isLocal) {
+            const isParam = name.startsWith('?A:');
+            if (isParam) {
+                const paramMatch = name.match(/^\?A:(.+?):(\d+)$/);
+                if (paramMatch) {
+                    const fnName = paramMatch[1];
+                    const paramIdx = parseInt(paramMatch[2], 10);
+                    for (const fn of symbols.getFunctions()) {
+                        if (fn.name === fnName && !fn.isDeclare && paramIdx < fn.parameters.length) {
+                            const v = fn.parameters[paramIdx];
+                            if (!this.localVarAddrIndex.has(v)) {
+                                this.localVarAddrIndex.set(v, idx);
+                            }
+                            break;
+                        }
+                    }
+                }
+            } else if (isLocal) {
                 const match = name.match(/^\?V:(.+?):local\(/);
                 if (match) {
                     const simpleName = match[1];
