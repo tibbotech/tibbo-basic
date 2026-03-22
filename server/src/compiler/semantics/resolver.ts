@@ -174,12 +174,28 @@ export class SemanticResolver {
         };
         this.symbols.defineGlobal(propSym);
 
+        const objPrefix = decl.isBang ? `!${decl.objectName}` : decl.objectName;
         if (decl.isBang) {
-            const intObj = this.getOrCreateObject(`!${decl.objectName}`, decl.loc);
+            const intObj = this.getOrCreateObject(objPrefix, decl.loc);
             intObj.properties.set(decl.propertyName.toLowerCase(), propSym);
         } else {
-            const obj = this.getOrCreateObject(decl.objectName, decl.loc);
+            const obj = this.getOrCreateObject(objPrefix, decl.loc);
             obj.properties.set(decl.propertyName.toLowerCase(), propSym);
+        }
+
+        if (decl.getter?.syscallNumber != null) {
+            this.symbols.addSyscallEntry({
+                name: `get_${objPrefix}.${decl.propertyName}`, kind: SymbolKind.Syscall,
+                syscallNumber: decl.getter.syscallNumber, syscallLib: decl.getter.syscallLib,
+                isInternal: false, parameters: [], location: decl.loc, isPublic: false, isDeclare: false,
+            });
+        }
+        if (decl.setter?.syscallNumber != null) {
+            this.symbols.addSyscallEntry({
+                name: `set_${objPrefix}.${decl.propertyName}`, kind: SymbolKind.Syscall,
+                syscallNumber: decl.setter.syscallNumber, syscallLib: decl.setter.syscallLib,
+                isInternal: false, parameters: [], location: decl.loc, isPublic: false, isDeclare: false,
+            });
         }
     }
 

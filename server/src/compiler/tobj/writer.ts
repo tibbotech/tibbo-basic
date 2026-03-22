@@ -70,6 +70,7 @@ export class TObjWriter {
     private flags = 0;
     private functionAddrIndex = new Map<string, number>();
     private varAddrIndex = new Map<string, number>();
+    private typeIndexMap = new Map<string, number>();
 
     setFlags(flags: number): void { this.flags = flags; }
 
@@ -388,55 +389,20 @@ export class TObjWriter {
 
     private buildSyscalls(symbols: SymbolTable): Buffer {
         const w = new BinaryWriter();
-        const allSyms = symbols.globalScope.getAllSymbols();
         const allSyscalls = symbols.getSyscalls();
 
-        // Standalone syscalls and orphan object methods from ALL collected
-        const registeredObjects = new Set<string>();
-        for (const sym of allSyms) {
-            if (sym.kind === SymbolKind.Object) registeredObjects.add(sym.name.toLowerCase());
-        }
-
-        const emittedStandalone = new Set<string>();
         for (const sc of allSyscalls) {
-            if (sc.objectName) {
-                const base = sc.objectName.toLowerCase();
-                if (registeredObjects.has(base) || registeredObjects.has('!' + base)) continue;
-            }
             let displayName: string;
-            if (sc.objectName) {
+            if (sc.name.startsWith('get_') || sc.name.startsWith('set_')) {
+                displayName = sc.name;
+            } else if (sc.objectName) {
                 const prefix = sc.isInternal ? '!' : '';
                 displayName = `${prefix}${sc.objectName}.${sc.name}`;
             } else {
                 displayName = sc.isInternal ? `!${sc.name}` : sc.name;
             }
-            if (emittedStandalone.has(displayName)) continue;
-            emittedStandalone.add(displayName);
             w.writeDword(this.symStrings.add(displayName));
             w.writeWord(sc.syscallNumber);
-        }
-
-        // Object method and property syscalls
-        for (const sym of allSyms) {
-            if (sym.kind !== SymbolKind.Object) continue;
-            const obj = sym as ObjectSymbol;
-
-            for (const [, sc] of obj.functions) {
-                const displayName = `${obj.name}.${sc.name}`;
-                w.writeDword(this.symStrings.add(displayName));
-                w.writeWord(sc.syscallNumber);
-            }
-
-            for (const [, prop] of obj.properties) {
-                if (prop.getterSyscall != null) {
-                    w.writeDword(this.symStrings.add(`get_${obj.name}.${prop.name}`));
-                    w.writeWord(prop.getterSyscall);
-                }
-                if (prop.setterSyscall != null) {
-                    w.writeDword(this.symStrings.add(`set_${obj.name}.${prop.name}`));
-                    w.writeWord(prop.setterSyscall);
-                }
-            }
         }
 
         return w.toBuffer();
@@ -446,11 +412,12 @@ export class TObjWriter {
         const w = new BinaryWriter();
         const allSyms = symbols.globalScope.getAllSymbols();
 
+        let typeIdx = 0;
         for (const sym of allSyms) {
-            if (sym.kind === SymbolKind.Type && sym.dataType) {
-                this.writeTypeEntry(w, sym.dataType);
-            }
-            if (sym.kind === SymbolKind.Enum && sym.dataType) {
+            if ((sym.kind === SymbolKind.Type || sym.kind === SymbolKind.Enum) && sym.dataType) {
+                if (isString(sym.dataType)) continue;
+                this.typeIndexMap.set(sym.dataType.name.toLowerCase(), typeIdx);
+                typeIdx++;
                 this.writeTypeEntry(w, sym.dataType);
             }
         }
@@ -522,13 +489,13 @@ export class TObjWriter {
             w.writeWord(0);
         } else if (isArray(dt)) {
             w.writeByte(TObjDataType.Array);
-            w.writeDword(0);
+            w.writeDword(this.typeIndexMap.get(dt.name.toLowerCase()) ?? 0);
         } else if (isStruct(dt)) {
             w.writeByte(TObjDataType.Struct);
-            w.writeDword(0);
+            w.writeDword(this.typeIndexMap.get(dt.name.toLowerCase()) ?? 0);
         } else if (isEnum(dt)) {
             w.writeByte(TObjDataType.Enum);
-            w.writeDword(0);
+            w.writeDword(this.typeIndexMap.get(dt.name.toLowerCase()) ?? 0);
         } else {
             w.writeByte(TObjDataType.Byte);
             w.writeDword(0);

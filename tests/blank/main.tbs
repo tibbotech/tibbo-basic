@@ -1,7 +1,7 @@
 include "global.tbh"
 
-dim aa as string="hellowwzza"
-'====================================================================
+dim aa as string
+
 sub on_sys_init()
-	sys.debugprint(aa)
+	aa = "hello"
 end sub

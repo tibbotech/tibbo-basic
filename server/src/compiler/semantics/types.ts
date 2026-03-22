@@ -131,18 +131,18 @@ export function makeEnumType(name: string, members: EnumMember[]): EnumDataType 
     }
 
     let actualType: DataType;
-    if (minVal >= BigInt(0) && maxVal <= BigInt(0xFF)) {
-        actualType = BUILTIN_TYPES.byte;
-    } else if (minVal >= BigInt(-128) && maxVal <= BigInt(127)) {
+    if (minVal >= BigInt(-128) && maxVal <= BigInt(127)) {
         actualType = BUILTIN_TYPES.char;
-    } else if (minVal >= BigInt(0) && maxVal <= BigInt(0xFFFF)) {
-        actualType = BUILTIN_TYPES.word;
+    } else if (minVal >= BigInt(0) && maxVal <= BigInt(0xFF)) {
+        actualType = BUILTIN_TYPES.byte;
     } else if (minVal >= BigInt(-32768) && maxVal <= BigInt(32767)) {
         actualType = BUILTIN_TYPES.short;
-    } else if (minVal >= BigInt(0) && maxVal <= BigInt(0xFFFFFFFF)) {
-        actualType = BUILTIN_TYPES.dword;
-    } else {
+    } else if (minVal >= BigInt(0) && maxVal <= BigInt(0xFFFF)) {
+        actualType = BUILTIN_TYPES.word;
+    } else if (minVal >= BigInt(-2147483648) && maxVal <= BigInt(2147483647)) {
         actualType = BUILTIN_TYPES.long;
+    } else {
+        actualType = BUILTIN_TYPES.dword;
     }
 
     return {

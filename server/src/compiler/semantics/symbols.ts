@@ -245,4 +245,8 @@ export class SymbolTable {
     getSyscalls(): SyscallSymbol[] {
         return this.allSyscalls;
     }
+
+    addSyscallEntry(sym: SyscallSymbol): void {
+        this.allSyscalls.push(sym);
+    }
 }
