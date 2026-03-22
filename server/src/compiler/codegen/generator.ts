@@ -213,8 +213,7 @@ export class PCodeGenerator {
     }
 
     private emitLeaToArg(addr: number, argIndex: number, isByRef = false): void {
-        const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
-        this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+        this.emitter.emitByte(isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
         this.emitter.emitDataAddress(addr);
         this.emitSyscallArg(argIndex);
     }
@@ -249,8 +248,7 @@ export class PCodeGenerator {
     private emitVarLeaArgAt(sym: VariableSymbol, argIndex: number): void {
         const labelName = sym.isGlobal ? `?V:${sym.name}` : this.localVarLabelMap.get(sym);
         if (labelName) {
-            const indirection = sym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
-            this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+            this.emitter.emitByte(sym.isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
             this.emitter.emitDataAddressRef(labelName);
             this.emitSyscallArg(argIndex);
         } else {
@@ -273,8 +271,7 @@ export class PCodeGenerator {
     }
 
     private emitLeaToArgOffset(addr: number, offset: number, isByRef = false): void {
-        const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
-        this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+        this.emitter.emitByte(isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
         this.emitter.emitDataAddress(addr);
         this.emitStoreToArgBuffer(offset, 4);
     }
@@ -282,8 +279,7 @@ export class PCodeGenerator {
     private emitVarLeaToArgOffset(sym: VariableSymbol, offset: number): void {
         const labelName = sym.isGlobal ? `?V:${sym.name}` : this.localVarLabelMap.get(sym);
         if (labelName) {
-            const indirection = sym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
-            this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+            this.emitter.emitByte(sym.isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
             this.emitter.emitDataAddressRef(labelName);
             this.emitStoreToArgBuffer(offset, 4);
         } else {
@@ -379,7 +375,11 @@ export class PCodeGenerator {
                     const argSym = this.symbols.current.lookup(argExpr.name);
                     if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
                         const varSym = argSym as VariableSymbol;
-                        this.emitter.emitByte(OP.OPCODE_LEA);
+                        if (varSym.isByRef) {
+                            this.emitter.emitByte(OP.OPCODE_LOA32);
+                        } else {
+                            this.emitter.emitByte(OP.OPCODE_LEA);
+                        }
                         this.emitVarDataAddress(varSym);
                         this.emitStoreToArgBuffer(offset, 4);
                         offset += storeSize;
@@ -797,7 +797,7 @@ export class PCodeGenerator {
                     this.emitter.defineDataLabel(labelName, v.address);
                 }
                 ordinal++;
-                offset += v.dataType?.size ?? 2;
+                offset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
             }
 
             if (!decl.name.startsWith('on_')) {
@@ -857,7 +857,7 @@ export class PCodeGenerator {
                     this.localVarLabelMap.set(v, labelName);
                     this.emitter.defineDataLabel(labelName, v.address);
                 }
-                paramEnd += v.dataType?.size ?? 2;
+                paramEnd += v.isByRef ? 4 : (v.dataType?.size ?? 2);
             }
 
             const nextCalls = this.callGraph.get(name);
@@ -900,11 +900,11 @@ export class PCodeGenerator {
                         this.localVarLabelMap.set(v, labelName);
                         this.emitter.defineDataLabel(labelName, v.address);
                     }
-                    liveParamOffset += v.dataType?.size ?? 2;
+                    liveParamOffset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
                 }
             } else {
                 for (const p of sym.parameters) {
-                    deadParamTotal += p.dataType?.size ?? 2;
+                    deadParamTotal += p.isByRef ? 4 : (p.dataType?.size ?? 2);
                 }
             }
 

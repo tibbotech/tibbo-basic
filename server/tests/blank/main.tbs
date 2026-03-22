@@ -2,7 +2,7 @@ include "global.tbh"
 
 dim aa as string
 
-sub finalthing(input as string)
+sub finalthing(byref input as string)
     dim zz as byte=1
     sys.debugprint(input)
     zz=zz+1
