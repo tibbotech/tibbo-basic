@@ -32,6 +32,7 @@ export interface CompileResult {
     errors: Diagnostic[];
     warnings: Diagnostic[];
     globalAllocSize: number;
+    localAllocSize: number;
 }
 
 export interface LinkOptions {
@@ -123,6 +124,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         sourceFilePath: options.sourceFilePath,
         firmwareVer: options.firmwareVer,
         headerLineCount: options.headerLineCount,
+        globalAllocSize: generator.getGlobalAllocSize(),
+        localAllocSize: generator.getLocalAllocSize(),
+        stackSize: 15,
     });
 
     return {
@@ -131,6 +135,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         errors: diagnostics.getErrors(),
         warnings: diagnostics.getWarnings(),
         globalAllocSize: generator.getGlobalAllocSize(),
+        localAllocSize: generator.getLocalAllocSize(),
     };
 }
 

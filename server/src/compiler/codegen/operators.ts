@@ -90,7 +90,7 @@ export function getCmpOpInfo(op: string, signed: boolean): CmpOpInfo | undefined
 }
 
 export function needsSyscall(type: DataType, op: string): boolean {
-    return isFloat(type);
+    return isFloat(type) || (isPrimitive(type) && type.size >= 4);
 }
 
 export function getSyscallName(type: DataType, op: string): string | undefined {

@@ -62,6 +62,9 @@ export interface TObjWriteOptions {
     sourceFilePath?: string;
     firmwareVer?: string;
     headerLineCount?: number;
+    globalAllocSize?: number;
+    localAllocSize?: number;
+    stackSize?: number;
 }
 
 export class TObjWriter {
@@ -137,9 +140,9 @@ export class TObjWriter {
 
         // TOBJ_ALLOC_INFO
         w.writeDword(platformSize);
-        w.writeDword(0);  // globalAllocSize (computed by linker)
-        w.writeDword(0);  // stackSize (computed by linker)
-        w.writeDword(0);  // localAllocSize (computed by linker)
+        w.writeDword(options.globalAllocSize ?? 0);
+        w.writeDword(options.stackSize ?? 0);
+        w.writeDword(options.localAllocSize ?? 0);
 
         w.writeDword(this.flags);
         w.writeDword(MAXDWORD);  // projectName (not used at OBJ level)
@@ -289,21 +292,30 @@ export class TObjWriter {
 
     private buildFunctions(symbols: SymbolTable): Buffer {
         const w = new BinaryWriter();
-        const fns = symbols.getFunctions();
+        const fns = symbols.getFunctions().filter(fn => !fn.isDeclare);
+        const functionIndex = new Map<string, number>();
+
+        for (let i = 0; i < fns.length; i++) {
+            functionIndex.set(fns[i].name.toLowerCase(), i);
+        }
 
         for (const fn of fns) {
-            if (fn.isDeclare) continue;
-
             let flags = 0;
             if (fn.isEvent) flags |= TObjFunctionFlags.Event;
 
             const addrIdx = this.functionAddrIndex.get(fn.name) ?? 0;
+            const calleeIndexes = [...fn.callees]
+                .map(name => functionIndex.get(name.toLowerCase()))
+                .filter((idx): idx is number => idx !== undefined);
 
             w.writeByte(flags);
             w.writeDword(this.symStrings.add(fn.name));
             w.writeDword(addrIdx);
             w.writeDword(fn.eventNumber ?? 0);
-            w.writeDword(fn.callees.size);
+            w.writeDword(calleeIndexes.length);
+            for (const idx of calleeIndexes) {
+                w.writeDword(idx);
+            }
         }
 
         return w.toBuffer();

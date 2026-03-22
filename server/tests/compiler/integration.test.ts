@@ -6,10 +6,10 @@ import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const TESTS_ROOT = path.resolve(REPO_ROOT, 'tests');
 
-/** Regenerate reference .tpc (and objs) via Tibbo tmake before comparing outputs. */
+/** Regenerate reference .tpc and .obj files via tmake before comparing outputs. */
 beforeAll(() => {
     const script = path.join(REPO_ROOT, 'scripts', 'generate-reference-tpc.js');
-    execFileSync(process.execPath, [script, '--optional'], {
+    execFileSync(process.execPath, [script], {
         cwd: REPO_ROOT,
         stdio: 'inherit',
         env: process.env,

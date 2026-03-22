@@ -161,9 +161,12 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
         if (this.getCurrentStack()) {
             const name = ctx.children[2].symbol.text;
             if (ctx.children.length == 4) {//define has value
+                let val = ctx.children[3].start.text.trim();
+                const commentIdx = val.indexOf("'");
+                if (commentIdx >= 0) val = val.substring(0, commentIdx).trim();
                 this.preprocessor.defines[name] = {
                     name: name,
-                    value: ctx.children[3].start.text.trim(),
+                    value: val,
                     line: ctx.start.line
                 };
             }
@@ -180,10 +183,16 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
 
     enterPreprocessorInclude(ctx: any) {
         if (this.getCurrentStack()) {
+            const firstToken = ctx.children[0].symbol || ctx.children[0];
+            const isIncludePP = firstToken && firstToken.text &&
+                firstToken.text.trim().toLowerCase() === 'includepp';
             const symbol = ctx.children[1].symbol.text;
             let filePath = symbol.substring(1, symbol.length - 1);
             filePath = filePath.split('\\').join(path.sep);
             this.addCode(ctx);
+            if (isIncludePP) {
+                return;
+            }
             if (path.basename(this.filePath) == filePath) {
                 return;
             }

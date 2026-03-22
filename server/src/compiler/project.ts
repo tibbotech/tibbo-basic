@@ -35,7 +35,7 @@ export interface ProjectConfig {
 
 export interface ProjectFile {
     path: string;
-    type: 'basic' | 'header';
+    type: 'basic' | 'header' | 'resource';
 }
 
 export interface ProjectCompileResult {
@@ -64,7 +64,9 @@ export function parseProjectFile(tprPath: string): ProjectConfig {
         const fileEntry = tpr[`file${fileIdx}`];
         config.sourceFiles.push({
             path: fileEntry['path'] || '',
-            type: fileEntry['type'] === 'basic' ? 'basic' : 'header',
+            type: fileEntry['type'] === 'basic' ? 'basic'
+                : fileEntry['type'] === 'header' ? 'header'
+                : 'resource',
         });
         fileIdx++;
     }
@@ -244,6 +246,7 @@ export class ProjectCompiler {
         const allErrors: Diagnostic[] = [];
         const allWarnings: Diagnostic[] = [];
         let totalGlobalAllocSize = 0;
+        let maxLocalAllocSize = 0;
 
         // Compile each .tbs file separately into its own OBJ
         for (const sf of sourceFiles) {
@@ -275,9 +278,13 @@ export class ProjectCompiler {
             allErrors.push(...result.errors);
             allWarnings.push(...result.warnings);
             totalGlobalAllocSize += result.globalAllocSize;
+            if (result.localAllocSize > maxLocalAllocSize) {
+                maxLocalAllocSize = result.localAllocSize;
+            }
         }
 
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
+        const stackSize = maxLocalAllocSize > 0 ? 15 : 0;
 
         const linkerOptions: LinkerOptions = {
             projectName: this.config.name || 'project',
@@ -286,8 +293,8 @@ export class ProjectCompiler {
             configStr: this.platformConfig.configStr,
             platformSize: this.platformConfig.platformId,
             globalAllocSize: totalGlobalAllocSize,
-            stackSize: 0,
-            localAllocSize: 0,
+            stackSize,
+            localAllocSize: maxLocalAllocSize,
             maxEventNumber: maxEventNumber + 1,
             flags,
             fixedTimestamp: this.options.fixedTimestamp,
