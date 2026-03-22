@@ -42,6 +42,7 @@ export interface VariableSymbol extends Symbol {
     kind: SymbolKind.Variable | SymbolKind.Parameter;
     isByRef: boolean;
     isGlobal: boolean;
+    isTemp?: boolean;
     ownerScope?: Scope;
     address?: number;
     size?: number;

@@ -4,6 +4,7 @@ import {
     TObjAddressFlags, TObjFunctionFlags, TObjRefType, TObjDataType, TObjVariableFlags,
 } from './format';
 import { ByteEmitter, CodeLabel, RDataEntry, LineInfoEntry } from '../codegen/emitter';
+import { ReferenceType } from '../codegen/opcodes';
 import { SymbolTable, FunctionSymbol, VariableSymbol, SymbolKind, ObjectSymbol, SyscallSymbol, PropertySymbol, Scope, ScopeType } from '../semantics/symbols';
 import { DataType, isPrimitive, isString, isArray, isStruct, isEnum, PrimitiveType, StringDataType, ArrayDataType, StructDataType, EnumDataType } from '../semantics/types';
 
@@ -74,6 +75,9 @@ export interface TObjWriteOptions {
     fileData?: Buffer;
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
     sourceMap?: SourceMapEntry[];
+    mergeInitIntoCode?: boolean;
+    projectName?: string;
+    buildId?: string;
 }
 
 export class TObjWriter {
@@ -102,10 +106,52 @@ export class TObjWriter {
             includeFileOffsets.push(this.symStrings.add(incFile));
         }
 
+        // Pre-add project metadata strings (before Symbols section is built)
+        const projectNameOff = options.projectName ? this.symStrings.add(options.projectName) : MAXDWORD;
+        const buildIdOff = options.buildId ? this.symStrings.add(options.buildId) : MAXDWORD;
+
         // Build section data
-        const codeData = emitter.getCode();
-        const initData = emitter.getInitCode();
+        let codeData = emitter.getCode();
+        let initData = emitter.getInitCode();
         const rdata = emitter.getRData();
+
+        if (options.mergeInitIntoCode && initData.length > 0) {
+            const initSize = initData.length + 1;
+            for (const label of emitter.getLabels().values()) {
+                if (label.defined) label.address += initSize;
+                for (const ref of label.references) {
+                    if (ref.type === ReferenceType.Code) {
+                        ref.offset += initSize;
+                    }
+                }
+            }
+            for (const label of emitter.getDataLabels().values()) {
+                for (const ref of label.references) {
+                    if (ref.type === ReferenceType.Code) {
+                        ref.offset += initSize;
+                    }
+                }
+            }
+            for (const entry of emitter.getLineInfo()) {
+                entry.address += initSize;
+            }
+            for (const entry of emitter.getRDataEntries()) {
+                for (const ref of entry.references) {
+                    if (ref.type === ReferenceType.Code) {
+                        ref.offset += initSize;
+                    }
+                }
+            }
+            for (const fn of symbols.getFunctions()) {
+                if (fn.codeStartAddress != null) fn.codeStartAddress += initSize;
+                if (fn.codeEndAddress != null) fn.codeEndAddress += initSize;
+            }
+            for (const scope of symbols.getScopes()) {
+                if (scope.startAddress != null) scope.startAddress += initSize;
+                if (scope.endAddress != null) scope.endAddress += initSize;
+            }
+            codeData = Buffer.concat([initData, Buffer.from([0x1F]), codeData]);
+        }
 
         // Build section buffers
         const sections: Buffer[] = new Array(TObjSection.CountObj).fill(Buffer.alloc(0));
@@ -115,7 +161,7 @@ export class TObjWriter {
         sections[TObjSection.RData] = rdata;
         sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
         sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
-        sections[TObjSection.EventDir] = Buffer.alloc(0);
+        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0));
         sections[TObjSection.LibFileDir] = Buffer.alloc(0);
         sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
         sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
@@ -160,8 +206,8 @@ export class TObjWriter {
         w.writeDword(options.localAllocSize ?? 0);
 
         w.writeDword(this.flags);
-        w.writeDword(MAXDWORD);  // projectName (not used at OBJ level)
-        w.writeDword(MAXDWORD);  // buildId (not used at OBJ level)
+        w.writeDword(projectNameOff);
+        w.writeDword(buildIdOff);
         w.writeDword(MAXDWORD);  // firmwareVer (not used at OBJ level)
 
         // File time
@@ -238,7 +284,7 @@ export class TObjWriter {
         for (let i = 0; i < entryCount; i++) {
             const handler = eventHandlers.get(i);
             if (handler) {
-                w.writeDword(handler.address ?? 0);
+                w.writeDword(handler.codeStartAddress ?? 0);
                 w.writeDword(globalDataSize);
             } else {
                 w.writeDword(MAXDWORD);
@@ -281,6 +327,7 @@ export class TObjWriter {
         for (const [name, label] of labels) {
             if (emittedCodeLabels.has(name)) continue;
             if (!label.defined && label.references.length === 0) continue;
+            if (/^sub_end_\d+$/.test(name) || /^fn_end_\d+$/.test(name)) continue;
 
             let flags = TObjAddressFlags.Code;
             if (label.defined) flags |= TObjAddressFlags.Defined;
@@ -300,11 +347,31 @@ export class TObjWriter {
             addrIndex++;
         }
 
-        // Data labels (global variables)
+        // Data labels (global and local variables)
         const dataLabels = emitter.getDataLabels();
+        const dataLabelNames = new Set<string>();
         for (const [name, label] of dataLabels) {
+            dataLabelNames.add(name);
             const varName = name.startsWith('?V:') ? name.substring(3) : name;
-            this.varAddrIndex.set(varName, addrIndex++);
+            const idx = addrIndex++;
+
+            const isLocal = name.includes(':local(');
+            if (isLocal) {
+                const match = name.match(/^\?V:(.+?):local\(/);
+                if (match) {
+                    const simpleName = match[1];
+                    for (const fn of symbols.getFunctions()) {
+                        if (fn.isDeclare) continue;
+                        for (const v of [...fn.parameters, ...fn.localVariables]) {
+                            if (v.name === simpleName && !this.localVarAddrIndex.has(v)) {
+                                this.localVarAddrIndex.set(v, idx);
+                            }
+                        }
+                    }
+                }
+            } else {
+                this.varAddrIndex.set(varName, idx);
+            }
 
             let flags = 0;
             if (label.defined) flags |= TObjAddressFlags.Defined;
@@ -327,6 +394,10 @@ export class TObjWriter {
             if (fn.isDeclare) continue;
             for (const v of [...fn.parameters, ...fn.localVariables]) {
                 if (v.address == null) continue;
+                if (this.localVarAddrIndex.has(v)) {
+                    localVarOrdinal++;
+                    continue;
+                }
                 this.localVarAddrIndex.set(v, addrIndex++);
 
                 w.writeByte(TObjAddressFlags.Defined);
@@ -374,9 +445,16 @@ export class TObjWriter {
     private buildScopes(symbols: SymbolTable, fileName: string, sourceFilePath?: string, headerLineCount = 0): Buffer {
         const w = new BinaryWriter();
         const fileNameOff = this.symStrings.add(sourceFilePath || fileName);
-        const scopes = symbols.getScopes().filter(
-            scope => scope !== symbols.globalScope && scope.type !== undefined,
-        );
+        const seenFunctions = new Set<FunctionSymbol>();
+        const scopes = symbols.getScopes().filter(scope => {
+            if (scope === symbols.globalScope) return false;
+            if (scope.type !== ScopeType.Function && scope.type !== ScopeType.Sub) return false;
+            if (scope.ownerFunction) {
+                if (seenFunctions.has(scope.ownerFunction)) return false;
+                seenFunctions.add(scope.ownerFunction);
+            }
+            return true;
+        });
         for (let i = 0; i < scopes.length; i++) {
             const scope = scopes[i];
             this.scopeIndexMap.set(scope, i);
@@ -407,6 +485,7 @@ export class TObjWriter {
                 let flags = 0;
                 if (v.kind === SymbolKind.Parameter) flags |= TObjVariableFlags.Argument;
                 if (v.isByRef) flags |= TObjVariableFlags.ByRef;
+                if (v.isTemp) flags |= TObjVariableFlags.Temp;
 
                 const addrIdx = v.isGlobal
                     ? (this.varAddrIndex.get(v.name) ?? 0)
@@ -530,7 +609,10 @@ export class TObjWriter {
                 lines.push({ line: mapping.originalLine, address: entry.address });
             }
 
-            for (const [filePath, lines] of fileEntries) {
+            for (const [filePath, rawLines] of fileEntries) {
+                const lines = rawLines.filter((l, i) =>
+                    i === rawLines.length - 1 || l.address !== rawLines[i + 1].address,
+                );
                 w.writeDword(this.symStrings.add(filePath));
                 w.writeDword(lines.length);
                 for (const line of lines) {

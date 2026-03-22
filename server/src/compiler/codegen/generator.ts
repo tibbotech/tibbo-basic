@@ -45,6 +45,7 @@ export class PCodeGenerator {
     private resolveDataAddresses = false;
     private headerLineCount = 0;
     private tempScratchBase = 0;
+    private localVarLabelMap = new Map<VariableSymbol, string>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -96,6 +97,8 @@ export class PCodeGenerator {
         const tempStringSlots = this.computeTempStringSlots(program);
         this.tempScratchBase = this.platformSize + this.globalDataOffset + this.localAllocSize;
         this.localAllocSize += tempStringSlots * 257;
+
+        this.registerTempVariables(program);
 
         this.emitter.beginInit();
         this.generateGlobalInit(program);
@@ -211,7 +214,12 @@ export class PCodeGenerator {
         if (sym.isGlobal) {
             this.emitter.emitDataAddressRef(`?V:${sym.name}`);
         } else {
-            this.emitter.emitDataAddress(sym.address ?? 0);
+            const labelName = this.localVarLabelMap.get(sym);
+            if (labelName) {
+                this.emitter.emitDataAddressRef(labelName);
+            } else {
+                this.emitter.emitDataAddress(sym.address ?? 0);
+            }
         }
     }
 
@@ -220,13 +228,14 @@ export class PCodeGenerator {
     }
 
     private emitVarLeaArgAt(sym: VariableSymbol, argIndex: number): void {
-        if (sym.isGlobal) {
-            this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddressRef(`?V:${sym.name}`);
+        const labelName = sym.isGlobal ? `?V:${sym.name}` : this.localVarLabelMap.get(sym);
+        if (labelName) {
+            const indirection = sym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+            this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+            this.emitter.emitDataAddressRef(labelName);
             this.emitSyscallArg(argIndex);
         } else {
             this.emitLeaToArg(sym.address ?? 0, argIndex, sym.isByRef);
-            return;
         }
     }
 
@@ -252,9 +261,11 @@ export class PCodeGenerator {
     }
 
     private emitVarLeaToArgOffset(sym: VariableSymbol, offset: number): void {
-        if (sym.isGlobal) {
-            this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddressRef(`?V:${sym.name}`);
+        const labelName = sym.isGlobal ? `?V:${sym.name}` : this.localVarLabelMap.get(sym);
+        if (labelName) {
+            const indirection = sym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+            this.emitter.emitByte(OP.OPCODE_LEA | indirection);
+            this.emitter.emitDataAddressRef(labelName);
             this.emitStoreToArgBuffer(offset, 4);
         } else {
             this.emitLeaToArgOffset(sym.address ?? 0, offset, sym.isByRef);
@@ -600,12 +611,16 @@ export class PCodeGenerator {
             if (!sym) continue;
 
             let offset = 0;
-            for (const p of sym.parameters) {
-                p.address = localBase + offset;
-                offset += p.dataType?.size ?? 2;
-            }
-            for (const v of sym.localVariables) {
+            let ordinal = 1;
+            const allLocals = [...sym.parameters, ...sym.localVariables];
+            for (const v of allLocals) {
                 v.address = localBase + offset;
+                if (this.resolveDataAddresses) {
+                    const labelName = `?V:${v.name}:local(${sym.name}:${ordinal})`;
+                    this.localVarLabelMap.set(v, labelName);
+                    this.emitter.defineDataLabel(labelName, v.address);
+                }
+                ordinal++;
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
@@ -669,6 +684,39 @@ export class PCodeGenerator {
             }
         }
         return false;
+    }
+
+    private registerTempVariables(program: AST.Program): void {
+        const TEMP_COUNT = 3;
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!fn || fn.isDeclare) continue;
+
+            const existingCount = fn.parameters.length + fn.localVariables.length;
+            for (let i = 0; i < TEMP_COUNT; i++) {
+                const addr = this.tempScratchBase;
+                const ordinal = existingCount + i + 1;
+                const labelName = `?V:_tmp_${i + 1}:local(${fn.name}:${ordinal})`;
+                const tmpVar: VariableSymbol = {
+                    name: `_tmp_${i + 1}`,
+                    kind: SymbolKind.Variable,
+                    dataType: BUILTIN_TYPES.string,
+                    location: { file: '', line: 0, column: 0 },
+                    isPublic: false,
+                    isDeclare: false,
+                    isByRef: false,
+                    isGlobal: false,
+                    isTemp: true,
+                    address: addr,
+                };
+                fn.localVariables.push(tmpVar);
+                this.localVarLabelMap.set(tmpVar, labelName);
+                this.emitter.defineDataLabel(labelName, addr);
+            }
+            break;
+        }
     }
 
     // ─── Global init ────────────────────────────────────────────────────────

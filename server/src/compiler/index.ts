@@ -34,6 +34,10 @@ export interface CompileOptions {
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
     sourceMap?: SourceMapEntry[];
     resolveDataAddresses?: boolean;
+    stackSize?: number;
+    mergeInitIntoCode?: boolean;
+    projectName?: string;
+    buildId?: string;
 }
 
 export interface CompileResult {
@@ -121,6 +125,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     }
     if (options.resolveDataAddresses) {
         generator.setResolveDataAddresses(true);
+        generator.emitter.setAutoTrackDataRefs(true);
     }
     generator.generate(ast);
 
@@ -139,10 +144,13 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         headerLineCount: options.headerLineCount,
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
-        stackSize: 15,
+        stackSize: options.stackSize ?? 0,
         fileData: options.fileData,
         resourceEntries: options.resourceEntries,
         sourceMap: options.sourceMap,
+        mergeInitIntoCode: options.mergeInitIntoCode,
+        projectName: options.projectName,
+        buildId: options.buildId,
     });
 
     return {

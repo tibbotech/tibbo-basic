@@ -152,9 +152,8 @@ export class SemanticResolver {
         };
         if (!decl.objectName) {
             this.symbols.defineGlobal(sysSym);
-        }
-
-        if (decl.objectName) {
+        } else {
+            this.symbols.addSyscallEntry(sysSym);
             if (decl.isInternal) {
                 const intObj = this.getOrCreateObject(`!${decl.objectName}`, decl.loc);
                 intObj.functions.set(decl.name.toLowerCase(), sysSym);

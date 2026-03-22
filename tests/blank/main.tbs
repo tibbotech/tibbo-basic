@@ -3,10 +3,10 @@ include "global.tbh"
 dim aa as string
 
 sub on_sys_init()
-	aa = "hello"
+	aa = "helloaabbb"
     dim bb as byte
-    bb = 3
-	sys.debugprint(str(bb))
+    bb = 0
+	sys.debugprint(aa + str(bb))
     bb = bb + 3
     sys.debugprint(str(bb))
     pat.play("B-G-~",PL_PAT_CANINT)

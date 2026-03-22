@@ -305,6 +305,9 @@ export class ProjectCompiler {
             }
         }
 
+        const buildId = this.options.fixedBuildId ?? this.generateBuildId();
+        const projectName = this.config.name || 'project';
+
         const { source: combinedSource, sourceMap } = this.buildCombinedSource(preprocessor);
         let debugObj: Buffer | null = null;
         if (combinedSource.replace(/\s/g, '').length > 0) {
@@ -313,19 +316,20 @@ export class ProjectCompiler {
                 flags,
                 maxEventNumber,
                 platformSize: this.platformConfig.platformId,
-                includedFiles,
+                includedFiles: [],
                 fileSequence,
-                sourceFilePath: path.join(this.projectPath, 'gen'),
+                sourceFilePath: projectName,
                 firmwareVer: this.platformConfig.version,
                 sourceMap,
                 resolveDataAddresses: true,
+                mergeInitIntoCode: true,
+                projectName,
+                buildId,
             });
             if (debugResult.errors.length === 0) {
                 debugObj = debugResult.obj;
             }
         }
-
-        const buildId = this.options.fixedBuildId ?? this.generateBuildId();
         const stackSize = 0;
         const linkedResources = this.config.sourceFiles
             .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')

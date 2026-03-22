@@ -34,6 +34,9 @@ export class ByteEmitter {
     private emittingInit = false;
     private use24BitCode = false;
     private useData32 = false;
+    private autoTrackDataRefs = false;
+    private addrToDataLabel = new Map<number, DataLabel>();
+    private suppressAutoTrack = false;
 
     get codeSize(): number { return this.code.length; }
     get initSize(): number { return this.initCode.length; }
@@ -41,6 +44,7 @@ export class ByteEmitter {
 
     setUse24BitCode(v: boolean): void { this.use24BitCode = v; }
     setUseData32(v: boolean): void { this.useData32 = v; }
+    setAutoTrackDataRefs(v: boolean): void { this.autoTrackDataRefs = v; }
     get isData32(): boolean { return this.useData32; }
     get isCode24(): boolean { return this.use24BitCode; }
     get addressSize(): number { return this.use24BitCode ? 3 : 2; }
@@ -74,6 +78,17 @@ export class ByteEmitter {
     }
 
     emitDataAddress(value: number): void {
+        if (this.autoTrackDataRefs && !this.suppressAutoTrack) {
+            const label = this.addrToDataLabel.get(value);
+            if (label) {
+                const ref: CodeReference = {
+                    type: this.emittingInit ? ReferenceType.Init : ReferenceType.Code,
+                    offset: this.currentOffset,
+                    targetLabel: label.name,
+                };
+                label.references.push(ref);
+            }
+        }
         if (this.useData32) {
             this.emitDword(value);
         } else {
@@ -90,6 +105,9 @@ export class ByteEmitter {
             label.address = address;
             label.defined = true;
         }
+        if (!this.addrToDataLabel.has(address)) {
+            this.addrToDataLabel.set(address, label);
+        }
         return label;
     }
 
@@ -105,7 +123,9 @@ export class ByteEmitter {
             targetLabel: name,
         };
         label.references.push(ref);
+        this.suppressAutoTrack = true;
         this.emitDataAddress(label.address);
+        this.suppressAutoTrack = false;
     }
 
     getDataLabels(): Map<string, DataLabel> { return this.dataLabels; }
