@@ -449,6 +449,9 @@ export class PCodeGenerator {
         this.allocateLocals(sym);
         this.generateBlock(decl.body);
         this.emitter.defineLabel(endLabel);
+        if (decl.endLoc) {
+            this.emitter.addLineInfo(this.emitter.currentOffset, decl.endLoc.line);
+        }
         this.emitter.emitByte(OP.OPCODE_RET);
         sym.codeEndAddress = this.emitter.currentOffset;
         sym.endLoc = decl.endLoc;
@@ -475,6 +478,9 @@ export class PCodeGenerator {
         this.allocateLocals(sym);
         this.generateBlock(decl.body);
         this.emitter.defineLabel(endLabel);
+        if (decl.endLoc) {
+            this.emitter.addLineInfo(this.emitter.currentOffset, decl.endLoc.line);
+        }
         this.emitter.emitByte(OP.OPCODE_RET);
         sym.codeEndAddress = this.emitter.currentOffset;
         sym.endLoc = decl.endLoc;

@@ -26,15 +26,15 @@ export class SemanticResolver {
     }
 
     resolve(program: AST.Program): void {
-        // Pass 1a: collect enums, types, objects first (they define types used elsewhere)
+        // Pass 1a: collect enums and types first (they define types used elsewhere)
         for (const decl of program.declarations) {
-            if (decl.kind === 'EnumDecl' || decl.kind === 'TypeDecl' || decl.kind === 'ObjectDecl') {
+            if (decl.kind === 'EnumDecl' || decl.kind === 'TypeDecl') {
                 this.collectDeclaration(decl);
             }
         }
-        // Pass 1b: collect everything else (variables, functions, syscalls, etc.)
+        // Pass 1b: collect everything else in source order (objects, syscalls, variables, etc.)
         for (const decl of program.declarations) {
-            if (decl.kind !== 'EnumDecl' && decl.kind !== 'TypeDecl' && decl.kind !== 'ObjectDecl') {
+            if (decl.kind !== 'EnumDecl' && decl.kind !== 'TypeDecl') {
                 this.collectDeclaration(decl);
             }
         }
@@ -114,12 +114,8 @@ export class SemanticResolver {
     }
 
     private collectObject(decl: AST.ObjectDecl): void {
-        const objSym: ObjectSymbol = {
-            name: decl.name, kind: SymbolKind.Object,
-            location: decl.loc, isPublic: false, isDeclare: false,
-            properties: new Map(), functions: new Map(), events: new Map(),
-        };
-        this.symbols.defineGlobal(objSym);
+        const obj = this.getOrCreateObject(decl.name, decl.loc);
+        obj.location = decl.loc;
     }
 
     private collectEvent(decl: AST.EventDecl): void {

@@ -186,11 +186,22 @@ export class ProjectCompiler {
         includedFiles.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
         // File processing sequence (includes re-entries for LineInfo blocks)
-        const fileSequence: string[] = [];
-        for (const filePath of preprocessor.fileSequence as string[]) {
+        const rawFileSeq: string[] = [];
+        for (const filePath of (preprocessor.lineInfoFileSequence || preprocessor.fileSequence) as string[]) {
             const basename = path.basename(filePath);
             if (sourceFileBasenames.has(basename)) continue;
-            fileSequence.push(filePath);
+            if (basename.toLowerCase() === 'global.tbh') continue;
+            const content = preprocessor.files[filePath] as string;
+            if (content && content.replace(/\s/g, '').length === 0) continue;
+            rawFileSeq.push(filePath);
+        }
+        // Remove "last returns": return-to-parent after the final include in each file
+        const fileSequence: string[] = [];
+        for (let i = 0; i < rawFileSeq.length; i++) {
+            const isReturn = i >= 2 && rawFileSeq[i] === rawFileSeq[i - 2];
+            const isLast = isReturn && (i + 2 >= rawFileSeq.length || rawFileSeq[i] !== rawFileSeq[i + 2]);
+            if (isLast) continue;
+            fileSequence.push(rawFileSeq[i]);
         }
 
         const flags = this.getCompilerFlags();

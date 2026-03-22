@@ -28,6 +28,7 @@ export default class TibboBasicPreprocessor {
     files: { [filename: string]: string } = {};
     filePriorities: string[] = [];
     fileSequence: string[] = [];
+    lineInfoFileSequence: string[] = [];
     originalFiles: { [filename: string]: string } = {};
     private parseStack: Set<string> = new Set();
 
@@ -66,24 +67,20 @@ export default class TibboBasicPreprocessor {
         return path.join(currentDirectory, filePath);
     }
 
-    private pathKey(p: string): string {
-        return p.toLowerCase();
-    }
-
     parseFile(currentDirectory: string, filePath: string, update = false): string {
         filePath = this.getFilePath(currentDirectory, filePath);
-        const key = this.pathKey(filePath);
-        if (this.files[key] && !update) {
+        if (this.files[filePath] && !update) {
             return filePath;
         }
-        if (this.parseStack.has(key)) {
+        if (this.parseStack.has(filePath)) {
             return filePath;
         }
         this.parseStack.add(filePath);
         this.fileSequence.push(filePath);
+        this.lineInfoFileSequence.push(filePath);
         let deviceRootFile = '';
-        if (this.originalFiles[filePath] == undefined) {
-            this.filePriorities.push(filePath);
+        const isNewFile = this.originalFiles[filePath] == undefined;
+        if (isNewFile) {
             deviceRootFile = fs.readFileSync(filePath, 'utf-8');
             this.originalFiles[filePath] = deviceRootFile;
         }
@@ -109,6 +106,9 @@ export default class TibboBasicPreprocessor {
             antlr4.tree.ParseTreeWalker.DEFAULT.walk(preprocessor, tree);
         } catch (e) {
             console.error(`Failed to parse file: ${filePath}`);
+        }
+        if (isNewFile) {
+            this.filePriorities.push(filePath);
         }
         this.parseStack.delete(filePath);
         return filePath;
@@ -196,6 +196,7 @@ export class PreprocessorListener extends TibboBasicPreprocessorParserListener {
             if (path.extname(filePath) == '.tbh') {
                 this.preprocessor.parseFile(path.dirname(this.filePath), filePath.replace('.tbh', '.tbs'), true);
             }
+            this.preprocessor.lineInfoFileSequence.push(this.filePath);
         }
     }
 

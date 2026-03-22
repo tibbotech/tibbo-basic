@@ -98,15 +98,15 @@ export class TObjWriter {
         sections[TObjSection.ResFileDir] = Buffer.alloc(0);
         sections[TObjSection.EventDir] = Buffer.alloc(0);
         sections[TObjSection.LibFileDir] = Buffer.alloc(0);
+        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
         sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
+        sections[TObjSection.Types] = this.buildTypes(symbols);
         sections[TObjSection.Functions] = this.buildFunctions(symbols);
         sections[TObjSection.Scopes] = this.buildScopes(symbols, fileName, options.sourceFilePath, options.headerLineCount);
         sections[TObjSection.Variables] = this.buildVariables(symbols);
         sections[TObjSection.Objects] = this.buildObjects(symbols);
         sections[TObjSection.Syscalls] = this.buildSyscalls(symbols);
-        sections[TObjSection.Types] = this.buildTypes(symbols);
-        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
-        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath);
+        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount);
         sections[TObjSection.LibNameDir] = Buffer.alloc(0);
         sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
         sections[TObjSection.Extra] = this.buildExtra(fileName, options.sourceFilePath, options.firmwareVer);
@@ -476,7 +476,7 @@ export class TObjWriter {
         return w.toBuffer();
     }
 
-    private buildLineInfo(emitter: ByteEmitter, fileName: string, fileSequence: string[], sourceFilePath?: string): Buffer {
+    private buildLineInfo(emitter: ByteEmitter, fileName: string, fileSequence: string[], sourceFilePath?: string, headerLineCount = 0): Buffer {
         const w = new BinaryWriter();
         const entries = emitter.getLineInfo();
 
@@ -490,7 +490,7 @@ export class TObjWriter {
         w.writeDword(this.symStrings.add(sourceFilePath || fileName));
         w.writeDword(entries.length);
         for (const entry of entries) {
-            w.writeDword(entry.line);
+            w.writeDword(Math.max(1, entry.line - headerLineCount));
             w.writeDword(entry.address);
         }
 
