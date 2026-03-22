@@ -757,12 +757,11 @@ export class PCodeGenerator {
             for (const c of calls) calledFunctions.add(c);
         }
 
+        const ordered = this.getCallChainOrder(calledFunctions);
+
         let paramOffset = 0;
-        for (const decl of program.declarations) {
-            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
-            if (!this.isFromCurrentFile(decl)) continue;
-            if (!calledFunctions.has(decl.name)) continue;
-            const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+        for (const fnName of ordered) {
+            const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
             if (!sym) continue;
 
             for (let i = 0; i < sym.parameters.length; i++) {
@@ -792,6 +791,45 @@ export class PCodeGenerator {
             paramOffset += localOffset;
         }
         this.localAllocSize += paramOffset;
+    }
+
+    private getCallChainOrder(calledFunctions: Set<string>): string[] {
+        const result: string[] = [];
+        const visited = new Set<string>();
+
+        const roots: string[] = [];
+        for (const name of this.callGraph.keys()) {
+            if (!calledFunctions.has(name)) roots.push(name);
+        }
+
+        const queue: string[] = [];
+        for (const root of roots) {
+            const calls = this.callGraph.get(root);
+            if (calls) {
+                for (const c of calls) {
+                    if (calledFunctions.has(c) && !visited.has(c)) {
+                        queue.push(c);
+                    }
+                }
+            }
+        }
+
+        while (queue.length > 0) {
+            const name = queue.shift()!;
+            if (visited.has(name)) continue;
+            visited.add(name);
+            result.push(name);
+            const calls = this.callGraph.get(name);
+            if (calls) {
+                for (const c of calls) {
+                    if (calledFunctions.has(c) && !visited.has(c)) {
+                        queue.push(c);
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     private allocateLocals(_fn: FunctionSymbol): void {

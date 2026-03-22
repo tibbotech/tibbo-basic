@@ -3,7 +3,9 @@ include "global.tbh"
 dim aa as string
 
 sub finalthing(input as string)
+    dim zz as byte=1
     sys.debugprint(input)
+    sys.debugprint(str(zz))
 end sub
 
 sub somethingelse(input as string)
