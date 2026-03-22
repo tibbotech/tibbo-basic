@@ -256,9 +256,8 @@ export class PCodeGenerator {
         }
     }
 
-    private emitTempStringInit(addr: number): void {
-        this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
-        this.emitter.emitWord(0xFF00);
+    private emitTempStringInit(addr: number, maxLen = 255): void {
+        this.generateIntLiteral(maxLen << 8);
         this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
         this.emitter.emitDataAddress(addr);
     }
@@ -353,9 +352,16 @@ export class PCodeGenerator {
                     }
                 }
                 if (paramDt && isString(paramDt) && argExpr.kind === 'StringLiteral') {
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitTempStringInit(tempAddr, argExpr.value.length);
+                    this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(tempAddr);
+                    this.emitSyscallArg(0);
                     const rdataOff = this.emitter.addStringRData(argExpr.value);
                     this.emitRDataLoad(rdataOff);
-                    this.emitStoreToArgBuffer(offset, 4);
+                    this.emitSyscallArg(1);
+                    this.emitSyscallByName('strload');
+                    this.emitLeaToArgOffset(tempAddr, offset);
                     offset += storeSize;
                     continue;
                 }
@@ -1295,7 +1301,10 @@ export class PCodeGenerator {
         } else if (value >= 0 && value <= 255) {
             this.emitter.emitByte(OP.OPCODE_LOA8 | OP.OPCODE_IMMEDIATE);
             this.emitter.emitByte(value & 0xFF);
-        } else if (value >= -32768 && value <= 65535) {
+        } else if (value >= -32768 && value <= 32767) {
+            this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_IMMEDIATE);
+            this.emitter.emitWord(value & 0xFFFF);
+        } else if (value >= 0 && value <= 65535) {
             this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
             this.emitter.emitWord(value & 0xFFFF);
         } else {
