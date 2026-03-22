@@ -2,8 +2,16 @@ include "global.tbh"
 
 dim aa as string
 
-sub dosomething(input as string)
+sub finalthing(input as string)
     sys.debugprint(input)
+end sub
+
+sub somethingelse(input as string)
+    finalthing(input)
+end sub
+
+sub dosomething(input as string)
+    somethingelse(input)
 end sub
 
 sub on_sys_init()

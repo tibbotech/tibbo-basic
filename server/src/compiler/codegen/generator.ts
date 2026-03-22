@@ -718,6 +718,18 @@ export class PCodeGenerator {
 
             let offset = 0;
             let ordinal = 1;
+            for (let pi = 0; pi < sym.parameters.length; pi++) {
+                const v = sym.parameters[pi];
+                v.address = localBase + offset;
+                if (this.resolveDataAddresses) {
+                    const labelName = `?A:${sym.name}:${pi}`;
+                    this.localVarLabelMap.set(v, labelName);
+                    this.emitter.defineDataLabel(labelName, v.address);
+                }
+                ordinal++;
+                offset += v.dataType?.size ?? 2;
+            }
+            const localsStartOffset = offset;
             for (const v of sym.localVariables) {
                 v.address = localBase + offset;
                 if (this.resolveDataAddresses) {
@@ -729,8 +741,9 @@ export class PCodeGenerator {
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            if (offset > this.localAllocSize) {
-                this.localAllocSize = offset;
+            const localVarsSize = offset - localsStartOffset;
+            if (localVarsSize > this.localAllocSize) {
+                this.localAllocSize = localVarsSize;
             }
         }
     }
