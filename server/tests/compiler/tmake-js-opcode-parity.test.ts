@@ -33,6 +33,12 @@ function findTprBasename(projectDir: string): string {
 function runTmake(projectDir: string): Buffer {
     const tpr = findTprBasename(projectDir);
     const platformsDir = path.join(projectDir, 'Platforms');
+    const tmpDir = path.join(projectDir, 'tmp');
+    if (fs.existsSync(tmpDir)) {
+        for (const f of fs.readdirSync(tmpDir)) {
+            fs.unlinkSync(path.join(tmpDir, f));
+        }
+    }
     execFileSync(tmakePath, [tpr, '-p', platformsDir], {
         cwd: projectDir,
         encoding: 'utf8',
