@@ -10,6 +10,7 @@ import { PCodeGenerator } from './codegen/generator';
 import { TObjWriter } from './tobj/writer';
 import { Linker, LinkerOptions } from './linker/linker';
 import { TObjHeaderFlags } from './tobj/format';
+import { resolvePathInsensitive } from '../pathUtils';
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const ini = require('ini');
@@ -106,9 +107,10 @@ export class ProjectCompiler {
 
     private loadPlatformConfig(): PlatformConfig {
         const result: PlatformConfig = { version: '', codebits: 16, databits: 16, platformId: 0, configStr: '', maxEventNumber: 32 };
-        const platformDir = path.join(this.platformsPath, this.config.platform);
-        const tpFile = path.join(platformDir, this.config.platform + '.tp');
-        if (fs.existsSync(tpFile)) {
+        const platformDir = resolvePathInsensitive(this.platformsPath, this.config.platform)
+            || path.join(this.platformsPath, this.config.platform);
+        const tpFile = resolvePathInsensitive(platformDir, this.config.platform + '.tp');
+        if (tpFile) {
             const tp = ini.parse(fs.readFileSync(tpFile, 'utf-8'));
             const platform = tp['platform'] || {};
             result.version = platform['version'] || '';
@@ -116,8 +118,8 @@ export class ProjectCompiler {
             result.databits = parseInt(platform['databits'] || '16', 10);
         }
 
-        const tphFile = path.join(platformDir, this.config.platform + '.tph');
-        if (fs.existsSync(tphFile)) {
+        const tphFile = resolvePathInsensitive(platformDir, this.config.platform + '.tph');
+        if (tphFile) {
             const content = fs.readFileSync(tphFile, 'utf-8');
             const pidMatch = content.match(/#define\s+PLATFORM_ID\s+(\d+)/);
             if (pidMatch) result.platformId = parseInt(pidMatch[1], 10);
@@ -165,11 +167,38 @@ export class ProjectCompiler {
         // Build shared header source from platform and .tbh files
         const headerSource = this.buildHeaderSource(preprocessor);
 
+        // Collect included file paths (non-.tbs) in preprocessor order
+        const sourceFileBasenames = new Set(
+            this.config.sourceFiles
+                .filter(f => f.type === 'basic')
+                .map(f => path.basename(f.path)),
+        );
+        const includedFiles: string[] = [];
+        const seenPaths = new Set<string>();
+        for (const filePath of preprocessor.filePriorities as string[]) {
+            const key = filePath.toLowerCase();
+            if (seenPaths.has(key)) continue;
+            seenPaths.add(key);
+            const basename = path.basename(filePath);
+            if (sourceFileBasenames.has(basename)) continue;
+            includedFiles.push(filePath);
+        }
+        includedFiles.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+        // File processing sequence (includes re-entries for LineInfo blocks)
+        const fileSequence: string[] = [];
+        for (const filePath of preprocessor.fileSequence as string[]) {
+            const basename = path.basename(filePath);
+            if (sourceFileBasenames.has(basename)) continue;
+            fileSequence.push(filePath);
+        }
+
         const flags = this.getCompilerFlags();
         const maxEventNumber = this.platformConfig.maxEventNumber;
         const objs = new Map<string, Buffer>();
         const allErrors: Diagnostic[] = [];
         const allWarnings: Diagnostic[] = [];
+        let totalGlobalAllocSize = 0;
 
         // Compile each .tbs file separately into its own OBJ
         for (const sf of sourceFiles) {
@@ -184,17 +213,23 @@ export class ProjectCompiler {
             );
 
             const baseName = path.basename(sf.path);
+            const sourceFilePath = path.resolve(this.projectPath, sf.path);
             const result = compile(perFileSource, {
                 fileName: baseName,
                 flags,
                 maxEventNumber,
                 platformSize: this.platformConfig.platformId,
                 headerLineCount,
+                includedFiles,
+                fileSequence,
+                sourceFilePath,
+                firmwareVer: this.platformConfig.version,
             });
 
             objs.set(baseName + '.obj', result.obj);
             allErrors.push(...result.errors);
             allWarnings.push(...result.warnings);
+            totalGlobalAllocSize += result.globalAllocSize;
         }
 
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
@@ -205,6 +240,7 @@ export class ProjectCompiler {
             firmwareVer: this.platformConfig.version,
             configStr: this.platformConfig.configStr,
             platformSize: this.platformConfig.platformId,
+            globalAllocSize: totalGlobalAllocSize,
             stackSize: 0,
             localAllocSize: 0,
             maxEventNumber: maxEventNumber + 1,

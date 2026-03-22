@@ -62,6 +62,9 @@ export interface FunctionSymbol extends Symbol {
     isEvent: boolean;
     eventNumber?: number;
     localAllocSize?: number;
+    codeStartAddress?: number;
+    codeEndAddress?: number;
+    endLoc?: SourceLocation;
 }
 
 export interface TypeSymbol extends Symbol {
@@ -91,6 +94,7 @@ export interface SyscallSymbol extends Symbol {
     syscallNumber: number;
     syscallLib?: string;
     objectName?: string;
+    isInternal?: boolean;
     parameters: VariableSymbol[];
     returnType?: DataType;
 }
@@ -170,6 +174,7 @@ export class SymbolTable {
     private allScopes: Scope[] = [];
     private allFunctions: FunctionSymbol[] = [];
     private allLabels: LabelSymbol[] = [];
+    private allSyscalls: SyscallSymbol[] = [];
 
     constructor() {
         this.globalScope = new Scope(ScopeType.Global);
@@ -211,6 +216,9 @@ export class SymbolTable {
         if (symbol.kind === SymbolKind.Function || symbol.kind === SymbolKind.Sub) {
             this.allFunctions.push(symbol as FunctionSymbol);
         }
+        if (symbol.kind === SymbolKind.Syscall) {
+            this.allSyscalls.push(symbol as SyscallSymbol);
+        }
     }
 
     lookup(name: string): AnySymbol | undefined {
@@ -231,5 +239,9 @@ export class SymbolTable {
 
     getLabels(): LabelSymbol[] {
         return this.allLabels;
+    }
+
+    getSyscalls(): SyscallSymbol[] {
+        return this.allSyscalls;
     }
 }

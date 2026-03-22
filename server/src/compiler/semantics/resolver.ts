@@ -138,6 +138,7 @@ export class SemanticResolver {
         const sysSym: SyscallSymbol = {
             name: decl.name, kind: SymbolKind.Syscall, syscallNumber: decl.syscallNumber,
             syscallLib: decl.syscallLib, objectName: decl.objectName,
+            isInternal: decl.isInternal,
             parameters: params, returnType,
             location: decl.loc, isPublic: false, isDeclare: false,
         };

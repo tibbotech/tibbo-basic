@@ -8,6 +8,7 @@ import { TBDefine } from './types';
 import { TerminalNodeImpl } from 'antlr4/tree/Tree';
 import { InputStream, ParserRuleContext } from 'antlr4';
 import { getHeapStatistics } from 'v8';
+import { resolvePathInsensitive } from './pathUtils';
 
 const antlr4 = require('antlr4');
 const TibboBasicPreprocessorLexer = require('../language/TibboBasic/lib/TibboBasicPreprocessorLexer').TibboBasicPreprocessorLexer;
@@ -26,6 +27,7 @@ export default class TibboBasicPreprocessor {
     codes: { [filename: string]: Array<TerminalNodeImpl> } = {};
     files: { [filename: string]: string } = {};
     filePriorities: string[] = [];
+    fileSequence: string[] = [];
     originalFiles: { [filename: string]: string } = {};
     private parseStack: Set<string> = new Set();
 
@@ -47,32 +49,19 @@ export default class TibboBasicPreprocessor {
     parsePlatforms(): void {
         this.codes = {};
         this.defines = {};
-        //parse platforms
-        const currentPath = path.join(this.platformsPath, this.platformType);
+        const currentPath = resolvePathInsensitive(this.platformsPath, this.platformType)
+            || path.join(this.platformsPath, this.platformType);
         this.parseFile(currentPath, this.platformType + '.tph');
     }
 
     getFilePath(currentDirectory: string, filePath: string): string {
         const platformLibs = path.join(this.platformsPath, 'src', this.platformVersion);
-        if (fs.existsSync(path.join(platformLibs, filePath.toLowerCase()))) {
-            filePath = filePath.toLowerCase();
+        const candidates = [platformLibs, this.projectPath, currentDirectory];
+        for (const dir of candidates) {
+            const resolved = resolvePathInsensitive(dir, filePath);
+            if (resolved) return resolved;
         }
-        if (fs.existsSync(path.join(this.projectPath, filePath.toLowerCase()))) {
-            filePath = filePath.toLowerCase();
-        }
-        if (fs.existsSync(path.join(currentDirectory, filePath.toLowerCase()))) {
-            filePath = filePath.toLowerCase();
-        }
-        if (fs.existsSync(path.join(platformLibs, filePath))) {//check platforms path
-            filePath = path.join(platformLibs, filePath);
-        }
-        else if (fs.existsSync(path.join(this.projectPath, filePath))) {
-            filePath = path.join(this.projectPath, filePath);
-        }
-        else {//check relative
-            filePath = path.join(currentDirectory, filePath);
-        }
-        return filePath;
+        return path.join(currentDirectory, filePath);
     }
 
     parseFile(currentDirectory: string, filePath: string, update = false): string {
@@ -84,6 +73,7 @@ export default class TibboBasicPreprocessor {
             return filePath;
         }
         this.parseStack.add(filePath);
+        this.fileSequence.push(filePath);
         let deviceRootFile = '';
         if (this.originalFiles[filePath] == undefined) {
             this.filePriorities.push(filePath);

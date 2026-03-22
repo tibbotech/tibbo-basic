@@ -12,6 +12,15 @@ export class ASTBuilder {
         this.fileName = fileName;
     }
 
+    private endLoc(ctx: any): SourceLocation {
+        const token = ctx.stop || ctx.start || ctx.symbol || ctx;
+        return {
+            file: this.fileName,
+            line: token.line ?? 0,
+            column: token.column ?? 0,
+        };
+    }
+
     private loc(ctx: any): SourceLocation {
         const token = ctx.start || ctx.symbol || ctx;
         return {
@@ -223,7 +232,8 @@ export class ASTBuilder {
         }
         const params = this.visitParamList(this.findRule(ctx, TibboBasicParser.RULE_paramList));
         const body = this.visitBlock(this.findRule(ctx, TibboBasicParser.RULE_block));
-        return { kind: 'SubDecl', name, objectName, isPublic, params, body, loc: this.loc(ctx) };
+        const endLoc = this.endLoc(ctx);
+        return { kind: 'SubDecl', name, objectName, isPublic, params, body, loc: this.loc(ctx), endLoc };
     }
 
     private visitFunctionStmt(ctx: any): AST.FunctionDecl {
@@ -245,7 +255,8 @@ export class ASTBuilder {
         const params = this.visitParamList(this.findRule(ctx, TibboBasicParser.RULE_paramList));
         const returnType = this.visitAsTypeClause(ctx.returnType ?? this.findRule(ctx, TibboBasicParser.RULE_asTypeClause));
         const body = this.visitBlock(this.findRule(ctx, TibboBasicParser.RULE_block));
-        return { kind: 'FunctionDecl', name, objectName, isPublic, params, returnType, body, loc: this.loc(ctx) };
+        const endLoc = this.endLoc(ctx);
+        return { kind: 'FunctionDecl', name, objectName, isPublic, params, returnType, body, loc: this.loc(ctx), endLoc };
     }
 
     // ─── Object / Property / Event / Syscall / Type ──────────────────────────

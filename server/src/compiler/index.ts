@@ -20,6 +20,10 @@ export interface CompileOptions {
     maxEventNumber?: number;
     platformSize?: number;
     headerLineCount?: number;
+    includedFiles?: string[];
+    fileSequence?: string[];
+    sourceFilePath?: string;
+    firmwareVer?: string;
 }
 
 export interface CompileResult {
@@ -27,6 +31,7 @@ export interface CompileResult {
     ast: Program;
     errors: Diagnostic[];
     warnings: Diagnostic[];
+    globalAllocSize: number;
 }
 
 export interface LinkOptions {
@@ -111,13 +116,21 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     // Emit TOBJ
     const tobjWriter = new TObjWriter();
     tobjWriter.setFlags(flags);
-    const obj = tobjWriter.write(generator.emitter, resolver.symbols, fileName, maxEventNumber);
+    const obj = tobjWriter.write(generator.emitter, resolver.symbols, fileName, maxEventNumber, {
+        includedFiles: options.includedFiles,
+        platformSize: options.platformSize,
+        fileSequence: options.fileSequence,
+        sourceFilePath: options.sourceFilePath,
+        firmwareVer: options.firmwareVer,
+        headerLineCount: options.headerLineCount,
+    });
 
     return {
         obj,
         ast,
         errors: diagnostics.getErrors(),
         warnings: diagnostics.getWarnings(),
+        globalAllocSize: generator.getGlobalAllocSize(),
     };
 }
 

@@ -37,6 +37,7 @@ export class PCodeGenerator {
     private ctx: GeneratorContext = { labelCounter: 0 };
     private syscallMap = new Map<string, number>();
     private globalDataOffset = 0;
+    private platformSize = 0;
     private headerLineCount = 0;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
@@ -47,11 +48,15 @@ export class PCodeGenerator {
     }
 
     setPlatformSize(size: number): void {
-        this.globalDataOffset = size;
+        this.platformSize = size;
     }
 
     setHeaderLineCount(count: number): void {
         this.headerLineCount = count;
+    }
+
+    getGlobalAllocSize(): number {
+        return this.globalDataOffset;
     }
 
     private isFromCurrentFile(decl: AST.TopLevelDeclaration): boolean {
@@ -160,6 +165,30 @@ export class PCodeGenerator {
         this.emitSyscallArg(0);
     }
 
+    private emitRDataLoad(rdataOffset: number): void {
+        this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
+        this.emitter.recordRDataRef(rdataOffset);
+        this.emitter.emitDword(rdataOffset);
+    }
+
+    private emitVarDataAddress(sym: VariableSymbol): void {
+        if (sym.isGlobal) {
+            this.emitter.emitDataAddressRef(`?V:${sym.name}`);
+        } else {
+            this.emitter.emitDataAddress(sym.address ?? 0);
+        }
+    }
+
+    private emitVarLeaArg(sym: VariableSymbol): void {
+        this.emitter.emitByte(OP.OPCODE_LEA);
+        if (sym.isGlobal) {
+            this.emitter.emitDataAddressRef(`?V:${sym.name}`);
+        } else {
+            this.emitter.emitDataAddress(sym.address ?? 0);
+        }
+        this.emitSyscallArg(0);
+    }
+
     private emitSyscallWithArgs(syscallName: string, sym: SyscallSymbol, args: AST.Expression[]): void {
         const params = sym.parameters;
         for (let i = 0; i < args.length && i < params.length; i++) {
@@ -173,15 +202,14 @@ export class PCodeGenerator {
                     if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
                         const varSym = argSym as VariableSymbol;
                         this.emitter.emitByte(OP.OPCODE_LEA);
-                        this.emitter.emitDataAddress(varSym.address ?? 0);
+                        this.emitVarDataAddress(varSym);
                         this.emitSyscallArg(i);
                         continue;
                     }
                 }
                 if (paramDt && isString(paramDt) && argExpr.kind === 'StringLiteral') {
                     const rdataOff = this.emitter.addStringRData(argExpr.value);
-                    this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-                    this.emitter.emitDword(rdataOff);
+                    this.emitRDataLoad(rdataOff);
                     this.emitSyscallArg(i);
                     continue;
                 }
@@ -218,15 +246,15 @@ export class PCodeGenerator {
             this.emitStringCatToTemp(expr.right, tempAddr);
         } else if (expr.kind === 'StringLiteral') {
             const rdataOff = this.emitter.addStringRData(expr.value);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOff);
+            this.emitRDataLoad(rdataOff);
             this.emitSyscallArg(argIndex);
             return;
         } else if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress((sym as VariableSymbol).address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(argIndex);
                 return;
             }
@@ -249,15 +277,15 @@ export class PCodeGenerator {
 
         if (expr.kind === 'StringLiteral') {
             const rdataOff = this.emitter.addStringRData(expr.value);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOff);
+            this.emitRDataLoad(rdataOff);
             this.emitSyscallArg(1);
             this.emitSyscallByName(isFirst ? 'strload' : 'strcat');
         } else if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress((sym as VariableSymbol).address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(1);
                 this.emitSyscallByName(isFirst ? 'strcpy' : 'strcat');
             }
@@ -281,15 +309,15 @@ export class PCodeGenerator {
 
         if (expr.kind === 'StringLiteral') {
             const rdataOff = this.emitter.addStringRData(expr.value);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOff);
+            this.emitRDataLoad(rdataOff);
             this.emitSyscallArg(1);
             this.emitSyscallByName('strcat');
         } else if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress((sym as VariableSymbol).address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(1);
                 this.emitSyscallByName('strcat');
             }
@@ -311,6 +339,7 @@ export class PCodeGenerator {
                 if (!sym) continue;
                 const size = sym.dataType?.size ?? 2;
                 sym.address = offset;
+                this.emitter.defineDataLabel(`?V:${v.name}`, offset);
                 offset += size;
             }
         }
@@ -356,18 +385,17 @@ export class PCodeGenerator {
                 if (!sym) continue;
                 const dt = sym.dataType;
                 if (!dt) continue;
-                const addr = sym.address ?? 0;
 
                 if (isString(dt)) {
                     const strType = dt as StringDataType;
                     this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(strType.maxLength << 8);
                     this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(addr);
+                    this.emitVarDataAddress(sym);
                 }
 
                 if (isStruct(dt)) {
-                    this.emitLeaArg(addr);
+                    this.emitVarLeaArg(sym);
                     this.emitSyscallByName('initobj');
                 }
 
@@ -375,21 +403,20 @@ export class PCodeGenerator {
                     if (isString(dt) && decl.initializer.kind === 'StringLiteral') {
                         const strLit = decl.initializer as AST.StringLiteral;
                         const rdataOffset = this.emitter.addStringRData(strLit.value);
-                        this.emitLeaArg(addr);
-                        this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-                        this.emitter.emitDword(rdataOffset);
+                        this.emitVarLeaArg(sym);
+                        this.emitRDataLoad(rdataOffset);
                         this.emitSyscallArg(1);
                         this.emitSyscallByName('strload');
-                    } else if (this.tryEmitPropertyGetterDirect(decl.initializer, addr)) {
+                    } else if (this.tryEmitPropertyGetterDirect(decl.initializer, sym.address ?? 0)) {
                         // Property getter stores directly into variable
                     } else if (isString(dt) && decl.initializer.kind === 'IdentifierExpr') {
                         const srcSym = this.symbols.current.lookup((decl.initializer as AST.IdentifierExpr).name);
                         if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
                             const src = srcSym as VariableSymbol;
                             if (src.dataType && isString(src.dataType)) {
-                                this.emitLeaArg(addr);
+                                this.emitVarLeaArg(sym);
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress(src.address ?? 0);
+                                this.emitVarDataAddress(src);
                                 this.emitSyscallArg(1);
                                 this.emitSyscallByName('strcpy');
                             }
@@ -417,11 +444,14 @@ export class PCodeGenerator {
         for (const p of sym.parameters) this.symbols.current.define(p);
         for (const v of sym.localVariables) this.symbols.current.define(v);
 
+        sym.codeStartAddress = this.emitter.currentOffset;
         this.emitter.defineLabel(decl.name);
         this.allocateLocals(sym);
         this.generateBlock(decl.body);
         this.emitter.defineLabel(endLabel);
         this.emitter.emitByte(OP.OPCODE_RET);
+        sym.codeEndAddress = this.emitter.currentOffset;
+        sym.endLoc = decl.endLoc;
 
         this.symbols.popScope();
         this.ctx.currentFunction = undefined;
@@ -440,11 +470,14 @@ export class PCodeGenerator {
         for (const p of sym.parameters) this.symbols.current.define(p);
         for (const v of sym.localVariables) this.symbols.current.define(v);
 
+        sym.codeStartAddress = this.emitter.currentOffset;
         this.emitter.defineLabel(decl.name);
         this.allocateLocals(sym);
         this.generateBlock(decl.body);
         this.emitter.defineLabel(endLabel);
         this.emitter.emitByte(OP.OPCODE_RET);
+        sym.codeEndAddress = this.emitter.currentOffset;
+        sym.endLoc = decl.endLoc;
 
         this.symbols.popScope();
         this.ctx.currentFunction = undefined;
@@ -541,8 +574,9 @@ export class PCodeGenerator {
                         if (value.kind === 'IdentifierExpr') {
                             const valSym = this.symbols.current.lookup(value.name);
                             if (valSym && (valSym.kind === SymbolKind.Variable || valSym.kind === SymbolKind.Parameter)) {
+                                const vSym = valSym as VariableSymbol;
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress((valSym as VariableSymbol).address ?? 0);
+                                this.emitVarDataAddress(vSym);
                                 this.emitSyscallArg(0);
                                 if (setNum !== undefined) this.emitSyscall(setNum);
                                 return;
@@ -550,8 +584,7 @@ export class PCodeGenerator {
                         }
                         if (value.kind === 'StringLiteral') {
                             const rdataOff = this.emitter.addStringRData(value.value);
-                            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-                            this.emitter.emitDword(rdataOff);
+                            this.emitRDataLoad(rdataOff);
                             this.emitSyscallArg(0);
                             if (setNum !== undefined) this.emitSyscall(setNum);
                             return;
@@ -611,13 +644,10 @@ export class PCodeGenerator {
     // ─── String assignment ──────────────────────────────────────────────────
 
     private generateStringAssignment(varSym: VariableSymbol, value: AST.Expression): void {
-        const addr = varSym.address ?? 0;
-
         if (value.kind === 'StringLiteral') {
             const rdataOffset = this.emitter.addStringRData(value.value);
-            this.emitLeaArg(addr);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOffset);
+            this.emitVarLeaArg(varSym);
+            this.emitRDataLoad(rdataOffset);
             this.emitSyscallArg(1);
             this.emitSyscallByName('strload');
         } else if (value.kind === 'IdentifierExpr') {
@@ -625,9 +655,9 @@ export class PCodeGenerator {
             if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
                 const src = srcSym as VariableSymbol;
                 if (src.dataType && isString(src.dataType)) {
-                    this.emitLeaArg(addr);
+                    this.emitVarLeaArg(varSym);
                     this.emitter.emitByte(OP.OPCODE_LEA);
-                    this.emitter.emitDataAddress(src.address ?? 0);
+                    this.emitVarDataAddress(src);
                     this.emitSyscallArg(1);
                     this.emitSyscallByName('strcpy');
                     return;
@@ -648,27 +678,26 @@ export class PCodeGenerator {
     }
 
     private emitStringCat(destSym: VariableSymbol, expr: AST.Expression): void {
-        const addr = destSym.address ?? 0;
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
             this.emitStringCat(destSym, expr.left);
             this.emitStringCat(destSym, expr.right);
             return;
         }
 
-        this.emitLeaArg(addr);
+        this.emitVarLeaArg(destSym);
         if (expr.kind === 'StringLiteral') {
             const rdataOffset = this.emitter.addStringRData(expr.value);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOffset);
+            this.emitRDataLoad(rdataOffset);
             this.emitSyscallArg(1);
             this.emitSyscallByName('strload');
-            this.emitLeaArg(addr);
+            this.emitVarLeaArg(destSym);
         }
         if (expr.kind === 'IdentifierExpr') {
             const srcSym = this.symbols.current.lookup(expr.name);
             if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                const src = srcSym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress((srcSym as VariableSymbol).address ?? 0);
+                this.emitVarDataAddress(src);
                 this.emitSyscallArg(1);
             }
         } else if (expr.kind !== 'StringLiteral') {
@@ -902,8 +931,7 @@ export class PCodeGenerator {
                     const strLit = stmt.initializer as AST.StringLiteral;
                     const rdataOffset = this.emitter.addStringRData(strLit.value);
                     this.emitLeaArg(addr);
-                    this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-                    this.emitter.emitDword(rdataOffset);
+                    this.emitRDataLoad(rdataOffset);
                     this.emitSyscallArg(1);
                     this.emitSyscallByName('strload');
                 } else if (dt && isString(dt)) {
@@ -1005,28 +1033,28 @@ export class PCodeGenerator {
         const dt = varSym.dataType;
         if (!dt) {
             this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_DIRECT);
-            this.emitter.emitDataAddress(varSym.address ?? 0);
+            this.emitVarDataAddress(varSym);
             return;
         }
 
         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
         const loadOp = getLoadOpcode(dt, 'A');
         this.emitter.emitByte(loadOp | indirection);
-        this.emitter.emitDataAddress(varSym.address ?? 0);
+        this.emitVarDataAddress(varSym);
     }
 
     private emitStore(varSym: VariableSymbol): void {
         const dt = varSym.dataType;
         if (!dt) {
             this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-            this.emitter.emitDataAddress(varSym.address ?? 0);
+            this.emitVarDataAddress(varSym);
             return;
         }
 
         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
         const storeOp = getStoreOpcode(dt);
         this.emitter.emitByte(storeOp | indirection);
-        this.emitter.emitDataAddress(varSym.address ?? 0);
+        this.emitVarDataAddress(varSym);
     }
 
     // ─── Binary operations ──────────────────────────────────────────────────
@@ -1101,7 +1129,7 @@ export class PCodeGenerator {
                         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                         const loadOp = getLoadOpcode(dt, 'B');
                         this.emitter.emitByte(loadOp | indirection);
-                        this.emitter.emitDataAddress(varSym.address ?? 0);
+                        this.emitVarDataAddress(varSym);
                         return;
                     }
                 }
@@ -1220,8 +1248,9 @@ export class PCodeGenerator {
         if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress((sym as VariableSymbol).address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(argIndex);
                 return;
             }
@@ -1232,8 +1261,7 @@ export class PCodeGenerator {
             this.emitter.emitByte(OP.OPCODE_LEA);
             this.emitter.emitDataAddress(tempAddr);
             this.emitSyscallArg(0);
-            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-            this.emitter.emitDword(rdataOff);
+            this.emitRDataLoad(rdataOff);
             this.emitSyscallArg(1);
             this.emitSyscallByName('strload');
             this.emitter.emitByte(OP.OPCODE_LEA);
@@ -1315,8 +1343,9 @@ export class PCodeGenerator {
                         if (argExpr.kind === 'IdentifierExpr') {
                             const argSym = this.symbols.current.lookup(argExpr.name);
                             if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
+                                const aVarSym = argSym as VariableSymbol;
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress((argSym as VariableSymbol).address ?? 0);
+                                this.emitVarDataAddress(aVarSym);
                                 this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
                                 this.emitter.emitDataAddress(param.address ?? 0);
                                 continue;
@@ -1340,16 +1369,16 @@ export class PCodeGenerator {
                         if (argExpr.kind === 'StringLiteral') {
                             const rdataOff = this.emitter.addStringRData(argExpr.value);
                             this.emitLeaArg(paramAddr);
-                            this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
-                            this.emitter.emitDword(rdataOff);
+                            this.emitRDataLoad(rdataOff);
                             this.emitSyscallArg(1);
                             this.emitSyscallByName('strload');
                         } else if (argExpr.kind === 'IdentifierExpr') {
                             const srcSym = this.symbols.current.lookup(argExpr.name);
                             if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                                const src = srcSym as VariableSymbol;
                                 this.emitLeaArg(paramAddr);
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress((srcSym as VariableSymbol).address ?? 0);
+                                this.emitVarDataAddress(src);
                                 this.emitSyscallArg(1);
                                 this.emitSyscallByName('strcpy');
                             }
@@ -1475,7 +1504,7 @@ export class PCodeGenerator {
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(varSym.address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(0);
 
                 if (expr.indices.length > 0) {
@@ -1498,7 +1527,7 @@ export class PCodeGenerator {
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(varSym.address ?? 0);
+                this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(0);
 
                 if (target.indices.length > 0) {

@@ -327,6 +327,8 @@ export class Linker {
                 address += codeBase;
             } else if (flags & TObjAddressFlags.Init) {
                 address += initBase;
+            } else if (flags & TObjAddressFlags.Defined) {
+                address += obj.header.platformSize;
             }
 
             const refs: LinkedReference[] = [];

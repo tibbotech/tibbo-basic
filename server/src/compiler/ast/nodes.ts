@@ -344,6 +344,7 @@ export interface SubDecl extends ASTNode {
     isPublic: boolean;
     params: ParamDecl[];
     body: Statement[];
+    endLoc?: SourceLocation;
 }
 
 export interface FunctionDecl extends ASTNode {
@@ -354,6 +355,7 @@ export interface FunctionDecl extends ASTNode {
     params: ParamDecl[];
     returnType: TypeRefNode;
     body: Statement[];
+    endLoc?: SourceLocation;
 }
 
 export interface DeclareSubStmt extends ASTNode {

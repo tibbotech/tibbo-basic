@@ -15,11 +15,20 @@ export interface CodeLabel {
     isCode: boolean;
 }
 
+export interface DataLabel {
+    name: string;
+    address: number;
+    defined: boolean;
+    references: CodeReference[];
+    isPublic: boolean;
+}
+
 export class ByteEmitter {
     private code: number[] = [];
     private initCode: number[] = [];
     private rdata: number[] = [];
     private labels = new Map<string, CodeLabel>();
+    private dataLabels = new Map<string, DataLabel>();
     private rdataEntries: RDataEntry[] = [];
     private lineInfo: LineInfoEntry[] = [];
     private emittingInit = false;
@@ -71,6 +80,35 @@ export class ByteEmitter {
             this.emitWord(value);
         }
     }
+
+    defineDataLabel(name: string, address: number, isPublic = false): DataLabel {
+        let label = this.dataLabels.get(name);
+        if (!label) {
+            label = { name, address, defined: true, references: [], isPublic };
+            this.dataLabels.set(name, label);
+        } else {
+            label.address = address;
+            label.defined = true;
+        }
+        return label;
+    }
+
+    emitDataAddressRef(name: string): void {
+        let label = this.dataLabels.get(name);
+        if (!label) {
+            label = { name, address: 0, defined: false, references: [], isPublic: false };
+            this.dataLabels.set(name, label);
+        }
+        const ref: CodeReference = {
+            type: this.emittingInit ? ReferenceType.Init : ReferenceType.Code,
+            offset: this.currentOffset,
+            targetLabel: name,
+        };
+        label.references.push(ref);
+        this.emitDataAddress(label.address);
+    }
+
+    getDataLabels(): Map<string, DataLabel> { return this.dataLabels; }
 
     emitFloat(value: number): void {
         const buf = new ArrayBuffer(4);
@@ -126,6 +164,18 @@ export class ByteEmitter {
         const entry: RDataEntry = { offset, size: len + 2, references: [] };
         this.rdataEntries.push(entry);
         return offset;
+    }
+
+    recordRDataRef(rdataOffset: number): void {
+        const ref: CodeReference = {
+            type: this.emittingInit ? ReferenceType.Init : ReferenceType.Code,
+            offset: this.currentOffset,
+            targetLabel: '',
+        };
+        const entry = this.rdataEntries.find(e => e.offset === rdataOffset);
+        if (entry) {
+            entry.references.push(ref);
+        }
     }
 
     // Line info

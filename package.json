@@ -41,7 +41,8 @@
         "webpack": "NODE_OPTIONS=--openssl-legacy-provider webpack --mode production --config ./client/webpack.config.js && webpack --mode production --config ./server/webpack.config.js",
         "vscode:prepublish": "npm run webpack",
         "package": "vsce package",
-        "test": "cd server && npm run test"
+        "test": "cd server && npm run test",
+        "generate-ref": "node scripts/generate-reference-tpc.js"
     },
     "contributes": {
         "languages": [
