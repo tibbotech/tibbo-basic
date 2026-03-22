@@ -12,6 +12,12 @@ const antlr4 = require('antlr4');
 const TibboBasicLexer = require('../../language/TibboBasic/lib/TibboBasicLexer').TibboBasicLexer;
 const TibboBasicParser = require('../../language/TibboBasic/lib/TibboBasicParser').TibboBasicParser;
 
+export interface SourceMapEntry {
+    filePath: string;
+    combinedStartLine: number;
+    lineCount: number;
+}
+
 export interface CompileOptions {
     fileName?: string;
     defines?: Record<string, string>;
@@ -26,6 +32,7 @@ export interface CompileOptions {
     firmwareVer?: string;
     fileData?: Buffer;
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
+    sourceMap?: SourceMapEntry[];
 }
 
 export interface CompileResult {
@@ -131,6 +138,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         stackSize: 15,
         fileData: options.fileData,
         resourceEntries: options.resourceEntries,
+        sourceMap: options.sourceMap,
     });
 
     return {

@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
-import { disassembleBinaryToLines } from '../../src/compiler/dump-pdb-instructions';
+import { disassembleBinaryToLines, disassembleBinaryBySourceLine, DecodedLineInstruction } from '../../src/compiler/dump-pdb-instructions';
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const TESTS_ROOT = path.resolve(REPO_ROOT, 'tests');
@@ -566,6 +566,76 @@ for (const project of testProjects) {
                     expect(jsEvt.length).toBe(refEvt.length);
                     if (refEvt.length === jsEvt.length) {
                         expect(jsEvt.equals(refEvt)).toBe(true);
+                    }
+                });
+
+                it('should match PDB decoded instructions by source line', () => {
+                    if (!pdbAvailable) return;
+                    const refDecoded = disassembleBinaryBySourceLine(refBuf);
+                    const jsDecoded = disassembleBinaryBySourceLine(jsBuf);
+
+                    if (refDecoded.length !== jsDecoded.length) {
+                        console.log(`PDB decoded instruction count: ref=${refDecoded.length} js=${jsDecoded.length}`);
+                        const refSummary = new Map<string, number>();
+                        for (const d of refDecoded) {
+                            const key = `${d.fileName}:${d.line}`;
+                            refSummary.set(key, (refSummary.get(key) ?? 0) + 1);
+                        }
+                        const jsSummary = new Map<string, number>();
+                        for (const d of jsDecoded) {
+                            const key = `${d.fileName}:${d.line}`;
+                            jsSummary.set(key, (jsSummary.get(key) ?? 0) + 1);
+                        }
+                        const allKeys = new Set([...refSummary.keys(), ...jsSummary.keys()]);
+                        for (const key of [...allKeys].sort()) {
+                            const rc = refSummary.get(key) ?? 0;
+                            const jc = jsSummary.get(key) ?? 0;
+                            if (rc !== jc) {
+                                console.log(`  ${key}: ref=${rc} instructions, js=${jc} instructions`);
+                            }
+                        }
+                    }
+
+                    const limit = Math.min(refDecoded.length, jsDecoded.length);
+                    for (let i = 0; i < limit; i++) {
+                        const r = refDecoded[i];
+                        const j = jsDecoded[i];
+                        if (r.fileName !== j.fileName || r.line !== j.line || r.instruction !== j.instruction) {
+                            console.log(`PDB instruction diff at index ${i}:`);
+                            console.log(`  ref: ${r.fileName}:${r.line} ${r.instruction}`);
+                            console.log(`  js:  ${j.fileName}:${j.line} ${j.instruction}`);
+                            break;
+                        }
+                    }
+
+                    expect(jsDecoded.length).toBe(refDecoded.length);
+                    for (let i = 0; i < limit; i++) {
+                        expect(jsDecoded[i]).toEqual(refDecoded[i]);
+                    }
+                });
+
+                it('should match PDB decoded bytecode against generated TPC bytecode', () => {
+                    if (!pdbAvailable || !result.tpc) return;
+                    const refPdbInstructions = disassembleBinaryToLines(refBuf);
+                    const jsTpcInstructions = disassembleBinaryToLines(result.tpc!);
+
+                    if (refPdbInstructions.length !== jsTpcInstructions.length) {
+                        console.log(`PDB vs TPC instruction count: pdb=${refPdbInstructions.length} tpc=${jsTpcInstructions.length}`);
+                    }
+
+                    const limit = Math.min(refPdbInstructions.length, jsTpcInstructions.length);
+                    for (let i = 0; i < limit; i++) {
+                        if (refPdbInstructions[i] !== jsTpcInstructions[i]) {
+                            console.log(`PDB vs TPC instruction diff at index ${i}:`);
+                            console.log(`  pdb: ${refPdbInstructions[i]}`);
+                            console.log(`  tpc: ${jsTpcInstructions[i]}`);
+                            break;
+                        }
+                    }
+
+                    expect(jsTpcInstructions.length).toBe(refPdbInstructions.length);
+                    for (let i = 0; i < limit; i++) {
+                        expect(jsTpcInstructions[i]).toBe(refPdbInstructions[i]);
                     }
                 });
             });

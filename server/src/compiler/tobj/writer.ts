@@ -55,6 +55,12 @@ class SymbolStringTable {
     toBuffer(): Buffer { return Buffer.from(this.data); }
 }
 
+export interface SourceMapEntry {
+    filePath: string;
+    combinedStartLine: number;
+    lineCount: number;
+}
+
 export interface TObjWriteOptions {
     includedFiles?: string[];
     platformSize?: number;
@@ -67,6 +73,7 @@ export interface TObjWriteOptions {
     stackSize?: number;
     fileData?: Buffer;
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
+    sourceMap?: SourceMapEntry[];
 }
 
 export class TObjWriter {
@@ -118,7 +125,7 @@ export class TObjWriter {
         sections[TObjSection.Variables] = this.buildVariables(symbols);
         sections[TObjSection.Objects] = this.buildObjects(symbols);
         sections[TObjSection.Syscalls] = this.buildSyscalls(symbols);
-        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount);
+        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount, options.sourceMap);
         sections[TObjSection.LibNameDir] = Buffer.alloc(0);
         sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
         sections[TObjSection.Extra] = this.buildExtra(fileName, options.sourceFilePath, options.firmwareVer);
@@ -504,25 +511,60 @@ export class TObjWriter {
         return w.toBuffer();
     }
 
-    private buildLineInfo(emitter: ByteEmitter, fileName: string, fileSequence: string[], sourceFilePath?: string, headerLineCount = 0): Buffer {
+    private buildLineInfo(emitter: ByteEmitter, fileName: string, fileSequence: string[], sourceFilePath?: string, headerLineCount = 0, sourceMap?: SourceMapEntry[]): Buffer {
         const w = new BinaryWriter();
         const entries = emitter.getLineInfo();
 
-        // Emit one block per file in the preprocessing sequence (all with count=0)
-        for (const filePath of fileSequence) {
-            w.writeDword(this.symStrings.add(filePath));
-            w.writeDword(0);
-        }
+        if (sourceMap && sourceMap.length > 0) {
+            const fileEntries = new Map<string, Array<{ line: number; address: number }>>();
 
-        // Last block: the source file with actual line info
-        w.writeDword(this.symStrings.add(sourceFilePath || fileName));
-        w.writeDword(entries.length);
-        for (const entry of entries) {
-            w.writeDword(Math.max(1, entry.line - headerLineCount));
-            w.writeDword(entry.address);
+            for (const entry of entries) {
+                const mapping = this.lookupSourceMap(entry.line, sourceMap);
+                if (!mapping) continue;
+
+                let lines = fileEntries.get(mapping.filePath);
+                if (!lines) {
+                    lines = [];
+                    fileEntries.set(mapping.filePath, lines);
+                }
+                lines.push({ line: mapping.originalLine, address: entry.address });
+            }
+
+            for (const [filePath, lines] of fileEntries) {
+                w.writeDword(this.symStrings.add(filePath));
+                w.writeDword(lines.length);
+                for (const line of lines) {
+                    w.writeDword(Math.max(1, line.line));
+                    w.writeDword(line.address);
+                }
+            }
+        } else {
+            for (const filePath of fileSequence) {
+                w.writeDword(this.symStrings.add(filePath));
+                w.writeDword(0);
+            }
+
+            w.writeDword(this.symStrings.add(sourceFilePath || fileName));
+            w.writeDword(entries.length);
+            for (const entry of entries) {
+                w.writeDword(Math.max(1, entry.line - headerLineCount));
+                w.writeDword(entry.address);
+            }
         }
 
         return w.toBuffer();
+    }
+
+    private lookupSourceMap(combinedLine: number, sourceMap: SourceMapEntry[]): { filePath: string; originalLine: number } | null {
+        for (const entry of sourceMap) {
+            if (combinedLine >= entry.combinedStartLine && combinedLine < entry.combinedStartLine + entry.lineCount) {
+                return {
+                    filePath: entry.filePath,
+                    originalLine: combinedLine - entry.combinedStartLine + 1,
+                };
+            }
+        }
+        return null;
     }
 
     private buildIncNameDir(includeFileOffsets: number[]): Buffer {

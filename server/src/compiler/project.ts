@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { compile, link, CompileResult, LinkResult } from './index';
+import { compile, link, CompileResult, LinkResult, SourceMapEntry } from './index';
 import { Diagnostic, DiagnosticCollection, DiagnosticSeverity } from './errors';
 import { ASTBuilder } from './ast/builder';
 import { Program, TopLevelDeclaration } from './ast/nodes';
@@ -305,7 +305,7 @@ export class ProjectCompiler {
             }
         }
 
-        const combinedSource = this.buildCombinedSource(preprocessor);
+        const { source: combinedSource, sourceMap } = this.buildCombinedSource(preprocessor);
         let debugObj: Buffer | null = null;
         if (combinedSource.replace(/\s/g, '').length > 0) {
             const debugResult = compile(combinedSource, {
@@ -317,6 +317,7 @@ export class ProjectCompiler {
                 fileSequence,
                 sourceFilePath: path.join(this.projectPath, 'gen'),
                 firmwareVer: this.platformConfig.version,
+                sourceMap,
             });
             if (debugResult.errors.length === 0) {
                 debugObj = debugResult.obj;
@@ -411,9 +412,11 @@ export class ProjectCompiler {
         return parts.join('\n');
     }
 
-    private buildCombinedSource(preprocessor: any): string {
+    private buildCombinedSource(preprocessor: any): { source: string; sourceMap: SourceMapEntry[] } {
         const parts: string[] = [];
+        const sourceMap: SourceMapEntry[] = [];
         const processedPaths = new Set<string>();
+        let currentLine = 1;
 
         for (const filePath of preprocessor.filePriorities as string[]) {
             if (processedPaths.has(filePath)) continue;
@@ -425,16 +428,16 @@ export class ProjectCompiler {
             const trimmed = content.replace(/\s/g, '');
             if (trimmed.length === 0) continue;
 
+            const lineCount = content.split('\n').length;
+            sourceMap.push({ filePath, combinedStartLine: currentLine, lineCount });
             parts.push(content);
+            currentLine += lineCount;
         }
 
         let combined = parts.join('\n');
-
-        // Expand #define macros in the source code
-        // The preprocessor handles conditionals but doesn't substitute defines in code text
         combined = this.expandDefines(combined, preprocessor.defines);
 
-        return combined;
+        return { source: combined, sourceMap };
     }
 
     private compileHtmlResource(

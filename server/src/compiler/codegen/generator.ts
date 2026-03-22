@@ -576,8 +576,8 @@ export class PCodeGenerator {
                 const sym = this.symbols.lookupGlobal(v.name) as VariableSymbol | undefined;
                 if (!sym) continue;
                 const size = sym.dataType?.size ?? 2;
-                sym.address = offset;
-                this.emitter.defineDataLabel(`?V:${v.name}`, offset);
+                sym.address = this.platformSize + offset;
+                this.emitter.defineDataLabel(`?V:${v.name}`, this.platformSize + offset);
                 offset += size;
             }
         }

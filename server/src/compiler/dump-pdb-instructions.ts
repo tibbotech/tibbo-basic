@@ -188,8 +188,27 @@ export function disassembleBinary(buf: Buffer): DecodedInstruction[] {
     return disassemble(code, codeAddrSize, dataAddrSize);
 }
 
+/**
+ * Disassemble a single object section (e.g. Code or Init) using the file header flags.
+ * For TBIN/TPDB/TOBJ, bytecode lives in {@link TObjSection.Code} and {@link TObjSection.Init}.
+ */
+export function disassembleBinarySectionToLines(buf: Buffer, sectionIndex: TObjSection): string[] {
+    const header = parseHeader(buf);
+    const sectionBuf = getSectionBuffer(buf, header, sectionIndex);
+    if (sectionBuf.length === 0) {
+        return [];
+    }
+    const useCode24 = (header.flags & TObjHeaderFlags.Code24) !== 0;
+    const useData32 = (header.flags & TObjHeaderFlags.Data32) !== 0;
+    const codeAddrSize = useCode24 ? 3 : 2;
+    const dataAddrSize = useData32 ? 4 : 2;
+    return disassemble(sectionBuf, codeAddrSize, dataAddrSize).map(
+        ins => `${ins.mnemonic} ${toHexBytes(ins.bytes)} `,
+    );
+}
+
 export function disassembleBinaryToLines(buf: Buffer): string[] {
-    return disassembleBinary(buf).map(ins => `${ins.mnemonic} ${toHexBytes(ins.bytes)} `);
+    return disassembleBinarySectionToLines(buf, TObjSection.Code);
 }
 
 export function disassembleBinaryBySourceLine(buf: Buffer): DecodedLineInstruction[] {

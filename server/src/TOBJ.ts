@@ -28,7 +28,7 @@ const decoder = new util.TextDecoder();
 
 export default class TOBJ {
     fileBuf: Buffer;
-    fileName: string;
+    fileName!: string;
     signature: FILE_SIGNATURE;
     version: string;
     checksum: number;
@@ -71,7 +71,7 @@ export default class TOBJ {
 
     constructor(buf: Buffer) {
         this.fileBuf = buf;
-        this.signature = String.fromCharCode.apply(null, buf.slice(0, 4));
+        this.signature = buf.toString('ascii', 0, 4) as FILE_SIGNATURE;
         this.version = buf[4] + '.' + buf[5];
         this.checksum = buf.readUInt16LE(6);
         this.fileSize = buf.readUInt32LE(8);
@@ -144,7 +144,7 @@ export default class TOBJ {
         let str = '';
         if (buffer != null) {
             const end = buffer.indexOf(0x0, start, 'ascii');
-            str = String.fromCharCode.apply(null, buffer.slice(start, end));
+            str = buffer.toString('ascii', start, end);
         }
 
         return str;
@@ -213,27 +213,28 @@ export default class TOBJ {
 
     addVariable(variable: TOBJVariableEntry): void {
         this.variables.push(variable);
+        const td = variable.dataType.typeDescription;
         if (variable.dataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_ARRAY
-            && variable.dataType.typeDescription.referenceDataType
-            && variable.dataType.typeDescription.referenceDataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_STRUCT) {
-            const arrayType = variable.dataType.typeDescription.referenceDataType;
-            const size = variable.dataType.typeDescription.elementCount;
+            && td?.referenceDataType
+            && td.referenceDataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_STRUCT) {
+            const arrayType = td.referenceDataType;
+            const size = td.elementCount;
             for (let i = 0; i < size; i++) {
                 this.addVariable({
                     flags: { ...variable.flags, isTemporary: true },
                     name: `${variable.name}[${i}]`,
                     address: {
                         ...variable.address,
-                        address: variable.address.address + 2 + (i * arrayType.typeDescription.size),
+                        address: variable.address.address + 2 + (i * (arrayType.typeDescription?.size ?? 0)),
                     },
                     ownerScope: variable.ownerScope,
                     dataType: arrayType,
                 });
             }
         }
-        if (variable.dataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_STRUCT) {
-            for (let i = 0; i < variable.dataType.typeDescription.structEntries.length; i++) {
-                const member = variable.dataType.typeDescription.structEntries[i];
+        if (variable.dataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_STRUCT && td) {
+            for (let i = 0; i < td.structEntries.length; i++) {
+                const member = td.structEntries[i];
                 if (member.dataType.dataType === TOBJ_DATA_TYPES.TOBJ_TYPE_STRUCT) {
                     this.addVariable({
                         flags: { ...variable.flags, isTemporary: true },
