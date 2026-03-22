@@ -8,7 +8,7 @@
 #define SSPI_MAX_SIGNATURE_LEN 32
 #define CTS_MAP 0
 #define RTS_MAP 0
-
+#define WLN_AVAILABLE 1
 
 
 

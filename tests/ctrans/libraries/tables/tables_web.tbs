@@ -43,7 +43,7 @@ sub tbl_web_get_tables(byref selected_type as string)
 			tbl_web_tbl_status=tbl_select(table_name,table_name)
 			if tbl_web_tbl_status=EN_TBL_STATUS_OK then
 				if tbl_get_table_info(table_name,html_tbl) = EN_TBL_STATUS_OK then
-					if html_tbl.struct = EN_TBL_STRUCT_TABLE then
+					if html_tbl.structure = EN_TBL_STRUCT_TABLE then
 						table_type="table"
 					else
 						table_type="log"

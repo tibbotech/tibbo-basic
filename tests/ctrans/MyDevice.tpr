@@ -1,36 +1,44 @@
 [project]
+version=1
+platform=TPP2W(G2)
+src_lib_ver=0_00
 name=MyDevice
 output=MyDevice.tpc
 debug=on
-address=0.0.0.0.0.0
-platform=TPP2W(G2)
-src_lib_ver=0_00
+defines= 
 transport=udp_winpcap
-
+[address1]
+platform=TPP2W(G2)
+transport=udp_winpcap
+address=
 [file1]
 path=main.tbs
 type=basic
-opened=active
-
+format=
+condition=
+locked=no
+location=
 [file2]
 path=global.tbh
 type=header
-opened=no
-
+format=
+condition=
+locked=no
+location=
 [file3]
 path=device.tbs
 type=basic
-opened=no
-
+format=
+condition=
+locked=no
+location=
 [file4]
 path=boot.tbs
 type=basic
-opened=no
-
-[address1]
-transport=udp_winpcap
-address=
-
+format=
+condition=
+locked=no
+location=
 [file5]
 path=libraries/sock/sock.tbh
 type=header
@@ -38,7 +46,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file6]
 path=libraries/sock/sock.tbs
 type=basic
@@ -46,7 +53,6 @@ format=
 condition=
 locked=no
 location=
-
 [file7]
 path=libraries/time/time.tbh
 type=header
@@ -54,7 +60,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file8]
 path=libraries/time/time.tbs
 type=basic
@@ -62,7 +67,6 @@ format=
 condition=
 locked=no
 location=
-
 [file9]
 path=libraries/wln/wln.tbh
 type=header
@@ -70,7 +74,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file10]
 path=libraries/wln/wln.tbs
 type=basic
@@ -78,7 +81,6 @@ format=
 condition=
 locked=no
 location=
-
 [file11]
 path=libraries/dhcp/dhcp.tbh
 type=header
@@ -86,7 +88,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file12]
 path=libraries/dhcp/dhcp.tbs
 type=basic
@@ -94,7 +95,6 @@ format=
 condition=
 locked=no
 location=
-
 [file13]
 path=libraries/time/datetime.tbs
 type=basic
@@ -102,7 +102,6 @@ format=
 condition=
 locked=no
 location=
-
 [file14]
 path=libraries/time/datetime.tbh
 type=header
@@ -110,7 +109,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file15]
 path=libraries/utils/utils.tbh
 type=header
@@ -118,7 +116,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file16]
 path=libraries/utils/utils.tbs
 type=basic
@@ -126,7 +123,6 @@ format=
 condition=
 locked=no
 location=
-
 [file17]
 path=index.html
 type=html
@@ -134,7 +130,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file18]
 path=libraries/upgrade/upgrade.tbh
 type=header
@@ -142,7 +137,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file19]
 path=libraries/upgrade/upgrade.tbs
 type=basic
@@ -150,7 +144,6 @@ format=
 condition=
 locked=no
 location=
-
 [file20]
 path=upload_firmware.html
 type=html
@@ -158,7 +151,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file21]
 path=upload_progress.html
 type=html
@@ -166,7 +158,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file22]
 path=filenum.xtxt
 type=text
@@ -174,7 +165,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file23]
 path=libraries/filenum/filenum.tbh
 type=header
@@ -182,7 +172,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file24]
 path=libraries/filenum/filenum.tbs
 type=basic
@@ -190,7 +179,6 @@ format=
 condition=
 locked=no
 location=
-
 [file25]
 path=api.html
 type=html
@@ -198,7 +186,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file26]
 path=Widgets.js
 type=text
@@ -206,7 +193,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file27]
 path=Information.js
 type=text
@@ -214,7 +200,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file28]
 path=Database.js
 type=text
@@ -222,7 +207,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file29]
 path=tables.xtxt
 type=xtext
@@ -230,7 +214,6 @@ format=TBL_lib_configurator
 condition=
 locked=no
 location=project
-
 [file30]
 path=libraries/tables/tables.tbh
 type=header
@@ -238,7 +221,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file31]
 path=libraries/tables/tables.tbs
 type=basic
@@ -246,7 +228,6 @@ format=
 condition=
 locked=no
 location=
-
 [file32]
 path=libraries/tables/tables_api.html
 type=html
@@ -254,7 +235,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file33]
 path=libraries/tables/tables_web.html
 type=html
@@ -262,7 +242,6 @@ format=65001
 condition=
 locked=no
 location=project
-
 [file34]
 path=libraries/tables/tables_web.tbh
 type=header
@@ -270,7 +249,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file35]
 path=libraries/tables/tables_web.js.gz
 type=text
@@ -278,7 +256,6 @@ format=
 condition=
 locked=no
 location=project
-
 [file36]
 path=libraries/tables/tables_web.tbs
 type=basic

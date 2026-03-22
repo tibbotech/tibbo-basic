@@ -58,18 +58,25 @@ export default class TibboBasicPreprocessor {
         const platformLibs = path.join(this.platformsPath, 'src', this.platformVersion);
         const candidates = [platformLibs, this.projectPath, currentDirectory];
         for (const dir of candidates) {
+            const joined = path.join(dir, filePath);
+            if (fs.existsSync(joined)) return joined;
             const resolved = resolvePathInsensitive(dir, filePath);
             if (resolved) return resolved;
         }
         return path.join(currentDirectory, filePath);
     }
 
+    private pathKey(p: string): string {
+        return p.toLowerCase();
+    }
+
     parseFile(currentDirectory: string, filePath: string, update = false): string {
         filePath = this.getFilePath(currentDirectory, filePath);
-        if (this.files[filePath] && !update) {
+        const key = this.pathKey(filePath);
+        if (this.files[key] && !update) {
             return filePath;
         }
-        if (this.parseStack.has(filePath)) {
+        if (this.parseStack.has(key)) {
             return filePath;
         }
         this.parseStack.add(filePath);

@@ -5,14 +5,12 @@ src_lib_ver=2_01_03
 name=MyDevice
 output=MyDevice.tpc
 debug=on
-defines=
+defines= 
 transport=udp_broadcast
-
 [address1]
 platform=TPP2W(G2)
 transport=udp_broadcast
 address=0.36.119.82.177.106
-
 [file1]
 path=main.tbs
 type=basic
@@ -20,7 +18,6 @@ format=
 condition=
 locked=no
 location=
-
 [file2]
 path=global.tbh
 type=header
@@ -28,7 +25,6 @@ format=
 condition=
 locked=no
 location=
-
 [file3]
 path=device.tbs
 type=basic
@@ -36,7 +32,6 @@ format=
 condition=
 locked=no
 location=
-
 [file4]
 path=boot.tbs
 type=basic
@@ -44,7 +39,6 @@ format=
 condition=
 locked=no
 location=
-
 [file5]
 path=dhcp\trunk\dhcp.tbs
 type=basic
@@ -52,7 +46,6 @@ format=
 condition=
 locked=no
 location=commonlib
-
 [file6]
 path=dhcp\trunk\dhcp.tbh
 type=header
@@ -60,7 +53,6 @@ format=
 condition=
 locked=no
 location=commonlib
-
 [file7]
 path=sock\trunk\sock.tbs
 type=basic
@@ -68,7 +60,6 @@ format=
 condition=
 locked=no
 location=commonlib
-
 [file8]
 path=sock\trunk\sock.tbh
 type=header

@@ -3,7 +3,8 @@ include "global.tbh"
 
 
 dim interface_ready(MAX_NUM_INTERFACES) as no_yes
-
+dim s as string="a"
+dim f as byte=3
 
 sub on_sys_init()
     boot()
@@ -14,13 +15,13 @@ sub on_sys_init()
     
     if len(s) = 1 then s = "0"+s 
     if sock.statesimple=PL_SSTS_EST then exit sub
-    if io.lineget(pin_miso)=HIGH then goto wait_alarm
+'    if io.lineget(pin_miso)=HIGH then goto wait_alarm
 
     if f=255 then f=3
     
     if f=255 then
         ' could not register a i2c hi-speed (SSI-based) mode, change to normal mode.
-        goto register_normal_slot
+'        goto register_normal_slot
     end if
 
 wait_alarm:

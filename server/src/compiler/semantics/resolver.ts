@@ -132,6 +132,18 @@ export class SemanticResolver {
         this.eventMap.set(decl.name.toLowerCase(), decl.eventNumber);
     }
 
+    private getOrCreateObject(name: string, loc: SourceLocation): ObjectSymbol {
+        let sym = this.symbols.lookupGlobal(name) as ObjectSymbol | undefined;
+        if (sym && sym.kind === SymbolKind.Object) return sym;
+        sym = {
+            name, kind: SymbolKind.Object,
+            location: loc, isPublic: false, isDeclare: false,
+            properties: new Map(), functions: new Map(), events: new Map(),
+        };
+        this.symbols.defineGlobal(sym);
+        return sym;
+    }
+
     private collectSyscall(decl: AST.SyscallDecl): void {
         const params = this.resolveParams(decl.params);
         const returnType = decl.returnType ? this.resolveTypeRef(decl.returnType) : undefined;
@@ -145,9 +157,12 @@ export class SemanticResolver {
         this.symbols.defineGlobal(sysSym);
 
         if (decl.objectName) {
-            const objSym = this.symbols.lookupGlobal(decl.objectName) as ObjectSymbol | undefined;
-            if (objSym && objSym.kind === SymbolKind.Object) {
-                objSym.functions.set(decl.name.toLowerCase(), sysSym);
+            if (decl.isInternal) {
+                const intObj = this.getOrCreateObject(`!${decl.objectName}`, decl.loc);
+                intObj.functions.set(decl.name.toLowerCase(), sysSym);
+            } else {
+                const obj = this.getOrCreateObject(decl.objectName, decl.loc);
+                obj.functions.set(decl.name.toLowerCase(), sysSym);
             }
         }
     }
@@ -157,14 +172,18 @@ export class SemanticResolver {
             name: decl.propertyName, kind: SymbolKind.Property, objectName: decl.objectName,
             getterSyscall: decl.getter?.syscallNumber,
             setterSyscall: decl.setter?.syscallNumber,
+            isInternal: decl.isBang,
             dataType: decl.getter?.returnType ? this.resolveTypeRef(decl.getter.returnType) : undefined,
             location: decl.loc, isPublic: false, isDeclare: false,
         };
         this.symbols.defineGlobal(propSym);
 
-        const objSym = this.symbols.lookupGlobal(decl.objectName) as ObjectSymbol | undefined;
-        if (objSym && objSym.kind === SymbolKind.Object) {
-            objSym.properties.set(decl.propertyName.toLowerCase(), propSym);
+        if (decl.isBang) {
+            const intObj = this.getOrCreateObject(`!${decl.objectName}`, decl.loc);
+            intObj.properties.set(decl.propertyName.toLowerCase(), propSym);
+        } else {
+            const obj = this.getOrCreateObject(decl.objectName, decl.loc);
+            obj.properties.set(decl.propertyName.toLowerCase(), propSym);
         }
     }
 

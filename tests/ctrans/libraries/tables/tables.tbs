@@ -2230,7 +2230,7 @@ public function tbl_field_sg(byref field_name as string,byref field_value as str
 		case `F`:
 			dim tmp_f as float=0
 			strtobin(tmp_f,s,4)
-			field_value=fstr(tmp_f)
+'			field_value=fstr(tmp_f)
 			if tmp_f<p1 then goto tbl_invalid
 			if tmp_f>p2 then goto tbl_invalid
 		end select	

@@ -343,14 +343,13 @@ export class TObjWriter {
                 const addrIdx = v.isGlobal
                     ? (this.varAddrIndex.get(v.name) ?? 0)
                     : (v.address ?? 0);
-                const nameStr = v.isGlobal ? `?V:${v.name}` : v.name;
+                const nameStr = v.name;
 
                 w.writeByte(flags);
                 w.writeDword(this.symStrings.add(nameStr));
                 w.writeDword(addrIdx);
                 w.writeDword(scopeIdx);
                 this.writeDataType(w, v.dataType);
-                w.writeByte(0);
             }
         };
 
@@ -391,20 +390,30 @@ export class TObjWriter {
         const w = new BinaryWriter();
         const allSyms = symbols.globalScope.getAllSymbols();
         const allSyscalls = symbols.getSyscalls();
-        const emitted = new Set<number>();
 
-        const emitSyscall = (displayName: string, num: number) => {
-            if (emitted.has(num)) return;
-            w.writeDword(this.symStrings.add(displayName));
-            w.writeWord(num);
-            emitted.add(num);
-        };
+        // Standalone syscalls and orphan object methods from ALL collected
+        const registeredObjects = new Set<string>();
+        for (const sym of allSyms) {
+            if (sym.kind === SymbolKind.Object) registeredObjects.add(sym.name.toLowerCase());
+        }
 
-        // Standalone syscalls (no object prefix) from ALL collected syscalls
+        const emittedStandalone = new Set<string>();
         for (const sc of allSyscalls) {
-            if (sc.objectName) continue;
-            const displayName = sc.isInternal ? `!${sc.name}` : sc.name;
-            emitSyscall(displayName, sc.syscallNumber);
+            if (sc.objectName) {
+                const base = sc.objectName.toLowerCase();
+                if (registeredObjects.has(base) || registeredObjects.has('!' + base)) continue;
+            }
+            let displayName: string;
+            if (sc.objectName) {
+                const prefix = sc.isInternal ? '!' : '';
+                displayName = `${prefix}${sc.objectName}.${sc.name}`;
+            } else {
+                displayName = sc.isInternal ? `!${sc.name}` : sc.name;
+            }
+            if (emittedStandalone.has(displayName)) continue;
+            emittedStandalone.add(displayName);
+            w.writeDword(this.symStrings.add(displayName));
+            w.writeWord(sc.syscallNumber);
         }
 
         // Object method and property syscalls
@@ -413,16 +422,19 @@ export class TObjWriter {
             const obj = sym as ObjectSymbol;
 
             for (const [, sc] of obj.functions) {
-                const prefix = sc.isInternal ? '!' : '';
-                emitSyscall(`${prefix}${obj.name}.${sc.name}`, sc.syscallNumber);
+                const displayName = `${obj.name}.${sc.name}`;
+                w.writeDword(this.symStrings.add(displayName));
+                w.writeWord(sc.syscallNumber);
             }
 
             for (const [, prop] of obj.properties) {
                 if (prop.getterSyscall != null) {
-                    emitSyscall(`get_${obj.name}.${prop.name}`, prop.getterSyscall);
+                    w.writeDword(this.symStrings.add(`get_${obj.name}.${prop.name}`));
+                    w.writeWord(prop.getterSyscall);
                 }
                 if (prop.setterSyscall != null) {
-                    emitSyscall(`set_${obj.name}.${prop.name}`, prop.setterSyscall);
+                    w.writeDword(this.symStrings.add(`set_${obj.name}.${prop.name}`));
+                    w.writeWord(prop.setterSyscall);
                 }
             }
         }
@@ -496,35 +508,30 @@ export class TObjWriter {
     private writeDataType(w: BinaryWriter, dt?: DataType): void {
         if (!dt) {
             w.writeByte(TObjDataType.Byte);
-            w.writeByte(0);
-            w.writeWord(0);
+            w.writeDword(0);
             return;
         }
 
         if (isPrimitive(dt)) {
             w.writeByte(this.primitiveToTObjType(dt.name));
-            w.writeByte(0);
-            w.writeWord(0);
+            w.writeDword(0);
         } else if (isString(dt)) {
             w.writeByte(TObjDataType.String);
             w.writeByte((dt as any).maxLength & 0xFF);
+            w.writeByte(0);
             w.writeWord(0);
         } else if (isArray(dt)) {
             w.writeByte(TObjDataType.Array);
-            w.writeByte(0);
-            w.writeWord(0); // type desc offset
+            w.writeDword(0);
         } else if (isStruct(dt)) {
             w.writeByte(TObjDataType.Struct);
-            w.writeByte(0);
-            w.writeWord(0); // type desc offset
+            w.writeDword(0);
         } else if (isEnum(dt)) {
             w.writeByte(TObjDataType.Enum);
-            w.writeByte(0);
-            w.writeWord(0); // type desc offset
+            w.writeDword(0);
         } else {
             w.writeByte(TObjDataType.Byte);
-            w.writeByte(0);
-            w.writeWord(0);
+            w.writeDword(0);
         }
     }
 

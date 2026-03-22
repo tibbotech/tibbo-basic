@@ -931,7 +931,7 @@ public sub wln_proc_task_complete(completed_task as pl_wln_tasks)
 			wln_debugprint("ASSOCIATE with "+wln_ap_name+" (bssid: "+wln.scanresultbssid+", ch: "+str(wln.scanresultchannel)+")")
 		#endif
 
-		wln_associated=PL_WLN_ASSOCIATION_INPROG
+'		wln_associated=PL_WLN_ASSOCIATION_INPROG
 		callback_wln_starting_association()
 		if wln.associate(wln.scanresultbssid,wln_ap_name,wln.scanresultchannel,wln.scanresultbssmode)<>ACCEPTED then
 			wln_result=WLN_STATUS_UNEXPECTED_ERROR

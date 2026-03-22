@@ -87,6 +87,7 @@ export interface PropertySymbol extends Symbol {
     objectName: string;
     getterSyscall?: number;
     setterSyscall?: number;
+    isInternal?: boolean;
 }
 
 export interface SyscallSymbol extends Symbol {
