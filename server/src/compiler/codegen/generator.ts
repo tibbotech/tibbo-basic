@@ -29,6 +29,9 @@ const INTERNAL_SYSCALL_MAP: Record<string, string> = {
 };
 
 export class PCodeGenerator {
+    private static readonly TEMP_STRING_SLOT_SIZE = 260;
+    private static readonly TEMP_STRING_SLOT_COUNT = 4;
+    private static readonly TEMP_SCALAR_SLOT_SIZE = 4;
     readonly emitter = new ByteEmitter();
     private symbols: SymbolTable;
     private resolver: SemanticResolver;
@@ -40,6 +43,7 @@ export class PCodeGenerator {
     private localAllocSize = 0;
     private platformSize = 0;
     private headerLineCount = 0;
+    private tempScratchBase = 0;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -62,6 +66,16 @@ export class PCodeGenerator {
 
     getLocalAllocSize(): number {
         return this.localAllocSize;
+    }
+
+    private getTempStringAddr(slot = 0): number {
+        return this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+    }
+
+    private getTempScalarAddr(slot = 0): number {
+        return this.tempScratchBase
+            + PCodeGenerator.TEMP_STRING_SLOT_COUNT * PCodeGenerator.TEMP_STRING_SLOT_SIZE
+            + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
     }
 
     private isFromCurrentFile(decl: AST.TopLevelDeclaration): boolean {
@@ -297,12 +311,12 @@ export class PCodeGenerator {
                     continue;
                 }
                 if (argExpr.kind === 'MemberExpr') {
-                    if (paramDt && isString(paramDt) && this.tryEmitPropertyGetterDirect(argExpr, 0)) {
-                        this.emitLeaToArg(0, argIndex);
+                    if (paramDt && isString(paramDt) && this.tryEmitPropertyGetterDirect(argExpr, this.getTempStringAddr(0))) {
+                        this.emitLeaToArg(this.getTempStringAddr(0), argIndex);
                         continue;
                     }
                     this.emitter.emitByte(OP.OPCODE_LEA);
-                    this.emitter.emitDataAddress(0);
+                    this.emitter.emitDataAddress(this.getTempScalarAddr(0));
                     this.emitSyscallArg(argIndex);
                     this.generateMember(argExpr);
                     continue;
@@ -363,7 +377,7 @@ export class PCodeGenerator {
     }
 
     private emitStringExprToArg(expr: AST.Expression, argIndex: number): void {
-        const tempAddr = 0;
+        const tempAddr = this.getTempStringAddr(0);
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
             this.emitStringExprToTemp(expr.left, tempAddr, true);
             this.emitStringCatToTemp(expr.right, tempAddr);
@@ -494,6 +508,7 @@ export class PCodeGenerator {
                 offset += size;
             }
         }
+        this.tempScratchBase = offset;
         this.globalDataOffset = offset;
     }
 
@@ -886,8 +901,8 @@ export class PCodeGenerator {
                 const src = srcSym as VariableSymbol;
                 this.emitVarLeaArgAt(src, 1);
             }
-        } else if (expr.kind === 'CallExpr' && this.emitStringCallResultToAddr(expr, 0)) {
-            this.emitLeaToArg(0, 1);
+        } else if (expr.kind === 'CallExpr' && this.emitStringCallResultToAddr(expr, this.getTempStringAddr(0))) {
+            this.emitLeaToArg(this.getTempStringAddr(0), 1);
         } else if (expr.kind !== 'StringLiteral') {
             this.generateExpression(expr);
             this.emitSyscallArg(1);
@@ -1475,12 +1490,12 @@ export class PCodeGenerator {
                 return;
             }
         }
-        if (expr.kind === 'MemberExpr' && this.tryEmitPropertyGetterDirect(expr, this.globalDataOffset + argIndex * 260)) {
-            this.emitLeaToArg(this.globalDataOffset + argIndex * 260, argIndex);
+        if (expr.kind === 'MemberExpr' && this.tryEmitPropertyGetterDirect(expr, this.getTempStringAddr(argIndex))) {
+            this.emitLeaToArg(this.getTempStringAddr(argIndex), argIndex);
             return;
         }
         if (expr.kind === 'StringLiteral') {
-            const tempAddr = this.globalDataOffset + argIndex * 260;
+            const tempAddr = this.getTempStringAddr(argIndex);
             const rdataOff = this.emitter.addStringRData(expr.value);
             this.emitter.emitByte(OP.OPCODE_LEA);
             this.emitter.emitDataAddress(tempAddr);
@@ -1735,14 +1750,15 @@ export class PCodeGenerator {
                 if (prop) {
                     const getNum = prop.getterSyscall;
                     if (getNum !== undefined) {
+                        const tempAddr = this.getTempScalarAddr(0);
                         this.emitter.emitByte(OP.OPCODE_LEA);
-                        this.emitter.emitDataAddress(0);
+                        this.emitter.emitDataAddress(tempAddr);
                         this.emitSyscallArg(0);
                         this.emitSyscall(getNum);
                         const dt = prop.dataType;
                         const loadOp = getLoadOpcode(dt ?? BUILTIN_TYPES.word, 'A');
                         this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(0);
+                        this.emitter.emitDataAddress(tempAddr);
                     }
                     return;
                 }
