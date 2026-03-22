@@ -305,6 +305,24 @@ export class ProjectCompiler {
             }
         }
 
+        const combinedSource = this.buildCombinedSource(preprocessor);
+        let debugObj: Buffer | null = null;
+        if (combinedSource.replace(/\s/g, '').length > 0) {
+            const debugResult = compile(combinedSource, {
+                fileName: 'gen',
+                flags,
+                maxEventNumber,
+                platformSize: this.platformConfig.platformId,
+                includedFiles,
+                fileSequence,
+                sourceFilePath: path.join(this.projectPath, 'gen'),
+                firmwareVer: this.platformConfig.version,
+            });
+            if (debugResult.errors.length === 0) {
+                debugObj = debugResult.obj;
+            }
+        }
+
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
         const stackSize = maxLocalAllocSize > 0 ? 15 : 0;
         const linkedResources = this.config.sourceFiles
@@ -330,6 +348,7 @@ export class ProjectCompiler {
         };
         const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
         const linkResult = link(objBuffers, {}, linkerOptions);
+        this.writeProjectArtifacts(objs, debugObj);
 
         return {
             tpc: linkResult.errors.length === 0 ? linkResult.tpc : null,
@@ -611,6 +630,46 @@ export class ProjectCompiler {
 
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    private writeProjectArtifacts(objs: Map<string, Buffer>, debugObj: Buffer | null): void {
+        const tmpDir = path.join(this.projectPath, 'tmp');
+        fs.mkdirSync(tmpDir, { recursive: true });
+
+        for (const fileName of fs.readdirSync(tmpDir)) {
+            if (fileName.endsWith('.obj') || fileName.endsWith('.pdb')) {
+                fs.unlinkSync(path.join(tmpDir, fileName));
+            }
+        }
+
+        for (const [name, data] of objs) {
+            fs.writeFileSync(path.join(tmpDir, name), data);
+        }
+
+        const pdbSource = debugObj ?? objs.values().next().value ?? null;
+        if (debugObj) {
+            fs.writeFileSync(path.join(tmpDir, 'gen.obj'), debugObj);
+        }
+        if (pdbSource) {
+            fs.writeFileSync(path.join(tmpDir, 'database.pdb'), this.buildProjectPdb(pdbSource));
+        }
+    }
+
+    private buildProjectPdb(sourceObj: Buffer): Buffer {
+        const pdb = Buffer.from(sourceObj);
+        pdb.write('TPDB', 0, 'ascii');
+        pdb.writeUInt16LE(0, 6);
+
+        let checksum = 0;
+        for (let i = 0; i + 1 < pdb.length; i += 2) {
+            checksum = (checksum + pdb.readUInt16LE(i)) & 0xFFFF;
+        }
+        if (pdb.length % 2 !== 0) {
+            checksum = (checksum + pdb[pdb.length - 1]) & 0xFFFF;
+        }
+        checksum = (~checksum + 1) & 0xFFFF;
+        pdb.writeUInt16LE(checksum, 6);
+        return pdb;
     }
 
     private generateBuildId(): string {
