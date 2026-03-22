@@ -18,6 +18,7 @@ export interface LinkerOptions {
     maxEventNumber?: number;
     flags?: number;
     fixedTimestamp?: Date;
+    resources?: Array<{ name: string; data: Buffer }>;
 }
 
 interface ObjFile {
@@ -67,6 +68,12 @@ interface RDataReloc {
     rdataTarget: number;
 }
 
+interface LinkedResourceEntry {
+    name: string;
+    dataOffset: number;
+    size: number;
+}
+
 export class Linker {
     private diagnostics: DiagnosticCollection;
     private options: LinkerOptions;
@@ -80,6 +87,7 @@ export class Linker {
     private eventEntries: { codeAddress: number; dataAddress: number }[] = [];
     private eventEntryCount = 0;
     private rdataRelocs: RDataReloc[] = [];
+    private resources: LinkedResourceEntry[] = [];
     private flags = 0;
     private totalGlobalSize = 0;
     private maxLocalAllocSize = 0;
@@ -97,6 +105,13 @@ export class Linker {
         }
 
         return this.emit();
+    }
+
+    private writeOperand(bytes: number[], offset: number, value: number, width: number): void {
+        if (offset < 0 || offset + width > bytes.length) return;
+        for (let i = 0; i < width; i++) {
+            bytes[offset + i] = (value >> (i * 8)) & 0xFF;
+        }
     }
 
     private loadObj(name: string, data: Buffer): ObjFile {
@@ -155,6 +170,7 @@ export class Linker {
         const codeBase = this.mergedCode.length;
         const initBase = this.mergedInit.length;
         const rdataBase = this.mergedRData.length;
+        const fileDataBase = this.mergedFileData.length;
 
         // Merge CODE
         const codeData = obj.sections[TObjSection.Code]?.data;
@@ -185,6 +201,8 @@ export class Linker {
         if (fileData) {
             for (const b of fileData) this.mergedFileData.push(b);
         }
+
+        this.linkResFileDir(obj, fileDataBase);
 
         // Merge ADDRESSES
         this.linkAddresses(obj, codeBase, initBase);
@@ -308,6 +326,30 @@ export class Linker {
         }
     }
 
+    private linkResFileDir(obj: ObjFile, fileDataBase: number): void {
+        const dirData = obj.sections[TObjSection.ResFileDir]?.data;
+        const symbolData = obj.sections[TObjSection.Symbols]?.data;
+        if (!dirData || dirData.length === 0 || !symbolData) return;
+
+        let pos = 0;
+        while (pos + 12 <= dirData.length) {
+            const nameOffset = dirData.readUInt32LE(pos); pos += 4;
+            const dataOffset = dirData.readUInt32LE(pos); pos += 4;
+            const size = dirData.readUInt32LE(pos); pos += 4;
+
+            let name = '';
+            for (let i = nameOffset; i < symbolData.length && symbolData[i] !== 0; i++) {
+                name += String.fromCharCode(symbolData[i]);
+            }
+
+            this.resources.push({
+                name,
+                dataOffset: fileDataBase + dataOffset,
+                size,
+            });
+        }
+    }
+
     private linkAddresses(obj: ObjFile, codeBase: number, initBase: number): void {
         const addrData = obj.sections[TObjSection.Addresses]?.data;
         if (!addrData || addrData.length === 0) return;
@@ -398,20 +440,17 @@ export class Linker {
 
         // Apply address fixups
         const useCode24 = !!(this.flags & TObjHeaderFlags.Code24);
-        const addrSize = useCode24 ? 3 : 2;
+        const useData32 = !!(this.flags & TObjHeaderFlags.Data32);
+        const codeAddrSize = useCode24 ? 3 : 2;
+        const dataAddrSize = useData32 ? 4 : 2;
 
         for (const addr of this.addresses) {
             if (!(addr.flags & TObjAddressFlags.Defined)) continue;
             for (const ref of addr.references) {
                 const offset = ref.offset;
                 if (ref.type === TObjRefType.Code || ref.type === TObjRefType.Init) {
-                    if (offset + addrSize <= fullCode.length) {
-                        fullCode[offset] = addr.address & 0xFF;
-                        fullCode[offset + 1] = (addr.address >> 8) & 0xFF;
-                        if (useCode24 && offset + 2 < fullCode.length) {
-                            fullCode[offset + 2] = (addr.address >> 16) & 0xFF;
-                        }
-                    }
+                    const width = (addr.flags & TObjAddressFlags.Code) ? codeAddrSize : dataAddrSize;
+                    this.writeOperand(fullCode, offset, addr.address, width);
                 }
             }
         }
@@ -423,19 +462,12 @@ export class Linker {
                 offset += initSize;
             }
             // Init refs already have correct offsets (init is at the start of fullCode)
-            if (offset + addrSize <= fullCode.length) {
-                fullCode[offset] = reloc.rdataTarget & 0xFF;
-                fullCode[offset + 1] = (reloc.rdataTarget >> 8) & 0xFF;
-                if (useCode24 && offset + 2 < fullCode.length) {
-                    fullCode[offset + 2] = (reloc.rdataTarget >> 16) & 0xFF;
-                }
-            }
+            this.writeOperand(fullCode, offset, reloc.rdataTarget, 4);
         }
 
         const sectionCount = TObjSection.CountBin;
         const codeBuffer = Buffer.from(fullCode);
         const rdataBuffer = Buffer.from(this.mergedRData);
-        const fileDataBuffer = Buffer.from(this.mergedFileData);
 
         // Build minimal BIN symbols section
         const binSymStrings = new BinSymbolStringTable();
@@ -462,6 +494,24 @@ export class Linker {
         const ss = String(now.getSeconds()).padStart(2, '0');
         const timeStr = `${day}, ${dd}-${month}-${yy} ${hh}:${mm}:${ss} ${yyyy}${String(now.getMonth()+1).padStart(2,'0')}${dd}${hh}${mm}${ss}`;
         const timeStrOff = binSymStrings.add(timeStr);
+
+        const resFileDirW = new BinaryWriter();
+        for (const resource of this.resources) {
+            resFileDirW.writeDword(binSymStrings.add(resource.name));
+            resFileDirW.writeDword(resource.dataOffset);
+            resFileDirW.writeDword(resource.size);
+        }
+        for (const resource of this.options.resources ?? []) {
+            const dataOffset = this.mergedFileData.length;
+            for (const byte of resource.data) {
+                this.mergedFileData.push(byte);
+            }
+            resFileDirW.writeDword(binSymStrings.add(resource.name));
+            resFileDirW.writeDword(dataOffset);
+            resFileDirW.writeDword(resource.data.length);
+        }
+        const fileDataBuffer = Buffer.from(this.mergedFileData);
+        const resFileDirBuffer = resFileDirW.toBuffer();
 
         const symbolsBuffer = binSymStrings.toBuffer();
 
@@ -494,7 +544,7 @@ export class Linker {
         extraW.writeDword(configOff);
         const extraBuffer = extraW.toBuffer();
 
-        // Layout: Extra, EventDir, Symbols, RData, Code
+        // Layout: Extra, EventDir, Symbols, RData, FileData, ResFileDir, Code
         const headerAndDescSize = HEADER_SIZE + sectionCount * SECTION_DESCRIPTOR_SIZE;
         let currentOffset = headerAndDescSize;
 
@@ -510,6 +560,12 @@ export class Linker {
         const rdataOffset = currentOffset;
         currentOffset += rdataBuffer.length;
 
+        const fileDataOffset = currentOffset;
+        currentOffset += fileDataBuffer.length;
+
+        const resFileDirOffset = currentOffset;
+        currentOffset += resFileDirBuffer.length;
+
         const codeOffset = currentOffset;
         currentOffset += codeBuffer.length;
 
@@ -518,7 +574,7 @@ export class Linker {
         const fileSize = Math.ceil(rawSize / ALIGNMENT) * ALIGNMENT;
 
         // Empty sections: Init uses offset 0 (merged into Code), others share RData offset
-        const emptyDataOffset = rdataOffset;
+        const emptyDataOffset = fileDataBuffer.length > 0 ? fileDataOffset : rdataOffset;
 
         const offsets: number[] = new Array(sectionCount).fill(0);
         const sizes: number[] = new Array(sectionCount).fill(0);
@@ -526,9 +582,11 @@ export class Linker {
         offsets[TObjSection.Code] = codeOffset;             sizes[TObjSection.Code] = codeBuffer.length;
         offsets[TObjSection.Init] = 0;                      sizes[TObjSection.Init] = 0;
         offsets[TObjSection.RData] = rdataOffset;            sizes[TObjSection.RData] = rdataBuffer.length;
-        offsets[TObjSection.FileData] = emptyDataOffset;     sizes[TObjSection.FileData] = 0;
+        offsets[TObjSection.FileData] = fileDataBuffer.length > 0 ? fileDataOffset : emptyDataOffset;
+        sizes[TObjSection.FileData] = fileDataBuffer.length;
         offsets[TObjSection.Symbols] = symbolsOffset;        sizes[TObjSection.Symbols] = symbolsBuffer.length;
-        offsets[TObjSection.ResFileDir] = emptyDataOffset;   sizes[TObjSection.ResFileDir] = 0;
+        offsets[TObjSection.ResFileDir] = resFileDirBuffer.length > 0 ? resFileDirOffset : emptyDataOffset;
+        sizes[TObjSection.ResFileDir] = resFileDirBuffer.length;
         offsets[TObjSection.EventDir] = eventDirOffset;      sizes[TObjSection.EventDir] = eventDirBuffer.length;
         offsets[TObjSection.LibFileDir] = emptyDataOffset;   sizes[TObjSection.LibFileDir] = 0;
         offsets[TObjSection.Extra] = extraOffset;            sizes[TObjSection.Extra] = extraBuffer.length;
@@ -570,6 +628,8 @@ export class Linker {
         w.writeBytes(eventDirBuffer);
         w.writeBytes(symbolsBuffer);
         w.writeBytes(rdataBuffer);
+        w.writeBytes(fileDataBuffer);
+        w.writeBytes(resFileDirBuffer);
         w.writeBytes(codeBuffer);
 
         // Zero-pad to aligned file size minus terminator

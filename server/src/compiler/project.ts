@@ -158,6 +158,7 @@ export class ProjectCompiler {
         }
 
         const sourceFiles = this.config.sourceFiles.filter(f => f.type === 'basic');
+        const resourceFiles = this.config.sourceFiles.filter(f => f.type === 'resource');
         for (const sf of sourceFiles) {
             preprocessor.parseFile(this.projectPath, sf.path, true);
         }
@@ -283,8 +284,35 @@ export class ProjectCompiler {
             }
         }
 
+        for (const rf of resourceFiles) {
+            const result = this.compileHtmlResource(
+                rf,
+                headerSource,
+                flags,
+                maxEventNumber,
+                includedFiles,
+                fileSequence,
+                preprocessor.defines,
+            );
+            if (!result) continue;
+
+            objs.set(path.basename(rf.path) + '.obj', result.obj);
+            allErrors.push(...result.errors);
+            allWarnings.push(...result.warnings);
+            totalGlobalAllocSize += result.globalAllocSize;
+            if (result.localAllocSize > maxLocalAllocSize) {
+                maxLocalAllocSize = result.localAllocSize;
+            }
+        }
+
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
         const stackSize = maxLocalAllocSize > 0 ? 15 : 0;
+        const linkedResources = this.config.sourceFiles
+            .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')
+            .map(f => ({
+                name: path.basename(f.path),
+                data: fs.readFileSync(path.resolve(this.projectPath, f.path)),
+            }));
 
         const linkerOptions: LinkerOptions = {
             projectName: this.config.name || 'project',
@@ -298,6 +326,7 @@ export class ProjectCompiler {
             maxEventNumber: maxEventNumber + 1,
             flags,
             fixedTimestamp: this.options.fixedTimestamp,
+            resources: linkedResources,
         };
         const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
         const linkResult = link(objBuffers, {}, linkerOptions);
@@ -387,6 +416,152 @@ export class ProjectCompiler {
         combined = this.expandDefines(combined, preprocessor.defines);
 
         return combined;
+    }
+
+    private compileHtmlResource(
+        file: ProjectFile,
+        headerSource: string,
+        flags: number,
+        maxEventNumber: number,
+        includedFiles: string[],
+        fileSequence: string[],
+        defines: Record<string, { name: string; value: string }>,
+    ): CompileResult | null {
+        if (path.extname(file.path).toLowerCase() !== '.html') {
+            return null;
+        }
+
+        const absPath = path.resolve(this.projectPath, file.path);
+        const rawContent = fs.readFileSync(absPath);
+        const htmlContent = rawContent.toString('utf-8');
+        const scriptBlocks: string[] = [];
+        const scriptRe = /<\?([\s\S]*?)\?>/g;
+        let match: RegExpExecArray | null;
+        while ((match = scriptRe.exec(htmlContent)) !== null) {
+            const block = this.preprocessResourceScript(match[1], defines)
+                .split('\n')
+                .filter(line => !/^\s*(include|includepp)\s+/i.test(line))
+                .join('\n')
+                .trim();
+            scriptBlocks.push(block);
+        }
+        const handlerName = `_html_${path.basename(file.path).replace(/[^A-Za-z0-9_]/g, '_')}`;
+        const headerLineCount = headerSource.split('\n').length;
+        const wrapperBody = scriptBlocks.filter(Boolean).join('\n\n');
+        const syntheticSource = `${headerSource}\nsub ${handlerName}()\n${wrapperBody}\nend sub\n`;
+        const placeholder = /^upload_/i.test(path.basename(file.path)) ? '~000000' : '~000000\r\n';
+        const payload = scriptBlocks.length > 0
+            ? Buffer.from(placeholder, 'latin1')
+            : rawContent;
+
+        return compile(this.expandDefines(syntheticSource, defines), {
+            fileName: path.basename(file.path),
+            flags,
+            maxEventNumber,
+            platformSize: this.platformConfig.platformId,
+            headerLineCount,
+            includedFiles,
+            fileSequence,
+            sourceFilePath: absPath,
+            firmwareVer: this.platformConfig.version,
+            fileData: payload,
+            resourceEntries: [{ name: path.basename(file.path), dataOffset: 0, size: payload.length }],
+        });
+    }
+
+    private preprocessResourceScript(source: string, defines: Record<string, { name: string; value: string }>): string {
+        type ConditionalFrame = {
+            parentActive: boolean;
+            active: boolean;
+            branchTaken: boolean;
+        };
+
+        const lines = source.split('\n');
+        const output: string[] = [];
+        const stack: ConditionalFrame[] = [];
+
+        const isActive = (): boolean => stack.every(frame => frame.active);
+        const currentParentActive = (): boolean => stack.every(frame => frame.parentActive && frame.active);
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            let match = trimmed.match(/^#ifdef\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+            if (match) {
+                const parentActive = isActive();
+                const cond = defines[match[1]] !== undefined;
+                stack.push({ parentActive, active: parentActive && cond, branchTaken: cond });
+                continue;
+            }
+
+            match = trimmed.match(/^#ifndef\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+            if (match) {
+                const parentActive = isActive();
+                const cond = defines[match[1]] === undefined;
+                stack.push({ parentActive, active: parentActive && cond, branchTaken: cond });
+                continue;
+            }
+
+            match = trimmed.match(/^#if\s+(.+)$/i);
+            if (match) {
+                const parentActive = isActive();
+                const cond = this.evaluateResourceCondition(match[1], defines);
+                stack.push({ parentActive, active: parentActive && cond, branchTaken: cond });
+                continue;
+            }
+
+            match = trimmed.match(/^#elif\s+(.+)$/i);
+            if (match && stack.length > 0) {
+                const frame = stack[stack.length - 1];
+                const cond = !frame.branchTaken && this.evaluateResourceCondition(match[1], defines);
+                frame.active = frame.parentActive && cond;
+                frame.branchTaken = frame.branchTaken || cond;
+                continue;
+            }
+
+            if (/^#else\b/i.test(trimmed) && stack.length > 0) {
+                const frame = stack[stack.length - 1];
+                frame.active = frame.parentActive && !frame.branchTaken;
+                frame.branchTaken = true;
+                continue;
+            }
+
+            if (/^#endif\b/i.test(trimmed) && stack.length > 0) {
+                stack.pop();
+                continue;
+            }
+
+            if (/^#/.test(trimmed)) {
+                continue;
+            }
+
+            if (isActive()) {
+                output.push(line);
+            }
+        }
+
+        return output.join('\n');
+    }
+
+    private evaluateResourceCondition(expr: string, defines: Record<string, { name: string; value: string }>): boolean {
+        const normalized = expr
+            .replace(/<>/g, '!=')
+            .replace(/\bAND\b/gi, '&&')
+            .replace(/\bOR\b/gi, '||')
+            .replace(/(^|[^<>!])=([^=]|$)/g, '$1==$2')
+            .replace(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g, (token, name: string) => {
+                const def = defines[name];
+                if (!def) return '0';
+                const value = def.value.trim();
+                if (value === '') return '1';
+                if (/^-?\d+(\.\d+)?$/.test(value)) return value;
+                return JSON.stringify(value);
+            });
+
+        try {
+            return !!Function(`return (${normalized});`)();
+        } catch {
+            return false;
+        }
     }
 
     private expandDefines(source: string, defines: Record<string, { name: string; value: string }>): string {

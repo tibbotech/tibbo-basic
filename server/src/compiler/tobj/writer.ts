@@ -65,6 +65,8 @@ export interface TObjWriteOptions {
     globalAllocSize?: number;
     localAllocSize?: number;
     stackSize?: number;
+    fileData?: Buffer;
+    resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
 }
 
 export class TObjWriter {
@@ -73,11 +75,17 @@ export class TObjWriter {
     private flags = 0;
     private functionAddrIndex = new Map<string, number>();
     private varAddrIndex = new Map<string, number>();
+    private localVarAddrIndex = new Map<VariableSymbol, number>();
+    private scopeIndexMap = new Map<Scope, number>();
     private typeIndexMap = new Map<string, number>();
 
     setFlags(flags: number): void { this.flags = flags; }
 
     write(emitter: ByteEmitter, symbols: SymbolTable, fileName: string, maxEventNumber = -1, options: TObjWriteOptions = {}): Buffer {
+        this.functionAddrIndex.clear();
+        this.varAddrIndex.clear();
+        this.localVarAddrIndex.clear();
+        this.scopeIndexMap.clear();
         const includedFiles = options.includedFiles || [];
         const platformSize = options.platformSize ?? 0;
 
@@ -98,8 +106,8 @@ export class TObjWriter {
         sections[TObjSection.Code] = codeData;
         sections[TObjSection.Init] = initData;
         sections[TObjSection.RData] = rdata;
-        sections[TObjSection.FileData] = Buffer.alloc(0);
-        sections[TObjSection.ResFileDir] = Buffer.alloc(0);
+        sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
+        sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
         sections[TObjSection.EventDir] = Buffer.alloc(0);
         sections[TObjSection.LibFileDir] = Buffer.alloc(0);
         sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
@@ -236,25 +244,23 @@ export class TObjWriter {
     private buildAddresses(emitter: ByteEmitter, symbols: SymbolTable): Buffer {
         const w = new BinaryWriter();
 
-        // Collect function names to identify which labels are function entries
-        const functionNames = new Set<string>();
-        for (const fn of symbols.getFunctions()) {
-            if (!fn.isDeclare) functionNames.add(fn.name);
-        }
-
-        // Code labels: only emit function entry labels (with ?F: prefix)
         let addrIndex = 0;
         const labels = emitter.getLabels();
-        for (const [name, label] of labels) {
-            if (!functionNames.has(name)) continue;
+        const emittedCodeLabels = new Set<string>();
+        for (const fn of symbols.getFunctions()) {
+            const label = labels.get(fn.name);
+            if (!label) continue;
+            if (!label.defined && label.references.length === 0) continue;
 
-            this.functionAddrIndex.set(name, addrIndex++);
+            emittedCodeLabels.add(fn.name);
+            this.functionAddrIndex.set(fn.name, addrIndex++);
 
-            let flags = TObjAddressFlags.Defined | TObjAddressFlags.Code;
-            if (label.isPublic) flags |= TObjAddressFlags.Public;
+            let flags = TObjAddressFlags.Code;
+            if (label.defined) flags |= TObjAddressFlags.Defined;
+            if (fn.isPublic || label.isPublic) flags |= TObjAddressFlags.Public;
 
             w.writeByte(flags);
-            w.writeDword(this.symStrings.add(`?F:${name}`));
+            w.writeDword(this.symStrings.add(`?F:${fn.name}`));
             w.writeDword(label.address);
             w.writeDword(MAXDWORD);
             w.writeDword(label.references.length);
@@ -263,6 +269,28 @@ export class TObjWriter {
                 w.writeByte(ref.type);
                 w.writeDword(ref.offset);
             }
+        }
+
+        for (const [name, label] of labels) {
+            if (emittedCodeLabels.has(name)) continue;
+            if (!label.defined && label.references.length === 0) continue;
+
+            let flags = TObjAddressFlags.Code;
+            if (label.defined) flags |= TObjAddressFlags.Defined;
+            if (label.isPublic) flags |= TObjAddressFlags.Public;
+
+            w.writeByte(flags);
+            w.writeDword(this.symStrings.add(name));
+            w.writeDword(label.address);
+            w.writeDword(MAXDWORD);
+            w.writeDword(label.references.length);
+
+            for (const ref of label.references) {
+                w.writeByte(ref.type);
+                w.writeDword(ref.offset);
+            }
+
+            addrIndex++;
         }
 
         // Data labels (global variables)
@@ -287,12 +315,27 @@ export class TObjWriter {
             }
         }
 
+        let localVarOrdinal = 0;
+        for (const fn of symbols.getFunctions()) {
+            if (fn.isDeclare) continue;
+            for (const v of [...fn.parameters, ...fn.localVariables]) {
+                if (v.address == null) continue;
+                this.localVarAddrIndex.set(v, addrIndex++);
+
+                w.writeByte(TObjAddressFlags.Defined);
+                w.writeDword(this.symStrings.add(`!V:${fn.name}:${v.name}:${localVarOrdinal++}`));
+                w.writeDword(v.address);
+                w.writeDword(MAXDWORD);
+                w.writeDword(0);
+            }
+        }
+
         return w.toBuffer();
     }
 
     private buildFunctions(symbols: SymbolTable): Buffer {
         const w = new BinaryWriter();
-        const fns = symbols.getFunctions().filter(fn => !fn.isDeclare);
+        const fns = symbols.getFunctions().filter(fn => this.functionAddrIndex.has(fn.name));
         const functionIndex = new Map<string, number>();
 
         for (let i = 0; i < fns.length; i++) {
@@ -311,7 +354,7 @@ export class TObjWriter {
             w.writeByte(flags);
             w.writeDword(this.symStrings.add(fn.name));
             w.writeDword(addrIdx);
-            w.writeDword(fn.eventNumber ?? 0);
+            w.writeDword(fn.isEvent ? (fn.eventNumber ?? 0) : MAXDWORD);
             w.writeDword(calleeIndexes.length);
             for (const idx of calleeIndexes) {
                 w.writeDword(idx);
@@ -324,21 +367,26 @@ export class TObjWriter {
     private buildScopes(symbols: SymbolTable, fileName: string, sourceFilePath?: string, headerLineCount = 0): Buffer {
         const w = new BinaryWriter();
         const fileNameOff = this.symStrings.add(sourceFilePath || fileName);
-
-        const fns = symbols.getFunctions().filter(fn => !fn.isDeclare);
-        for (const fn of fns) {
-            const beginLine = fn.location ? Math.max(1, fn.location.line - headerLineCount) : 0;
-            const endLine = fn.endLoc ? Math.max(1, fn.endLoc.line - headerLineCount) : beginLine;
-
+        const scopes = symbols.getScopes().filter(
+            scope => scope !== symbols.globalScope && scope.type !== undefined,
+        );
+        for (let i = 0; i < scopes.length; i++) {
+            const scope = scopes[i];
+            this.scopeIndexMap.set(scope, i);
+            const owner = scope.ownerFunction;
+            const beginLine = owner?.location ? Math.max(1, owner.location.line - headerLineCount) : 0;
+            const endLine = owner?.endLoc ? Math.max(1, owner.endLoc.line - headerLineCount) : beginLine;
+            const beginAddress = scope.startAddress || owner?.codeStartAddress || 0;
+            const endAddress = scope.endAddress || owner?.codeEndAddress || beginAddress;
             w.writeDword(fileNameOff);
             w.writeDword(beginLine);
             w.writeDword(1);
-            w.writeDword(fn.codeStartAddress ?? 0);
+            w.writeDword(beginAddress);
 
             w.writeDword(fileNameOff);
             w.writeDword(endLine);
             w.writeDword(1);
-            w.writeDword(fn.codeEndAddress ?? 0);
+            w.writeDword(endAddress);
         }
 
         return w.toBuffer();
@@ -355,24 +403,25 @@ export class TObjWriter {
 
                 const addrIdx = v.isGlobal
                     ? (this.varAddrIndex.get(v.name) ?? 0)
-                    : (v.address ?? 0);
+                    : (this.localVarAddrIndex.get(v) ?? 0);
+                const ownerScopeIdx = v.isGlobal
+                    ? MAXDWORD
+                    : (v.ownerScope ? (this.scopeIndexMap.get(v.ownerScope) ?? 0) : 0);
                 const nameStr = v.name;
 
                 w.writeByte(flags);
                 w.writeDword(this.symStrings.add(nameStr));
                 w.writeDword(addrIdx);
-                w.writeDword(scopeIdx);
+                w.writeDword(ownerScopeIdx);
                 this.writeDataType(w, v.dataType);
             }
         };
 
         writeVars(symbols.globalScope.getVariables(), MAXDWORD);
-        let scopeIdx = 1;
         for (const fn of symbols.getFunctions()) {
             if (fn.isDeclare) continue;
-            writeVars(fn.parameters, scopeIdx);
-            writeVars(fn.localVariables, scopeIdx);
-            scopeIdx++;
+            writeVars(fn.parameters, 0);
+            writeVars(fn.localVariables, 0);
         }
 
         return w.toBuffer();
@@ -480,6 +529,16 @@ export class TObjWriter {
         const w = new BinaryWriter();
         for (const off of includeFileOffsets) {
             w.writeDword(off);
+        }
+        return w.toBuffer();
+    }
+
+    private buildResFileDir(entries: Array<{ name: string; dataOffset: number; size: number }>): Buffer {
+        const w = new BinaryWriter();
+        for (const entry of entries) {
+            w.writeDword(this.symStrings.add(entry.name));
+            w.writeDword(entry.dataOffset);
+            w.writeDword(entry.size);
         }
         return w.toBuffer();
     }

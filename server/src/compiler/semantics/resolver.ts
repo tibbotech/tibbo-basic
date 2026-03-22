@@ -289,6 +289,7 @@ export class SemanticResolver {
         scope.ownerFunction = existing;
 
         for (const p of params) {
+            p.ownerScope = scope;
             this.symbols.define(p);
         }
 
@@ -296,9 +297,10 @@ export class SemanticResolver {
             const retVar: VariableSymbol = {
                 name: decl.name, kind: SymbolKind.Variable, dataType: returnType,
                 location: decl.loc, isPublic: false, isDeclare: false,
-                isByRef: false, isGlobal: false,
+                isByRef: false, isGlobal: false, ownerScope: scope,
             };
             this.symbols.define(retVar);
+            existing.localVariables.push(retVar);
         }
 
         this.resolveBlock(decl.body);
@@ -355,7 +357,7 @@ export class SemanticResolver {
             const varSym: VariableSymbol = {
                 name: v.name, kind: SymbolKind.Variable, dataType: varType,
                 location: decl.loc, isPublic: false, isDeclare: false,
-                isByRef: false, isGlobal: false,
+                isByRef: false, isGlobal: false, ownerScope: this.symbols.current,
             };
             this.symbols.define(varSym);
 
@@ -465,6 +467,7 @@ export class SemanticResolver {
                 isDeclare: false,
                 isByRef: p.passMode === AST.PassMode.ByRef,
                 isGlobal: false,
+                ownerScope: this.symbols.current,
             };
         });
     }

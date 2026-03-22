@@ -24,6 +24,8 @@ export interface CompileOptions {
     fileSequence?: string[];
     sourceFilePath?: string;
     firmwareVer?: string;
+    fileData?: Buffer;
+    resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
 }
 
 export interface CompileResult {
@@ -127,6 +129,8 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
         stackSize: 15,
+        fileData: options.fileData,
+        resourceEntries: options.resourceEntries,
     });
 
     return {
