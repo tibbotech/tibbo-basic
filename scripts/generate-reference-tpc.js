@@ -7,7 +7,13 @@
  *   node scripts/generate-reference-tpc.js [project-name ...]
  *
  * Options:
- *   --tmake <path>   Path to tmake.exe (default: C:\Program Files (x86)\Tibbo\TIDE\Bin\tmake.exe)
+ *   --tmake <path>   Path to tmake.exe (default: see below)
+ *   --optional       If tmake is missing, exit 0 (for CI); otherwise same as without this flag
+ *
+ * Environment:
+ *   TIBBO_TMAKE, TMAKE   Default path to tmake when --tmake is not passed
+ *
+ * Default tmake path when no env or flag: C:\\Program Files (x86)\\Tibbo\\TIDE\\Bin\\tmake.exe
  *
  * Examples:
  *   node scripts/generate-reference-tpc.js                  # all test projects
@@ -24,17 +30,20 @@ const DEFAULT_TMAKE = String.raw`C:\Program Files (x86)\Tibbo\TIDE\Bin\tmake.exe
 
 function parseArgs(argv) {
     const args = argv.slice(2);
-    let tmakePath = DEFAULT_TMAKE;
+    let tmakePath = process.env.TIBBO_TMAKE || process.env.TMAKE || DEFAULT_TMAKE;
     const projects = [];
+    let optional = false;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--tmake' && i + 1 < args.length) {
             tmakePath = args[++i];
+        } else if (args[i] === '--optional') {
+            optional = true;
         } else if (!args[i].startsWith('-')) {
             projects.push(args[i]);
         }
     }
-    return { tmakePath, projects };
+    return { tmakePath, projects, optional };
 }
 
 function discoverProjects(filter) {
@@ -62,9 +71,16 @@ function discoverProjects(filter) {
 }
 
 function main() {
-    const { tmakePath, projects: filter } = parseArgs(process.argv);
+    const { tmakePath, projects: filter, optional } = parseArgs(process.argv);
 
     if (!fs.existsSync(tmakePath)) {
+        if (optional) {
+            console.warn(
+                `[generate-reference-tpc] tmake not found at: ${tmakePath}\n` +
+                    'Skipping reference regeneration (committed .tpc will be used). Set TIBBO_TMAKE or pass --tmake.'
+            );
+            process.exit(0);
+        }
         console.error(`tmake.exe not found at: ${tmakePath}`);
         console.error(`Use --tmake <path> to specify the correct location.`);
         process.exit(1);

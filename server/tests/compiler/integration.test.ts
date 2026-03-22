@@ -1,8 +1,20 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import { execFileSync } from 'child_process';
 import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
 
-const TESTS_ROOT = path.resolve(__dirname, '../../../tests');
+const REPO_ROOT = path.resolve(__dirname, '../../..');
+const TESTS_ROOT = path.resolve(REPO_ROOT, 'tests');
+
+/** Regenerate reference .tpc (and objs) via Tibbo tmake before comparing outputs. */
+beforeAll(() => {
+    const script = path.join(REPO_ROOT, 'scripts', 'generate-reference-tpc.js');
+    execFileSync(process.execPath, [script, '--optional'], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+        env: process.env,
+    });
+});
 
 // ---------------------------------------------------------------------------
 // TPC comparison helpers
@@ -120,7 +132,7 @@ function discoverTestProjects(): TestProject[] {
         const files = fs.readdirSync(dir);
 
         const tprFile = files.find(f => f.endsWith('.tpr'));
-        if (!tprFile) continue;''
+        if (!tprFile) continue;
 
         const tpcFile = files.find(f => f.endsWith('.tpc') && !f.includes('_new')) || null;
 

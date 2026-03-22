@@ -186,23 +186,57 @@ export class ProjectCompiler {
         includedFiles.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
         // File processing sequence (includes re-entries for LineInfo blocks)
-        const rawFileSeq: string[] = [];
-        for (const filePath of (preprocessor.lineInfoFileSequence || preprocessor.fileSequence) as string[]) {
-            const basename = path.basename(filePath);
-            if (sourceFileBasenames.has(basename)) continue;
-            if (basename.toLowerCase() === 'global.tbh') continue;
-            const content = preprocessor.files[filePath] as string;
-            if (content && content.replace(/\s/g, '').length === 0) continue;
-            rawFileSeq.push(filePath);
+        const includeOrder: Map<string, string[]> = preprocessor.includeOrder || new Map();
+        const filesWithContentAfterLastInclude = new Set<string>();
+        for (const [parentPath, children] of includeOrder.entries()) {
+            if (children.length === 0) continue;
+            const origContent = preprocessor.originalFiles[parentPath] as string;
+            if (!origContent) continue;
+            const lines = origContent.split('\n');
+            let lastIncludeLine = -1;
+            for (let li = 0; li < lines.length; li++) {
+                if (/^\s*(include|includepp)\s+/i.test(lines[li])) lastIncludeLine = li;
+            }
+            if (lastIncludeLine >= 0) {
+                const afterLastInclude = lines.slice(lastIncludeLine + 1);
+                const hasContent = afterLastInclude.some(l => {
+                    const t = l.trim();
+                    return t.length > 0 && !t.startsWith("'") && !t.startsWith('#');
+                });
+                if (hasContent) filesWithContentAfterLastInclude.add(parentPath);
+            }
         }
-        // Remove "last returns": return-to-parent after the final include in each file
+
+        const emptyFiles = new Set<string>();
+        for (const fp of Object.keys(preprocessor.files)) {
+            const content = preprocessor.files[fp] as string;
+            if (!content) continue;
+            const hasCode = content.split('\n').some(l => {
+                const t = l.trim();
+                return t.length > 0 && !t.startsWith("'") && !t.startsWith('#');
+            });
+            if (!hasCode) emptyFiles.add(fp);
+        }
+
         const fileSequence: string[] = [];
-        for (let i = 0; i < rawFileSeq.length; i++) {
-            const isReturn = i >= 2 && rawFileSeq[i] === rawFileSeq[i - 2];
-            const isLast = isReturn && (i + 2 >= rawFileSeq.length || rawFileSeq[i] !== rawFileSeq[i + 2]);
-            if (isLast) continue;
-            fileSequence.push(rawFileSeq[i]);
-        }
+        const emitFileSequence = (filePath: string) => {
+            const basename = path.basename(filePath);
+            if (sourceFileBasenames.has(basename)) return;
+            if (basename.toLowerCase() === 'global.tbh') return;
+            if (emptyFiles.has(filePath)) return;
+            fileSequence.push(filePath);
+            const children = includeOrder.get(filePath) || [];
+            const validChildren = children.filter(c => !emptyFiles.has(c) && !sourceFileBasenames.has(path.basename(c)) && path.basename(c).toLowerCase() !== 'global.tbh');
+            for (let i = 0; i < validChildren.length; i++) {
+                emitFileSequence(validChildren[i]);
+                const isLast = i === validChildren.length - 1;
+                if (!isLast || filesWithContentAfterLastInclude.has(filePath)) {
+                    fileSequence.push(filePath);
+                }
+            }
+        };
+        const rootPlatformFile = (preprocessor.lineInfoFileSequence || preprocessor.fileSequence)[0] as string;
+        if (rootPlatformFile) emitFileSequence(rootPlatformFile);
 
         const flags = this.getCompilerFlags();
         const maxEventNumber = this.platformConfig.maxEventNumber;
