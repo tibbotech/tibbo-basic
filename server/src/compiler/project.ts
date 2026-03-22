@@ -324,7 +324,7 @@ export class ProjectCompiler {
         }
 
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
-        const stackSize = maxLocalAllocSize > 0 ? 15 : 0;
+        const stackSize = 0;
         const linkedResources = this.config.sourceFiles
             .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')
             .map(f => ({
