@@ -150,7 +150,9 @@ export class SemanticResolver {
             parameters: params, returnType,
             location: decl.loc, isPublic: false, isDeclare: false,
         };
-        this.symbols.defineGlobal(sysSym);
+        if (!decl.objectName) {
+            this.symbols.defineGlobal(sysSym);
+        }
 
         if (decl.objectName) {
             if (decl.isInternal) {

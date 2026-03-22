@@ -4,4 +4,10 @@ dim aa as string
 
 sub on_sys_init()
 	aa = "hello"
+    dim bb as byte
+    bb = 3
+	sys.debugprint(str(bb))
+    bb = bb + 3
+    sys.debugprint(str(bb))
+    pat.play("B-B-B-",PL_PAT_CANINT)
 end sub
