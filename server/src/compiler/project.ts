@@ -270,28 +270,53 @@ export class ProjectCompiler {
     }
 
     private buildHeaderSource(preprocessor: any): string {
-        const parts: string[] = [];
-        const processedPaths = new Set<string>();
         const sourceFileBasenames = new Set(
             this.config.sourceFiles
                 .filter(f => f.type === 'basic')
                 .map(f => path.basename(f.path)),
         );
 
-        for (const filePath of preprocessor.filePriorities as string[]) {
-            if (processedPaths.has(filePath)) continue;
-            processedPaths.add(filePath);
+        const includeOrder: Map<string, string[]> = preprocessor.includeOrder || new Map();
+        const expanded = new Set<string>();
+        const includeRe = /^\s*(include|includepp)\s+/i;
+
+        const expand = (filePath: string): string => {
+            if (expanded.has(filePath)) return '';
+            expanded.add(filePath);
 
             const basename = path.basename(filePath);
-            // Skip .tbs source files -- those are compiled separately
-            if (sourceFileBasenames.has(basename)) continue;
+            if (sourceFileBasenames.has(basename)) return '';
 
             const content = preprocessor.files[filePath] as string;
-            if (!content) continue;
-            const trimmed = content.replace(/\s/g, '');
-            if (trimmed.length === 0) continue;
+            if (!content) return '';
+            if (content.replace(/\s/g, '').length === 0) return '';
 
-            parts.push(content);
+            const childIncludes = includeOrder.get(filePath) || [];
+            if (childIncludes.length === 0) return content;
+
+            const lines = content.split('\n');
+            const result: string[] = [];
+            let childIdx = 0;
+
+            for (const line of lines) {
+                if (includeRe.test(line) && childIdx < childIncludes.length) {
+                    result.push(' '.repeat(line.length));
+                    result.push(expand(childIncludes[childIdx]));
+                    childIdx++;
+                } else {
+                    result.push(line);
+                }
+            }
+            return result.join('\n');
+        };
+
+        const parts: string[] = [];
+        for (const filePath of preprocessor.filePriorities as string[]) {
+            if (expanded.has(filePath)) continue;
+            const content = expand(filePath);
+            if (content && content.replace(/\s/g, '').length > 0) {
+                parts.push(content);
+            }
         }
 
         return parts.join('\n');

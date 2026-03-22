@@ -15,3 +15,7 @@ More information on Tibbo BASIC is available [here](https://docs.tibbo.com/taiko
 For more information about our IoT ecosystem, click [here](https://tibbo.com).
 
 ![Screenshot](images/screenshot.jpg)
+
+
+
+node server/out/compiler/compile-project.js path/to/project-folder
