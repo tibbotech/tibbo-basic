@@ -318,6 +318,7 @@ export class ProjectCompiler {
                 sourceFilePath: path.join(this.projectPath, 'gen'),
                 firmwareVer: this.platformConfig.version,
                 sourceMap,
+                resolveDataAddresses: true,
             });
             if (debugResult.errors.length === 0) {
                 debugObj = debugResult.obj;

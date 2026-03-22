@@ -33,6 +33,7 @@ export interface CompileOptions {
     fileData?: Buffer;
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
     sourceMap?: SourceMapEntry[];
+    resolveDataAddresses?: boolean;
 }
 
 export interface CompileResult {
@@ -117,6 +118,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
     }
     if (options.headerLineCount != null) {
         generator.setHeaderLineCount(options.headerLineCount);
+    }
+    if (options.resolveDataAddresses) {
+        generator.setResolveDataAddresses(true);
     }
     generator.generate(ast);
 

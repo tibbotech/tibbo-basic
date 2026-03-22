@@ -9,5 +9,5 @@ sub on_sys_init()
 	sys.debugprint(str(bb))
     bb = bb + 3
     sys.debugprint(str(bb))
-    pat.play("B-B-B-",PL_PAT_CANINT)
+    pat.play("B-G-~",PL_PAT_CANINT)
 end sub

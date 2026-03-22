@@ -42,6 +42,7 @@ export class PCodeGenerator {
     private globalDataOffset = 0;
     private localAllocSize = 0;
     private platformSize = 0;
+    private resolveDataAddresses = false;
     private headerLineCount = 0;
     private tempScratchBase = 0;
 
@@ -54,6 +55,10 @@ export class PCodeGenerator {
 
     setPlatformSize(size: number): void {
         this.platformSize = size;
+    }
+
+    setResolveDataAddresses(resolve: boolean): void {
+        this.resolveDataAddresses = resolve;
     }
 
     setHeaderLineCount(count: number): void {
@@ -569,6 +574,7 @@ export class PCodeGenerator {
 
     private allocateGlobalVariables(program: AST.Program): void {
         let offset = this.globalDataOffset;
+        const addrBase = this.resolveDataAddresses ? this.platformSize : 0;
         for (const decl of program.declarations) {
             if (decl.kind !== 'DimStmt' || decl.isDeclare) continue;
             if (!this.isFromCurrentFile(decl)) continue;
@@ -576,8 +582,8 @@ export class PCodeGenerator {
                 const sym = this.symbols.lookupGlobal(v.name) as VariableSymbol | undefined;
                 if (!sym) continue;
                 const size = sym.dataType?.size ?? 2;
-                sym.address = this.platformSize + offset;
-                this.emitter.defineDataLabel(`?V:${v.name}`, this.platformSize + offset);
+                sym.address = addrBase + offset;
+                this.emitter.defineDataLabel(`?V:${v.name}`, addrBase + offset);
                 offset += size;
             }
         }
