@@ -42,6 +42,12 @@ interface DecodedInstruction {
     bytes: number[];
 }
 
+export interface DecodedLineInstruction {
+    fileName: string;
+    line: number;
+    instruction: string;
+}
+
 const DIRECT_PREFIX = 0x00;
 const INDIRECT_PREFIX = 0x40;
 const IMMEDIATE_PREFIX = 0x80;
@@ -167,6 +173,60 @@ function main(): void {
     }
 
     printGroupedByLine(instructions, files);
+}
+
+export function disassembleBinary(buf: Buffer): DecodedInstruction[] {
+    const header = parseHeader(buf);
+    const code = getSectionBuffer(buf, header, TObjSection.Code);
+    if (code.length === 0) {
+        return [];
+    }
+    const useCode24 = (header.flags & TObjHeaderFlags.Code24) !== 0;
+    const useData32 = (header.flags & TObjHeaderFlags.Data32) !== 0;
+    const codeAddrSize = useCode24 ? 3 : 2;
+    const dataAddrSize = useData32 ? 4 : 2;
+    return disassemble(code, codeAddrSize, dataAddrSize);
+}
+
+export function disassembleBinaryToLines(buf: Buffer): string[] {
+    return disassembleBinary(buf).map(ins => `${ins.mnemonic} ${toHexBytes(ins.bytes)} `);
+}
+
+export function disassembleBinaryBySourceLine(buf: Buffer): DecodedLineInstruction[] {
+    const header = parseHeader(buf);
+    const code = getSectionBuffer(buf, header, TObjSection.Code);
+    const symbols = getSectionBuffer(buf, header, TObjSection.Symbols);
+    const lineInfo = getSectionBuffer(buf, header, TObjSection.LineInfo);
+    if (code.length === 0) {
+        return [];
+    }
+    const useCode24 = (header.flags & TObjHeaderFlags.Code24) !== 0;
+    const useData32 = (header.flags & TObjHeaderFlags.Data32) !== 0;
+    const instructions = disassemble(code, useCode24 ? 3 : 2, useData32 ? 4 : 2);
+    const files = parseLineInfo(lineInfo, symbols);
+
+    const out: DecodedLineInstruction[] = [];
+    for (const file of files) {
+        const sortedLines = [...file.lines].sort((a, b) => a.address - b.address);
+        let insIdx = 0;
+        for (let i = 0; i < sortedLines.length; i++) {
+            const cur = sortedLines[i];
+            const nextStart = i + 1 < sortedLines.length ? sortedLines[i + 1].address : Number.MAX_SAFE_INTEGER;
+            while (insIdx < instructions.length && instructions[insIdx].address < cur.address) {
+                insIdx++;
+            }
+            while (insIdx < instructions.length && instructions[insIdx].address < nextStart) {
+                const ins = instructions[insIdx];
+                out.push({
+                    fileName: file.fileName,
+                    line: cur.line,
+                    instruction: `${ins.mnemonic} ${toHexBytes(ins.bytes)} `,
+                });
+                insIdx++;
+            }
+        }
+    }
+    return out;
 }
 
 function parseHeader(buf: Buffer): ParsedHeader {
@@ -430,4 +490,6 @@ function toHexBytes(values: number[]): string {
     return values.map(v => toHexByte(v)).join(' ');
 }
 
-main();
+if (require.main === module) {
+    main();
+}

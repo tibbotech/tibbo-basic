@@ -86,6 +86,11 @@ function compileTmake(proj, tmakePath) {
         { cwd: proj.dir, encoding: 'utf-8', timeout: 60000 }
     );
     if (output.trim()) console.log(output.trim());
+
+    const tmakePdb = path.join(proj.dir, 'tmp', 'database.pdb');
+    if (fs.existsSync(tmakePdb)) {
+        fs.copyFileSync(tmakePdb, path.join(proj.dir, 'database.pdb'));
+    }
 }
 
 function compileJs(proj) {
