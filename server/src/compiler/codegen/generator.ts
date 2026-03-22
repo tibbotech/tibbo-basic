@@ -560,16 +560,27 @@ export class PCodeGenerator {
             }
         }
 
+        if (expr.kind === 'StringLiteral') {
+            const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            this.emitTempStringInit(litAddr, expr.value.length);
+            this.emitter.emitByte(OP.OPCODE_LEA);
+            this.emitter.emitDataAddress(litAddr);
+            this.emitSyscallArg(0);
+            const rdataOff = this.emitter.addStringRData(expr.value);
+            this.emitRDataLoad(rdataOff);
+            this.emitSyscallArg(1);
+            this.emitSyscallByName('strload');
+            this.emitLeaToArg(tempAddr, 0);
+            this.emitLeaToArg(litAddr, 1);
+            this.emitSyscallByName('strcat');
+            return;
+        }
+
         this.emitter.emitByte(OP.OPCODE_LEA);
         this.emitter.emitDataAddress(tempAddr);
         this.emitSyscallArg(0);
 
-        if (expr.kind === 'StringLiteral') {
-            const rdataOff = this.emitter.addStringRData(expr.value);
-            this.emitRDataLoad(rdataOff);
-            this.emitSyscallArg(1);
-            this.emitSyscallByName('strcat');
-        } else if (expr.kind === 'IdentifierExpr') {
+        if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
@@ -649,7 +660,8 @@ export class PCodeGenerator {
             if (!this.isFromCurrentFile(decl)) continue;
             const perStmt = this.countTempVarsPerStatement(decl.body);
             for (const n of perStmt) {
-                if (n > maxSlots) maxSlots = n;
+                const concurrent = n >= 2 ? 2 : n;
+                if (concurrent > maxSlots) maxSlots = concurrent;
             }
         }
         return maxSlots;
@@ -737,11 +749,12 @@ export class PCodeGenerator {
         return count;
     }
 
-    private countStringCallsInConcat(expr: AST.Expression): number {
+    private countStringCallsInConcat(expr: AST.Expression, isFirst = false): number {
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
-            return this.countStringCallsInConcat(expr.left) + this.countStringCallsInConcat(expr.right);
+            return this.countStringCallsInConcat(expr.left, isFirst) + this.countStringCallsInConcat(expr.right);
         }
         if (expr.kind === 'CallExpr' && this.isStringExpression(expr)) return 1;
+        if (expr.kind === 'StringLiteral' && !isFirst) return 1;
         return 0;
     }
 
@@ -800,7 +813,7 @@ export class PCodeGenerator {
             const slotAssignments: number[] = [];
             for (const stmtCount of perStmt) {
                 for (let s = 0; s < stmtCount; s++) {
-                    slotAssignments.push(s);
+                    slotAssignments.push(Math.min(s, 1));
                 }
             }
 
