@@ -5,7 +5,7 @@ import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
 import { disassembleBinaryToLines, disassembleBinaryBySourceLine, DecodedLineInstruction } from '../../src/compiler/dump-pdb-instructions';
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
-const TESTS_ROOT = path.resolve(REPO_ROOT, 'tests');
+const TESTS_ROOT = path.resolve(REPO_ROOT, 'server', 'tests');
 
 /** Regenerate reference .tpc and .obj files via tmake before comparing outputs. */
 beforeAll(() => {

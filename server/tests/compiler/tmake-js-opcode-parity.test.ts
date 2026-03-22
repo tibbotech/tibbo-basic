@@ -71,7 +71,7 @@ function logFirstMismatch(
 }
 
 describeTmake('tmake reference vs JS compiler opcodes (tests/blank)', () => {
-    const projectDir = path.join(REPO_ROOT, 'tests', 'blank');
+    const projectDir = path.join(REPO_ROOT, 'server', 'tests', 'blank');
 
     it('matches disassembled Code: tmake PDB vs JS TPC (TBIN Code section)', () => {
         const refPdb = runTmake(projectDir);

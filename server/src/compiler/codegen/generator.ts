@@ -49,6 +49,7 @@ export class PCodeGenerator {
     private localVarLabelMap = new Map<VariableSymbol, string>();
     private callGraph = new Map<string, Set<string>>();
     private functionTempBase = new Map<string, number>();
+    private liveReachable = new Set<string>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -746,6 +747,7 @@ export class PCodeGenerator {
         };
 
         for (const name of this.callGraph.keys()) {
+            if (!name.startsWith('on_')) continue;
             const d = getDepth(name);
             if (d > maxDepth) maxDepth = d;
         }
@@ -759,6 +761,22 @@ export class PCodeGenerator {
         const calledFunctions = new Set<string>();
         for (const calls of this.callGraph.values()) {
             for (const c of calls) calledFunctions.add(c);
+        }
+
+        const computeLive = (name: string) => {
+            const calls = this.callGraph.get(name);
+            if (!calls) return;
+            for (const c of calls) {
+                if (!this.liveReachable.has(c)) {
+                    this.liveReachable.add(c);
+                    computeLive(c);
+                }
+            }
+        };
+        for (const name of this.callGraph.keys()) {
+            if (name.startsWith('on_') && !calledFunctions.has(name)) {
+                computeLive(name);
+            }
         }
 
         for (const decl of program.declarations) {
@@ -781,6 +799,11 @@ export class PCodeGenerator {
                 ordinal++;
                 offset += v.dataType?.size ?? 2;
             }
+
+            if (!decl.name.startsWith('on_')) {
+                this.allocateDeadChainInRootArea(decl.name, localBase, offset);
+            }
+
             const localsStartOffset = offset;
             for (const v of sym.localVariables) {
                 v.address = localBase + offset;
@@ -800,6 +823,54 @@ export class PCodeGenerator {
         }
     }
 
+    private allocateDeadChainInRootArea(
+        rootName: string,
+        localBase: number,
+        startOffset: number,
+    ): void {
+        const visited = new Set<string>([rootName]);
+        const queue: { name: string; offset: number }[] = [];
+
+        const calls = this.callGraph.get(rootName);
+        if (!calls) return;
+
+        for (const c of calls) {
+            if (!this.liveReachable.has(c)) {
+                queue.push({ name: c, offset: startOffset });
+            }
+        }
+
+        while (queue.length > 0) {
+            const { name, offset } = queue.shift()!;
+            if (visited.has(name)) continue;
+            visited.add(name);
+
+            const sym = this.symbols.lookupGlobal(name) as FunctionSymbol | undefined;
+            if (!sym) continue;
+
+            let paramEnd = offset;
+            for (let i = 0; i < sym.parameters.length; i++) {
+                const v = sym.parameters[i];
+                v.address = localBase + paramEnd;
+                if (this.resolveDataAddresses) {
+                    const labelName = `?A:${sym.name}:${i}`;
+                    this.localVarLabelMap.set(v, labelName);
+                    this.emitter.defineDataLabel(labelName, v.address);
+                }
+                paramEnd += v.dataType?.size ?? 2;
+            }
+
+            const nextCalls = this.callGraph.get(name);
+            if (nextCalls) {
+                for (const c of nextCalls) {
+                    if (!this.liveReachable.has(c)) {
+                        queue.push({ name: c, offset: paramEnd });
+                    }
+                }
+            }
+        }
+    }
+
     private allocateCalledFunctionParams(program: AST.Program): void {
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
         const paramBase = localBase + this.localAllocSize;
@@ -811,52 +882,73 @@ export class PCodeGenerator {
 
         const ordered = this.getCallChainOrder(calledFunctions);
 
-        let paramOffset = 0;
+        let liveParamOffset = 0;
+        let deadParamTotal = 0;
+
         for (const fnName of ordered) {
             const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
             if (!sym) continue;
 
-            const fnParamStart = paramOffset;
-            for (let i = 0; i < sym.parameters.length; i++) {
-                const v = sym.parameters[i];
-                v.address = paramBase + paramOffset;
-                if (this.resolveDataAddresses) {
-                    const labelName = `?A:${sym.name}:${i}`;
-                    this.localVarLabelMap.set(v, labelName);
-                    this.emitter.defineDataLabel(labelName, v.address);
+            const isLive = this.liveReachable.has(fnName);
+
+            if (isLive) {
+                for (let i = 0; i < sym.parameters.length; i++) {
+                    const v = sym.parameters[i];
+                    v.address = paramBase + liveParamOffset;
+                    if (this.resolveDataAddresses) {
+                        const labelName = `?A:${sym.name}:${i}`;
+                        this.localVarLabelMap.set(v, labelName);
+                        this.emitter.defineDataLabel(labelName, v.address);
+                    }
+                    liveParamOffset += v.dataType?.size ?? 2;
                 }
-                paramOffset += v.dataType?.size ?? 2;
+            } else {
+                for (const p of sym.parameters) {
+                    deadParamTotal += p.dataType?.size ?? 2;
+                }
             }
 
             const hasCallees = (this.callGraph.get(fnName)?.size ?? 0) > 0;
 
             let localOffset = 0;
-            for (const v of sym.localVariables) {
-                v.address = paramBase + paramOffset + localOffset;
-                localOffset += v.dataType?.size ?? 2;
+            if (isLive) {
+                for (const v of sym.localVariables) {
+                    v.address = paramBase + liveParamOffset + localOffset;
+                    localOffset += v.dataType?.size ?? 2;
+                }
+            } else {
+                for (const v of sym.localVariables) {
+                    localOffset += v.dataType?.size ?? 2;
+                }
             }
 
             if (hasCallees) {
-                paramOffset += localOffset;
+                if (isLive) {
+                    liveParamOffset += localOffset;
+                } else {
+                    deadParamTotal += localOffset;
+                }
             }
 
-            const decl = program.declarations.find(d =>
-                (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
-            );
-            if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
-                const perStmt = this.countTempVarsPerStatement(decl.body);
-                let maxSlots = 0;
-                for (const n of perStmt) {
-                    const concurrent = n >= 2 ? 2 : n;
-                    if (concurrent > maxSlots) maxSlots = concurrent;
-                }
-                if (maxSlots > 0) {
-                    const tempBase = paramBase + paramOffset + (hasCallees ? 0 : localOffset);
-                    this.functionTempBase.set(fnName, tempBase);
+            if (isLive) {
+                const decl = program.declarations.find(d =>
+                    (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
+                );
+                if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
+                    const perStmt = this.countTempVarsPerStatement(decl.body);
+                    let maxSlots = 0;
+                    for (const n of perStmt) {
+                        const concurrent = n >= 2 ? 2 : n;
+                        if (concurrent > maxSlots) maxSlots = concurrent;
+                    }
+                    if (maxSlots > 0) {
+                        const tempBase = paramBase + liveParamOffset + (hasCallees ? 0 : localOffset);
+                        this.functionTempBase.set(fnName, tempBase);
+                    }
                 }
             }
         }
-        this.localAllocSize += paramOffset;
+        this.localAllocSize += liveParamOffset + deadParamTotal;
     }
 
     private getCallChainOrder(calledFunctions: Set<string>): string[] {

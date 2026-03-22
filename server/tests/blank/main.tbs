@@ -21,7 +21,7 @@ sub on_sys_init()
 	aa = "hello"
     dim bb as byte
     bb = 3
-	dosomething(aa + str(bb) + "asdf")
+	somethingelse(aa + str(bb) + "asdf")
     bb = bb + 3
     sys.debugprint(str(bb))
     pat.play("B-G-~",PL_PAT_CANINT)
