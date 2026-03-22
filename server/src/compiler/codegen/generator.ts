@@ -50,6 +50,7 @@ export class PCodeGenerator {
     private callGraph = new Map<string, Set<string>>();
     private functionTempBase = new Map<string, number>();
     private liveReachable = new Set<string>();
+    private preEvalMap = new Map<AST.CallExpr, number>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -449,6 +450,25 @@ export class PCodeGenerator {
         return null;
     }
 
+    private collectComplexStrCalls(expr: AST.Expression, result: AST.CallExpr[]): void {
+        if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+            this.collectComplexStrCalls(expr.left, result);
+            this.collectComplexStrCalls(expr.right, result);
+            return;
+        }
+        if (expr.kind !== 'CallExpr') return;
+        if (this.tryFoldStrCall(expr) !== null) return;
+        if (expr.callee.kind !== 'IdentifierExpr') return;
+        const sym = this.symbols.current.lookup(expr.callee.name);
+        if (!sym || sym.kind !== SymbolKind.Syscall) return;
+        const sc = sym as SyscallSymbol;
+        if (sc.name.toLowerCase() !== 'str' || expr.args.length < 1) return;
+        const arg = expr.args[0];
+        if (arg.kind !== 'IdentifierExpr' && arg.kind !== 'IntegerLiteral' && arg.kind !== 'HexLiteral') {
+            result.push(expr);
+        }
+    }
+
     private emitStringCallResultToAddr(expr: AST.CallExpr, addr: number, isByRef = false): boolean {
         if (expr.callee.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.callee.name);
@@ -467,7 +487,17 @@ export class PCodeGenerator {
                 const sc = sym as SyscallSymbol;
                 if (sc.returnType && isString(sc.returnType)) {
                     this.emitTempStringInit(addr);
-                    const nextOffset = this.emitSyscallArgsOnly(sc, expr.args, 0);
+                    let nextOffset: number;
+                    const preEvalAddr = this.preEvalMap.get(expr);
+                    if (preEvalAddr !== undefined) {
+                        this.emitter.emitByte(OP.OPCODE_LOA32);
+                        this.emitter.emitDataAddress(preEvalAddr);
+                        const storeSize = this.getSyscallParamStoreSize(sc.parameters[0]);
+                        this.emitStoreToArgBuffer(0, storeSize);
+                        nextOffset = storeSize;
+                    } else {
+                        nextOffset = this.emitSyscallArgsOnly(sc, expr.args, 0);
+                    }
                     const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                     this.emitter.emitByte(OP.OPCODE_LEA | indirection);
                     this.emitter.emitDataAddress(addr);
@@ -501,8 +531,20 @@ export class PCodeGenerator {
     private emitStringExprToArg(expr: AST.Expression, argOffset: number): void {
         const tempAddr = this.getTempStringAddr(0);
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+            const complexCalls: AST.CallExpr[] = [];
+            this.collectComplexStrCalls(expr, complexCalls);
+            const scalarBase = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            for (let i = 0; i < complexCalls.length; i++) {
+                const call = complexCalls[i];
+                this.generateExpression(call.args[0]);
+                const scalarAddr = scalarBase + i * 4;
+                this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(scalarAddr);
+                this.preEvalMap.set(call, scalarAddr);
+            }
             this.emitStringExprToTemp(expr.left, tempAddr, true);
             this.emitStringCatToTemp(expr.right, tempAddr);
+            this.preEvalMap.clear();
         } else if (expr.kind === 'StringLiteral') {
             const rdataOff = this.emitter.addStringRData(expr.value);
             this.emitRDataLoad(rdataOff);
@@ -575,7 +617,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName(isFirst ? 'strcpy' : 'strcat');
             }
         } else if (expr.kind === 'MemberExpr') {
-            const sourceAddr = isFirst ? tempAddr : tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const sourceAddr = isFirst ? tempAddr : tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
             if (this.tryEmitPropertyGetterDirect(expr, sourceAddr)) {
                 if (!isFirst) {
                     this.emitLeaToArg(tempAddr, 0);
@@ -600,7 +642,7 @@ export class PCodeGenerator {
         if (expr.kind === 'CallExpr') {
             const folded = this.tryFoldStrCall(expr);
             if (folded !== null) {
-                const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
                 this.emitTempStringInit(litAddr, folded.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
                 this.emitter.emitDataAddress(litAddr);
@@ -614,7 +656,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName('strcat');
                 return;
             }
-            const callResultAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const callResultAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
             if (this.emitStringCallResultToAddr(expr, callResultAddr)) {
                 this.emitLeaToArg(tempAddr, 0);
                 this.emitLeaToArg(callResultAddr, 1);
@@ -624,7 +666,7 @@ export class PCodeGenerator {
         }
 
         if (expr.kind === 'StringLiteral') {
-            const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
             this.emitTempStringInit(litAddr, expr.value.length);
             this.emitter.emitByte(OP.OPCODE_LEA);
             this.emitter.emitDataAddress(litAddr);
@@ -651,7 +693,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName('strcat');
             }
         } else if (expr.kind === 'MemberExpr') {
-            const sourceAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const sourceAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
             if (this.tryEmitPropertyGetterDirect(expr, sourceAddr)) {
                 this.emitLeaToArg(sourceAddr, 1);
                 this.emitSyscallByName('strcat');

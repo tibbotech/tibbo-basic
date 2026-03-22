@@ -2,11 +2,14 @@ include "global.tbh"
 
 dim aa as string
 
+declare function add(a as byte, b as byte) as word
+
+
 sub finalthing(byref input as string)
     dim zz as byte=1
     sys.debugprint(input)
-    zz=zz+1
-    sys.debugprint(str(zz) + "asdf")
+    zz=add(zz, 3)
+    sys.debugprint(str(zz) + "asdf" + str(zz + 3))
 end sub
 
 sub somethingelse(input as string)
@@ -26,3 +29,8 @@ sub on_sys_init()
     sys.debugprint(str(bb))
     pat.play("B-G-~",PL_PAT_CANINT)
 end sub
+
+
+function add(a as byte, b as byte) as word
+    add = a + b
+end function
