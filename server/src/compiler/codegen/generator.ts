@@ -1028,12 +1028,19 @@ export class PCodeGenerator {
             const hasCallees = (this.callGraph.get(fnName)?.size ?? 0) > 0;
 
             let localOffset = 0;
+            let localOrdinal = sym.parameters.length + (isFuncWithReturn ? 2 : 0);
             if (isLive) {
                 for (const v of sym.localVariables) {
                     if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
                         continue;
                     }
                     v.address = paramBase + liveParamOffset + localOffset;
+                    if (this.resolveDataAddresses) {
+                        const labelName = `?V:${v.name}:local(${sym.name}:${localOrdinal})`;
+                        this.localVarLabelMap.set(v, labelName);
+                        this.emitter.defineDataLabel(labelName, v.address);
+                    }
+                    localOrdinal++;
                     localOffset += v.dataType?.size ?? 2;
                 }
             } else {
@@ -1041,6 +1048,7 @@ export class PCodeGenerator {
                     if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
                         continue;
                     }
+                    localOrdinal++;
                     localOffset += v.dataType?.size ?? 2;
                 }
             }
@@ -1268,6 +1276,7 @@ export class PCodeGenerator {
 
     private registerTempVariables(program: AST.Program): void {
         let globalTmpCounter = 0;
+        let globalOrdinal = 0;
 
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
@@ -1276,9 +1285,24 @@ export class PCodeGenerator {
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
 
+            const isFuncWithReturn = fn.kind === SymbolKind.Function && !!fn.returnType;
+            const paramCount = fn.parameters.length;
+            const localCount = fn.localVariables.filter(v =>
+                !(isFuncWithReturn && v.name.toLowerCase() === fn.name.toLowerCase()) && !v.isTemp
+            ).length;
+
             const perStmt = this.countTempVarsPerStatement(decl.body);
             const total = perStmt.reduce((a, b) => a + b, 0);
-            if (total === 0) continue;
+            const scalarCount = this.countFunctionPreEvalScalars(decl);
+
+            const tempOrdinalBase = globalOrdinal + paramCount + localCount;
+            if (isFuncWithReturn) globalOrdinal += paramCount + 2 + localCount;
+            else globalOrdinal += paramCount + localCount;
+
+            if (total === 0) {
+                globalOrdinal += scalarCount > 0 ? 1 : 0;
+                continue;
+            }
 
             const fnTempBase = this.functionTempBase.get(fn.name);
             const tempBase = fnTempBase ?? this.tempScratchBase;
@@ -1290,14 +1314,14 @@ export class PCodeGenerator {
                 }
             }
 
-            const scalarCount = this.countFunctionPreEvalScalars(decl);
-            const existingCount = fn.parameters.length + fn.localVariables.length;
+            const slot1Offset = PCodeGenerator.TEMP_STRING_SLOT_SIZE +
+                scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
             for (let i = 0; i < slotAssignments.length; i++) {
                 globalTmpCounter++;
                 const slot = slotAssignments[i];
-                const addr = tempBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
-                const ordinal = existingCount + i + 1;
+                const addr = tempBase + (slot === 0 ? 0 : slot1Offset);
+                const ordinal = tempOrdinalBase + i;
                 const labelName = `?V:_tmp_${globalTmpCounter}:local(${fn.name}:${ordinal})`;
                 const tmpVar: VariableSymbol = {
                     name: `_tmp_${globalTmpCounter}`,
@@ -1314,11 +1338,12 @@ export class PCodeGenerator {
                 fn.localVariables.push(tmpVar);
                 this.localVarLabelMap.set(tmpVar, labelName);
                 this.emitter.defineDataLabel(labelName, addr);
+                globalOrdinal++;
             }
 
             if (scalarCount > 0) {
                 const scalarAddr = tempBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
-                const ordinal = existingCount + slotAssignments.length + 1;
+                const ordinal = tempOrdinalBase + slotAssignments.length;
                 const labelName = `?V:_tmp_numeric_result:local(${fn.name}:${ordinal})`;
                 const nrVar: VariableSymbol = {
                     name: '_tmp_numeric_result',
@@ -1335,6 +1360,7 @@ export class PCodeGenerator {
                 fn.localVariables.push(nrVar);
                 this.localVarLabelMap.set(nrVar, labelName);
                 this.emitter.defineDataLabel(labelName, scalarAddr);
+                globalOrdinal++;
             }
         }
     }

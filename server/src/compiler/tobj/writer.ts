@@ -343,7 +343,7 @@ export class TObjWriter {
         for (const [name, label] of labels) {
             if (emittedCodeLabels.has(name)) continue;
             if (!label.defined && label.references.length === 0) continue;
-            if (/^sub_end_\d+$/.test(name) || /^fn_end_\d+$/.test(name)) continue;
+            if (/^sub_end_\d+$/.test(name) || /^fn_end_\d+$/.test(name) || /^func_end_\d+$/.test(name)) continue;
 
             let flags = TObjAddressFlags.Code;
             if (label.defined) flags |= TObjAddressFlags.Defined;
@@ -379,13 +379,21 @@ export class TObjWriter {
                     const fnName = paramMatch[1];
                     const paramIdx = parseInt(paramMatch[2], 10);
                     for (const fn of symbols.getFunctions()) {
-                        if (fn.name === fnName && !fn.isDeclare && paramIdx < fn.parameters.length) {
+                        if (fn.name !== fnName || fn.isDeclare) continue;
+                        if (paramIdx < fn.parameters.length) {
                             const v = fn.parameters[paramIdx];
                             if (!this.localVarAddrIndex.has(v)) {
                                 this.localVarAddrIndex.set(v, idx);
                             }
-                            break;
+                        } else {
+                            const retVar = fn.localVariables.find(
+                                v => v.name.toLowerCase() === fn.name.toLowerCase()
+                            );
+                            if (retVar && !this.localVarAddrIndex.has(retVar)) {
+                                this.localVarAddrIndex.set(retVar, idx);
+                            }
                         }
+                        break;
                     }
                 }
             } else if (isLocal) {
