@@ -113,11 +113,12 @@ export class PCodeGenerator {
         this.stackSize = this.computeStackSize();
         this.allocateFunctionFrames(program);
 
-        const tempStringSlots = this.computeTempStringSlots(program);
-        this.tempScratchBase = this.platformSize + this.globalDataOffset + this.stackSize + this.localAllocSize;
-        this.localAllocSize += tempStringSlots * 257;
+        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        // Scratch temps start after declared root locals (same as pre–maxRootArea layout); avoids overlapping e.g. `dim bb as byte` at localBase+0.
+        this.tempScratchBase = localBase + this.localAllocSize;
 
-        this.allocateCalledFunctionParams(program);
+        const maxRootArea = this.computeMaxRootArea(program);
+        this.allocateCalledFunctionParams(program, maxRootArea);
 
         this.registerTempVariables(program);
         this.assignLocalVarLabels(program);
@@ -611,6 +612,12 @@ export class PCodeGenerator {
                 this.emitVarLeaToArgOffset(varSym, argOffset);
                 return;
             }
+            if (sym && sym.kind === SymbolKind.Constant && typeof (sym as ConstantSymbol).value === 'string') {
+                const rdataOff = this.emitter.addStringRData((sym as ConstantSymbol).value as string);
+                this.emitRDataLoad(rdataOff);
+                this.emitStoreToArgBuffer(argOffset, 4);
+                return;
+            }
         } else if (expr.kind === 'MemberExpr' && this.tryEmitPropertyGetterDirect(expr, tempAddr)) {
             this.emitLeaToArgOffset(tempAddr, argOffset);
             return;
@@ -961,9 +968,49 @@ export class PCodeGenerator {
         }
     }
 
-    private allocateCalledFunctionParams(program: AST.Program): void {
+    private computeMaxRootArea(program: AST.Program): number {
+        const calledFunctions = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) calledFunctions.add(c);
+        }
+
+        let maxRootArea = 0;
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            if (calledFunctions.has(decl.name)) continue;
+
+            const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!sym) continue;
+
+            const callsLiveChain = (this.callGraph.get(decl.name)?.size ?? 0) > 0;
+            if (!callsLiveChain) continue;
+
+            let rootArea = 0;
+            for (const p of sym.parameters) {
+                rootArea += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+            }
+            for (const v of sym.localVariables) {
+                rootArea += v.dataType?.size ?? 2;
+            }
+
+            const perStmt = this.countTempVarsPerStatement(decl.body);
+            let maxSlots = 0;
+            for (const n of perStmt) {
+                const concurrent = n >= 2 ? 2 : n;
+                if (concurrent > maxSlots) maxSlots = concurrent;
+            }
+            const scalarCount = this.countFunctionPreEvalScalars(decl);
+            rootArea += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+
+            if (rootArea > maxRootArea) maxRootArea = rootArea;
+        }
+        return maxRootArea;
+    }
+
+    private allocateCalledFunctionParams(program: AST.Program, maxRootArea: number): void {
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
-        const paramBase = localBase + this.localAllocSize;
+        const paramBase = localBase + maxRootArea;
 
         const calledFunctions = new Set<string>();
         for (const calls of this.callGraph.values()) {
@@ -1051,22 +1098,29 @@ export class PCodeGenerator {
                     (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
                 );
                 if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
-                    const perStmt = this.countTempVarsPerStatement(decl.body);
-                    let maxSlots = 0;
-                    for (const n of perStmt) {
+                    // Must match registerTempVariables: same perStmt / maxSlots / scalarCount as full body.
+                    const perStmtTail = this.countTempVarsPerStatement(decl.body);
+                    let maxSlotsTail = 0;
+                    for (const n of perStmtTail) {
                         const concurrent = n >= 2 ? 2 : n;
-                        if (concurrent > maxSlots) maxSlots = concurrent;
+                        if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
                     }
-                    if (maxSlots > 0) {
+                    const scalarCountTail = this.countFunctionPreEvalScalars(decl);
+                    const tailTempSize =
+                        maxSlotsTail * PCodeGenerator.TEMP_STRING_SLOT_SIZE +
+                        scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+                    if (tailTempSize > 0) {
                         const tempBase = paramBase + liveParamOffset;
                         this.functionTempBase.set(fnName, tempBase);
-                        const scalarCount = this.countFunctionPreEvalScalars(decl);
-                        liveParamOffset += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+                        liveParamOffset += tailTempSize;
                     }
                 }
             }
         }
-        this.localAllocSize += liveParamOffset + deadParamTotal;
+        const chainSize = maxRootArea + liveParamOffset + deadParamTotal;
+        if (chainSize > this.localAllocSize) {
+            this.localAllocSize = chainSize;
+        }
     }
 
     private getCallChainOrder(calledFunctions: Set<string>): string[] {
@@ -1656,6 +1710,9 @@ export class PCodeGenerator {
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 return !!(sym.dataType && isString(sym.dataType));
             }
+            if (sym && sym.kind === SymbolKind.Constant) {
+                return typeof (sym as ConstantSymbol).value === 'string';
+            }
         }
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
             return this.isStringExpression(expr.left) || this.isStringExpression(expr.right);
@@ -1692,6 +1749,14 @@ export class PCodeGenerator {
             this.emitSyscallByName('strload');
         } else if (value.kind === 'IdentifierExpr') {
             const srcSym = this.symbols.current.lookup(value.name);
+            if (srcSym && srcSym.kind === SymbolKind.Constant && typeof (srcSym as ConstantSymbol).value === 'string') {
+                const rdataOffset = this.emitter.addStringRData((srcSym as ConstantSymbol).value as string);
+                this.emitVarLeaArg(varSym);
+                this.emitRDataLoad(rdataOffset);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                return;
+            }
             if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
                 const src = srcSym as VariableSymbol;
                 if (src.dataType && isString(src.dataType)) {
@@ -2552,7 +2617,13 @@ export class PCodeGenerator {
                         this.emitSyscallByName('strload');
                     } else if (argExpr.kind === 'IdentifierExpr') {
                         const srcSym = this.symbols.current.lookup(argExpr.name);
-                        if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                        if (srcSym && srcSym.kind === SymbolKind.Constant && typeof (srcSym as ConstantSymbol).value === 'string') {
+                            const rdataOff = this.emitter.addStringRData((srcSym as ConstantSymbol).value as string);
+                            this.emitLeaArg(paramAddr);
+                            this.emitRDataLoad(rdataOff);
+                            this.emitSyscallArg(1);
+                            this.emitSyscallByName('strload');
+                        } else if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
                             const src = srcSym as VariableSymbol;
                             this.emitLeaArg(paramAddr);
                             this.emitVarLeaArgAt(src, 1);

@@ -94,7 +94,7 @@ export function makeArrayType(elementType: DataType, dimensions: number[]): Arra
     return {
         kind: 'array',
         name: `${elementType.name}[]`,
-        size: elementType.size * elementCount,
+        size: 2 + elementType.size * elementCount,
         signed: false,
         elementType,
         elementCount,

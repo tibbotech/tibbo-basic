@@ -8,19 +8,46 @@ import {
 } from '../../src/compiler/dump-pdb-instructions';
 import { TObjSection } from '../../src/compiler/tobj/format';
 
-const REPO_ROOT = path.resolve(__dirname, '../../..');
+/** Parent of this folder: `server/tests` — Tibbo project fixtures live here and in its subfolders. */
+const TESTS_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_TMAKE = String.raw`C:\Program Files (x86)\Tibbo\TIDE\Bin\tmake.exe`;
 
 const tmakePath = process.env.TIBBO_TMAKE || process.env.TMAKE || DEFAULT_TMAKE;
 const tmakeExists = fs.existsSync(tmakePath);
 
 /**
- * When Tibbo tmake is installed, builds tests/blank with tmake and reads tmp/database.pdb,
- * then compiles with the JS compiler. Compares decoded bytecode the same way as
- * {@link disassembleBinaryToLines}: TBIN/PDB Code section only (Init can differ by toolchain).
- * Also asserts {@link disassembleBinarySectionToLines} on TBIN Code matches that stream.
+ * When Tibbo tmake is installed, for each immediate subfolder of `server/tests` that contains
+ * a `.tpr`, runs tmake and reads `tmp/database.pdb`, then compiles with the JS compiler.
+ * Compares decoded bytecode the same way as {@link disassembleBinaryToLines}: TBIN/PDB Code
+ * section only (Init can differ by toolchain). Also asserts
+ * {@link disassembleBinarySectionToLines} on TBIN Code matches that stream.
  */
 const describeTmake = tmakeExists ? describe : describe.skip;
+
+function dirContainsTpr(dir: string): boolean {
+    return fs.readdirSync(dir).some(f => f.endsWith('.tpr'));
+}
+
+/** Each direct child of `testsRoot` that is a directory and contains a `.tpr` project file. */
+function discoverTprProjectDirs(testsRoot: string): string[] {
+    const dirs: string[] = [];
+    for (const ent of fs.readdirSync(testsRoot, { withFileTypes: true })) {
+        if (!ent.isDirectory()) {
+            continue;
+        }
+        const full = path.join(testsRoot, ent.name);
+        if (dirContainsTpr(full)) {
+            dirs.push(full);
+        }
+    }
+    return dirs.sort((a, b) => a.localeCompare(b, 'en'));
+}
+
+function projectLabel(projectDir: string): string {
+    return path.relative(TESTS_ROOT, projectDir).split(path.sep).join('/');
+}
+
+const TPR_PROJECT_DIRS = discoverTprProjectDirs(TESTS_ROOT);
 
 function findTprBasename(projectDir: string): string {
     const tpr = fs.readdirSync(projectDir).find(f => f.endsWith('.tpr'));
@@ -70,31 +97,32 @@ function logFirstMismatch(
     }
 }
 
-describeTmake('tmake reference vs JS compiler opcodes (tests/blank)', () => {
-    const projectDir = path.join(REPO_ROOT, 'server', 'tests', 'blank');
+describeTmake('tmake reference vs JS compiler opcodes (all server/tests *.tpr projects)', () => {
+    it.each(TPR_PROJECT_DIRS.map(d => [projectLabel(d), d] as const))(
+        'matches disassembled Code: tmake PDB vs JS TPC (TBIN Code section) — %s',
+        (label, projectDir) => {
+            const refPdb = runTmake(projectDir);
 
-    it('matches disassembled Code: tmake PDB vs JS TPC (TBIN Code section)', () => {
-        const refPdb = runTmake(projectDir);
+            const refFromPdb = disassembleBinaryToLines(refPdb);
+            const refCodeSection = disassembleBinarySectionToLines(refPdb, TObjSection.Code);
+            expect(refCodeSection).toEqual(refFromPdb);
 
-        const refFromPdb = disassembleBinaryToLines(refPdb);
-        const refCodeSection = disassembleBinarySectionToLines(refPdb, TObjSection.Code);
-        expect(refCodeSection).toEqual(refFromPdb);
+            const compiler = new ProjectCompiler(projectDir);
+            const result = compiler.compile();
+            expect(result.errors).toHaveLength(0);
+            expect(result.tpc).not.toBeNull();
 
-        const compiler = new ProjectCompiler(projectDir);
-        const result = compiler.compile();
-        expect(result.errors).toHaveLength(0);
-        expect(result.tpc).not.toBeNull();
+            const jsTpc = result.tpc!;
+            expect(jsTpc.toString('ascii', 0, 4)).toBe('TBIN');
 
-        const jsTpc = result.tpc!;
-        expect(jsTpc.toString('ascii', 0, 4)).toBe('TBIN');
+            const jsFromTpc = disassembleBinaryToLines(jsTpc);
+            const jsCodeSection = disassembleBinarySectionToLines(jsTpc, TObjSection.Code);
+            expect(jsCodeSection).toEqual(jsFromTpc);
 
-        const jsFromTpc = disassembleBinaryToLines(jsTpc);
-        const jsCodeSection = disassembleBinarySectionToLines(jsTpc, TObjSection.Code);
-        expect(jsCodeSection).toEqual(jsFromTpc);
-
-        if (refFromPdb.length !== jsFromTpc.length) {
-            logFirstMismatch('Code', refFromPdb, jsFromTpc);
-        }
-        expect(jsFromTpc).toEqual(refFromPdb);
-    });
+            if (refFromPdb.length !== jsFromTpc.length) {
+                logFirstMismatch(label, refFromPdb, jsFromTpc);
+            }
+            expect(jsFromTpc).toEqual(refFromPdb);
+        },
+    );
 });

@@ -215,7 +215,14 @@ export class SemanticResolver {
 
     private collectConst(decl: AST.ConstDecl): void {
         for (const c of decl.constants) {
-            const value = this.evaluateConstExpr(c.value);
+            let value: number | string | boolean;
+            if (c.value.kind === 'StringLiteral') {
+                value = (c.value as AST.StringLiteral).value;
+            } else if (c.value.kind === 'BooleanLiteral') {
+                value = (c.value as AST.BooleanLiteral).value;
+            } else {
+                value = this.evaluateConstExpr(c.value);
+            }
             const constSym: ConstantSymbol = {
                 name: c.name, kind: SymbolKind.Constant, value,
                 location: c.loc, isPublic: false, isDeclare: false,
