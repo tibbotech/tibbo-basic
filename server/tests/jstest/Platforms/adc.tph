@@ -1,0 +1,42 @@
+'**************************************************************************************************
+'       ADC (Analog-to-digital converter) object
+'**************************************************************************************************
+
+object adc
+'Adc. object provides access to the analog-to-digital converter (ADC).
+
+'--------------------------------------------------------------------
+property adc.num
+'<b>PROPERTY (ENUM, BYTE), DEFAULT VALUE= 0.</b><br><br>
+'Sets/returns the number of the currently selected ADC channel.
+'<br><br>
+'ADC inputs are mapped to regular GPIO lines, and such mapping is platform-specific. For information see the pl_adc_num enum.
+'<br><br>
+'After changing the channel, discard the first result returned by adc.getdata.
+    get = syscall(726) as pl_adc_num
+    set = syscall(727) (num as pl_adc_num)
+end property
+
+'--------------------------------------------------------------------
+property adc.enabled
+'<b>PROPERTY (ENUM, BYTE). DEFAULT VALUE= 0- NO.</b><br><br>
+'For the currently selected ADC channel (selection is made through the adc.num property), defines whether this ADC channel is enabled or disabled.
+'<br><br>
+'Setting this property to 0- NO disables the ADC channel and allows the corresponding line to work as a regular GPIO line.
+'Note that after you set adc.enabled to 0- NO, the corresponding GPIO line will be configured as an input and its output register will be set to HIGH.
+'<br><br>
+'Discard the first result returned by adc.getdata after enabling an ADC channel.
+    get = syscall(728) as no_yes
+    set = syscall(729) (state as no_yes)
+end property
+
+'--------------------------------------------------------------------
+syscall(730) adc.getdata() as word
+'<b>METHOD.</b><br><br>
+'Performs a single conversion and returns the current voltage on the selected ADC channel (selection is made through the adc.num property).
+'<br><br>
+'This method returns a value in the 0-4095 range, where 0 corresponds to 0V, and 4095 -- to the VCC voltage (3.3V nominal).
+'<br><br>
+'Discard the first result returned by this method after booting up your device, enabling the currently selected ADC channel (through adc.enabled), or changing the selected channel (through adc.num).
+'<br><br>
+'Attempting to execute this method on a channel that is currently disabled (adc.enabled= 0-NO) will return 0.

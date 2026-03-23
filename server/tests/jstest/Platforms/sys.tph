@@ -1,0 +1,14 @@
+'**************************************************************************************************
+'       SYS (System) object
+'**************************************************************************************************
+
+'--------------------------------------------------------------------
+property !sys.limitbuffersize
+    get = syscall(644) as no_yes
+    set= syscall(645) (value as no_yes)
+end property
+
+'--------------------------------------------------------------------
+event(1)  on_sys_init
+'<b>EVENT of the sys object. </b><br><br> First event to be generated after your devices boots up. Typically, initialization code for
+'your application is placed here.

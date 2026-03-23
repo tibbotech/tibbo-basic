@@ -30,7 +30,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const TESTS_ROOT = path.resolve(__dirname, '..', 'tests');
+const TESTS_ROOT = path.resolve(__dirname, '..', 'server', 'tests');
 const DEFAULT_TMAKE = String.raw`C:\Program Files (x86)\Tibbo\TIDE\Bin\tmake.exe`;
 
 function parseArgs(argv) {

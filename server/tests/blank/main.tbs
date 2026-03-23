@@ -2,7 +2,7 @@ include "global.tbh"
 
 dim aa as string
 
-declare function add(a as byte, b as byte) as word
+declare function add(byref a as byte, b as byte) as word
 
 
 sub finalthing(byref input as string)
@@ -31,6 +31,7 @@ sub on_sys_init()
 end sub
 
 
-function add(a as byte, b as byte) as word
+function add(byref a as byte, b as byte) as word
+    sys.debugprint(str(a))
     add = a + b
 end function
