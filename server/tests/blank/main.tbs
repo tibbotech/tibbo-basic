@@ -36,3 +36,7 @@ function add(byref a as byte, b as byte) as word
     sys.debugprint(str(a))
     add = a + b
 end function
+
+sub on_button_pressed()
+    sys.debugprint("button pressed")
+end sub

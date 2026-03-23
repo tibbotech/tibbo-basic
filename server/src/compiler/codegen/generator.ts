@@ -52,6 +52,8 @@ export class PCodeGenerator {
     private liveReachable = new Set<string>();
     private preEvalMap = new Map<AST.CallExpr, number>();
     private functionReturnPtrAddr = new Map<string, number>();
+    /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
+    private onEventDeclaredLocalBytes = 0;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -84,6 +86,26 @@ export class PCodeGenerator {
         return this.stackSize;
     }
 
+    /** Static bytes before scratch (params + all user locals). Used for registerTempVariables / maxRootArea parity. */
+    private eventFramePrefixBytes(fn: FunctionSymbol | undefined): number {
+        if (!fn?.name.startsWith('on_')) return 0;
+        let n = 0;
+        for (const p of fn.parameters) {
+            n += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+        }
+        for (const v of fn.localVariables) {
+            if (v.isTemp) continue;
+            n += v.dataType?.size ?? 2;
+        }
+        return n;
+    }
+
+    private onEventScratchSkip(): number {
+        const fn = this.ctx.currentFunction;
+        if (!fn?.name.startsWith('on_')) return 0;
+        return this.onEventDeclaredLocalBytes;
+    }
+
     private getTempStringAddr(slot = 0): number {
         const fn = this.ctx.currentFunction;
         if (fn) {
@@ -92,11 +114,13 @@ export class PCodeGenerator {
                 return fnBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
             }
         }
-        return this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+        const skip = this.onEventScratchSkip();
+        return this.tempScratchBase + skip + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
     }
 
     private getTempScalarAddr(slot = 0): number {
-        return this.tempScratchBase
+        const skip = this.onEventScratchSkip();
+        return this.tempScratchBase + skip
             + PCodeGenerator.TEMP_STRING_SLOT_COUNT * PCodeGenerator.TEMP_STRING_SLOT_SIZE
             + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
     }
@@ -114,8 +138,8 @@ export class PCodeGenerator {
         this.allocateFunctionFrames(program);
 
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
-        // Scratch temps start after declared root locals (same as pre–maxRootArea layout); avoids overlapping e.g. `dim bb as byte` at localBase+0.
-        this.tempScratchBase = localBase + this.localAllocSize;
+        // Stack frame base; on_* scratch offset grows as dim locals are emitted (onEventDeclaredLocalBytes).
+        this.tempScratchBase = localBase;
 
         const maxRootArea = this.computeMaxRootArea(program);
         this.allocateCalledFunctionParams(program, maxRootArea);
@@ -1334,7 +1358,7 @@ export class PCodeGenerator {
             if (total === 0 && scalarCount === 0) continue;
 
             const fnTempBase = this.functionTempBase.get(fn.name);
-            const tempBase = fnTempBase ?? this.tempScratchBase;
+            const tempBase = fnTempBase ?? this.tempScratchBase + this.eventFramePrefixBytes(fn);
 
             if (total > 0) {
                 const slotAssignments: number[] = [];
@@ -1493,6 +1517,13 @@ export class PCodeGenerator {
         this.ctx.currentFunction = sym;
         this.ctx.functionEndLabel = endLabel;
 
+        this.onEventDeclaredLocalBytes = 0;
+        if (sym.name.startsWith('on_')) {
+            for (const par of sym.parameters) {
+                this.onEventDeclaredLocalBytes += par.isByRef ? 4 : (par.dataType?.size ?? 2);
+            }
+        }
+
         this.symbols.pushScope(undefined as any);
         for (const p of sym.parameters) this.symbols.current.define(p);
         for (const v of sym.localVariables) this.symbols.current.define(v);
@@ -1521,6 +1552,13 @@ export class PCodeGenerator {
         const endLabel = this.makeLabel('func_end');
         this.ctx.currentFunction = sym;
         this.ctx.functionEndLabel = endLabel;
+
+        this.onEventDeclaredLocalBytes = 0;
+        if (sym.name.startsWith('on_')) {
+            for (const par of sym.parameters) {
+                this.onEventDeclaredLocalBytes += par.isByRef ? 4 : (par.dataType?.size ?? 2);
+            }
+        }
 
         this.symbols.pushScope(undefined as any);
         for (const p of sym.parameters) this.symbols.current.define(p);
@@ -2051,6 +2089,10 @@ export class PCodeGenerator {
 
             if (stmt.arrayInitializer && dt && isArray(dt)) {
                 this.emitArrayInitializer(addr, dt, stmt.arrayInitializer, varSym.isByRef);
+            }
+
+            if (this.ctx.currentFunction?.name.startsWith('on_') && !varSym.isTemp) {
+                this.onEventDeclaredLocalBytes += varSym.dataType?.size ?? 2;
             }
         }
     }
