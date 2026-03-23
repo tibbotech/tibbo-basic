@@ -2,9 +2,9 @@
 watch=
 [file1]
 line=0
-cursor=415
+cursor=519
 opened=active
-breakpoints=9
+breakpoints=
 [file2]
 line=0
 cursor=0

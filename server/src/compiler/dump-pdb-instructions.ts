@@ -10,6 +10,8 @@ import {
     TOBJ_SIGNATURE_BIN,
     TOBJ_SIGNATURE_OBJ,
     TOBJ_SIGNATURE_PDB,
+    TOBJ_SIGNATURE_PDB_ALT_TPDB,
+    TOBJ_SIGNATURE_PDB_ALT_TDBP,
 } from './tobj/format';
 import * as OP from './codegen/opcodes';
 
@@ -53,8 +55,6 @@ const INDIRECT_PREFIX = 0x40;
 const IMMEDIATE_PREFIX = 0x80;
 const OPCODE_PREFIX_MASK = 0xC0;
 const OPCODE_BASE_MASK = 0x3F;
-// Some legacy PDB files use LE uint32 0x42445054 ("TPDB" in ASCII bytes).
-const TOBJ_SIGNATURE_PDB_LEGACY = 0x42445054;
 
 const SINGLE_BYTE_MNEMONICS = new Map<number, string>([
     [OP.OPCODE_CMP, 'CMP'],
@@ -190,7 +190,7 @@ export function disassembleBinary(buf: Buffer): DecodedInstruction[] {
 
 /**
  * Disassemble a single object section (e.g. Code or Init) using the file header flags.
- * For TBIN/TPDB/TOBJ, bytecode lives in {@link TObjSection.Code} and {@link TObjSection.Init}.
+ * For TBIN/PDB (BDPT)/TOBJ, bytecode lives in {@link TObjSection.Code} and {@link TObjSection.Init}.
  */
 export function disassembleBinarySectionToLines(buf: Buffer, sectionIndex: TObjSection): string[] {
     const header = parseHeader(buf);
@@ -256,7 +256,8 @@ function parseHeader(buf: Buffer): ParsedHeader {
     if (
         signature !== TOBJ_SIGNATURE_OBJ &&
         signature !== TOBJ_SIGNATURE_PDB &&
-        signature !== TOBJ_SIGNATURE_PDB_LEGACY &&
+        signature !== TOBJ_SIGNATURE_PDB_ALT_TPDB &&
+        signature !== TOBJ_SIGNATURE_PDB_ALT_TDBP &&
         signature !== TOBJ_SIGNATURE_BIN
     ) {
         throw new Error(`Unsupported signature: 0x${signature.toString(16)}`);

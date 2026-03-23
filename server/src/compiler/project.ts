@@ -9,7 +9,7 @@ import { TypeChecker } from './semantics/checker';
 import { PCodeGenerator } from './codegen/generator';
 import { TObjWriter } from './tobj/writer';
 import { Linker, LinkerOptions } from './linker/linker';
-import { TObjHeaderFlags } from './tobj/format';
+import { TObjHeaderFlags, TOBJ_SIGNATURE_PDB } from './tobj/format';
 import { resolvePathInsensitive } from '../pathUtils';
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -274,6 +274,7 @@ export class ProjectCompiler {
                 fileSequence,
                 sourceFilePath,
                 firmwareVer: this.platformConfig.version,
+                configStr: this.platformConfig.configStr,
             });
 
             objs.set(baseName + '.obj', result.obj);
@@ -327,6 +328,7 @@ export class ProjectCompiler {
                 fileSequence,
                 sourceFilePath: projectName,
                 firmwareVer: this.platformConfig.version,
+                configStr: this.platformConfig.configStr,
                 sourceMap,
                 resolveDataAddresses: true,
                 mergeInitIntoCode: true,
@@ -498,6 +500,7 @@ export class ProjectCompiler {
             fileSequence,
             sourceFilePath: absPath,
             firmwareVer: this.platformConfig.version,
+            configStr: this.platformConfig.configStr,
             fileData: payload,
             resourceEntries: [{ name: path.basename(file.path), dataOffset: 0, size: payload.length }],
         });
@@ -670,9 +673,16 @@ export class ProjectCompiler {
         }
     }
 
+    /**
+     * Tibbo PDB is not a renamed OBJ: tide `CTObjFile::Save(TOBJ_SAVE_PDB)` runs
+     * `RelocateAndFixup()` then re-serializes Addresses/Types/Functions/… and writes via
+     * `CTObjFileBaseImpl::Save` (see tide/src/tobj/TObjFileSave.cpp, TObjFileReloc.cpp).
+     * We clone the in-memory OBJ and only patch signature + checksum so debuggers accept the file;
+     * byte parity with tmake PDB requires mirroring that full pipeline.
+     */
     private buildProjectPdb(sourceObj: Buffer): Buffer {
         const pdb = Buffer.from(sourceObj);
-        pdb.write('TPDB', 0, 'ascii');
+        pdb.writeUInt32LE(TOBJ_SIGNATURE_PDB, 0);
         pdb.writeUInt16LE(0, 6);
 
         let checksum = 0;

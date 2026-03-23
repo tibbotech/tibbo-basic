@@ -21,7 +21,7 @@ sub dosomething(input as string)
 end sub
 
 sub on_sys_init()
-    sys.debugprint("asdf")
+    sys.debugprint("hi hello world")
 	aa = "hello"
     dim bb as byte
     bb = 3

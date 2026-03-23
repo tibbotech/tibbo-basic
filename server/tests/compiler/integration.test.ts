@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { ProjectCompiler, parseProjectFile } from '../../src/compiler/project';
 import { disassembleBinaryToLines, disassembleBinaryBySourceLine, DecodedLineInstruction } from '../../src/compiler/dump-pdb-instructions';
+import { TOBJ_SIGNATURE_BIN, MAXDWORD, TObjSection } from '../../src/compiler/tobj/format';
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const TESTS_ROOT = path.resolve(REPO_ROOT, 'server', 'tests');
@@ -27,6 +28,187 @@ function strLenAt(buf: Buffer, base: number, off: number): number {
     return len;
 }
 
+function getTobjSectionCount(buf: Buffer): number {
+    return buf.readUInt32LE(0) === TOBJ_SIGNATURE_BIN ? TObjSection.CountBin : TObjSection.CountObj;
+}
+
+interface TobjDevMaskLens {
+    maxBuildIdLen: number;
+    maxTimeLen: number;
+    maxProjectNameLen: number;
+    maxFirmwareVerLen: number;
+    maxExtraSrcLen: number;
+    maxExtraConfigLen: number;
+    /** Per LineInfo file entry; undefined = skip (TBIN or parse mismatch) */
+    lineInfoFileNameLens?: number[];
+}
+
+function computeLineInfoFileNameLens(a: Buffer, b: Buffer): number[] | undefined {
+    if (getTobjSectionCount(a) < TObjSection.CountObj || getTobjSectionCount(b) < TObjSection.CountObj) {
+        return undefined;
+    }
+    const symA = a.readUInt32LE(HEADER_SIZE + TObjSection.Symbols * 8);
+    const symB = b.readUInt32LE(HEADER_SIZE + TObjSection.Symbols * 8);
+    const da = HEADER_SIZE + TObjSection.LineInfo * 8;
+    const offA = a.readUInt32LE(da);
+    const szA = a.readUInt32LE(da + 4);
+    const offB = b.readUInt32LE(da);
+    const szB = b.readUInt32LE(da + 4);
+    if (szA !== szB || szA === 0) return undefined;
+    let pos = 0;
+    const lens: number[] = [];
+    while (pos + 8 <= szA) {
+        const fa = a.readUInt32LE(offA + pos);
+        const fb = b.readUInt32LE(offB + pos);
+        const lc = a.readUInt32LE(offA + pos + 4);
+        const lcB = b.readUInt32LE(offB + pos + 4);
+        if (lc !== lcB) return undefined;
+        lens.push(Math.max(strLenAt(a, symA, fa), strLenAt(b, symB, fb)));
+        pos += 8 + lc * 8;
+    }
+    if (pos !== szA) return undefined;
+    return lens;
+}
+
+function computeTobjDevMaskLens(a: Buffer, b: Buffer): TobjDevMaskLens {
+    const empty: TobjDevMaskLens = {
+        maxBuildIdLen: 0,
+        maxTimeLen: 0,
+        maxProjectNameLen: 0,
+        maxFirmwareVerLen: 0,
+        maxExtraSrcLen: 0,
+        maxExtraConfigLen: 0,
+    };
+    if (a.length < HEADER_SIZE + 9 * 8 || b.length < HEADER_SIZE + 9 * 8) {
+        return empty;
+    }
+    const buildIdStrOff = a.readUInt32LE(36);
+    const symA = a.readUInt32LE(HEADER_SIZE + TObjSection.Symbols * 8);
+    const symB = b.readUInt32LE(HEADER_SIZE + TObjSection.Symbols * 8);
+    const projA = a.readUInt32LE(32);
+    const projB = b.readUInt32LE(32);
+    const fwA = a.readUInt32LE(40);
+    const fwB = b.readUInt32LE(40);
+
+    const extraA = a.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8);
+    const extraB = b.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8);
+    const extraSzA = a.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8 + 4);
+    const extraSzB = b.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8 + 4);
+
+    let maxTimeLen = 0;
+    let maxExtraSrcLen = 0;
+    let maxExtraConfigLen = 0;
+    if (extraA + 12 <= a.length && extraB + 12 <= b.length && extraSzA >= 12 && extraSzB >= 12) {
+        const timeOffA = a.readUInt32LE(extraA);
+        const timeOffB = b.readUInt32LE(extraB);
+        maxTimeLen = Math.max(strLenAt(a, symA, timeOffA), strLenAt(b, symB, timeOffB));
+        const srcOffA = a.readUInt32LE(extraA + 4);
+        const srcOffB = b.readUInt32LE(extraB + 4);
+        const cfgOffA = a.readUInt32LE(extraA + 8);
+        const cfgOffB = b.readUInt32LE(extraB + 8);
+        maxExtraSrcLen = Math.max(strLenAt(a, symA, srcOffA), strLenAt(b, symB, srcOffB));
+        maxExtraConfigLen = Math.max(strLenAt(a, symA, cfgOffA), strLenAt(b, symB, cfgOffB));
+    } else if (extraA + 4 <= a.length && extraB + 4 <= b.length) {
+        const timeOffA = a.readUInt32LE(extraA);
+        const timeOffB = b.readUInt32LE(extraB);
+        maxTimeLen = Math.max(strLenAt(a, symA, timeOffA), strLenAt(b, symB, timeOffB));
+    }
+
+    let maxProjectNameLen = 0;
+    if (projA !== MAXDWORD && projB !== MAXDWORD) {
+        maxProjectNameLen = Math.max(strLenAt(a, symA, projA), strLenAt(b, symB, projB));
+    }
+    let maxFirmwareVerLen = 0;
+    if (fwA !== MAXDWORD && fwB !== MAXDWORD) {
+        maxFirmwareVerLen = Math.max(strLenAt(a, symA, fwA), strLenAt(b, symB, fwB));
+    }
+
+    return {
+        maxBuildIdLen: Math.max(strLenAt(a, symA, buildIdStrOff), strLenAt(b, symB, buildIdStrOff)),
+        maxTimeLen,
+        maxProjectNameLen,
+        maxFirmwareVerLen,
+        maxExtraSrcLen,
+        maxExtraConfigLen,
+        lineInfoFileNameLens: computeLineInfoFileNameLens(a, b),
+    };
+}
+
+/** TBIN/TPC/TOBJ/PDB: zero volatile header + symbol strings (paths, ids, times). */
+function applyTobjDevMask(buf: Buffer, lens: TobjDevMaskLens): void {
+    if (buf.length < HEADER_SIZE + 9 * 8) return;
+
+    buf.writeUInt16LE(0, 6);
+    buf.writeUInt16LE(0, 44);
+    buf.writeUInt16LE(0, 46);
+
+    const symbolsSectionOff = buf.readUInt32LE(HEADER_SIZE + TObjSection.Symbols * 8);
+    const buildIdStrOff = buf.readUInt32LE(36);
+    const extraSectionOff = buf.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8);
+    const extraSz = buf.readUInt32LE(HEADER_SIZE + TObjSection.Extra * 8 + 4);
+
+    const buildIdAbsOff = symbolsSectionOff + buildIdStrOff;
+    for (let i = 0; i < lens.maxBuildIdLen; i++) {
+        if (buildIdAbsOff + i < buf.length) buf[buildIdAbsOff + i] = 0;
+    }
+
+    if (extraSectionOff + 4 <= buf.length) {
+        const timeStrOff = buf.readUInt32LE(extraSectionOff);
+        const timeAbsOff = symbolsSectionOff + timeStrOff;
+        for (let i = 0; i < lens.maxTimeLen; i++) {
+            if (timeAbsOff + i < buf.length) buf[timeAbsOff + i] = 0;
+        }
+    }
+
+    const projOff = buf.readUInt32LE(32);
+    if (projOff !== MAXDWORD && lens.maxProjectNameLen > 0) {
+        const abs = symbolsSectionOff + projOff;
+        for (let i = 0; i < lens.maxProjectNameLen; i++) {
+            if (abs + i < buf.length) buf[abs + i] = 0;
+        }
+    }
+
+    const fwOff = buf.readUInt32LE(40);
+    if (fwOff !== MAXDWORD && lens.maxFirmwareVerLen > 0) {
+        const abs = symbolsSectionOff + fwOff;
+        for (let i = 0; i < lens.maxFirmwareVerLen; i++) {
+            if (abs + i < buf.length) buf[abs + i] = 0;
+        }
+    }
+
+    if (extraSectionOff + 12 <= buf.length && extraSz >= 12) {
+        const srcOff = buf.readUInt32LE(extraSectionOff + 4);
+        const cfgOff = buf.readUInt32LE(extraSectionOff + 8);
+        const srcAbs = symbolsSectionOff + srcOff;
+        for (let i = 0; i < lens.maxExtraSrcLen; i++) {
+            if (srcAbs + i < buf.length) buf[srcAbs + i] = 0;
+        }
+        const cfgAbs = symbolsSectionOff + cfgOff;
+        for (let i = 0; i < lens.maxExtraConfigLen; i++) {
+            if (cfgAbs + i < buf.length) buf[cfgAbs + i] = 0;
+        }
+    }
+
+    const liLens = lens.lineInfoFileNameLens;
+    if (liLens && liLens.length > 0 && getTobjSectionCount(buf) >= TObjSection.CountObj) {
+        const d = HEADER_SIZE + TObjSection.LineInfo * 8;
+        const off = buf.readUInt32LE(d);
+        const sz = buf.readUInt32LE(d + 4);
+        let pos = 0;
+        let idx = 0;
+        while (pos + 8 <= sz && idx < liLens.length) {
+            const fnOff = buf.readUInt32LE(off + pos);
+            const lc = buf.readUInt32LE(off + pos + 4);
+            const z = liLens[idx++];
+            const abs = symbolsSectionOff + fnOff;
+            for (let i = 0; i < z; i++) {
+                if (abs + i < buf.length) buf[abs + i] = 0;
+            }
+            pos += 8 + lc * 8;
+        }
+    }
+}
+
 /**
  * Compare two TPC buffers, masking out build ID, timestamp, and checksum
  * which are expected to differ between builds. Returns the list of
@@ -37,44 +219,11 @@ function compareTpcMasked(actual: Buffer, expected: Buffer): number[] {
         return [-1];
     }
 
+    const lens = computeTobjDevMaskLens(expected, actual);
     const maskedExpected = Buffer.from(expected);
     const maskedActual = Buffer.from(actual);
-
-    // Checksum (bytes 6-7)
-    maskedExpected.writeUInt16LE(0, 6);
-    maskedActual.writeUInt16LE(0, 6);
-
-    // Header timestamp: daysSince2000 (44-45) and minutesOfDay (46-47)
-    maskedExpected.writeUInt16LE(0, 44);
-    maskedActual.writeUInt16LE(0, 44);
-    maskedExpected.writeUInt16LE(0, 46);
-    maskedActual.writeUInt16LE(0, 46);
-
-    // Build ID and timestamp strings in the Symbols section
-    const symbolsSectionOff = expected.readUInt32LE(48 + 4 * 8);
-    const buildIdStrOff = expected.readUInt32LE(36);
-    const extraSectionOff = expected.readUInt32LE(48 + 8 * 8);
-    const timeStrOff = expected.readUInt32LE(extraSectionOff);
-
-    const buildIdAbsOff = symbolsSectionOff + buildIdStrOff;
-    const maxBuildIdLen = Math.max(
-        strLenAt(expected, symbolsSectionOff, buildIdStrOff),
-        strLenAt(actual, symbolsSectionOff, buildIdStrOff)
-    );
-    for (let i = 0; i < maxBuildIdLen; i++) {
-        if (buildIdAbsOff + i < maskedExpected.length) maskedExpected[buildIdAbsOff + i] = 0;
-        if (buildIdAbsOff + i < maskedActual.length) maskedActual[buildIdAbsOff + i] = 0;
-    }
-
-    const timeAbsOff = symbolsSectionOff + timeStrOff;
-    const maxTimeLen = Math.max(
-        strLenAt(expected, symbolsSectionOff, timeStrOff),
-        strLenAt(actual, symbolsSectionOff, timeStrOff)
-    );
-    for (let i = 0; i < maxTimeLen; i++) {
-        if (timeAbsOff + i < maskedExpected.length) maskedExpected[timeAbsOff + i] = 0;
-        if (timeAbsOff + i < maskedActual.length) maskedActual[timeAbsOff + i] = 0;
-    }
+    applyTobjDevMask(maskedExpected, lens);
+    applyTobjDevMask(maskedActual, lens);
 
     const diffs: number[] = [];
     for (let i = 0; i < maskedExpected.length; i++) {
@@ -83,6 +232,72 @@ function compareTpcMasked(actual: Buffer, expected: Buffer): number[] {
         }
     }
     return diffs;
+}
+
+const TOBJ_SECTION_COUNT_OBJ = 20;
+
+/**
+ * Compare two TOBJ (.obj) buffers like compareTpcMasked (checksum, times, build id / time strings).
+ * Returns [-1] on total size mismatch.
+ */
+function compareObjMasked(actual: Buffer, expected: Buffer): number[] {
+    if (actual.length !== expected.length) {
+        return [-1];
+    }
+    const lens = computeTobjDevMaskLens(expected, actual);
+    const maskedExpected = Buffer.from(expected);
+    const maskedActual = Buffer.from(actual);
+    applyTobjDevMask(maskedExpected, lens);
+    applyTobjDevMask(maskedActual, lens);
+
+    const diffs: number[] = [];
+    for (let i = 0; i < maskedExpected.length; i++) {
+        if (maskedExpected[i] !== maskedActual[i]) {
+            diffs.push(i);
+        }
+    }
+    return diffs;
+}
+
+/** Alias: PDB uses same TOBJ container as .obj */
+function comparePdbMasked(actual: Buffer, expected: Buffer): number[] {
+    return compareObjMasked(actual, expected);
+}
+
+function logObjSectionLayout(label: string, buf: Buffer): void {
+    console.log(`${label} file size ${buf.length}`);
+    for (let i = 0; i < TOBJ_SECTION_COUNT_OBJ; i++) {
+        const d = HEADER_SIZE + i * 8;
+        if (d + 8 > buf.length) break;
+        const off = buf.readUInt32LE(d);
+        const sz = buf.readUInt32LE(d + 4);
+        console.log(`  ${SECTION_NAMES[i] ?? i}: off=${off} sz=${sz}`);
+    }
+}
+
+function logObjMaskedDiffs(actual: Buffer, expected: Buffer, diffs: number[]): void {
+    if (diffs.length === 0) return;
+    console.log(`OBJ masked diff count: ${diffs.length}`);
+    for (const off of diffs.slice(0, 25)) {
+        const hdrEnd = HEADER_SIZE + TOBJ_SECTION_COUNT_OBJ * 8;
+        let where = 'past_end';
+        if (off < HEADER_SIZE) where = 'header';
+        else if (off < hdrEnd) where = 'section_descriptors';
+        else {
+            for (let i = 0; i < TOBJ_SECTION_COUNT_OBJ; i++) {
+                const d = HEADER_SIZE + i * 8;
+                const so = expected.readUInt32LE(d);
+                const ss = expected.readUInt32LE(d + 4);
+                if (off >= so && off < so + ss) {
+                    where = `${SECTION_NAMES[i] ?? i}+0x${(off - so).toString(16)}`;
+                    break;
+                }
+            }
+        }
+        console.log(
+            `  0x${off.toString(16)} (${where}): ref=0x${expected[off].toString(16).padStart(2, '0')} js=0x${actual[off].toString(16).padStart(2, '0')}`,
+        );
+    }
 }
 
 function logTpcDiffs(actual: Buffer, expected: Buffer, diffs: number[]): void {
@@ -436,6 +651,34 @@ for (const project of testProjects) {
                     });
                 }
             });
+
+            describe('per-file OBJ reference parity (masked)', () => {
+                const refObjNames = fs.readdirSync(project.refObjDir!)
+                    .filter(f => f.endsWith('.obj'));
+
+                for (const objName of refObjNames) {
+                    it(`should match tmake ${objName} (checksum, times, build id / time strings masked)`, () => {
+                        const gen = result.objs.get(objName);
+                        if (!gen) {
+                            console.log(`  ${objName}: not produced by compiler (skipping)`);
+                            return;
+                        }
+
+                        const ref = fs.readFileSync(path.join(project.refObjDir!, objName));
+                        if (gen.length !== ref.length) {
+                            logObjSectionLayout('ref', ref);
+                            logObjSectionLayout('js ', gen);
+                        }
+                        expect(gen.length).toBe(ref.length);
+
+                        const diffs = compareObjMasked(gen, ref);
+                        if (diffs.length > 0) {
+                            logObjMaskedDiffs(gen, ref, diffs);
+                        }
+                        expect(diffs).toHaveLength(0);
+                    });
+                }
+            });
         }
 
         if (project.refPdbFile) {
@@ -456,9 +699,9 @@ for (const project of testProjects) {
                     pdbAvailable = true;
                 });
 
-                it('should produce a PDB with TPDB signature', () => {
+                it('should produce a PDB with BDPT signature (CTObjFileInfo::PDB_FILE_SIGNATURE)', () => {
                     expect(pdbAvailable).toBe(true);
-                    expect(jsH.signature).toBe('TPDB');
+                    expect(jsH.signature).toBe('BDPT');
                 });
 
                 it('should match PDB header allocation fields', () => {
@@ -484,6 +727,19 @@ for (const project of testProjects) {
                     if (diffs.length > 0) {
                         console.log(`PDB section size diffs for ${project.name}:`);
                         for (const d of diffs) console.log(`  ${d}`);
+                    }
+                    expect(diffs).toHaveLength(0);
+                });
+
+                it('should match reference PDB byte-for-byte (dev mask)', () => {
+                    if (!pdbAvailable) return;
+                    if (jsBuf.length !== refBuf.length) {
+                        console.log(`PDB size: ref=${refBuf.length} js=${jsBuf.length}`);
+                    }
+                    expect(jsBuf.length).toBe(refBuf.length);
+                    const diffs = comparePdbMasked(jsBuf, refBuf);
+                    if (diffs.length > 0) {
+                        logObjMaskedDiffs(jsBuf, refBuf, diffs);
                     }
                     expect(diffs).toHaveLength(0);
                 });

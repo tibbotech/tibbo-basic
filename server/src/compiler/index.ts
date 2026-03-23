@@ -38,6 +38,7 @@ export interface CompileOptions {
     mergeInitIntoCode?: boolean;
     projectName?: string;
     buildId?: string;
+    configStr?: string;
 }
 
 export interface CompileResult {
@@ -152,6 +153,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         mergeInitIntoCode: options.mergeInitIntoCode,
         projectName: options.projectName,
         buildId: options.buildId,
+        configStr: options.configStr,
     });
 
     return {

@@ -78,6 +78,8 @@ export interface TObjWriteOptions {
     mergeInitIntoCode?: boolean;
     projectName?: string;
     buildId?: string;
+    /** Platform config string → TOBJ_EXTRA third dword (tide `m_dwConfigStr`) */
+    configStr?: string;
 }
 
 export class TObjWriter {
@@ -190,7 +192,11 @@ export class TObjWriter {
         sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount, options.sourceMap);
         sections[TObjSection.LibNameDir] = Buffer.alloc(0);
         sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
-        sections[TObjSection.Extra] = this.buildExtra(fileName, options.sourceFilePath, options.firmwareVer);
+        sections[TObjSection.Extra] = this.buildExtra(
+            fileName,
+            options.sourceFilePath,
+            options.configStr,
+        );
 
         // Symbols section is built last since other sections add to it
         sections[TObjSection.Symbols] = this.symStrings.toBuffer();
@@ -260,7 +266,7 @@ export class TObjWriter {
         return result;
     }
 
-    private buildExtra(fileName: string, sourceFilePath?: string, firmwareVer?: string): Buffer {
+    private buildExtra(fileName: string, sourceFilePath?: string, configStr?: string): Buffer {
         const w = new BinaryWriter();
         const now = new Date();
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -273,15 +279,12 @@ export class TObjWriter {
         const MM = String(now.getMonth() + 1).padStart(2, '0');
         const timeFormatted = `${dayNames[now.getDay()]}, ${dd}-${monthNames[now.getMonth()]}-${yy} ${hh}:${mm}:${ss} ${yy}${MM}${dd}${hh}${mm}${ss}`;
 
-        const fdOff = this.symStrings.add('<FD>');
-        if (firmwareVer) {
-            this.symStrings.add(firmwareVer);
-        }
         const timeStrOff = this.symStrings.add(timeFormatted);
         const srcPathOff = this.symStrings.add(sourceFilePath || fileName);
+        const configOff = this.symStrings.add(configStr ?? '');
         w.writeDword(timeStrOff);
         w.writeDword(srcPathOff);
-        w.writeDword(fdOff);
+        w.writeDword(configOff);
         return w.toBuffer();
     }
 

@@ -2,7 +2,11 @@
 
 // File signatures (stored as LE uint32, so bytes appear as the ASCII string)
 export const TOBJ_SIGNATURE_OBJ = 0x4A424F54;  // 'TOBJ' in file bytes
-export const TOBJ_SIGNATURE_PDB = 0x50424454;  // 'TDBP' in file bytes
+/** MSVC multichar 'BDPT' — CTObjFileInfo::PDB_FILE_SIGNATURE; LE file bytes are B,D,P,T (TObjFileBase.h Save) */
+export const TOBJ_SIGNATURE_PDB = 0x54504442;
+/** Alternate signatures seen in the wild / older JS output */
+export const TOBJ_SIGNATURE_PDB_ALT_TPDB = 0x42445054; // ASCII "TPDB"
+export const TOBJ_SIGNATURE_PDB_ALT_TDBP = 0x50424454; // ASCII "TDBP"
 export const TOBJ_SIGNATURE_BIN = 0x4E494254;  // 'TBIN' in file bytes
 
 export const TOBJ_VERSION = (3 | (5 << 8));    // version 3.5

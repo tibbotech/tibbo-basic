@@ -381,7 +381,7 @@ export interface TOBJFunctionFlags {
 
 export enum FILE_SIGNATURE {
     OBJ_FILE_SIGNATURE = "TOBJ",
-    PDB_FILE_SIGNATURE = "TPDB",
+    PDB_FILE_SIGNATURE = "BDPT",
     BIN_FILE_SIGNATURE = "TBIN"
 }
 
