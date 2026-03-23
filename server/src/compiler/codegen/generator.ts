@@ -999,8 +999,22 @@ export class PCodeGenerator {
                     liveParamOffset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
                 }
                 if (isFuncWithReturn) {
-                    this.functionReturnPtrAddr.set(fnName, paramBase + liveParamOffset);
+                    const retPtrAddr = paramBase + liveParamOffset;
+                    this.functionReturnPtrAddr.set(fnName, retPtrAddr);
                     liveParamOffset += 4;
+
+                    const retVar = sym.localVariables.find(
+                        v => v.name.toLowerCase() === sym.name.toLowerCase()
+                    );
+                    if (retVar) {
+                        retVar.address = retPtrAddr;
+                        retVar.isByRef = true;
+                        if (this.resolveDataAddresses) {
+                            const retLabelName = `?A:${sym.name}:${sym.parameters.length + 1}`;
+                            this.localVarLabelMap.set(retVar, retLabelName);
+                            this.emitter.defineDataLabel(retLabelName, retPtrAddr);
+                        }
+                    }
                 }
             } else {
                 for (const p of sym.parameters) {
@@ -1031,12 +1045,10 @@ export class PCodeGenerator {
                 }
             }
 
-            if (hasCallees) {
-                if (isLive) {
-                    liveParamOffset += localOffset;
-                } else {
-                    deadParamTotal += localOffset;
-                }
+            if (isLive) {
+                liveParamOffset += localOffset;
+            } else {
+                deadParamTotal += localOffset;
             }
 
             if (isLive) {
@@ -1051,12 +1063,10 @@ export class PCodeGenerator {
                         if (concurrent > maxSlots) maxSlots = concurrent;
                     }
                     if (maxSlots > 0) {
-                        const tempBase = paramBase + liveParamOffset + (hasCallees ? 0 : localOffset);
+                        const tempBase = paramBase + liveParamOffset;
                         this.functionTempBase.set(fnName, tempBase);
-                        if (hasCallees) {
-                            const scalarCount = this.countFunctionPreEvalScalars(decl);
-                            liveParamOffset += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
-                        }
+                        const scalarCount = this.countFunctionPreEvalScalars(decl);
+                        liveParamOffset += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
                     }
                 }
             }
@@ -1257,52 +1267,75 @@ export class PCodeGenerator {
     }
 
     private registerTempVariables(program: AST.Program): void {
-        let bestDecl: AST.SubDecl | AST.FunctionDecl | null = null;
-        let bestCount = 0;
+        let globalTmpCounter = 0;
+
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
+
+            const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!fn || fn.isDeclare) continue;
+
             const perStmt = this.countTempVarsPerStatement(decl.body);
             const total = perStmt.reduce((a, b) => a + b, 0);
-            if (total > bestCount) {
-                bestCount = total;
-                bestDecl = decl;
+            if (total === 0) continue;
+
+            const fnTempBase = this.functionTempBase.get(fn.name);
+            const tempBase = fnTempBase ?? this.tempScratchBase;
+
+            const slotAssignments: number[] = [];
+            for (const stmtCount of perStmt) {
+                for (let s = 0; s < stmtCount; s++) {
+                    slotAssignments.push(Math.min(s, 1));
+                }
             }
-        }
-        if (!bestDecl || bestCount === 0) return;
 
-        const fn = this.symbols.lookupGlobal(bestDecl.name) as FunctionSymbol | undefined;
-        if (!fn || fn.isDeclare) return;
+            const scalarCount = this.countFunctionPreEvalScalars(decl);
+            const existingCount = fn.parameters.length + fn.localVariables.length;
 
-        const perStmt = this.countTempVarsPerStatement(bestDecl.body);
-        const slotAssignments: number[] = [];
-        for (const stmtCount of perStmt) {
-            for (let s = 0; s < stmtCount; s++) {
-                slotAssignments.push(Math.min(s, 1));
+            for (let i = 0; i < slotAssignments.length; i++) {
+                globalTmpCounter++;
+                const slot = slotAssignments[i];
+                const addr = tempBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                const ordinal = existingCount + i + 1;
+                const labelName = `?V:_tmp_${globalTmpCounter}:local(${fn.name}:${ordinal})`;
+                const tmpVar: VariableSymbol = {
+                    name: `_tmp_${globalTmpCounter}`,
+                    kind: SymbolKind.Variable,
+                    dataType: BUILTIN_TYPES.string,
+                    location: { file: '', line: 0, column: 0 },
+                    isPublic: false,
+                    isDeclare: false,
+                    isByRef: false,
+                    isGlobal: false,
+                    isTemp: true,
+                    address: addr,
+                };
+                fn.localVariables.push(tmpVar);
+                this.localVarLabelMap.set(tmpVar, labelName);
+                this.emitter.defineDataLabel(labelName, addr);
             }
-        }
 
-        const existingCount = fn.parameters.length + fn.localVariables.length;
-        for (let i = 0; i < slotAssignments.length; i++) {
-            const slot = slotAssignments[i];
-            const addr = this.tempScratchBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
-            const ordinal = existingCount + i + 1;
-            const labelName = `?V:_tmp_${i + 1}:local(${fn.name}:${ordinal})`;
-            const tmpVar: VariableSymbol = {
-                name: `_tmp_${i + 1}`,
-                kind: SymbolKind.Variable,
-                dataType: BUILTIN_TYPES.string,
-                location: { file: '', line: 0, column: 0 },
-                isPublic: false,
-                isDeclare: false,
-                isByRef: false,
-                isGlobal: false,
-                isTemp: true,
-                address: addr,
-            };
-            fn.localVariables.push(tmpVar);
-            this.localVarLabelMap.set(tmpVar, labelName);
-            this.emitter.defineDataLabel(labelName, addr);
+            if (scalarCount > 0) {
+                const scalarAddr = tempBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                const ordinal = existingCount + slotAssignments.length + 1;
+                const labelName = `?V:_tmp_numeric_result:local(${fn.name}:${ordinal})`;
+                const nrVar: VariableSymbol = {
+                    name: '_tmp_numeric_result',
+                    kind: SymbolKind.Variable,
+                    dataType: BUILTIN_TYPES.dword,
+                    location: { file: '', line: 0, column: 0 },
+                    isPublic: false,
+                    isDeclare: false,
+                    isByRef: false,
+                    isGlobal: false,
+                    isTemp: true,
+                    address: scalarAddr,
+                };
+                fn.localVariables.push(nrVar);
+                this.localVarLabelMap.set(nrVar, labelName);
+                this.emitter.defineDataLabel(labelName, scalarAddr);
+            }
         }
     }
 
