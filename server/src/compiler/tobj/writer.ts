@@ -42,9 +42,9 @@ class SymbolStringTable {
     private offsets = new Map<string, number>();
     private data: number[] = [];
 
-    add(s: string): number {
+    add(s: string, writeNew: boolean = false): number {
         const existing = this.offsets.get(s);
-        if (existing !== undefined) return existing;
+        if (existing !== undefined && !writeNew) return existing;
         const offset = this.data.length;
         for (let i = 0; i < s.length; i++) this.data.push(s.charCodeAt(i));
         this.data.push(0);
@@ -108,10 +108,6 @@ export class TObjWriter {
             includeFileOffsets.push(this.symStrings.add(incFile));
         }
 
-        // Pre-add project metadata strings (before Symbols section is built)
-        const projectNameOff = options.projectName ? this.symStrings.add(options.projectName) : MAXDWORD;
-        const buildIdOff = options.buildId ? this.symStrings.add(options.buildId) : MAXDWORD;
-
         // Build section data
         let codeData = emitter.getCode();
         let initData = emitter.getInitCode();
@@ -174,11 +170,6 @@ export class TObjWriter {
         // Build section buffers
         const sections: Buffer[] = new Array(TObjSection.CountObj).fill(Buffer.alloc(0));
 
-        sections[TObjSection.Extra] = this.buildExtra(
-            fileName,
-            options.sourceFilePath,
-            options.configStr,
-        );
         sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
         sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
         sections[TObjSection.LibFileDir] = Buffer.alloc(0);
@@ -198,7 +189,14 @@ export class TObjWriter {
         sections[TObjSection.LibNameDir] = Buffer.alloc(0);
         sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
 
-        // Symbols built last since other build* methods add to symStrings
+        // Metadata symbols added last, matching reference Save order
+        const metadata = this.buildMetadataSymbols(
+            fileName, options.sourceFilePath, options.configStr,
+            options.projectName, options.buildId,
+        );
+        sections[TObjSection.Extra] = metadata.extra;
+        const { projectNameOff, buildIdOff } = metadata;
+
         sections[TObjSection.Symbols] = this.symStrings.toBuffer();
 
         // Physical write order matching _SectionOrder in TObjFileBase.h
@@ -290,8 +288,28 @@ export class TObjWriter {
         return result;
     }
 
-    private buildExtra(fileName: string, sourceFilePath?: string, configStr?: string): Buffer {
-        const w = new BinaryWriter();
+    /**
+     * Add metadata symbols and build the Extra section + header offsets.
+     * Must be called after all other build* methods so that the symbol
+     * positions match the reference (TObjFileBase.h Save: AddSymbol calls
+     * happen after all section data is already populated).
+     *
+     * Reference order:
+     *   SrcFilePath, ConfigString, ProjectName, PlatformName,
+     *   BuildId, FirmwareVer, FileTimeStr
+     */
+    private buildMetadataSymbols(
+        fileName: string,
+        sourceFilePath?: string,
+        configStr?: string,
+        projectName?: string,
+        buildId?: string,
+    ): { extra: Buffer; projectNameOff: number; buildIdOff: number } {
+        const srcPathOff = this.symStrings.add(sourceFilePath || fileName);
+        const configOff = this.symStrings.add(configStr ?? '');
+        const projectNameOff = projectName ? this.symStrings.add(projectName, true) : MAXDWORD;
+        const buildIdOff = buildId ? this.symStrings.add(buildId) : MAXDWORD;
+
         const now = new Date();
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -302,14 +320,14 @@ export class TObjWriter {
         const ss = String(now.getSeconds()).padStart(2, '0');
         const MM = String(now.getMonth() + 1).padStart(2, '0');
         const timeFormatted = `${dayNames[now.getDay()]}, ${dd}-${monthNames[now.getMonth()]}-${yy} ${hh}:${mm}:${ss} ${yy}${MM}${dd}${hh}${mm}${ss}`;
-
         const timeStrOff = this.symStrings.add(timeFormatted);
-        const srcPathOff = this.symStrings.add(sourceFilePath || fileName);
-        const configOff = this.symStrings.add(configStr ?? '');
+
+        const w = new BinaryWriter();
         w.writeDword(timeStrOff);
         w.writeDword(srcPathOff);
         w.writeDword(configOff);
-        return w.toBuffer();
+
+        return { extra: w.toBuffer(), projectNameOff, buildIdOff };
     }
 
     private buildEventDir(symbols: SymbolTable, maxEventNumber: number, globalDataSize: number): Buffer {
