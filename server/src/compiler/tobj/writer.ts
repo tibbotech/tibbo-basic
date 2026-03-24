@@ -167,29 +167,36 @@ export class TObjWriter {
             }
         }
 
-        // Build section buffers
+        // Build section buffers.
+        // Order of build* calls matches reference SaveObj() symbol discovery
+        // order so that symStrings offsets are laid out identically:
+        //   LibNames, IncNames, Addresses, Types, Functions, Scopes,
+        //   Variables, Objects, Syscalls, LineInfo, RDataDir, ResFileDir,
+        //   then metadata (SrcPath, Config, ProjectName, BuildId, TimeStr).
         const sections: Buffer[] = new Array(TObjSection.CountObj).fill(Buffer.alloc(0));
 
-        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
-        sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
-        sections[TObjSection.LibFileDir] = Buffer.alloc(0);
-        sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
-        sections[TObjSection.RData] = rdata;
         sections[TObjSection.Code] = codeData;
         sections[TObjSection.Init] = initData;
+        sections[TObjSection.RData] = rdata;
+        sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
+        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
+        sections[TObjSection.LibFileDir] = Buffer.alloc(0);
+
+        // Symbol-adding sections in SaveObj() declaration order
+        sections[TObjSection.LibNameDir] = Buffer.alloc(0);
+        sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
         sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
+        sections[TObjSection.Types] = this.buildTypes(symbols);
         sections[TObjSection.Functions] = this.buildFunctions(symbols);
         sections[TObjSection.Scopes] = this.buildScopes(symbols, fileName, options.sourceFilePath, options.headerLineCount);
         sections[TObjSection.Variables] = this.buildVariables(symbols);
         sections[TObjSection.Objects] = this.buildObjects(symbols);
         sections[TObjSection.Syscalls] = this.buildSyscalls(symbols);
-        sections[TObjSection.Types] = this.buildTypes(symbols);
-        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
         sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount, options.sourceMap);
-        sections[TObjSection.LibNameDir] = Buffer.alloc(0);
-        sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
+        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
+        sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
 
-        // Metadata symbols added last, matching reference Save order
+        // Metadata symbols added last, matching CTObjFileBaseImpl::Save order
         const metadata = this.buildMetadataSymbols(
             fileName, options.sourceFilePath, options.configStr,
             options.projectName, options.buildId,
