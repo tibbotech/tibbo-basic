@@ -8,7 +8,11 @@ import { TOBJ_SIGNATURE_BIN, MAXDWORD, TObjSection } from '../../src/compiler/to
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const TESTS_ROOT = path.resolve(REPO_ROOT, 'server', 'tests');
 
-/** Regenerate reference .tpc and .obj files via tmake before comparing outputs. */
+/**
+ * Regenerate reference .tpc (and tmp/*.obj when tmake runs) before comparing outputs.
+ * Per-project OBJ parity uses committed `tmake-ref/*.obj` when present — official tmake
+ * layout preserved in git — not the volatile `tmp/` copy from this run.
+ */
 beforeAll(() => {
     const script = path.join(REPO_ROOT, 'scripts', 'generate-reference-tpc.js');
     execFileSync(process.execPath, [script], {
@@ -353,9 +357,13 @@ function discoverTestProjects(): TestProject[] {
 
         const tpcFile = files.find(f => f.endsWith('.tpc') && !f.includes('_new')) || null;
 
+        const tmakeRefDir = path.join(dir, 'tmake-ref');
+        const hasTmakeRefObjs = fs.existsSync(tmakeRefDir) &&
+            fs.readdirSync(tmakeRefDir).some(f => f.endsWith('.obj'));
         const tmpDir = path.join(dir, 'tmp');
-        const hasRefObjs = fs.existsSync(tmpDir) &&
+        const hasTmpObjs = fs.existsSync(tmpDir) &&
             fs.readdirSync(tmpDir).some(f => f.endsWith('.obj'));
+        const refObjDir = hasTmakeRefObjs ? tmakeRefDir : (hasTmpObjs ? tmpDir : null);
 
         const pdbFile = path.join(dir, 'database.pdb');
         const refPdbFile = fs.existsSync(pdbFile) ? pdbFile : null;
@@ -365,7 +373,7 @@ function discoverTestProjects(): TestProject[] {
             dir,
             tprFile: path.join(dir, tprFile),
             tpcFile: tpcFile ? path.join(dir, tpcFile) : null,
-            refObjDir: hasRefObjs ? tmpDir : null,
+            refObjDir,
             refPdbFile,
         });
     }

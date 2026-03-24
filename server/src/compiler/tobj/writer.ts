@@ -174,42 +174,66 @@ export class TObjWriter {
         // Build section buffers
         const sections: Buffer[] = new Array(TObjSection.CountObj).fill(Buffer.alloc(0));
 
-        sections[TObjSection.Code] = codeData;
-        sections[TObjSection.Init] = initData;
-        sections[TObjSection.RData] = rdata;
-        sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
-        sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
-        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
-        sections[TObjSection.LibFileDir] = Buffer.alloc(0);
-        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
-        sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
-        sections[TObjSection.Types] = this.buildTypes(symbols);
-        sections[TObjSection.Functions] = this.buildFunctions(symbols);
-        sections[TObjSection.Scopes] = this.buildScopes(symbols, fileName, options.sourceFilePath, options.headerLineCount);
-        sections[TObjSection.Variables] = this.buildVariables(symbols);
-        sections[TObjSection.Objects] = this.buildObjects(symbols);
-        sections[TObjSection.Syscalls] = this.buildSyscalls(symbols);
-        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount, options.sourceMap);
-        sections[TObjSection.LibNameDir] = Buffer.alloc(0);
-        sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
         sections[TObjSection.Extra] = this.buildExtra(
             fileName,
             options.sourceFilePath,
             options.configStr,
         );
+        sections[TObjSection.EventDir] = this.buildEventDir(symbols, maxEventNumber, platformSize + (options.globalAllocSize ?? 0) + (options.stackSize ?? 0));
+        sections[TObjSection.ResFileDir] = this.buildResFileDir(options.resourceEntries ?? []);
+        sections[TObjSection.LibFileDir] = Buffer.alloc(0);
+        sections[TObjSection.FileData] = options.fileData ?? Buffer.alloc(0);
+        sections[TObjSection.RData] = rdata;
+        sections[TObjSection.Code] = codeData;
+        sections[TObjSection.Init] = initData;
+        sections[TObjSection.Addresses] = this.buildAddresses(emitter, symbols);
+        sections[TObjSection.Functions] = this.buildFunctions(symbols);
+        sections[TObjSection.Scopes] = this.buildScopes(symbols, fileName, options.sourceFilePath, options.headerLineCount);
+        sections[TObjSection.Variables] = this.buildVariables(symbols);
+        sections[TObjSection.Objects] = this.buildObjects(symbols);
+        sections[TObjSection.Syscalls] = this.buildSyscalls(symbols);
+        sections[TObjSection.Types] = this.buildTypes(symbols);
+        sections[TObjSection.RDataDir] = this.buildRDataDir(emitter);
+        sections[TObjSection.LineInfo] = this.buildLineInfo(emitter, fileName, options.fileSequence || [], options.sourceFilePath, options.headerLineCount, options.sourceMap);
+        sections[TObjSection.LibNameDir] = Buffer.alloc(0);
+        sections[TObjSection.IncNameDir] = this.buildIncNameDir(includeFileOffsets);
 
-        // Symbols section is built last since other sections add to it
+        // Symbols built last since other build* methods add to symStrings
         sections[TObjSection.Symbols] = this.symStrings.toBuffer();
 
-        // Calculate offsets
+        // Physical write order matching _SectionOrder in TObjFileBase.h
+        const sectionOrder = [
+            TObjSection.Extra,
+            TObjSection.EventDir,
+            TObjSection.Symbols,
+            TObjSection.ResFileDir,
+            TObjSection.LibFileDir,
+            TObjSection.FileData,
+            TObjSection.RData,
+            TObjSection.Code,
+            TObjSection.Init,
+            TObjSection.Addresses,
+            TObjSection.Functions,
+            TObjSection.Scopes,
+            TObjSection.Variables,
+            TObjSection.Objects,
+            TObjSection.Syscalls,
+            TObjSection.Types,
+            TObjSection.RDataDir,
+            TObjSection.LineInfo,
+            TObjSection.LibNameDir,
+            TObjSection.IncNameDir,
+        ];
+
+        // Calculate offsets in physical write order
         const sectionCount = TObjSection.CountObj;
         const headerAndDescSize = HEADER_SIZE + sectionCount * SECTION_DESCRIPTOR_SIZE;
         let currentOffset = headerAndDescSize;
-        const offsets: number[] = [];
+        const offsets: number[] = new Array(sectionCount);
 
-        for (let i = 0; i < sectionCount; i++) {
-            offsets.push(currentOffset);
-            currentOffset += sections[i].length;
+        for (const idx of sectionOrder) {
+            offsets[idx] = currentOffset;
+            currentOffset += sections[idx].length;
         }
 
         const fileSize = currentOffset;
@@ -245,9 +269,9 @@ export class TObjWriter {
             w.writeDword(sections[i].length);
         }
 
-        // Section data
-        for (let i = 0; i < sectionCount; i++) {
-            w.writeBytes(sections[i]);
+        // Section data (physical write order matching reference)
+        for (const idx of sectionOrder) {
+            w.writeBytes(sections[idx]);
         }
 
         // Checksum (16-bit word-level sum, matching reference C++ compiler)

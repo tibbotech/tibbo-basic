@@ -147,6 +147,11 @@ export class PCodeGenerator {
         this.registerTempVariables(program);
         this.assignLocalVarLabels(program);
 
+        // Match tmake RData layout: pool every string literal from the full parsed unit
+        // (platform header + source) in source order before codegen. Otherwise literals
+        // used only in skipped header bodies never get slots and later strings sit too low.
+        this.preallocateStringPoolFromAst(program);
+
         this.emitter.beginInit();
         this.generateGlobalInit(program);
         this.emitter.endInit();
@@ -160,6 +165,47 @@ export class PCodeGenerator {
         }
 
         this.emitter.resolveLabels();
+    }
+
+    /**
+     * Tibbo pools string literals from the entire expanded translation unit (headers + file)
+     * in source order. We only emit bytecode for decls after headerLineCount, so without this
+     * pass RData omits header-only literals and every later string sits at the wrong offset.
+     */
+    private preallocateStringPoolFromAst(program: AST.Program): void {
+        const hits: { s: string; line: number; col: number }[] = [];
+
+        const visit = (node: unknown): void => {
+            if (node === null || node === undefined) return;
+            if (typeof node !== 'object') return;
+            const n = node as Record<string, unknown>;
+            if (n.kind === 'StringLiteral') {
+                const sl = n as unknown as AST.StringLiteral;
+                hits.push({
+                    s: sl.value,
+                    line: sl.loc?.line ?? 0,
+                    col: sl.loc?.column ?? 0,
+                });
+            }
+            for (const key of Object.keys(n)) {
+                if (key === 'loc') continue;
+                const v = n[key];
+                if (Array.isArray(v)) {
+                    for (const item of v) visit(item);
+                } else if (v && typeof v === 'object') {
+                    visit(v);
+                }
+            }
+        };
+
+        for (const decl of program.declarations) {
+            visit(decl);
+        }
+
+        hits.sort((a, b) => a.line - b.line || a.col - b.col);
+        for (const h of hits) {
+            this.emitter.addStringRData(h.s);
+        }
     }
 
     private makeLabel(prefix: string): string {

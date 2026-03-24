@@ -186,7 +186,8 @@ export class ProjectCompiler {
             if (sourceFileBasenames.has(basename)) continue;
             includedFiles.push(filePath);
         }
-        includedFiles.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        // Keep preprocessor discovery order (filePriorities). Sorting alphabetically
+        // breaks byte parity with tmake: IncNameDir + symbol string offsets must match.
 
         // File processing sequence (includes re-entries for LineInfo blocks)
         const includeOrder: Map<string, string[]> = preprocessor.includeOrder || new Map();
@@ -682,7 +683,7 @@ export class ProjectCompiler {
      */
     private buildProjectPdb(sourceObj: Buffer): Buffer {
         const pdb = Buffer.from(sourceObj);
-        pdb.writeUInt32LE(TOBJ_SIGNATURE_PDB, 0);
+        pdb.writeUInt32BE(TOBJ_SIGNATURE_PDB, 0);
         pdb.writeUInt16LE(0, 6);
 
         let checksum = 0;
