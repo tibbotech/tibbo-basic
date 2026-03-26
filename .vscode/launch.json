@@ -101,7 +101,7 @@
                 "program": "${workspaceFolder}/node_modules/jest/bin/jest",
             }
         },
-		{
+        {
             "type": "node",
             "request": "launch",
             "name": "Test Parser",
@@ -117,6 +117,23 @@
                 "program": "${workspaceFolder}/node_modules/jest/bin/jest",
             }
         },
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Compiler integration test",
+			"cwd": "${workspaceFolder}/server",
+			"program": "${workspaceFolder}/server/node_modules/.bin/jest",
+			"args": [
+				"tests/compiler/integration.test.ts",
+				"--runInBand"
+			],
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"disableOptimisticBPs": true,
+			"windows": {
+				"program": "${workspaceFolder}/server/node_modules/jest/bin/jest"
+			}
+		},
 	],
 	"compounds": [
 		{
