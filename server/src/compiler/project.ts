@@ -319,27 +319,27 @@ export class ProjectCompiler {
 
         const { source: combinedSource, sourceMap } = this.buildCombinedSource(preprocessor);
         let debugObj: Buffer | null = null;
-        if (combinedSource.replace(/\s/g, '').length > 0) {
-            const debugResult = compile(combinedSource, {
-                fileName: 'gen',
-                flags,
-                maxEventNumber,
-                platformSize: this.platformConfig.platformId,
-                includedFiles: [],
-                fileSequence,
-                sourceFilePath: projectName,
-                firmwareVer: this.platformConfig.version,
-                configStr: this.platformConfig.configStr,
-                sourceMap,
-                resolveDataAddresses: true,
-                mergeInitIntoCode: true,
-                projectName,
-                buildId,
-            });
-            if (debugResult.errors.length === 0) {
-                debugObj = debugResult.obj;
-            }
-        }
+        // if (combinedSource.replace(/\s/g, '').length > 0) {
+        //     const debugResult = compile(combinedSource, {
+        //         fileName: 'gen',
+        //         flags,
+        //         maxEventNumber,
+        //         platformSize: this.platformConfig.platformId,
+        //         includedFiles: [],
+        //         fileSequence,
+        //         sourceFilePath: projectName,
+        //         firmwareVer: this.platformConfig.version,
+        //         configStr: this.platformConfig.configStr,
+        //         sourceMap,
+        //         resolveDataAddresses: true,
+        //         mergeInitIntoCode: true,
+        //         projectName,
+        //         buildId,
+        //     });
+        //     if (debugResult.errors.length === 0) {
+        //         debugObj = debugResult.obj;
+        //     }
+        // }
         const stackSize = maxStackSize;
         const linkedResources = this.config.sourceFiles
             .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')
