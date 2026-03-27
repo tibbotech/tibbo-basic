@@ -148,7 +148,26 @@ export class TObjWriter {
                 if (scope.startAddress != null) scope.startAddress += initSize;
                 if (scope.endAddress != null) scope.endAddress += initSize;
             }
+
+            // Init is now part of the code section — retype all Init refs to Code
+            for (const label of emitter.getLabels().values()) {
+                for (const ref of label.references) {
+                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
+                }
+            }
+            for (const label of emitter.getDataLabels().values()) {
+                for (const ref of label.references) {
+                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
+                }
+            }
+            for (const entry of emitter.getRDataEntries()) {
+                for (const ref of entry.references) {
+                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
+                }
+            }
+
             codeData = Buffer.concat([initData, Buffer.from([0x1F]), codeData]);
+            initData = Buffer.alloc(0);
 
             for (const label of emitter.getLabels().values()) {
                 if (!label.defined || !label.isCode) continue;

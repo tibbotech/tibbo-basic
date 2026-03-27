@@ -276,6 +276,7 @@ export class ProjectCompiler {
                 sourceFilePath,
                 firmwareVer: this.platformConfig.version,
                 configStr: this.platformConfig.configStr,
+                mergeInitIntoCode: true,
             });
 
             objs.set(baseName + '.obj', result.obj);
