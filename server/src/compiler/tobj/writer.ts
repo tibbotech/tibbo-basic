@@ -145,8 +145,8 @@ export class TObjWriter {
                 if (fn.codeEndAddress != null) fn.codeEndAddress += initSize;
             }
             for (const scope of symbols.getScopes()) {
-                if (scope.startAddress != null) scope.startAddress += initSize;
-                if (scope.endAddress != null) scope.endAddress += initSize;
+                if (scope.startAddress) scope.startAddress += initSize;
+                if (scope.endAddress) scope.endAddress += initSize;
             }
 
             // Init is now part of the code section — retype all Init refs to Code
