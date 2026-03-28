@@ -138,8 +138,8 @@ export class PCodeGenerator {
         this.allocateFunctionFrames(program);
 
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
-        // Stack frame base; on_* scratch offset grows as dim locals are emitted (onEventDeclaredLocalBytes).
-        this.tempScratchBase = localBase;
+        this.includeTempsInLocalAllocSize(program);
+        this.tempScratchBase = localBase + this.localAllocSize;
 
         const maxRootArea = this.computeMaxRootArea(program);
         this.allocateCalledFunctionParams(program, maxRootArea);
@@ -1234,6 +1234,60 @@ export class PCodeGenerator {
 
     private allocateLocals(_fn: FunctionSymbol): void {
         // Addresses already assigned in allocateFunctionFrames
+    }
+
+    private includeTempsInLocalAllocSize(program: AST.Program): void {
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!fn || fn.isDeclare) continue;
+
+            const perStmt = this.countTempVarsPerStatement(decl.body);
+            const hasTempUsage = perStmt.some(n => n > 0);
+            if (!hasTempUsage) continue;
+
+            const maxContentLen = this.findMaxStringLiteralLength(decl.body);
+            if (maxContentLen <= 0) continue;
+
+            const tempFootprint = maxContentLen + 1;
+
+            let declaredSize = 0;
+            for (const p of fn.parameters) {
+                declaredSize += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+            }
+            for (const v of fn.localVariables) {
+                declaredSize += v.dataType?.size ?? 2;
+            }
+
+            const totalSize = declaredSize + tempFootprint;
+            if (totalSize > this.localAllocSize) {
+                this.localAllocSize = totalSize;
+            }
+        }
+    }
+
+    private findMaxStringLiteralLength(stmts: AST.Statement[]): number {
+        let maxLen = 0;
+        const visit = (node: unknown): void => {
+            if (!node || typeof node !== 'object') return;
+            const n = node as Record<string, unknown>;
+            if (n.kind === 'StringLiteral') {
+                const len = (n.value as string).length;
+                if (len > maxLen) maxLen = len;
+            }
+            for (const key of Object.keys(n)) {
+                if (key === 'loc' || key === 'kind') continue;
+                const child = n[key];
+                if (Array.isArray(child)) {
+                    for (const item of child) visit(item);
+                } else if (child && typeof child === 'object') {
+                    visit(child);
+                }
+            }
+        };
+        for (const stmt of stmts) visit(stmt);
+        return maxLen;
     }
 
     private computeTempStringSlots(program: AST.Program): number {
