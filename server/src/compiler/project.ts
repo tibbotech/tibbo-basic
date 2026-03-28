@@ -684,7 +684,7 @@ export class ProjectCompiler {
      */
     private buildProjectPdb(sourceObj: Buffer): Buffer {
         const pdb = Buffer.from(sourceObj);
-        pdb.writeUInt32BE(TOBJ_SIGNATURE_PDB, 0);
+        pdb.writeUInt32LE(TOBJ_SIGNATURE_PDB, 0);
         pdb.writeUInt16LE(0, 6);
 
         let checksum = 0;
