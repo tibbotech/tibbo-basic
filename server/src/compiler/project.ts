@@ -7,9 +7,12 @@ import { Program, TopLevelDeclaration } from './ast/nodes';
 import { SemanticResolver } from './semantics/resolver';
 import { TypeChecker } from './semantics/checker';
 import { PCodeGenerator } from './codegen/generator';
-import { TObjWriter } from './tobj/writer';
+import { TObjWriter, BinaryWriter } from './tobj/writer';
 import { Linker, LinkerOptions } from './linker/linker';
-import { TObjHeaderFlags, TOBJ_SIGNATURE_PDB } from './tobj/format';
+import {
+    TObjHeaderFlags, TOBJ_SIGNATURE_PDB, TOBJ_VERSION, TObjSection,
+    TObjAddressFlags, TObjRefType, HEADER_SIZE, SECTION_DESCRIPTOR_SIZE, MAXDWORD,
+} from './tobj/format';
 import { resolvePathInsensitive } from '../pathUtils';
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -316,31 +319,6 @@ export class ProjectCompiler {
         }
 
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();
-        const projectName = this.config.name || 'project';
-
-        const { source: combinedSource, sourceMap } = this.buildCombinedSource(preprocessor);
-        let debugObj: Buffer | null = null;
-        // if (combinedSource.replace(/\s/g, '').length > 0) {
-        //     const debugResult = compile(combinedSource, {
-        //         fileName: 'gen',
-        //         flags,
-        //         maxEventNumber,
-        //         platformSize: this.platformConfig.platformId,
-        //         includedFiles: [],
-        //         fileSequence,
-        //         sourceFilePath: projectName,
-        //         firmwareVer: this.platformConfig.version,
-        //         configStr: this.platformConfig.configStr,
-        //         sourceMap,
-        //         resolveDataAddresses: true,
-        //         mergeInitIntoCode: true,
-        //         projectName,
-        //         buildId,
-        //     });
-        //     if (debugResult.errors.length === 0) {
-        //         debugObj = debugResult.obj;
-        //     }
-        // }
         const stackSize = maxStackSize;
         const linkedResources = this.config.sourceFiles
             .filter(f => f.type === 'resource' && path.extname(f.path).toLowerCase() !== '.html')
@@ -365,7 +343,7 @@ export class ProjectCompiler {
         };
         const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
         const linkResult = link(objBuffers, {}, linkerOptions);
-        this.writeProjectArtifacts(objs, debugObj);
+        this.writeProjectArtifacts(objs);
 
         return {
             tpc: linkResult.errors.length === 0 ? linkResult.tpc : null,
@@ -652,7 +630,7 @@ export class ProjectCompiler {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    private writeProjectArtifacts(objs: Map<string, Buffer>, debugObj: Buffer | null): void {
+    private writeProjectArtifacts(objs: Map<string, Buffer>): void {
         const tmpDir = path.join(this.projectPath, 'tmp');
         fs.mkdirSync(tmpDir, { recursive: true });
 
@@ -666,12 +644,8 @@ export class ProjectCompiler {
             fs.writeFileSync(path.join(tmpDir, name), data);
         }
 
-        const pdbSource = debugObj ?? objs.values().next().value ?? null;
-        if (debugObj) {
-            fs.writeFileSync(path.join(tmpDir, 'gen.obj'), debugObj);
-        }
-        if (pdbSource) {
-            fs.writeFileSync(path.join(tmpDir, 'database.pdb'), this.buildProjectPdb(pdbSource));
+        if (objs.size > 0) {
+            fs.writeFileSync(path.join(tmpDir, 'database.pdb'), this.mergeObjsForPdb(objs));
         }
     }
 
@@ -697,6 +671,372 @@ export class ProjectCompiler {
         checksum = (~checksum + 1) & 0xFFFF;
         pdb.writeUInt16LE(checksum, 6);
         return pdb;
+    }
+
+    private parseObjSections(data: Buffer): Buffer[] {
+        const sections: Buffer[] = [];
+        const count = TObjSection.CountObj;
+        for (let i = 0; i < count; i++) {
+            const descOff = HEADER_SIZE + i * SECTION_DESCRIPTOR_SIZE;
+            if (descOff + 8 > data.length) {
+                sections.push(Buffer.alloc(0));
+                continue;
+            }
+            const offset = data.readUInt32LE(descOff);
+            const size = data.readUInt32LE(descOff + 4);
+            sections.push(offset + size <= data.length ? data.slice(offset, offset + size) : Buffer.alloc(0));
+        }
+        return sections;
+    }
+
+    private countAddressEntries(data: Buffer): number {
+        let pos = 0, count = 0;
+        while (pos + 17 <= data.length) {
+            pos += 13;
+            const refCount = data.readUInt32LE(pos); pos += 4;
+            pos += refCount * 5;
+            count++;
+        }
+        return count;
+    }
+
+    private countFunctionEntries(data: Buffer): number {
+        let pos = 0, count = 0;
+        while (pos + 17 <= data.length) {
+            pos += 13;
+            const calleeCount = data.readUInt32LE(pos); pos += 4;
+            pos += calleeCount * 4;
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * Merge all compiled OBJ files into a single PDB by concatenating debug
+     * sections (Addresses, Functions, Scopes, Variables, LineInfo) with
+     * rebased code addresses, symbol offsets, and cross-section indices.
+     * Shared sections (Types, Objects, Syscalls, IncNameDir) are taken from
+     * the first OBJ since every OBJ is compiled with the same header.
+     */
+    private mergeObjsForPdb(objs: Map<string, Buffer>): Buffer {
+        const buffers = [...objs.values()];
+        if (buffers.length === 0) return Buffer.alloc(0);
+        if (buffers.length === 1) return this.buildProjectPdb(buffers[0]);
+
+        const allSections = buffers.map(buf => this.parseObjSections(buf));
+
+        let codeBase = 0, symBase = 0, addrBase = 0, funcBase = 0, scopeBase = 0, rdataBase = 0;
+        const codeBases: number[] = [];
+        const symBases: number[] = [];
+        const addrBases: number[] = [];
+        const funcBases: number[] = [];
+        const scopeBases: number[] = [];
+        const rdataBases: number[] = [];
+
+        for (const s of allSections) {
+            codeBases.push(codeBase);
+            symBases.push(symBase);
+            addrBases.push(addrBase);
+            funcBases.push(funcBase);
+            scopeBases.push(scopeBase);
+            rdataBases.push(rdataBase);
+
+            codeBase += s[TObjSection.Code].length;
+            symBase += s[TObjSection.Symbols].length;
+            addrBase += this.countAddressEntries(s[TObjSection.Addresses]);
+            funcBase += this.countFunctionEntries(s[TObjSection.Functions]);
+            scopeBase += Math.floor(s[TObjSection.Scopes].length / 32);
+            rdataBase += s[TObjSection.RData].length;
+        }
+
+        const mergedCode = Buffer.concat(allSections.map(s => s[TObjSection.Code]));
+        const mergedSymbols = Buffer.concat(allSections.map(s => s[TObjSection.Symbols]));
+        const mergedRData = Buffer.concat(allSections.map(s => s[TObjSection.RData]));
+
+        const base = allSections[0];
+
+        const sections: Buffer[] = new Array(TObjSection.CountObj).fill(Buffer.alloc(0));
+        sections[TObjSection.Code] = mergedCode;
+        sections[TObjSection.Init] = base[TObjSection.Init];
+        sections[TObjSection.RData] = mergedRData;
+        sections[TObjSection.FileData] = base[TObjSection.FileData];
+        sections[TObjSection.Symbols] = mergedSymbols;
+        sections[TObjSection.ResFileDir] = base[TObjSection.ResFileDir];
+        sections[TObjSection.EventDir] = this.pdbMergeEventDir(allSections, codeBases);
+        sections[TObjSection.LibFileDir] = base[TObjSection.LibFileDir];
+        sections[TObjSection.Extra] = base[TObjSection.Extra];
+        sections[TObjSection.Addresses] = this.pdbMergeAddresses(allSections, codeBases, symBases);
+        sections[TObjSection.Functions] = this.pdbMergeFunctions(allSections, symBases, addrBases, funcBases);
+        sections[TObjSection.Scopes] = this.pdbMergeScopes(allSections, codeBases, symBases);
+        sections[TObjSection.Variables] = this.pdbMergeVariables(allSections, symBases, addrBases, scopeBases);
+        sections[TObjSection.Objects] = base[TObjSection.Objects];
+        sections[TObjSection.Syscalls] = base[TObjSection.Syscalls];
+        sections[TObjSection.Types] = base[TObjSection.Types];
+        sections[TObjSection.RDataDir] = this.pdbMergeRDataDir(allSections, codeBases, rdataBases);
+        sections[TObjSection.LineInfo] = this.pdbMergeLineInfo(allSections, codeBases, symBases);
+        sections[TObjSection.LibNameDir] = base[TObjSection.LibNameDir];
+        sections[TObjSection.IncNameDir] = base[TObjSection.IncNameDir];
+
+        const sectionOrder = [
+            TObjSection.Extra, TObjSection.EventDir, TObjSection.Symbols,
+            TObjSection.ResFileDir, TObjSection.LibFileDir, TObjSection.FileData,
+            TObjSection.RData, TObjSection.Code, TObjSection.Init,
+            TObjSection.Addresses, TObjSection.Functions, TObjSection.Scopes,
+            TObjSection.Variables, TObjSection.Objects, TObjSection.Syscalls,
+            TObjSection.Types, TObjSection.RDataDir, TObjSection.LineInfo,
+            TObjSection.LibNameDir, TObjSection.IncNameDir,
+        ];
+
+        const sectionCount = TObjSection.CountObj;
+        const headerAndDescSize = HEADER_SIZE + sectionCount * SECTION_DESCRIPTOR_SIZE;
+        let currentOffset = headerAndDescSize;
+        const offsets: number[] = new Array(sectionCount);
+
+        for (const idx of sectionOrder) {
+            offsets[idx] = currentOffset;
+            currentOffset += sections[idx].length;
+        }
+
+        const fileSize = currentOffset;
+        const baseHdr = buffers[0];
+
+        const w = new BinaryWriter();
+        w.writeDword(TOBJ_SIGNATURE_PDB);
+        w.writeWord(TOBJ_VERSION);
+        w.writeWord(0); // checksum placeholder
+        w.writeDword(fileSize);
+        w.writeDword(baseHdr.readUInt32LE(12)); // platformSize
+        w.writeDword(baseHdr.readUInt32LE(16)); // globalAllocSize
+        w.writeDword(baseHdr.readUInt32LE(20)); // stackSize
+        w.writeDword(baseHdr.readUInt32LE(24)); // localAllocSize
+        w.writeDword(baseHdr.readUInt32LE(28)); // flags
+        w.writeDword(baseHdr.readUInt32LE(32)); // projectName
+        w.writeDword(baseHdr.readUInt32LE(36)); // buildId
+        w.writeDword(baseHdr.readUInt32LE(40)); // firmwareVer
+        w.writeWord(baseHdr.readUInt16LE(44));  // time day
+        w.writeWord(baseHdr.readUInt16LE(46));  // time minutes
+
+        for (let i = 0; i < sectionCount; i++) {
+            w.writeDword(offsets[i]);
+            w.writeDword(sections[i].length);
+        }
+
+        for (const idx of sectionOrder) {
+            w.writeBytes(sections[idx]);
+        }
+
+        const result = w.toBuffer();
+        let checksum = 0;
+        for (let i = 0; i + 1 < result.length; i += 2) {
+            checksum = (checksum + result.readUInt16LE(i)) & 0xFFFF;
+        }
+        if (result.length % 2 !== 0) {
+            checksum = (checksum + result[result.length - 1]) & 0xFFFF;
+        }
+        checksum = (~checksum + 1) & 0xFFFF;
+        result[6] = checksum & 0xFF;
+        result[7] = (checksum >> 8) & 0xFF;
+
+        return result;
+    }
+
+    private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.Addresses];
+            const cb = codeBases[i], sb = symBases[i];
+            let pos = 0;
+            while (pos + 17 <= data.length) {
+                const flags = data.readUInt8(pos); pos += 1;
+                let tag = data.readUInt32LE(pos); pos += 4;
+                let addr = data.readUInt32LE(pos); pos += 4;
+                const base = data.readUInt32LE(pos); pos += 4;
+                const refCount = data.readUInt32LE(pos); pos += 4;
+
+                tag += sb;
+                if (flags & TObjAddressFlags.Code) addr += cb;
+
+                w.writeByte(flags);
+                w.writeDword(tag);
+                w.writeDword(addr);
+                w.writeDword(base);
+                w.writeDword(refCount);
+
+                for (let r = 0; r < refCount; r++) {
+                    if (pos + 5 > data.length) break;
+                    const rt = data.readUInt8(pos); pos += 1;
+                    let ro = data.readUInt32LE(pos); pos += 4;
+                    if (rt === TObjRefType.Code) ro += cb;
+                    w.writeByte(rt);
+                    w.writeDword(ro);
+                }
+            }
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeFunctions(allSections: Buffer[][], symBases: number[], addrBases: number[], funcBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.Functions];
+            const sb = symBases[i], ab = addrBases[i], fb = funcBases[i];
+            let pos = 0;
+            while (pos + 17 <= data.length) {
+                const flags = data.readUInt8(pos); pos += 1;
+                let name = data.readUInt32LE(pos); pos += 4;
+                let addrIdx = data.readUInt32LE(pos); pos += 4;
+                const eventIdx = data.readUInt32LE(pos); pos += 4;
+                const calleeCount = data.readUInt32LE(pos); pos += 4;
+
+                name += sb;
+                addrIdx += ab;
+
+                w.writeByte(flags);
+                w.writeDword(name);
+                w.writeDword(addrIdx);
+                w.writeDword(eventIdx);
+                w.writeDword(calleeCount);
+
+                for (let c = 0; c < calleeCount; c++) {
+                    if (pos + 4 > data.length) break;
+                    let ci = data.readUInt32LE(pos); pos += 4;
+                    ci += fb;
+                    w.writeDword(ci);
+                }
+            }
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeScopes(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.Scopes];
+            const cb = codeBases[i], sb = symBases[i];
+            let pos = 0;
+            while (pos + 32 <= data.length) {
+                w.writeDword(data.readUInt32LE(pos) + sb); pos += 4; // begin file
+                w.writeDword(data.readUInt32LE(pos)); pos += 4;       // begin line
+                w.writeDword(data.readUInt32LE(pos)); pos += 4;       // begin col
+                w.writeDword(data.readUInt32LE(pos) + cb); pos += 4; // begin addr
+                w.writeDword(data.readUInt32LE(pos) + sb); pos += 4; // end file
+                w.writeDword(data.readUInt32LE(pos)); pos += 4;       // end line
+                w.writeDword(data.readUInt32LE(pos)); pos += 4;       // end col
+                w.writeDword(data.readUInt32LE(pos) + cb); pos += 4; // end addr
+            }
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeVariables(allSections: Buffer[][], symBases: number[], addrBases: number[], scopeBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.Variables];
+            const sb = symBases[i], ab = addrBases[i], scb = scopeBases[i];
+            let pos = 0;
+            while (pos + 18 <= data.length) {
+                const flags = data.readUInt8(pos); pos += 1;
+                let name = data.readUInt32LE(pos); pos += 4;
+                let addrIdx = data.readUInt32LE(pos); pos += 4;
+                let scopeIdx = data.readUInt32LE(pos); pos += 4;
+                const dtByte = data.readUInt8(pos); pos += 1;
+                const dtDword = data.readUInt32LE(pos); pos += 4;
+
+                name += sb;
+                addrIdx += ab;
+                if (scopeIdx !== MAXDWORD) scopeIdx += scb;
+
+                w.writeByte(flags);
+                w.writeDword(name);
+                w.writeDword(addrIdx);
+                w.writeDword(scopeIdx);
+                w.writeByte(dtByte);
+                w.writeDword(dtDword);
+            }
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeLineInfo(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.LineInfo];
+            const cb = codeBases[i], sb = symBases[i];
+            let pos = 0;
+            while (pos + 8 <= data.length) {
+                let fp = data.readUInt32LE(pos); pos += 4;
+                const count = data.readUInt32LE(pos); pos += 4;
+                fp += sb;
+                w.writeDword(fp);
+                w.writeDword(count);
+                for (let e = 0; e < count; e++) {
+                    if (pos + 8 > data.length) break;
+                    const line = data.readUInt32LE(pos); pos += 4;
+                    let addr = data.readUInt32LE(pos); pos += 4;
+                    addr += cb;
+                    w.writeDword(line);
+                    w.writeDword(addr);
+                }
+            }
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeEventDir(allSections: Buffer[][], codeBases: number[]): Buffer {
+        let maxEntries = 0;
+        for (const s of allSections) {
+            const n = Math.floor(s[TObjSection.EventDir].length / 8);
+            if (n > maxEntries) maxEntries = n;
+        }
+        const entries: Array<{ code: number; data: number }> = [];
+        for (let e = 0; e < maxEntries; e++) {
+            entries.push({ code: MAXDWORD, data: MAXDWORD });
+        }
+        for (let i = 0; i < allSections.length; i++) {
+            const d = allSections[i][TObjSection.EventDir];
+            const cb = codeBases[i];
+            const n = Math.floor(d.length / 8);
+            for (let e = 0; e < n; e++) {
+                const code = d.readUInt32LE(e * 8);
+                const data = d.readUInt32LE(e * 8 + 4);
+                if (code !== MAXDWORD) {
+                    entries[e] = { code: code + cb, data };
+                }
+            }
+        }
+        const w = new BinaryWriter();
+        for (const e of entries) {
+            w.writeDword(e.code);
+            w.writeDword(e.data);
+        }
+        return w.toBuffer();
+    }
+
+    private pdbMergeRDataDir(allSections: Buffer[][], codeBases: number[], rdataBases: number[]): Buffer {
+        const w = new BinaryWriter();
+        for (let i = 0; i < allSections.length; i++) {
+            const data = allSections[i][TObjSection.RDataDir];
+            const cb = codeBases[i], rb = rdataBases[i];
+            let pos = 0;
+            while (pos + 12 <= data.length) {
+                let rdOff = data.readUInt32LE(pos); pos += 4;
+                const rdSize = data.readUInt32LE(pos); pos += 4;
+                const refCount = data.readUInt32LE(pos); pos += 4;
+                rdOff += rb;
+                w.writeDword(rdOff);
+                w.writeDword(rdSize);
+                w.writeDword(refCount);
+                for (let r = 0; r < refCount; r++) {
+                    if (pos + 5 > data.length) break;
+                    const rt = data.readUInt8(pos); pos += 1;
+                    let ro = data.readUInt32LE(pos); pos += 4;
+                    if (rt === TObjRefType.Code) ro += cb;
+                    w.writeByte(rt);
+                    w.writeDword(ro);
+                }
+            }
+        }
+        return w.toBuffer();
     }
 
     private generateBuildId(): string {
