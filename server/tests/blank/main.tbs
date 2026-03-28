@@ -29,6 +29,8 @@ sub on_sys_init()
     bb = bb + 3
     sys.debugprint(str(bb))
     pat.play("B-G-~",PL_PAT_CANINT)
+
+    boot()
 end sub
 
 
@@ -39,4 +41,8 @@ end function
 
 sub on_button_pressed()
     sys.debugprint("button pressed")
+end sub
+
+sub on_sys_timer()
+    sys.debugprint("timaaaer")
 end sub
