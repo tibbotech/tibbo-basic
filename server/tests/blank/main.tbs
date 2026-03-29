@@ -1,6 +1,12 @@
 include "global.tbh"
 
 dim aa as string
+dim asdf as byte=4
+dim bbzz as string
+dim zzaa as string
+
+dim interface_ready(MAX_NUM_INTERFACES) as no_yes
+dim current_interface as pl_sock_interfaces
 
 declare function add(byref a as byte, b as byte) as word
 

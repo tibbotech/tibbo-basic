@@ -40,6 +40,12 @@ export interface CompileOptions {
     configStr?: string;
 }
 
+export interface InitObjDescriptor {
+    initOffset: number;
+    data: number[];
+    isInit: boolean;
+}
+
 export interface CompileResult {
     obj: Buffer;
     ast: Program;
@@ -48,6 +54,7 @@ export interface CompileResult {
     globalAllocSize: number;
     localAllocSize: number;
     stackSize: number;
+    initObjDescriptors: InitObjDescriptor[];
 }
 
 export interface LinkOptions {
@@ -162,10 +169,11 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
         stackSize: generator.getStackSize(),
+        initObjDescriptors: generator.emitter.getInitObjDescriptors(),
     };
 }
 
-export function link(objFiles: { name: string; data: Buffer }[], options: LinkOptions = {}, linkerOptions: LinkerOptions = {}): LinkResult {
+export function link(objFiles: { name: string; data: Buffer; initObjDescriptors?: InitObjDescriptor[] }[], options: LinkOptions = {}, linkerOptions: LinkerOptions = {}): LinkResult {
     const diagnostics = new DiagnosticCollection();
     const linker = new Linker(diagnostics, linkerOptions);
     const tpc = linker.link(objFiles);

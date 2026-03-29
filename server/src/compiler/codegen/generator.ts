@@ -7,7 +7,7 @@ import { SemanticResolver } from '../semantics/resolver';
 import { TypeChecker } from '../semantics/checker';
 import {
     DataType, isString, isFloat, isNumeric, isEnum, isStruct, isArray,
-    StringDataType, EnumDataType, StructDataType, getPromotedType, BUILTIN_TYPES,
+    StringDataType, EnumDataType, StructDataType, ArrayDataType, getPromotedType, BUILTIN_TYPES,
 } from '../semantics/types';
 import { BINARY_OPS, CMP_OPS, CMP_OPS_SIGNED, CMP_OPS_UNSIGNED, UNARY_OPS, getLoadOpcode, getStoreOpcode, getCmpOpInfo, needsSyscall, getSyscallName } from './operators';
 
@@ -367,12 +367,33 @@ export class PCodeGenerator {
         this.emitter.emitDataAddress(addr);
     }
 
-    private emitInitObjAtAddr(addr: number, isByRef = false): void {
+    private buildTypeDescriptor(dt: DataType | undefined): number[] | null {
+        if (!dt) return null;
+        if (isArray(dt)) {
+            const a = dt as ArrayDataType;
+            return [
+                0x04,
+                a.dimensions[0] & 0xFF,
+                0x00,
+                dt.size & 0xFF,
+                0x00, 0x00, 0x00, 0x00,
+                a.elementType.size & 0xFF,
+                (a.elementType.size >> 8) & 0xFF,
+            ];
+        }
+        return null;
+    }
+
+    private emitInitObjAtAddr(addr: number, isByRef = false, dt?: DataType): void {
         const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
         this.emitter.emitByte(OP.OPCODE_LEA | indirection);
         this.emitter.emitDataAddress(addr);
         this.emitSyscallArg(0);
         this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
+        const desc = this.buildTypeDescriptor(dt);
+        if (desc) {
+            this.emitter.addInitObjDescriptor(desc);
+        }
         this.emitter.emitDword(0);
         this.emitSyscallArg(1);
         this.emitSyscallByName('initobj');
@@ -382,10 +403,14 @@ export class PCodeGenerator {
         if (sym.isGlobal) {
             this.emitVarLeaArg(sym);
         } else {
-            this.emitInitObjAtAddr(sym.address ?? 0, sym.isByRef);
+            this.emitInitObjAtAddr(sym.address ?? 0, sym.isByRef, sym.dataType);
             return;
         }
         this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
+        const desc = this.buildTypeDescriptor(sym.dataType);
+        if (desc) {
+            this.emitter.addInitObjDescriptor(desc);
+        }
         this.emitter.emitDword(0);
         this.emitSyscallArg(1);
         this.emitSyscallByName('initobj');
@@ -2166,7 +2191,7 @@ export class PCodeGenerator {
             }
 
             if (dt && (isStruct(dt) || isArray(dt))) {
-                this.emitInitObjAtAddr(addr, varSym.isByRef);
+                this.emitInitObjAtAddr(addr, varSym.isByRef, dt);
             }
 
             if (stmt.initializer) {

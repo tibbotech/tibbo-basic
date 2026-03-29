@@ -38,6 +38,7 @@ export class ByteEmitter {
     private autoTrackDataRefs = false;
     private addrToDataLabel = new Map<number, DataLabel>();
     private suppressAutoTrack = false;
+    private initDescriptors: { initOffset: number; data: number[]; isInit: boolean }[] = [];
 
     get codeSize(): number { return this.code.length; }
     get initSize(): number { return this.initCode.length; }
@@ -172,6 +173,26 @@ export class ByteEmitter {
         const offset = this.rdata.length;
         for (const b of data) this.rdata.push(b & 0xFF);
         return offset;
+    }
+
+    addRDataWithEntry(data: number[]): number {
+        const offset = this.rdata.length;
+        for (const b of data) this.rdata.push(b & 0xFF);
+        const entry: RDataEntry = { offset, size: data.length, references: [] };
+        this.rdataEntries.push(entry);
+        return offset;
+    }
+
+    addInitObjDescriptor(data: number[]): void {
+        this.initDescriptors.push({
+            initOffset: this.currentOffset,
+            data,
+            isInit: this.emittingInit,
+        });
+    }
+
+    getInitObjDescriptors(): { initOffset: number; data: number[]; isInit: boolean }[] {
+        return this.initDescriptors;
     }
 
     addStringRData(str: string): number {

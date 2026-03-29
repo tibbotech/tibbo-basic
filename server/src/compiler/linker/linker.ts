@@ -91,17 +91,31 @@ export class Linker {
     private flags = 0;
     private totalGlobalSize = 0;
     private maxLocalAllocSize = 0;
+    private pendingDescriptors: { adjustedOffset: number; data: number[]; refType: number }[] = [];
 
     constructor(diagnostics: DiagnosticCollection, options: LinkerOptions = {}) {
         this.diagnostics = diagnostics;
         this.options = options;
     }
 
-    link(objBuffers: { name: string; data: Buffer }[]): Buffer {
+    link(objBuffers: { name: string; data: Buffer; initObjDescriptors?: { initOffset: number; data: number[]; isInit?: boolean }[] }[]): Buffer {
         const objFiles = objBuffers.map(b => this.loadObj(b.name, b.data));
 
-        for (const obj of objFiles) {
-            this.linkObj(obj);
+        for (let i = 0; i < objFiles.length; i++) {
+            const initBase = this.mergedInit.length;
+            const codeBase = this.mergedCode.length;
+            this.linkObj(objFiles[i]);
+            const descs = objBuffers[i].initObjDescriptors;
+            if (descs) {
+                for (const d of descs) {
+                    const isInit = d.isInit !== false;
+                    this.pendingDescriptors.push({
+                        adjustedOffset: d.initOffset + (isInit ? initBase : codeBase),
+                        data: d.data,
+                        refType: isInit ? TObjRefType.Init : TObjRefType.Code,
+                    });
+                }
+            }
         }
 
         return this.emit();
@@ -455,6 +469,17 @@ export class Linker {
                     this.writeOperand(fullCode, offset, addr.address, width);
                 }
             }
+        }
+
+        // Append type descriptors to RData (after all OBJ RData, matching tmake layout)
+        for (const desc of this.pendingDescriptors) {
+            const rdataTarget = this.mergedRData.length;
+            for (const b of desc.data) this.mergedRData.push(b);
+            this.rdataRelocs.push({
+                codeOffset: desc.adjustedOffset,
+                refType: desc.refType,
+                rdataTarget,
+            });
         }
 
         // Apply RData relocations: adjust RData offsets in code after init prepend

@@ -3,4 +3,10 @@
 'INCLUDES------------------------------------------------------------
 
 'DECLARATIONS--------------------------------------------------------
+
+declare asdf as byte
+const MAX_NUM_INTERFACES = 4
 declare sub boot()
+
+
+declare interface_ready(MAX_NUM_INTERFACES) as no_yes

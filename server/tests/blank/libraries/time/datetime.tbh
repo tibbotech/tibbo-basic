@@ -1,0 +1,78 @@
+enum datetime_convert_dir
+	TIME_TO_STR
+	STR_TO_TIME
+	TIME_TO_BYTESTR
+	BYTESTR_TO_TIME
+	STR_TO_BYTESTR
+	BYTESTR_TO_STR
+end enum
+
+enum en_datetime_rdwr
+	TIME_GET = 0,
+	TIME_SET
+end enum
+
+declare datetime_tz_offset as en_td_timezones
+declare datetime_lat as float
+declare datetime_lng as float
+declare datetime_convert_err as ok_ng
+declare datetime_format_err as ok_ng
+
+type crontab
+	minute as string(10)
+	hour as string(10)
+	day as string(10) 'day of month
+	month as string(10)
+	day_of_week as string(12)
+	next_timestamp as dword
+	astro as string(3)
+end type
+
+type astro_struct  
+	yy as byte 
+	mm as byte
+	dd as byte 
+	lat as real 
+	lng as real
+	tz as integer 
+	
+	'Julian Days/Century 
+	jd as real 'Julian Day
+	jc as real 'Julian Century
+	
+	'Sun
+	gmls as real   'Geom Mean Long Sun (deg)
+	gmas as real   'Geom Mean Anom Sun (deg)	
+	ecceo as real  'Eccent Earth Orbit
+	seqcrt as real 'Sun Eq of Ctr
+	stl as real    'Sun True Long (deg)
+	sta as real    'Sun True Anom (deg)
+	sal as real    'Sun App Long (deg)
+	moe as real	   'Mean Obliq Ecliptic (deg)	
+	oc as real	   'Obliq Corr (deg)	
+	rtasc as real  'Sun Rt Ascen (deg)	
+	sdec as real   'Sun Declin (deg)	
+	y as real	   'var y	
+	eqtm as real   'Eq of Time (minutes)	
+	hasr as real   'HA Sunrise (deg)	
+	
+	'Useful things? 
+	solnoon  as real  'Solar Noon (LST)	
+	sunrise as real   'sunrise time in seconds 
+	sunset as real    'sunset time in seconds
+
+end type
+
+declare function datetime_to_timestamp(days as word, mins as word, secs as byte) as dword
+declare function datetime_current_timestamp() as dword
+declare function datetime_str_to_timestamp(byref datestr as string, byref format as string) as dword
+declare function datetime_next_cron(next_cron as crontab) as dword
+declare function datetime_timestamp_to_string(timestamp as dword, byref format as string) as string
+declare sub datetime_from_timestamp(timestamp as dword, byref days as word, byref mins as word, byref secs as byte)
+declare sub datetime_astro(byref a as astro_struct)
+declare sub datetime_type_convert(byref ts_str as string(14),byref time_daycount as word,byref time_mincount as word,byref bSec as byte, convert_dir as datetime_convert_dir)
+declare sub datetime_string_format(byref result as string(14), 
+	byref format as string(14),
+	byref time_daycount as word,
+	byref time_mincount as word,
+	byref time_second_byte as byte)

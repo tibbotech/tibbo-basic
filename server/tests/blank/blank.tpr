@@ -16,7 +16,7 @@ address=undefined
 [address2]
 platform=TPP2W(G2)
 transport=udp_winpcap
-address=
+address=0.36.119.88.47.201
 
 [file1]
 path=main.tbs

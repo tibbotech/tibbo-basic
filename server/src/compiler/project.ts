@@ -248,6 +248,7 @@ export class ProjectCompiler {
         const flags = this.getCompilerFlags();
         const maxEventNumber = this.platformConfig.maxEventNumber;
         const objs = new Map<string, Buffer>();
+        const objDescriptors = new Map<string, { initOffset: number; data: number[]; isInit: boolean }[]>();
         const allErrors: Diagnostic[] = [];
         const allWarnings: Diagnostic[] = [];
         let totalGlobalAllocSize = 0;
@@ -281,7 +282,11 @@ export class ProjectCompiler {
                 configStr: this.platformConfig.configStr,
             });
 
-            objs.set(baseName + '.obj', result.obj);
+            const objName = baseName + '.obj';
+            objs.set(objName, result.obj);
+            if (result.initObjDescriptors.length > 0) {
+                objDescriptors.set(objName, result.initObjDescriptors);
+            }
             allErrors.push(...result.errors);
             allWarnings.push(...result.warnings);
             if (result.globalAllocSize > totalGlobalAllocSize) {
@@ -344,9 +349,13 @@ export class ProjectCompiler {
             fixedTimestamp: this.options.fixedTimestamp,
             resources: linkedResources,
         };
-        const objBuffers = [...objs.entries()].map(([name, data]) => ({ name, data }));
+        const objBuffers = [...objs.entries()].map(([name, data]) => ({
+            name,
+            data,
+            initObjDescriptors: objDescriptors.get(name),
+        }));
         const linkResult = link(objBuffers, {}, linkerOptions);
-        this.writeProjectArtifacts(objs);
+        this.writeProjectArtifacts(objs, objDescriptors);
 
         return {
             tpc: linkResult.errors.length === 0 ? linkResult.tpc : null,
@@ -633,7 +642,7 @@ export class ProjectCompiler {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    private writeProjectArtifacts(objs: Map<string, Buffer>): void {
+    private writeProjectArtifacts(objs: Map<string, Buffer>, objDescriptors?: Map<string, { initOffset: number; data: number[]; isInit: boolean }[]>): void {
         const tmpDir = path.join(this.projectPath, 'tmp');
         fs.mkdirSync(tmpDir, { recursive: true });
 
@@ -648,7 +657,7 @@ export class ProjectCompiler {
         }
 
         if (objs.size > 0) {
-            fs.writeFileSync(path.join(tmpDir, 'database.pdb'), this.mergeObjsForPdb(objs));
+            fs.writeFileSync(path.join(tmpDir, 'database.pdb'), this.mergeObjsForPdb(objs, objDescriptors));
         }
     }
 
@@ -697,7 +706,8 @@ export class ProjectCompiler {
      * Shared sections (Types, Objects, Syscalls, IncNameDir) are taken from
      * the first OBJ since every OBJ is compiled with the same header.
      */
-    private mergeObjsForPdb(objs: Map<string, Buffer>): Buffer {
+    private mergeObjsForPdb(objs: Map<string, Buffer>, objDescriptors?: Map<string, { initOffset: number; data: number[]; isInit: boolean }[]>): Buffer {
+        const objNames = [...objs.keys()];
         const buffers = [...objs.values()];
         if (buffers.length === 0) return Buffer.alloc(0);
 
@@ -735,7 +745,32 @@ export class ProjectCompiler {
 
         const mergedCode = Buffer.concat(allSections.map(s => s[TObjSection.Code]));
         const mergedSymbols = Buffer.concat(allSections.map(s => s[TObjSection.Symbols]));
-        const mergedRData = Buffer.concat(allSections.map(s => s[TObjSection.RData]));
+        let mergedRData = Buffer.concat(allSections.map(s => s[TObjSection.RData]));
+
+        // Append type descriptors after all OBJ RData (matching tmake layout)
+        const descriptorRDataDir = new BinaryWriter();
+        if (objDescriptors) {
+            let initBase = 0;
+            let codeBaseForDesc = 0;
+            for (let i = 0; i < objNames.length; i++) {
+                const descs = objDescriptors.get(objNames[i]);
+                if (descs) {
+                    for (const d of descs) {
+                        const rdataOffset = mergedRData.length;
+                        const descBuf = Buffer.from(d.data);
+                        mergedRData = Buffer.concat([mergedRData, descBuf]);
+                        descriptorRDataDir.writeDword(rdataOffset);
+                        descriptorRDataDir.writeDword(d.data.length);
+                        descriptorRDataDir.writeDword(1);
+                        const isInit = d.isInit !== false;
+                        descriptorRDataDir.writeByte(isInit ? TObjRefType.Init : TObjRefType.Code);
+                        descriptorRDataDir.writeDword(d.initOffset + (isInit ? initBase : codeBaseForDesc));
+                    }
+                }
+                initBase += allSections[i][TObjSection.Init].length;
+                codeBaseForDesc += allSections[i][TObjSection.Code].length;
+            }
+        }
 
         const base = allSections[0];
 
@@ -756,7 +791,8 @@ export class ProjectCompiler {
         sections[TObjSection.Objects] = base[TObjSection.Objects];
         sections[TObjSection.Syscalls] = base[TObjSection.Syscalls];
         sections[TObjSection.Types] = base[TObjSection.Types];
-        sections[TObjSection.RDataDir] = this.pdbMergeRDataDir(allSections, codeBases, rdataBases);
+        const rdataDirBase = this.pdbMergeRDataDir(allSections, codeBases, rdataBases);
+        sections[TObjSection.RDataDir] = Buffer.concat([rdataDirBase, descriptorRDataDir.toBuffer()]);
         sections[TObjSection.LineInfo] = this.pdbMergeLineInfo(allSections, codeBases, symBases, initOffset);
         sections[TObjSection.LibNameDir] = base[TObjSection.LibNameDir];
         sections[TObjSection.IncNameDir] = base[TObjSection.IncNameDir];
