@@ -1947,6 +1947,22 @@ export class PCodeGenerator {
         } else if (value.kind === 'BinaryExpr' && value.op === AST.BinaryOp.Add) {
             this.generateStringAssignment(varSym, value.left);
             this.emitStringCat(varSym, value.right);
+        } else if (value.kind === 'MemberExpr') {
+            const member = value as AST.MemberExpr;
+            if (member.object.kind === 'IdentifierExpr') {
+                const objSym = this.symbols.current.lookup(member.object.name);
+                if (objSym && objSym.kind === SymbolKind.Object) {
+                    const obj = objSym as ObjectSymbol;
+                    const prop = obj.properties.get(member.property.toLowerCase());
+                    if (prop && prop.getterSyscall !== undefined) {
+                        this.emitVarLeaArg(varSym);
+                        this.emitSyscall(prop.getterSyscall);
+                        return;
+                    }
+                }
+            }
+            this.generateExpression(value);
+            this.emitStore(varSym);
         } else if (value.kind === 'CallExpr') {
             if (this.emitStringCallResultToAddr(value, varSym.address ?? 0, varSym.isByRef)) {
                 return;
