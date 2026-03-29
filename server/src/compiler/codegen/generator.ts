@@ -696,9 +696,15 @@ export class PCodeGenerator {
             this.emitStringCatToTemp(expr.right, tempAddr);
             this.preEvalMap.clear();
         } else if (expr.kind === 'StringLiteral') {
+            this.emitTempStringInit(tempAddr, expr.value.length);
+            this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
+            this.emitter.emitDataAddress(tempAddr);
+            this.emitSyscallArg(0);
             const rdataOff = this.emitter.addStringRData(expr.value);
             this.emitRDataLoad(rdataOff);
-            this.emitStoreToArgBuffer(argOffset, 4);
+            this.emitSyscallArg(1);
+            this.emitSyscallByName('strload');
+            this.emitLeaToArgOffset(tempAddr, argOffset);
             return;
         } else if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
@@ -708,9 +714,16 @@ export class PCodeGenerator {
                 return;
             }
             if (sym && sym.kind === SymbolKind.Constant && typeof (sym as ConstantSymbol).value === 'string') {
-                const rdataOff = this.emitter.addStringRData((sym as ConstantSymbol).value as string);
+                const constStr = (sym as ConstantSymbol).value as string;
+                this.emitTempStringInit(tempAddr, constStr.length);
+                this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(constStr);
                 this.emitRDataLoad(rdataOff);
-                this.emitStoreToArgBuffer(argOffset, 4);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                this.emitLeaToArgOffset(tempAddr, argOffset);
                 return;
             }
         } else if (expr.kind === 'MemberExpr' && this.tryEmitPropertyGetterDirect(expr, tempAddr)) {
