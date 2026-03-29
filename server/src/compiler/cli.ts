@@ -90,7 +90,15 @@ function compileMode(args: CLIArgs): void {
     let hasErrors = false;
 
     for (const inputFile of args.inputFiles) {
-        const source = fs.readFileSync(inputFile, 'utf-8');
+        let source: string;
+        try {
+            source = fs.readFileSync(inputFile, 'utf-8');
+        } catch (e) {
+            console.error(`error: Cannot read file "${inputFile}": ${e instanceof Error ? e.message : String(e)}`);
+            hasErrors = true;
+            continue;
+        }
+
         const ext = path.extname(inputFile);
         const baseName = path.basename(inputFile, ext);
         const outputFile = args.outputFile ?? `${baseName}.obj`;
@@ -128,10 +136,15 @@ function compileMode(args: CLIArgs): void {
 }
 
 function linkMode(args: CLIArgs): void {
-    const objFiles = args.inputFiles.map(f => ({
-        name: f,
-        data: fs.readFileSync(f),
-    }));
+    const objFiles: { name: string; data: Buffer }[] = [];
+    for (const f of args.inputFiles) {
+        try {
+            objFiles.push({ name: f, data: fs.readFileSync(f) });
+        } catch (e) {
+            console.error(`error: Cannot read file "${f}": ${e instanceof Error ? e.message : String(e)}`);
+            process.exit(1);
+        }
+    }
 
     const outputFile = args.outputFile ?? 'output.tpc';
 
@@ -143,12 +156,12 @@ function linkMode(args: CLIArgs): void {
 
     let hasErrors = false;
     for (const err of result.errors) {
-        console.error(`error: ${err.message}`);
+        console.error(`${err.location.file}:${err.location.line}:${err.location.column}: error: ${err.message}`);
         hasErrors = true;
     }
 
     for (const warn of result.warnings) {
-        console.warn(`warning: ${warn.message}`);
+        console.warn(`${warn.location.file}:${warn.location.line}:${warn.location.column}: warning: ${warn.message}`);
     }
 
     if (!hasErrors) {

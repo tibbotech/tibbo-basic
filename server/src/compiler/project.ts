@@ -257,73 +257,93 @@ export class ProjectCompiler {
 
         // Compile each .tbs file separately into its own OBJ
         for (const sf of sourceFiles) {
-            const resolvedPath = preprocessor.parseFile(this.projectPath, sf.path, false);
-            const fileContent = preprocessor.files[resolvedPath] as string || '';
-            if (!fileContent || fileContent.replace(/\s/g, '').length === 0) continue;
-
-            const headerLineCount = headerSource.split('\n').length;
-            const perFileSource = this.expandDefines(
-                headerSource + '\n' + fileContent,
-                preprocessor.defines,
-            );
-
             const baseName = path.basename(sf.path);
-            const sourceFilePath = path.resolve(this.projectPath, sf.path);
-            const result = compile(perFileSource, {
-                fileName: baseName,
-                flags,
-                maxEventNumber,
-                platformSize: this.platformConfig.platformId,
-                headerLineCount,
-                includedFiles,
-                fileSequence,
-                sourceFilePath,
-                firmwareVer: this.platformConfig.version,
-                configStr: this.platformConfig.configStr,
-            });
+            try {
+                const resolvedPath = preprocessor.parseFile(this.projectPath, sf.path, false);
+                const fileContent = preprocessor.files[resolvedPath] as string || '';
+                if (!fileContent || fileContent.replace(/\s/g, '').length === 0) continue;
 
-            const objName = baseName + '.obj';
-            objs.set(objName, result.obj);
-            if (result.initObjDescriptors.length > 0) {
-                objDescriptors.set(objName, result.initObjDescriptors);
-            }
-            allErrors.push(...result.errors);
-            allWarnings.push(...result.warnings);
-            if (result.globalAllocSize > totalGlobalAllocSize) {
-                totalGlobalAllocSize = result.globalAllocSize;
-            }
-            if (result.localAllocSize > maxLocalAllocSize) {
-                maxLocalAllocSize = result.localAllocSize;
-            }
-            if (result.stackSize > maxStackSize) {
-                maxStackSize = result.stackSize;
+                const headerLineCount = headerSource.split('\n').length;
+                const perFileSource = this.expandDefines(
+                    headerSource + '\n' + fileContent,
+                    preprocessor.defines,
+                );
+
+                const sourceFilePath = path.resolve(this.projectPath, sf.path);
+                const result = compile(perFileSource, {
+                    fileName: baseName,
+                    flags,
+                    maxEventNumber,
+                    platformSize: this.platformConfig.platformId,
+                    headerLineCount,
+                    includedFiles,
+                    fileSequence,
+                    sourceFilePath,
+                    firmwareVer: this.platformConfig.version,
+                    configStr: this.platformConfig.configStr,
+                });
+
+                const objName = baseName + '.obj';
+                objs.set(objName, result.obj);
+                if (result.initObjDescriptors.length > 0) {
+                    objDescriptors.set(objName, result.initObjDescriptors);
+                }
+                allErrors.push(...result.errors);
+                allWarnings.push(...result.warnings);
+                if (result.globalAllocSize > totalGlobalAllocSize) {
+                    totalGlobalAllocSize = result.globalAllocSize;
+                }
+                if (result.localAllocSize > maxLocalAllocSize) {
+                    maxLocalAllocSize = result.localAllocSize;
+                }
+                if (result.stackSize > maxStackSize) {
+                    maxStackSize = result.stackSize;
+                }
+            } catch (e) {
+                allErrors.push({
+                    severity: DiagnosticSeverity.Error,
+                    location: { file: baseName, line: 1, column: 0 },
+                    message: `Failed to compile ${baseName}: ${e instanceof Error ? e.message : String(e)}`,
+                });
             }
         }
 
         for (const rf of resourceFiles) {
-            const result = this.compileHtmlResource(
-                rf,
-                headerSource,
-                flags,
-                maxEventNumber,
-                includedFiles,
-                fileSequence,
-                preprocessor.defines,
-            );
-            if (!result) continue;
+            try {
+                const result = this.compileHtmlResource(
+                    rf,
+                    headerSource,
+                    flags,
+                    maxEventNumber,
+                    includedFiles,
+                    fileSequence,
+                    preprocessor.defines,
+                );
+                if (!result) continue;
 
-            objs.set(path.basename(rf.path) + '.obj', result.obj);
-            allErrors.push(...result.errors);
-            allWarnings.push(...result.warnings);
-            if (result.globalAllocSize > totalGlobalAllocSize) {
-                totalGlobalAllocSize = result.globalAllocSize;
+                objs.set(path.basename(rf.path) + '.obj', result.obj);
+                allErrors.push(...result.errors);
+                allWarnings.push(...result.warnings);
+                if (result.globalAllocSize > totalGlobalAllocSize) {
+                    totalGlobalAllocSize = result.globalAllocSize;
+                }
+                if (result.localAllocSize > maxLocalAllocSize) {
+                    maxLocalAllocSize = result.localAllocSize;
+                }
+                if (result.stackSize > maxStackSize) {
+                    maxStackSize = result.stackSize;
+                }
+            } catch (e) {
+                allErrors.push({
+                    severity: DiagnosticSeverity.Error,
+                    location: { file: path.basename(rf.path), line: 1, column: 0 },
+                    message: `Failed to compile resource ${rf.path}: ${e instanceof Error ? e.message : String(e)}`,
+                });
             }
-            if (result.localAllocSize > maxLocalAllocSize) {
-                maxLocalAllocSize = result.localAllocSize;
-            }
-            if (result.stackSize > maxStackSize) {
-                maxStackSize = result.stackSize;
-            }
+        }
+
+        if (allErrors.length > 0) {
+            return { tpc: null, objs, errors: allErrors, warnings: allWarnings };
         }
 
         const buildId = this.options.fixedBuildId ?? this.generateBuildId();

@@ -61,7 +61,14 @@ function main(): void {
         console.log(`Project folder: ${resolvedPath}`);
     }
 
-    const config = parseProjectFile(findTprFile(resolvedPath));
+    let config;
+    try {
+        config = parseProjectFile(findTprFile(resolvedPath));
+    } catch (e) {
+        console.error(`error: Failed to parse project file: ${e instanceof Error ? e.message : String(e)}`);
+        process.exit(1);
+    }
+
     const defaultOutput = path.join(resolvedPath, config.output || `${config.name || 'output'}.tpc`);
     const tpcOutput = outputFile ? path.resolve(outputFile) : defaultOutput;
 
@@ -73,8 +80,14 @@ function main(): void {
         console.log('');
     }
 
-    const options: ProjectCompilerOptions = {};
-    const compiler = new ProjectCompiler(resolvedPath, platformsPath, options);
+    let compiler;
+    try {
+        const options: ProjectCompilerOptions = {};
+        compiler = new ProjectCompiler(resolvedPath, platformsPath, options);
+    } catch (e) {
+        console.error(`error: Failed to initialize compiler: ${e instanceof Error ? e.message : String(e)}`);
+        process.exit(1);
+    }
 
     if (verbose) {
         console.log('Compiling...');

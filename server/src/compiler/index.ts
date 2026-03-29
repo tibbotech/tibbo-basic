@@ -102,64 +102,94 @@ export function buildAST(source: string, fileName = '<input>'): { ast: Program; 
 export function compile(source: string, options: CompileOptions = {}): CompileResult {
     const fileName = options.fileName ?? '<input>';
     const diagnostics = new DiagnosticCollection();
+    const emptyResult: CompileResult = {
+        obj: Buffer.alloc(0),
+        ast: { kind: 'Program', declarations: [], loc: { file: fileName, line: 1, column: 0 } },
+        errors: [],
+        warnings: [],
+        globalAllocSize: 0,
+        localAllocSize: 0,
+        stackSize: 0,
+        initObjDescriptors: [],
+    };
 
-    // Parse
-    const { ast, parseErrors } = buildAST(source, fileName);
-    for (const e of parseErrors) {
-        diagnostics.error({ file: fileName, line: e.line, column: e.column }, e.message, 'PARSE');
+    let ast: Program;
+    try {
+        const result = buildAST(source, fileName);
+        ast = result.ast;
+        for (const e of result.parseErrors) {
+            diagnostics.error({ file: fileName, line: e.line, column: e.column }, e.message, 'PARSE');
+        }
+    } catch (e) {
+        diagnostics.error({ file: fileName, line: 1, column: 0 }, `Parse failed: ${e instanceof Error ? e.message : String(e)}`, 'PARSE');
+        return { ...emptyResult, errors: diagnostics.getErrors(), warnings: diagnostics.getWarnings() };
     }
 
-    // Semantic analysis
-    const resolver = new SemanticResolver(diagnostics);
-    resolver.resolve(ast);
+    let resolver: SemanticResolver;
+    let checker: TypeChecker;
+    try {
+        resolver = new SemanticResolver(diagnostics);
+        resolver.resolve(ast);
 
-    const checker = new TypeChecker(resolver.symbols, diagnostics, resolver);
-    checker.check(ast);
+        checker = new TypeChecker(resolver.symbols, diagnostics, resolver);
+        checker.check(ast);
+    } catch (e) {
+        diagnostics.error({ file: fileName, line: 1, column: 0 }, `Semantic analysis failed: ${e instanceof Error ? e.message : String(e)}`, 'SEMANTIC');
+        return { ...emptyResult, ast, errors: diagnostics.getErrors(), warnings: diagnostics.getWarnings() };
+    }
 
-    // Set Code24/Data32 flags on the emitter
     const flags = options.flags ?? 0;
     const useCode24 = !!(flags & 0x02);
     const useData32 = !!(flags & 0x04);
 
-    // Code generation
-    const generator = new PCodeGenerator(resolver.symbols, resolver, checker, diagnostics);
-    generator.emitter.setUse24BitCode(useCode24);
-    generator.emitter.setUseData32(useData32);
-    if (options.platformSize != null) {
-        generator.setPlatformSize(options.platformSize);
+    let generator: PCodeGenerator;
+    try {
+        generator = new PCodeGenerator(resolver.symbols, resolver, checker, diagnostics);
+        generator.emitter.setUse24BitCode(useCode24);
+        generator.emitter.setUseData32(useData32);
+        if (options.platformSize != null) {
+            generator.setPlatformSize(options.platformSize);
+        }
+        if (options.headerLineCount != null) {
+            generator.setHeaderLineCount(options.headerLineCount);
+        }
+        if (options.resolveDataAddresses) {
+            generator.setResolveDataAddresses(true);
+            generator.emitter.setAutoTrackDataRefs(true);
+        }
+        generator.generate(ast);
+    } catch (e) {
+        diagnostics.error({ file: fileName, line: 1, column: 0 }, `Code generation failed: ${e instanceof Error ? e.message : String(e)}`, 'CODEGEN');
+        return { ...emptyResult, ast, errors: diagnostics.getErrors(), warnings: diagnostics.getWarnings() };
     }
-    if (options.headerLineCount != null) {
-        generator.setHeaderLineCount(options.headerLineCount);
-    }
-    if (options.resolveDataAddresses) {
-        generator.setResolveDataAddresses(true);
-        generator.emitter.setAutoTrackDataRefs(true);
-    }
-    generator.generate(ast);
 
-    // Determine max event number
     const maxEventNumber = options.maxEventNumber ?? resolver.getMaxEventNumber();
 
-    // Emit TOBJ
-    const tobjWriter = new TObjWriter();
-    tobjWriter.setFlags(flags);
-    const obj = tobjWriter.write(generator.emitter, resolver.symbols, fileName, maxEventNumber, {
-        includedFiles: options.includedFiles,
-        platformSize: options.platformSize,
-        fileSequence: options.fileSequence,
-        sourceFilePath: options.sourceFilePath,
-        firmwareVer: options.firmwareVer,
-        headerLineCount: options.headerLineCount,
-        globalAllocSize: generator.getGlobalAllocSize(),
-        localAllocSize: generator.getLocalAllocSize(),
-        stackSize: generator.getStackSize(),
-        fileData: options.fileData,
-        resourceEntries: options.resourceEntries,
-        sourceMap: options.sourceMap,
-        projectName: options.projectName,
-        buildId: options.buildId,
-        configStr: options.configStr,
-    });
+    let obj: Buffer;
+    try {
+        const tobjWriter = new TObjWriter();
+        tobjWriter.setFlags(flags);
+        obj = tobjWriter.write(generator.emitter, resolver.symbols, fileName, maxEventNumber, {
+            includedFiles: options.includedFiles,
+            platformSize: options.platformSize,
+            fileSequence: options.fileSequence,
+            sourceFilePath: options.sourceFilePath,
+            firmwareVer: options.firmwareVer,
+            headerLineCount: options.headerLineCount,
+            globalAllocSize: generator.getGlobalAllocSize(),
+            localAllocSize: generator.getLocalAllocSize(),
+            stackSize: generator.getStackSize(),
+            fileData: options.fileData,
+            resourceEntries: options.resourceEntries,
+            sourceMap: options.sourceMap,
+            projectName: options.projectName,
+            buildId: options.buildId,
+            configStr: options.configStr,
+        });
+    } catch (e) {
+        diagnostics.error({ file: fileName, line: 1, column: 0 }, `Object file generation failed: ${e instanceof Error ? e.message : String(e)}`, 'TOBJ');
+        return { ...emptyResult, ast, errors: diagnostics.getErrors(), warnings: diagnostics.getWarnings() };
+    }
 
     return {
         obj,
@@ -175,14 +205,22 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
 
 export function link(objFiles: { name: string; data: Buffer; initObjDescriptors?: InitObjDescriptor[] }[], options: LinkOptions = {}, linkerOptions: LinkerOptions = {}): LinkResult {
     const diagnostics = new DiagnosticCollection();
-    const linker = new Linker(diagnostics, linkerOptions);
-    const tpc = linker.link(objFiles);
-
-    return {
-        tpc,
-        errors: diagnostics.getErrors(),
-        warnings: diagnostics.getWarnings(),
-    };
+    try {
+        const linker = new Linker(diagnostics, linkerOptions);
+        const tpc = linker.link(objFiles);
+        return {
+            tpc,
+            errors: diagnostics.getErrors(),
+            warnings: diagnostics.getWarnings(),
+        };
+    } catch (e) {
+        diagnostics.error({ file: '<linker>', line: 0, column: 0 }, `Linking failed: ${e instanceof Error ? e.message : String(e)}`, 'LINK');
+        return {
+            tpc: Buffer.alloc(0),
+            errors: diagnostics.getErrors(),
+            warnings: diagnostics.getWarnings(),
+        };
+    }
 }
 
 // Re-exports
