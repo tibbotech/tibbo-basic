@@ -3,12 +3,12 @@ include "global.tbh"
 
 sub boot()
     dim i as byte
-    for i = 0 to MAX_NUM_INTERFACES - 1
+    for i = 1-1 to MAX_NUM_INTERFACES
         sys.debugprint(str(i))
     next i
 
     dim f as byte
-    for f=0 to MAX_NUM_INTERFACES
+    for f=0 to MAX_NUM_INTERFACES-1
         interface_ready(f)=NO
     next f
     sys.debugprint("booting")

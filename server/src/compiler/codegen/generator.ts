@@ -2080,8 +2080,9 @@ export class PCodeGenerator {
             const counterName = stmt.init.left.name;
             const counterSym = this.symbols.current.lookup(counterName);
             if (counterSym && (counterSym.kind === SymbolKind.Variable || counterSym.kind === SymbolKind.Parameter)) {
+                this.generateExpression(stmt.to);
+                this.emitter.emitByte(OP.OPCODE_XCG);
                 this.emitLoad(counterSym as VariableSymbol);
-                this.emitSecondOperand(stmt.to);
                 this.emitter.emitByte(OP.OPCODE_CMP);
                 this.emitter.emitByte(OP.OPCODE_JG | OP.OPCODE_DIRECT);
                 this.emitter.emitLabelReference(endLabel);
