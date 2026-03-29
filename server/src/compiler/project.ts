@@ -284,7 +284,9 @@ export class ProjectCompiler {
             objs.set(baseName + '.obj', result.obj);
             allErrors.push(...result.errors);
             allWarnings.push(...result.warnings);
-            totalGlobalAllocSize += result.globalAllocSize;
+            if (result.globalAllocSize > totalGlobalAllocSize) {
+                totalGlobalAllocSize = result.globalAllocSize;
+            }
             if (result.localAllocSize > maxLocalAllocSize) {
                 maxLocalAllocSize = result.localAllocSize;
             }
@@ -308,7 +310,9 @@ export class ProjectCompiler {
             objs.set(path.basename(rf.path) + '.obj', result.obj);
             allErrors.push(...result.errors);
             allWarnings.push(...result.warnings);
-            totalGlobalAllocSize += result.globalAllocSize;
+            if (result.globalAllocSize > totalGlobalAllocSize) {
+                totalGlobalAllocSize = result.globalAllocSize;
+            }
             if (result.localAllocSize > maxLocalAllocSize) {
                 maxLocalAllocSize = result.localAllocSize;
             }

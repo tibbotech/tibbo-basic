@@ -232,7 +232,9 @@ export class Linker {
         // Process RDataDir for RData relocations
         this.linkRDataDir(obj, codeBase, initBase, rdataBase);
 
-        this.totalGlobalSize += obj.header.globalAllocSize;
+        if (obj.header.globalAllocSize > this.totalGlobalSize) {
+            this.totalGlobalSize = obj.header.globalAllocSize;
+        }
         if (obj.header.localAllocSize > this.maxLocalAllocSize) {
             this.maxLocalAllocSize = obj.header.localAllocSize;
         }
