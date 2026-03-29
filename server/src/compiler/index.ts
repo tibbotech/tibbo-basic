@@ -35,7 +35,6 @@ export interface CompileOptions {
     sourceMap?: SourceMapEntry[];
     resolveDataAddresses?: boolean;
     stackSize?: number;
-    mergeInitIntoCode?: boolean;
     projectName?: string;
     buildId?: string;
     configStr?: string;
@@ -150,7 +149,6 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         fileData: options.fileData,
         resourceEntries: options.resourceEntries,
         sourceMap: options.sourceMap,
-        mergeInitIntoCode: options.mergeInitIntoCode,
         projectName: options.projectName,
         buildId: options.buildId,
         configStr: options.configStr,

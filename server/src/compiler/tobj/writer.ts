@@ -4,7 +4,6 @@ import {
     TObjAddressFlags, TObjFunctionFlags, TObjRefType, TObjDataType, TObjVariableFlags,
 } from './format';
 import { ByteEmitter, CodeLabel, RDataEntry, LineInfoEntry } from '../codegen/emitter';
-import { ReferenceType } from '../codegen/opcodes';
 import { SymbolTable, FunctionSymbol, VariableSymbol, SymbolKind, ObjectSymbol, SyscallSymbol, PropertySymbol, Scope, ScopeType } from '../semantics/symbols';
 import { DataType, isPrimitive, isString, isArray, isStruct, isEnum, PrimitiveType, StringDataType, ArrayDataType, StructDataType, EnumDataType } from '../semantics/types';
 
@@ -75,7 +74,6 @@ export interface TObjWriteOptions {
     fileData?: Buffer;
     resourceEntries?: Array<{ name: string; dataOffset: number; size: number }>;
     sourceMap?: SourceMapEntry[];
-    mergeInitIntoCode?: boolean;
     projectName?: string;
     buildId?: string;
     /** Platform config string → TOBJ_EXTRA third dword (tide `m_dwConfigStr`) */
@@ -109,82 +107,9 @@ export class TObjWriter {
         }
 
         // Build section data
-        let codeData = emitter.getCode();
-        let initData = emitter.getInitCode();
+        const codeData = emitter.getCode();
+        const initData = emitter.getInitCode();
         const rdata = emitter.getRData();
-
-        if (options.mergeInitIntoCode && initData.length > 0) {
-            const initSize = initData.length + 1;
-            for (const label of emitter.getLabels().values()) {
-                if (label.defined) label.address += initSize;
-                for (const ref of label.references) {
-                    if (ref.type === ReferenceType.Code) {
-                        ref.offset += initSize;
-                    }
-                }
-            }
-            for (const label of emitter.getDataLabels().values()) {
-                for (const ref of label.references) {
-                    if (ref.type === ReferenceType.Code) {
-                        ref.offset += initSize;
-                    }
-                }
-            }
-            for (const entry of emitter.getLineInfo()) {
-                entry.address += initSize;
-            }
-            for (const entry of emitter.getRDataEntries()) {
-                for (const ref of entry.references) {
-                    if (ref.type === ReferenceType.Code) {
-                        ref.offset += initSize;
-                    }
-                }
-            }
-            for (const fn of symbols.getFunctions()) {
-                if (fn.codeStartAddress != null) fn.codeStartAddress += initSize;
-                if (fn.codeEndAddress != null) fn.codeEndAddress += initSize;
-            }
-            for (const scope of symbols.getScopes()) {
-                if (scope.startAddress) scope.startAddress += initSize;
-                if (scope.endAddress) scope.endAddress += initSize;
-            }
-
-            // Init is now part of the code section — retype all Init refs to Code
-            for (const label of emitter.getLabels().values()) {
-                for (const ref of label.references) {
-                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
-                }
-            }
-            for (const label of emitter.getDataLabels().values()) {
-                for (const ref of label.references) {
-                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
-                }
-            }
-            for (const entry of emitter.getRDataEntries()) {
-                for (const ref of entry.references) {
-                    if (ref.type === ReferenceType.Init) ref.type = ReferenceType.Code;
-                }
-            }
-
-            codeData = Buffer.concat([initData, Buffer.from([0x1F]), codeData]);
-            initData = Buffer.alloc(0);
-
-            for (const label of emitter.getLabels().values()) {
-                if (!label.defined || !label.isCode) continue;
-                for (const ref of label.references) {
-                    const off = ref.offset;
-                    if (off + 3 <= codeData.length) {
-                        const cur = emitter.isCode24
-                            ? codeData[off] | (codeData[off + 1] << 8) | (codeData[off + 2] << 16)
-                            : codeData[off] | (codeData[off + 1] << 8);
-                        const adj = cur + initSize;
-                        codeData[off] = adj & 0xFF;
-                        codeData[off + 1] = (adj >> 8) & 0xFF;
-                        if (emitter.isCode24) codeData[off + 2] = (adj >> 16) & 0xFF;
-                    }
-                }
-            }
-        }
 
         // Build section buffers.
         // Order of build* calls matches reference SaveObj() symbol discovery

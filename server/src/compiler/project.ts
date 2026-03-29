@@ -279,7 +279,6 @@ export class ProjectCompiler {
                 sourceFilePath,
                 firmwareVer: this.platformConfig.version,
                 configStr: this.platformConfig.configStr,
-                mergeInitIntoCode: true,
             });
 
             objs.set(baseName + '.obj', result.obj);
@@ -649,30 +648,6 @@ export class ProjectCompiler {
         }
     }
 
-    /**
-     * Tibbo PDB is not a renamed OBJ: tide `CTObjFile::Save(TOBJ_SAVE_PDB)` runs
-     * `RelocateAndFixup()` then re-serializes Addresses/Types/Functions/… and writes via
-     * `CTObjFileBaseImpl::Save` (see tide/src/tobj/TObjFileSave.cpp, TObjFileReloc.cpp).
-     * We clone the in-memory OBJ and only patch signature + checksum so debuggers accept the file;
-     * byte parity with tmake PDB requires mirroring that full pipeline.
-     */
-    private buildProjectPdb(sourceObj: Buffer): Buffer {
-        const pdb = Buffer.from(sourceObj);
-        pdb.writeUInt32LE(TOBJ_SIGNATURE_PDB, 0);
-        pdb.writeUInt16LE(0, 6);
-
-        let checksum = 0;
-        for (let i = 0; i + 1 < pdb.length; i += 2) {
-            checksum = (checksum + pdb.readUInt16LE(i)) & 0xFFFF;
-        }
-        if (pdb.length % 2 !== 0) {
-            checksum = (checksum + pdb[pdb.length - 1]) & 0xFFFF;
-        }
-        checksum = (~checksum + 1) & 0xFFFF;
-        pdb.writeUInt16LE(checksum, 6);
-        return pdb;
-    }
-
     private parseObjSections(data: Buffer): Buffer[] {
         const sections: Buffer[] = [];
         const count = TObjSection.CountObj;
@@ -721,9 +696,14 @@ export class ProjectCompiler {
     private mergeObjsForPdb(objs: Map<string, Buffer>): Buffer {
         const buffers = [...objs.values()];
         if (buffers.length === 0) return Buffer.alloc(0);
-        if (buffers.length === 1) return this.buildProjectPdb(buffers[0]);
 
         const allSections = buffers.map(buf => this.parseObjSections(buf));
+
+        let totalInitSize = 0;
+        for (const s of allSections) {
+            totalInitSize += s[TObjSection.Init].length;
+        }
+        const initOffset = totalInitSize > 0 ? totalInitSize + 1 : 0;
 
         let codeBase = 0, symBase = 0, addrBase = 0, funcBase = 0, scopeBase = 0, rdataBase = 0;
         const codeBases: number[] = [];
@@ -762,18 +742,18 @@ export class ProjectCompiler {
         sections[TObjSection.FileData] = base[TObjSection.FileData];
         sections[TObjSection.Symbols] = mergedSymbols;
         sections[TObjSection.ResFileDir] = base[TObjSection.ResFileDir];
-        sections[TObjSection.EventDir] = this.pdbMergeEventDir(allSections, codeBases);
+        sections[TObjSection.EventDir] = this.pdbMergeEventDir(allSections, codeBases, initOffset);
         sections[TObjSection.LibFileDir] = base[TObjSection.LibFileDir];
         sections[TObjSection.Extra] = base[TObjSection.Extra];
-        sections[TObjSection.Addresses] = this.pdbMergeAddresses(allSections, codeBases, symBases);
+        sections[TObjSection.Addresses] = this.pdbMergeAddresses(allSections, codeBases, symBases, initOffset);
         sections[TObjSection.Functions] = this.pdbMergeFunctions(allSections, symBases, addrBases, funcBases);
-        sections[TObjSection.Scopes] = this.pdbMergeScopes(allSections, codeBases, symBases);
+        sections[TObjSection.Scopes] = this.pdbMergeScopes(allSections, codeBases, symBases, initOffset);
         sections[TObjSection.Variables] = this.pdbMergeVariables(allSections, symBases, addrBases, scopeBases);
         sections[TObjSection.Objects] = base[TObjSection.Objects];
         sections[TObjSection.Syscalls] = base[TObjSection.Syscalls];
         sections[TObjSection.Types] = base[TObjSection.Types];
         sections[TObjSection.RDataDir] = this.pdbMergeRDataDir(allSections, codeBases, rdataBases);
-        sections[TObjSection.LineInfo] = this.pdbMergeLineInfo(allSections, codeBases, symBases);
+        sections[TObjSection.LineInfo] = this.pdbMergeLineInfo(allSections, codeBases, symBases, initOffset);
         sections[TObjSection.LibNameDir] = base[TObjSection.LibNameDir];
         sections[TObjSection.IncNameDir] = base[TObjSection.IncNameDir];
 
@@ -840,7 +820,7 @@ export class ProjectCompiler {
         return result;
     }
 
-    private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+    private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], symBases: number[], initOffset: number): Buffer {
         const w = new BinaryWriter();
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.Addresses];
@@ -854,7 +834,7 @@ export class ProjectCompiler {
                 const refCount = data.readUInt32LE(pos); pos += 4;
 
                 tag += sb;
-                if (flags & TObjAddressFlags.Code) addr += cb;
+                if (flags & TObjAddressFlags.Code) addr += cb + initOffset;
 
                 w.writeByte(flags);
                 w.writeDword(tag);
@@ -908,7 +888,7 @@ export class ProjectCompiler {
         return w.toBuffer();
     }
 
-    private pdbMergeScopes(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+    private pdbMergeScopes(allSections: Buffer[][], codeBases: number[], symBases: number[], initOffset: number): Buffer {
         const w = new BinaryWriter();
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.Scopes];
@@ -918,11 +898,11 @@ export class ProjectCompiler {
                 w.writeDword(data.readUInt32LE(pos) + sb); pos += 4; // begin file
                 w.writeDword(data.readUInt32LE(pos)); pos += 4;       // begin line
                 w.writeDword(data.readUInt32LE(pos)); pos += 4;       // begin col
-                w.writeDword(data.readUInt32LE(pos) + cb); pos += 4; // begin addr
+                w.writeDword(data.readUInt32LE(pos) + cb + initOffset); pos += 4; // begin addr
                 w.writeDword(data.readUInt32LE(pos) + sb); pos += 4; // end file
                 w.writeDword(data.readUInt32LE(pos)); pos += 4;       // end line
                 w.writeDword(data.readUInt32LE(pos)); pos += 4;       // end col
-                w.writeDword(data.readUInt32LE(pos) + cb); pos += 4; // end addr
+                w.writeDword(data.readUInt32LE(pos) + cb + initOffset); pos += 4; // end addr
             }
         }
         return w.toBuffer();
@@ -957,7 +937,7 @@ export class ProjectCompiler {
         return w.toBuffer();
     }
 
-    private pdbMergeLineInfo(allSections: Buffer[][], codeBases: number[], symBases: number[]): Buffer {
+    private pdbMergeLineInfo(allSections: Buffer[][], codeBases: number[], symBases: number[], initOffset: number): Buffer {
         const w = new BinaryWriter();
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.LineInfo];
@@ -973,7 +953,7 @@ export class ProjectCompiler {
                     if (pos + 8 > data.length) break;
                     const line = data.readUInt32LE(pos); pos += 4;
                     let addr = data.readUInt32LE(pos); pos += 4;
-                    addr += cb;
+                    addr += cb + initOffset;
                     w.writeDword(line);
                     w.writeDword(addr);
                 }
@@ -982,7 +962,7 @@ export class ProjectCompiler {
         return w.toBuffer();
     }
 
-    private pdbMergeEventDir(allSections: Buffer[][], codeBases: number[]): Buffer {
+    private pdbMergeEventDir(allSections: Buffer[][], codeBases: number[], initOffset: number): Buffer {
         let maxEntries = 0;
         for (const s of allSections) {
             const n = Math.floor(s[TObjSection.EventDir].length / 8);
@@ -1000,7 +980,7 @@ export class ProjectCompiler {
                 const code = d.readUInt32LE(e * 8);
                 const data = d.readUInt32LE(e * 8 + 4);
                 if (code !== MAXDWORD) {
-                    entries[e] = { code: code + cb, data };
+                    entries[e] = { code: code + cb + initOffset, data };
                 }
             }
         }
