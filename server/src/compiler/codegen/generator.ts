@@ -3016,7 +3016,10 @@ export class PCodeGenerator {
 
         // return value pointer at offset 21 (after all 8 possible word indices)
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
-        const tempAddr = localBase + (this.ctx.currentFunction?.localAllocSize ?? 0);
+        const fn = this.ctx.currentFunction;
+        const tempAddr = fn?.name.startsWith('on_')
+            ? localBase + this.onEventDeclaredLocalBytes
+            : localBase + (fn?.localAllocSize ?? 0);
         this.emitter.emitByte(OP.OPCODE_LEA);
         this.emitter.emitDataAddress(tempAddr);
         this.emitStoreToArgBuffer(21, 4);
