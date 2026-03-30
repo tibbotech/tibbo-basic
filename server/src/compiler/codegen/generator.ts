@@ -1846,10 +1846,7 @@ export class PCodeGenerator {
                             return;
                         }
 
-                        this.generateIndexAssignment(
-                            { kind: 'IndexExpr', object: call.callee, indices: call.args, loc: call.loc } as AST.IndexExpr,
-                            value,
-                        );
+                        this.emitGotoidxStore(varSym, call.args, elementType, value);
                         return;
                     }
                 }
@@ -2796,14 +2793,7 @@ export class PCodeGenerator {
                         this.emitter.emitByte(loadOp | indirection);
                         this.emitter.emitDataAddress(elementAddr);
                     } else {
-                        this.emitter.emitByte(OP.OPCODE_LEA);
-                        this.emitVarDataAddress(varSym);
-                        this.emitSyscallArg(0);
-                        if (expr.args.length > 0) {
-                            this.generateExpression(expr.args[0]);
-                            this.emitSyscallArg(1);
-                        }
-                        this.emitSyscallByName('gotoidx');
+                        this.emitGotoidxLoad(varSym, expr.args, elementType);
                     }
                     return;
                 }
@@ -3002,6 +2992,56 @@ export class PCodeGenerator {
                 }
             }
         }
+    }
+
+    // ─── gotoidx helpers ────────────────────────────────────────────────────
+
+    private emitGotoidxArgs(varSym: VariableSymbol, indices: AST.Expression[]): number {
+        // arg[0..3]: byref obj (array base address)
+        this.emitter.emitByte(OP.OPCODE_LEA);
+        this.emitVarDataAddress(varSym);
+        this.emitStoreToArgBuffer(0, 4);
+
+        // arg[4]: count as byte (number of dimensions)
+        this.generateIntLiteral(indices.length);
+        this.emitStoreToArgBuffer(4, 1);
+
+        // arg[5..]: indices as word (i1, i2, ...)
+        let offset = 5;
+        for (const idx of indices) {
+            this.generateExpression(idx);
+            this.emitStoreToArgBuffer(offset, 2);
+            offset += 2;
+        }
+
+        // return value pointer at offset 21 (after all 8 possible word indices)
+        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const tempAddr = localBase + (this.ctx.currentFunction?.localAllocSize ?? 0);
+        this.emitter.emitByte(OP.OPCODE_LEA);
+        this.emitter.emitDataAddress(tempAddr);
+        this.emitStoreToArgBuffer(21, 4);
+
+        this.emitSyscallByName('gotoidx');
+        return tempAddr;
+    }
+
+    private emitGotoidxStore(
+        varSym: VariableSymbol, indices: AST.Expression[],
+        elementType: DataType, value: AST.Expression,
+    ): void {
+        const tempAddr = this.emitGotoidxArgs(varSym, indices);
+        this.generateExpression(value);
+        this.emitter.emitByte(getStoreOpcode(elementType) | OP.OPCODE_INDIRECT);
+        this.emitter.emitDataAddress(tempAddr);
+    }
+
+    private emitGotoidxLoad(
+        varSym: VariableSymbol, indices: AST.Expression[],
+        elementType: DataType,
+    ): void {
+        const tempAddr = this.emitGotoidxArgs(varSym, indices);
+        this.emitter.emitByte(getLoadOpcode(elementType, 'A') | OP.OPCODE_INDIRECT);
+        this.emitter.emitDataAddress(tempAddr);
     }
 
     // ─── Index expression ───────────────────────────────────────────────────
