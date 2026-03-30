@@ -33,6 +33,14 @@ export class BinaryWriter {
         this.writeByte(0);
     }
 
+    writeRef(ref: { type: number; offset: number; addrOffset?: number }): void {
+        this.writeByte(ref.type);
+        this.writeDword(ref.offset);
+        if (ref.type === TObjRefType.CodeOffset || ref.type === TObjRefType.InitOffset) {
+            this.writeDword(ref.addrOffset ?? 0);
+        }
+    }
+
     toBuffer(): Buffer { return Buffer.from(this.buf); }
 }
 
@@ -420,8 +428,7 @@ export class TObjWriter {
             w.writeDword(label.references.length);
 
             for (const ref of label.references) {
-                w.writeByte(ref.type);
-                w.writeDword(ref.offset);
+                w.writeRef(ref);
             }
         }
 

@@ -4,6 +4,7 @@ export interface CodeReference {
     type: ReferenceType;
     offset: number;
     targetLabel: string;
+    addrOffset?: number;
 }
 
 export interface CodeLabel {
@@ -127,6 +128,19 @@ export class ByteEmitter {
         label.references.push(ref);
         this.suppressAutoTrack = true;
         this.emitDataAddress(label.address);
+        this.suppressAutoTrack = false;
+    }
+
+    emitDataAddressRefOffset(name: string, addrOffset: number): void {
+        let label = this.dataLabels.get(name);
+        if (!label) {
+            label = { name, address: 0, defined: false, references: [], isPublic: false };
+            this.dataLabels.set(name, label);
+        }
+        const type = this.emittingInit ? ReferenceType.InitOffset : ReferenceType.CodeOffset;
+        label.references.push({ type, offset: this.currentOffset, targetLabel: name, addrOffset });
+        this.suppressAutoTrack = true;
+        this.emitDataAddress(label.address + addrOffset);
         this.suppressAutoTrack = false;
     }
 

@@ -316,6 +316,23 @@ export class PCodeGenerator {
         }
     }
 
+    private emitVarDataAddressWithOffset(sym: VariableSymbol, byteOffset: number): void {
+        if (byteOffset === 0) {
+            this.emitVarDataAddress(sym);
+            return;
+        }
+        if (sym.isGlobal) {
+            this.emitter.emitDataAddressRefOffset(`?V:${sym.name}`, byteOffset);
+        } else {
+            const labelName = this.localVarLabelMap.get(sym);
+            if (labelName) {
+                this.emitter.emitDataAddressRefOffset(labelName, byteOffset);
+            } else {
+                this.emitter.emitDataAddress((sym.address ?? 0) + byteOffset);
+            }
+        }
+    }
+
     private emitVarLeaArg(sym: VariableSymbol): void {
         this.emitVarLeaArgAt(sym, 0);
     }
@@ -2787,11 +2804,11 @@ export class PCodeGenerator {
 
                     if (expr.args.length > 0 && expr.args[0].kind === 'IntegerLiteral') {
                         const index = (expr.args[0] as AST.IntegerLiteral).value;
-                        const elementAddr = (varSym.address ?? 0) + index * elementType.size;
+                        const byteOffset = 2 + index * elementType.size;
                         const loadOp = getLoadOpcode(elementType, 'A');
                         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                         this.emitter.emitByte(loadOp | indirection);
-                        this.emitter.emitDataAddress(elementAddr);
+                        this.emitVarDataAddressWithOffset(varSym, byteOffset);
                     } else {
                         this.emitGotoidxLoad(varSym, expr.args, elementType);
                     }
@@ -3054,17 +3071,21 @@ export class PCodeGenerator {
             const sym = this.symbols.current.lookup(expr.object.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
-                this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitVarDataAddress(varSym);
-                this.emitSyscallArg(0);
-
-                if (expr.indices.length > 0) {
-                    this.generateExpression(expr.indices[0]);
-                    this.emitSyscallArg(1);
+                const dt = varSym.dataType;
+                if (dt && isArray(dt)) {
+                    const elementType = (dt as ArrayDataType).elementType;
+                    if (expr.indices.length > 0 && expr.indices[0].kind === 'IntegerLiteral') {
+                        const index = (expr.indices[0] as AST.IntegerLiteral).value;
+                        const byteOffset = 2 + index * elementType.size;
+                        const loadOp = getLoadOpcode(elementType, 'A');
+                        const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+                        this.emitter.emitByte(loadOp | indirection);
+                        this.emitVarDataAddressWithOffset(varSym, byteOffset);
+                    } else {
+                        this.emitGotoidxLoad(varSym, expr.indices, elementType);
+                    }
+                    return;
                 }
-
-                this.emitSyscallByName('gotoidx');
-                return;
             }
         }
         if (expr.object.kind === 'MemberExpr') {

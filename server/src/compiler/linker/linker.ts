@@ -60,6 +60,7 @@ interface LinkedAddress {
 interface LinkedReference {
     type: number;
     offset: number;
+    addrOffset: number;
 }
 
 interface RDataReloc {
@@ -394,11 +395,19 @@ export class Linker {
                 if (pos + 5 > addrData.length) break;
                 const refType = addrData.readUInt8(pos); pos += 1;
                 let refOffset = addrData.readUInt32LE(pos); pos += 4;
+                let addrOffset = 0;
 
                 if (refType === TObjRefType.Code) refOffset += codeBase;
                 else if (refType === TObjRefType.Init) refOffset += initBase;
+                else if (refType === TObjRefType.CodeOffset) {
+                    refOffset += codeBase;
+                    if (pos + 4 <= addrData.length) { addrOffset = addrData.readUInt32LE(pos); pos += 4; }
+                } else if (refType === TObjRefType.InitOffset) {
+                    refOffset += initBase;
+                    if (pos + 4 <= addrData.length) { addrOffset = addrData.readUInt32LE(pos); pos += 4; }
+                }
 
-                refs.push({ type: refType, offset: refOffset });
+                refs.push({ type: refType, offset: refOffset, addrOffset });
             }
 
             const symbolSection = obj.sections[TObjSection.Symbols]?.data;
@@ -441,7 +450,7 @@ export class Linker {
                     addr.address += initSize;
                 }
                 for (const ref of addr.references) {
-                    if (ref.type === TObjRefType.Code) {
+                    if (ref.type === TObjRefType.Code || ref.type === TObjRefType.CodeOffset) {
                         ref.offset += initSize;
                     }
                 }
@@ -464,9 +473,10 @@ export class Linker {
             if (!(addr.flags & TObjAddressFlags.Defined)) continue;
             for (const ref of addr.references) {
                 const offset = ref.offset;
-                if (ref.type === TObjRefType.Code || ref.type === TObjRefType.Init) {
+                if (ref.type === TObjRefType.Code || ref.type === TObjRefType.Init ||
+                    ref.type === TObjRefType.CodeOffset || ref.type === TObjRefType.InitOffset) {
                     const width = (addr.flags & TObjAddressFlags.Code) ? codeAddrSize : dataAddrSize;
-                    this.writeOperand(fullCode, offset, addr.address, width);
+                    this.writeOperand(fullCode, offset, addr.address + (ref.addrOffset ?? 0), width);
                 }
             }
         }
