@@ -3077,19 +3077,18 @@ export class PCodeGenerator {
                 const dt = varSym.dataType;
                 const elementType = (dt && isArray(dt)) ? (dt as ArrayDataType).elementType : undefined;
 
-                this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitVarDataAddress(varSym);
-                this.emitSyscallArg(0);
-
-                if (target.indices.length > 0) {
-                    this.generateExpression(target.indices[0]);
-                    this.emitSyscallArg(1);
-                }
-
-                this.emitSyscallByName('gotoidx');
-
                 if (elementType && isString(elementType)) {
-                    // gotoidx result is the element pointer (in accumulator); store as arg0
+                    this.emitter.emitByte(OP.OPCODE_LEA);
+                    this.emitVarDataAddress(varSym);
+                    this.emitSyscallArg(0);
+
+                    if (target.indices.length > 0) {
+                        this.generateExpression(target.indices[0]);
+                        this.emitSyscallArg(1);
+                    }
+
+                    this.emitSyscallByName('gotoidx');
+
                     this.emitSyscallArg(0);
                     if (value.kind === 'StringLiteral') {
                         const rdataOff = this.emitter.addStringRData((value as AST.StringLiteral).value);
@@ -3114,9 +3113,10 @@ export class PCodeGenerator {
                     return;
                 }
 
-                this.generateExpression(value);
-                this.emitSyscallByName('setidx');
-                return;
+                if (elementType) {
+                    this.emitGotoidxStore(varSym, target.indices, elementType, value);
+                    return;
+                }
             }
         }
         this.generateExpression(value);
