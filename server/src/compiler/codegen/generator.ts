@@ -10,6 +10,7 @@ import {
     StringDataType, EnumDataType, StructDataType, ArrayDataType, getPromotedType, BUILTIN_TYPES,
 } from '../semantics/types';
 import { BINARY_OPS, CMP_OPS, CMP_OPS_SIGNED, CMP_OPS_UNSIGNED, UNARY_OPS, getLoadOpcode, getStoreOpcode, getCmpOpInfo, needsSyscall, getSyscallName } from './operators';
+import { TObjRttiType } from '../tobj/format';
 
 interface GeneratorContext {
     currentFunction?: FunctionSymbol;
@@ -367,18 +368,35 @@ export class PCodeGenerator {
         this.emitter.emitDataAddress(addr);
     }
 
+    private elementRttiType(et: DataType): number {
+        if (isString(et)) return TObjRttiType.String;
+        if (isArray(et))  return TObjRttiType.Array;
+        if (isStruct(et)) return TObjRttiType.Struct;
+        // primitive: classify by size
+        if (et.size >= 4) return TObjRttiType.Dword;
+        if (et.size >= 2) return TObjRttiType.Word;
+        return TObjRttiType.Byte;
+    }
+
     private buildTypeDescriptor(dt: DataType | undefined): number[] | null {
         if (!dt) return null;
         if (isArray(dt)) {
             const a = dt as ArrayDataType;
+            const et = a.elementType;
+            const etTag = this.elementRttiType(et);
+            // info byte: for strings = maxLength; otherwise 0
+            const etInfo = isString(et) ? (et as StringDataType).maxLength : 0;
             return [
-                0x04,
-                a.dimensions[0] & 0xFF,
-                0x00,
-                dt.size & 0xFF,
-                0x00, 0x00, 0x00, 0x00,
-                a.elementType.size & 0xFF,
-                (a.elementType.size >> 8) & 0xFF,
+                TObjRttiType.Array,          // [0] array type tag
+                a.dimensions[0] & 0xFF,      // [1] element count lo
+                (a.dimensions[0] >> 8) & 0xFF, // [2] element count hi
+                dt.size & 0xFF,              // [3] total size lo
+                (dt.size >> 8) & 0xFF,       // [4] total size hi
+                etTag,                       // [5] element type tag
+                etInfo & 0xFF,               // [6] element info (maxLength for string)
+                0x00,                        // [7] reserved
+                et.size & 0xFF,              // [8] element size lo
+                (et.size >> 8) & 0xFF,       // [9] element size hi
             ];
         }
         return null;
@@ -1803,6 +1821,40 @@ export class PCodeGenerator {
             this.generateIndexAssignment(target, value);
             return;
         }
+        if (target.kind === 'CallExpr') {
+            const call = target as AST.CallExpr;
+            if (call.callee.kind === 'IdentifierExpr') {
+                const sym = this.symbols.current.lookup((call.callee as AST.IdentifierExpr).name);
+                if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                    const varSym = sym as VariableSymbol;
+                    const dt = varSym.dataType;
+                    if (dt && isArray(dt)) {
+                        const elementType = (dt as ArrayDataType).elementType;
+
+                        if (call.args.length > 0 && call.args[0].kind === 'IntegerLiteral') {
+                            const index = (call.args[0] as AST.IntegerLiteral).value;
+                            const elementAddr = (varSym.address ?? 0) + index * elementType.size;
+                            if (isString(elementType)) {
+                                this.generateStringAssignmentToAddr(elementAddr, varSym.isByRef, value);
+                            } else {
+                                this.generateExpression(value);
+                                const storeOp = getStoreOpcode(elementType);
+                                const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+                                this.emitter.emitByte(storeOp | indirection);
+                                this.emitter.emitDataAddress(elementAddr);
+                            }
+                            return;
+                        }
+
+                        this.generateIndexAssignment(
+                            { kind: 'IndexExpr', object: call.callee, indices: call.args, loc: call.loc } as AST.IndexExpr,
+                            value,
+                        );
+                        return;
+                    }
+                }
+            }
+        }
         this.generateExpression(value);
     }
 
@@ -2598,16 +2650,10 @@ export class PCodeGenerator {
             return;
         }
         if (expr.kind === 'StringLiteral') {
-            const tempAddr = this.getTempStringAddr(argIndex);
+            // Load rdata pointer directly — strcmp is read-only, rdata format matches string format.
+            // Using strload+temp would corrupt arg0 when this is the right (argIndex=1) operand.
             const rdataOff = this.emitter.addStringRData(expr.value);
-            this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddress(tempAddr);
-            this.emitSyscallArg(0);
             this.emitRDataLoad(rdataOff);
-            this.emitSyscallArg(1);
-            this.emitSyscallByName('strload');
-            this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddress(tempAddr);
             this.emitSyscallArg(argIndex);
             return;
         }
@@ -2676,6 +2722,15 @@ export class PCodeGenerator {
         if (expr.kind === 'MemberExpr') {
             return this.inferMemberType(expr);
         }
+        if (expr.kind === 'IndexExpr') {
+            if (expr.object.kind === 'IdentifierExpr') {
+                const sym = this.symbols.current.lookup(expr.object.name);
+                if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                    const dt = (sym as VariableSymbol).dataType;
+                    if (dt && isArray(dt)) return (dt as ArrayDataType).elementType;
+                }
+            }
+        }
         if (expr.kind === 'UnaryExpr') return this.inferType(expr.operand);
         if (expr.kind === 'ParenExpr') return this.inferType(expr.expression);
         return undefined;
@@ -2725,6 +2780,33 @@ export class PCodeGenerator {
                     this.emitter.emitDataAddress(this.getTempStringAddr(0));
                 }
                 return;
+            }
+
+            if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
+                const dt = varSym.dataType;
+                if (dt && isArray(dt)) {
+                    const elementType = (dt as ArrayDataType).elementType;
+
+                    if (expr.args.length > 0 && expr.args[0].kind === 'IntegerLiteral') {
+                        const index = (expr.args[0] as AST.IntegerLiteral).value;
+                        const elementAddr = (varSym.address ?? 0) + index * elementType.size;
+                        const loadOp = getLoadOpcode(elementType, 'A');
+                        const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+                        this.emitter.emitByte(loadOp | indirection);
+                        this.emitter.emitDataAddress(elementAddr);
+                    } else {
+                        this.emitter.emitByte(OP.OPCODE_LEA);
+                        this.emitVarDataAddress(varSym);
+                        this.emitSyscallArg(0);
+                        if (expr.args.length > 0) {
+                            this.generateExpression(expr.args[0]);
+                            this.emitSyscallArg(1);
+                        }
+                        this.emitSyscallByName('gotoidx');
+                    }
+                    return;
+                }
             }
         }
 
@@ -2952,6 +3034,9 @@ export class PCodeGenerator {
             const sym = this.symbols.current.lookup(target.object.name);
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
+                const dt = varSym.dataType;
+                const elementType = (dt && isArray(dt)) ? (dt as ArrayDataType).elementType : undefined;
+
                 this.emitter.emitByte(OP.OPCODE_LEA);
                 this.emitVarDataAddress(varSym);
                 this.emitSyscallArg(0);
@@ -2962,6 +3047,32 @@ export class PCodeGenerator {
                 }
 
                 this.emitSyscallByName('gotoidx');
+
+                if (elementType && isString(elementType)) {
+                    // gotoidx result is the element pointer (in accumulator); store as arg0
+                    this.emitSyscallArg(0);
+                    if (value.kind === 'StringLiteral') {
+                        const rdataOff = this.emitter.addStringRData((value as AST.StringLiteral).value);
+                        this.emitRDataLoad(rdataOff);
+                        this.emitSyscallArg(1);
+                        this.emitSyscallByName('strload');
+                    } else if (value.kind === 'IdentifierExpr') {
+                        const srcSym = this.symbols.current.lookup((value as AST.IdentifierExpr).name);
+                        if (srcSym && srcSym.kind === SymbolKind.Constant && typeof (srcSym as ConstantSymbol).value === 'string') {
+                            const rdataOff = this.emitter.addStringRData((srcSym as ConstantSymbol).value as string);
+                            this.emitRDataLoad(rdataOff);
+                            this.emitSyscallArg(1);
+                            this.emitSyscallByName('strload');
+                        } else if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                            const src = srcSym as VariableSymbol;
+                            if (src.dataType && isString(src.dataType)) {
+                                this.emitVarLeaArgAt(src, 1);
+                                this.emitSyscallByName('strcpy');
+                            }
+                        }
+                    }
+                    return;
+                }
 
                 this.generateExpression(value);
                 this.emitSyscallByName('setidx');
