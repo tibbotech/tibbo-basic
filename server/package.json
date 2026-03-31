@@ -13,7 +13,8 @@
         "watch": "tsc -w",
         "test": "jest",
         "compile": "node out/compiler/compile-project.js",
-        "dump-pdb": "node out/compiler/dump-pdb-instructions.js"
+        "dump-pdb": "node out/compiler/dump-pdb-instructions.js",
+        "tobj-debug": "node out/tobj-debug-server.js"
     },
     "author": {
         "name": "Jimmy Hu",

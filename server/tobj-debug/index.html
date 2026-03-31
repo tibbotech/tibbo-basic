@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TOBJ parse debugger</title>
+  <style>
+    :root {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8fd1;
+      --err: #e06c75;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #2a3544;
+      background: var(--panel);
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    p {
+      margin: 0.35rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    main {
+      padding: 1rem 1.25rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    input[type="file"] {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .status.error { color: var(--err); }
+    pre {
+      margin: 0;
+      padding: 1rem;
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 220px);
+      font-size: 0.75rem;
+      line-height: 1.45;
+      border: 1px solid #2a3544;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TOBJ parse debugger</h1>
+    <p>Uses the language server <code>TOBJ</code> parser (<code>server/src/TOBJ.ts</code>). Drop a <code>.obj</code> / <code>.tpc</code> / binary slice; POSTs raw bytes to <code>/parse</code>.</p>
+  </header>
+  <main>
+    <div class="row">
+      <input type="file" id="file" accept="*/*" />
+      <button type="button" id="parse" disabled>Parse</button>
+      <span class="status" id="status"></span>
+    </div>
+    <pre id="out">Select a file, then Parse.</pre>
+  </main>
+  <script>
+    const fileEl = document.getElementById('file');
+    const parseBtn = document.getElementById('parse');
+    const statusEl = document.getElementById('status');
+    const outEl = document.getElementById('out');
+
+    fileEl.addEventListener('change', () => {
+      parseBtn.disabled = !fileEl.files?.length;
+      statusEl.textContent = '';
+      statusEl.classList.remove('error');
+    });
+
+    parseBtn.addEventListener('click', async () => {
+      const f = fileEl.files?.[0];
+      if (!f) return;
+      statusEl.textContent = 'Parsing…';
+      statusEl.classList.remove('error');
+      outEl.textContent = '';
+      parseBtn.disabled = true;
+      try {
+        const buf = await f.arrayBuffer();
+        const res = await fetch('/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: buf,
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          outEl.textContent = text;
+          statusEl.textContent = res.ok ? 'Done' : 'Error';
+          if (!res.ok) statusEl.classList.add('error');
+          return;
+        }
+        if (!res.ok && data.error) {
+          outEl.textContent = JSON.stringify(data, null, 2);
+          statusEl.textContent = data.error;
+          statusEl.classList.add('error');
+        } else {
+          outEl.textContent = JSON.stringify(data, null, 2);
+          statusEl.textContent = 'OK — ' + f.name + ' (' + buf.byteLength + ' bytes)';
+        }
+      } catch (e) {
+        statusEl.textContent = String(e.message || e);
+        statusEl.classList.add('error');
+        outEl.textContent = '';
+      } finally {
+        parseBtn.disabled = !fileEl.files?.length;
+      }
+    });
+  </script>
+</body>
+</html>
