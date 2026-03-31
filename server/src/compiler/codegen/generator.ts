@@ -2810,10 +2810,6 @@ export class PCodeGenerator {
 
             if (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub) {
                 const fn = sym as FunctionSymbol;
-                if (fn.isDeclare) {
-                    this.diagnostics.error(expr.callee.loc, `'${fn.name}' is declared but not defined`);
-                    return;
-                }
                 this.emitFunctionCall(fn, expr.args);
                 if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name)) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
