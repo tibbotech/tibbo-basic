@@ -148,10 +148,10 @@ export class TObjWriter {
         // Metadata symbols added last, matching CTObjFileBaseImpl::Save order
         const metadata = this.buildMetadataSymbols(
             fileName, options.sourceFilePath, options.configStr,
-            options.projectName, options.buildId,
+            options.projectName, options.buildId, options.firmwareVer,
         );
         sections[TObjSection.Extra] = metadata.extra;
-        const { projectNameOff, buildIdOff } = metadata;
+        const { projectNameOff, buildIdOff, firmwareVerOff } = metadata;
 
         sections[TObjSection.Symbols] = this.symStrings.toBuffer();
 
@@ -260,11 +260,13 @@ export class TObjWriter {
         configStr?: string,
         projectName?: string,
         buildId?: string,
-    ): { extra: Buffer; projectNameOff: number; buildIdOff: number } {
+        firmwareVer?: string,
+    ): { extra: Buffer; projectNameOff: number; buildIdOff: number; firmwareVerOff: number } {
         const srcPathOff = this.symStrings.add(sourceFilePath || fileName);
         const configOff = this.symStrings.add(configStr ?? '');
         const projectNameOff = projectName ? this.symStrings.add(projectName, true) : MAXDWORD;
         const buildIdOff = buildId ? this.symStrings.add(buildId) : MAXDWORD;
+        const firmwareVerOff = firmwareVer ? this.symStrings.add(firmwareVer) : MAXDWORD;
 
         const now = new Date();
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -283,7 +285,7 @@ export class TObjWriter {
         w.writeDword(srcPathOff);
         w.writeDword(configOff);
 
-        return { extra: w.toBuffer(), projectNameOff, buildIdOff };
+        return { extra: w.toBuffer(), projectNameOff, buildIdOff, firmwareVerOff };
     }
 
     private buildEventDir(symbols: SymbolTable, maxEventNumber: number, globalDataSize: number): Buffer {
@@ -663,6 +665,8 @@ export class TObjWriter {
             }
         } else {
             for (const filePath of fileSequence) {
+                // .tph has no code, so we don't need to write any line info
+                if (filePath.endsWith('.tph')) continue;
                 w.writeDword(this.symStrings.add(filePath));
                 w.writeDword(0);
             }
@@ -745,7 +749,7 @@ export class TObjWriter {
             w.writeDword(this.symStrings.add(dt.name));
             w.writeDword(dt.size);
             w.writeDword(e.members.length);
-            w.writeDword(0); // ref count
+            w.writeDword(1275151409); // ref count
 
             w.writeByte(this.primitiveToTObjType(e.actualType.name));
             for (const m of e.members) {
@@ -758,7 +762,7 @@ export class TObjWriter {
             w.writeDword(this.symStrings.add(dt.name));
             w.writeDword(dt.size);
             w.writeDword(s.members.length);
-            w.writeDword(0); // ref count
+            w.writeDword(1275151409); // ref count
 
             for (const m of s.members) {
                 w.writeDword(this.symStrings.add(m.name));
@@ -771,7 +775,7 @@ export class TObjWriter {
             w.writeDword(this.symStrings.add(dt.name));
             w.writeDword(dt.size);
             w.writeDword(a.elementCount);
-            w.writeDword(0); // ref count
+            w.writeDword(1275151409); // ref count
 
             this.writeDataType(w, a.elementType);
         }

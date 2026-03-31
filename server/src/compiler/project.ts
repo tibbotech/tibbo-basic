@@ -281,6 +281,7 @@ export class ProjectCompiler {
                     sourceFilePath,
                     firmwareVer: this.platformConfig.version,
                     configStr: this.platformConfig.configStr,
+                    projectName: this.config.name,
                 });
 
                 const objName = baseName + '.obj';
