@@ -303,6 +303,12 @@ export class PCodeGenerator {
         this.emitter.emitDword(rdataOffset);
     }
 
+    private checkNotDeclareOnly(sym: VariableSymbol, loc: { file: string; line: number; column: number }): void {
+        if (sym.isDeclare) {
+            this.diagnostics.error(loc, `'${sym.name}' is declared but not defined`);
+        }
+    }
+
     private emitVarDataAddress(sym: VariableSymbol): void {
         if (sym.isGlobal) {
             this.emitter.emitDataAddressRef(`?V:${sym.name}`);
@@ -1794,8 +1800,13 @@ export class PCodeGenerator {
     private generateAssignment(target: AST.Expression, value: AST.Expression): void {
         if (target.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(target.name);
+            if (!sym) {
+                this.diagnostics.error(target.loc, `Undefined variable: '${target.name}'`);
+                return;
+            }
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
+                this.checkNotDeclareOnly(varSym, target.loc);
                 const dt = varSym.dataType;
                 if (dt && isString(dt)) {
                     this.generateStringAssignment(varSym, value);
@@ -1841,9 +1852,15 @@ export class PCodeGenerator {
         if (target.kind === 'CallExpr') {
             const call = target as AST.CallExpr;
             if (call.callee.kind === 'IdentifierExpr') {
-                const sym = this.symbols.current.lookup((call.callee as AST.IdentifierExpr).name);
+                const calleeIdent = call.callee as AST.IdentifierExpr;
+                const sym = this.symbols.current.lookup(calleeIdent.name);
+                if (!sym) {
+                    this.diagnostics.error(call.callee.loc, `Undefined variable: '${calleeIdent.name}'`);
+                    return;
+                }
                 if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                     const varSym = sym as VariableSymbol;
+                    this.checkNotDeclareOnly(varSym, call.callee.loc);
                     const dt = varSym.dataType;
                     if (dt && isArray(dt)) {
                         const elementType = (dt as ArrayDataType).elementType;
@@ -2372,7 +2389,7 @@ export class PCodeGenerator {
     private generateIdentifier(expr: AST.IdentifierExpr): void {
         const sym = this.symbols.current.lookup(expr.name);
         if (!sym) {
-            this.diagnostics.warning(expr.loc, `Undefined identifier: ${expr.name}`);
+            this.diagnostics.error(expr.loc, `Undefined identifier: ${expr.name}`);
             return;
         }
 
@@ -2380,6 +2397,7 @@ export class PCodeGenerator {
             case SymbolKind.Variable:
             case SymbolKind.Parameter: {
                 const varSym = sym as VariableSymbol;
+                this.checkNotDeclareOnly(varSym, expr.loc);
                 this.emitLoad(varSym);
                 break;
             }
@@ -2779,14 +2797,23 @@ export class PCodeGenerator {
             const name = expr.callee.name;
             const sym = this.symbols.current.lookup(name);
 
-            if (sym && sym.kind === SymbolKind.Syscall) {
+            if (!sym) {
+                this.diagnostics.error(expr.callee.loc, `Undefined function or sub: '${name}'`);
+                return;
+            }
+
+            if (sym.kind === SymbolKind.Syscall) {
                 const sc = sym as SyscallSymbol;
                 this.emitSyscallWithArgs(sc.name, sc, expr.args);
                 return;
             }
 
-            if (sym && (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub)) {
+            if (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub) {
                 const fn = sym as FunctionSymbol;
+                if (fn.isDeclare) {
+                    this.diagnostics.error(expr.callee.loc, `'${fn.name}' is declared but not defined`);
+                    return;
+                }
                 this.emitFunctionCall(fn, expr.args);
                 if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name)) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
@@ -2798,6 +2825,7 @@ export class PCodeGenerator {
 
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
+                this.checkNotDeclareOnly(varSym, expr.callee.loc);
                 const dt = varSym.dataType;
                 if (dt && isArray(dt)) {
                     const elementType = (dt as ArrayDataType).elementType;
