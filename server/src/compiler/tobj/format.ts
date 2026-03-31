@@ -69,8 +69,6 @@ export enum TObjRefType {
     Code = 0,
     Init = 1,
     Html = 2,
-    CodeOffset = 3,  // Code ref followed by extra addrOffset dword
-    InitOffset = 4,  // Init ref followed by extra addrOffset dword
 }
 
 // Data types

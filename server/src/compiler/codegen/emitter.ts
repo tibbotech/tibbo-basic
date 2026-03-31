@@ -4,7 +4,6 @@ export interface CodeReference {
     type: ReferenceType;
     offset: number;
     targetLabel: string;
-    addrOffset?: number;
 }
 
 export interface CodeLabel {
@@ -111,6 +110,15 @@ export class ByteEmitter {
         if (!this.addrToDataLabel.has(address)) {
             this.addrToDataLabel.set(address, label);
         }
+        if (!/:offset:\d+$/.test(name)) {
+            const prefix = `${name}:offset:`;
+            for (const [k, lbl] of this.dataLabels) {
+                if (!k.startsWith(prefix)) continue;
+                const off = parseInt(k.slice(prefix.length), 10);
+                if (Number.isNaN(off)) continue;
+                lbl.address = address + off;
+            }
+        }
         return label;
     }
 
@@ -131,17 +139,23 @@ export class ByteEmitter {
         this.suppressAutoTrack = false;
     }
 
+    /**
+     * Emit a fixup to base symbol address + byte offset using a derived data label.
+     * TOBJ address refs are always 5 bytes (type + dword); we do not use extended ref types.
+     */
     emitDataAddressRefOffset(name: string, addrOffset: number): void {
-        let label = this.dataLabels.get(name);
-        if (!label) {
-            label = { name, address: 0, defined: false, references: [], isPublic: false };
-            this.dataLabels.set(name, label);
+        if (addrOffset === 0) {
+            this.emitDataAddressRef(name);
+            return;
         }
-        const type = this.emittingInit ? ReferenceType.InitOffset : ReferenceType.CodeOffset;
-        label.references.push({ type, offset: this.currentOffset, targetLabel: name, addrOffset });
-        this.suppressAutoTrack = true;
-        this.emitDataAddress(label.address + addrOffset);
-        this.suppressAutoTrack = false;
+        const synthetic = `${name}:offset:${addrOffset}`;
+        let base = this.dataLabels.get(name);
+        if (!base) {
+            base = { name, address: 0, defined: false, references: [], isPublic: false };
+            this.dataLabels.set(name, base);
+        }
+        this.defineDataLabel(synthetic, (base.address ?? 0) + addrOffset);
+        this.emitDataAddressRef(synthetic);
     }
 
     getDataLabels(): Map<string, DataLabel> { return this.dataLabels; }

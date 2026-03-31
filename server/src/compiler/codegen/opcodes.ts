@@ -88,6 +88,4 @@ export enum ReferenceType {
     Code = 0,
     Init = 1,
     Html = 2,
-    CodeOffset = 3,  // Code ref with extra addrOffset dword (patched addr = label + addrOffset)
-    InitOffset = 4,  // Init ref with extra addrOffset dword
 }

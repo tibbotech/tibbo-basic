@@ -33,12 +33,9 @@ export class BinaryWriter {
         this.writeByte(0);
     }
 
-    writeRef(ref: { type: number; offset: number; addrOffset?: number }): void {
+    writeRef(ref: { type: number; offset: number }): void {
         this.writeByte(ref.type);
         this.writeDword(ref.offset);
-        if (ref.type === TObjRefType.CodeOffset || ref.type === TObjRefType.InitOffset) {
-            this.writeDword(ref.addrOffset ?? 0);
-        }
     }
 
     toBuffer(): Buffer { return Buffer.from(this.buf); }
@@ -375,9 +372,10 @@ export class TObjWriter {
             const varName = name.startsWith('?V:') ? name.substring(3) : name;
             const idx = addrIndex++;
 
+            const isDerivedOffset = /:offset:\d+$/.test(name);
             const isLocal = name.includes(':local(');
             const isParam = name.startsWith('?A:');
-            if (isParam) {
+            if (!isDerivedOffset && isParam) {
                 const paramMatch = name.match(/^\?A:(.+?):(\d+)$/);
                 if (paramMatch) {
                     const fnName = paramMatch[1];
@@ -400,7 +398,7 @@ export class TObjWriter {
                         break;
                     }
                 }
-            } else if (isLocal) {
+            } else if (!isDerivedOffset && isLocal) {
                 const match = name.match(/^\?V:(.+?):local\(/);
                 if (match) {
                     const simpleName = match[1];
@@ -413,7 +411,7 @@ export class TObjWriter {
                         }
                     }
                 }
-            } else {
+            } else if (!isDerivedOffset) {
                 this.varAddrIndex.set(varName, idx);
             }
 
