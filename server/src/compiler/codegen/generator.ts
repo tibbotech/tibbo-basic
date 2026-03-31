@@ -53,6 +53,8 @@ export class PCodeGenerator {
     private liveReachable = new Set<string>();
     private preEvalMap = new Map<AST.CallExpr, number>();
     private functionReturnPtrAddr = new Map<string, number>();
+    /** Bytes the root-function temp scratch area extends past tempScratchBase. */
+    private rootTempScratchSize = 0;
     /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
     private onEventDeclaredLocalBytes = 0;
 
@@ -141,6 +143,7 @@ export class PCodeGenerator {
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
         this.includeTempsInLocalAllocSize(program);
         this.tempScratchBase = localBase + this.localAllocSize;
+        this.localAllocSize += this.rootTempScratchSize;
 
         const maxRootArea = this.computeMaxRootArea(program);
         this.allocateCalledFunctionParams(program, maxRootArea);
@@ -1316,20 +1319,14 @@ export class PCodeGenerator {
     }
 
     private includeTempsInLocalAllocSize(program: AST.Program): void {
+        const frameSizes = new Map<string, number>();
+        const tempFootprints = new Map<string, number>();
+
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
             if (!this.isFromCurrentFile(decl)) continue;
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
-
-            const perStmt = this.countTempVarsPerStatement(decl.body);
-            const hasTempUsage = perStmt.some(n => n > 0);
-            if (!hasTempUsage) continue;
-
-            const maxContentLen = this.findMaxStringLiteralLength(decl.body);
-            if (maxContentLen <= 0) continue;
-
-            const tempFootprint = maxContentLen + 1;
 
             let declaredSize = 0;
             for (const p of fn.parameters) {
@@ -1339,34 +1336,57 @@ export class PCodeGenerator {
                 declaredSize += v.dataType?.size ?? 2;
             }
 
-            const totalSize = declaredSize + tempFootprint;
-            if (totalSize > this.localAllocSize) {
-                this.localAllocSize = totalSize;
+            const perStmt = this.countTempVarsPerStatement(decl.body);
+            let maxSlots = 0;
+            for (const n of perStmt) {
+                const concurrent = n >= 2 ? 2 : n;
+                if (concurrent > maxSlots) maxSlots = concurrent;
             }
-        }
-    }
+            const scalarCount = this.countFunctionPreEvalScalars(decl);
+            const tempFootprint = maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE
+                + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
-    private findMaxStringLiteralLength(stmts: AST.Statement[]): number {
-        let maxLen = 0;
-        const visit = (node: unknown): void => {
-            if (!node || typeof node !== 'object') return;
-            const n = node as Record<string, unknown>;
-            if (n.kind === 'StringLiteral') {
-                const len = (n.value as string).length;
-                if (len > maxLen) maxLen = len;
-            }
-            for (const key of Object.keys(n)) {
-                if (key === 'loc' || key === 'kind') continue;
-                const child = n[key];
-                if (Array.isArray(child)) {
-                    for (const item of child) visit(item);
-                } else if (child && typeof child === 'object') {
-                    visit(child);
+            frameSizes.set(decl.name, declaredSize + tempFootprint);
+            tempFootprints.set(decl.name, tempFootprint);
+        }
+
+        const calledFunctions = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) calledFunctions.add(c);
+        }
+
+        let maxRootTempExt = 0;
+        for (const [name, tempFp] of tempFootprints) {
+            if (calledFunctions.has(name)) continue;
+            if (tempFp === 0) continue;
+            const fn = this.symbols.lookupGlobal(name) as FunctionSymbol | undefined;
+            if (!fn) continue;
+            const ext = this.eventFramePrefixBytes(fn) + tempFp;
+            if (ext > maxRootTempExt) maxRootTempExt = ext;
+        }
+        this.rootTempScratchSize = maxRootTempExt;
+
+        const getChainSize = (name: string, counted: Set<string>): number => {
+            if (counted.has(name)) return 0;
+            counted.add(name);
+            const ownSize = frameSizes.get(name) ?? 0;
+            const calls = this.callGraph.get(name);
+            let calleeTotal = 0;
+            if (calls) {
+                for (const c of calls) {
+                    calleeTotal += getChainSize(c, counted);
                 }
             }
+            return ownSize + calleeTotal;
         };
-        for (const stmt of stmts) visit(stmt);
-        return maxLen;
+
+        for (const [name] of frameSizes) {
+            if (calledFunctions.has(name)) continue;
+            const chainTotal = getChainSize(name, new Set<string>());
+            if (chainTotal > this.localAllocSize) {
+                this.localAllocSize = chainTotal;
+            }
+        }
     }
 
     private computeTempStringSlots(program: AST.Program): number {
