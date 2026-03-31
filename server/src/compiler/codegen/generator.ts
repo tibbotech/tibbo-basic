@@ -913,7 +913,7 @@ export class PCodeGenerator {
 
     private allocateGlobalVariables(program: AST.Program): void {
         let offset = this.globalDataOffset;
-        const addrBase = this.resolveDataAddresses ? this.platformSize : 0;
+        const addrBase = this.platformSize;
         for (const decl of program.declarations) {
             if (decl.kind !== 'DimStmt' || decl.isDeclare) continue;
             if (!this.isFromCurrentFile(decl)) continue;

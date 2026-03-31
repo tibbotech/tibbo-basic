@@ -24,6 +24,7 @@ export interface DataLabel {
 }
 
 export class ByteEmitter {
+    private static readonly UNRESOLVED_ADDR = 0xFFFFFFFF;
     private code: number[] = [];
     private initCode: number[] = [];
     private rdata: number[] = [];
@@ -125,7 +126,7 @@ export class ByteEmitter {
     emitDataAddressRef(name: string): void {
         let label = this.dataLabels.get(name);
         if (!label) {
-            label = { name, address: 0, defined: false, references: [], isPublic: false };
+            label = { name, address: ByteEmitter.UNRESOLVED_ADDR, defined: false, references: [], isPublic: false };
             this.dataLabels.set(name, label);
         }
         const ref: CodeReference = {
@@ -151,10 +152,18 @@ export class ByteEmitter {
         const synthetic = `${name}:offset:${addrOffset}`;
         let base = this.dataLabels.get(name);
         if (!base) {
-            base = { name, address: 0, defined: false, references: [], isPublic: false };
+            base = { name, address: ByteEmitter.UNRESOLVED_ADDR, defined: false, references: [], isPublic: false };
             this.dataLabels.set(name, base);
         }
-        this.defineDataLabel(synthetic, (base.address ?? 0) + addrOffset);
+        if (base.defined) {
+            this.defineDataLabel(synthetic, base.address + addrOffset);
+        } else {
+            let derived = this.dataLabels.get(synthetic);
+            if (!derived) {
+                derived = { name: synthetic, address: ByteEmitter.UNRESOLVED_ADDR, defined: false, references: [], isPublic: false };
+                this.dataLabels.set(synthetic, derived);
+            }
+        }
         this.emitDataAddressRef(synthetic);
     }
 
