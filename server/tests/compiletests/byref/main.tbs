@@ -1,0 +1,16 @@
+include "global.tbh"
+
+function calledfunction(byref s as string) as string
+    sys.debugprint(s)
+    calledfunction=s
+end function
+
+sub calledsub(byref s as string)
+    sys.debugprint(s)
+    calledfunction(s)
+end sub
+
+sub on_sys_init()
+    dim astring as string="astring"
+    calledsub(astring)
+end sub

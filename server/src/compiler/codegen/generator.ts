@@ -1292,11 +1292,6 @@ export class PCodeGenerator {
             for (const p of sym.parameters) {
                 rootArea += p.isByRef ? 4 : (p.dataType?.size ?? 2);
             }
-            if (!decl.name.startsWith('on_')) {
-                for (const v of sym.localVariables) {
-                    rootArea += v.dataType?.size ?? 2;
-                }
-            }
 
             const perStmt = this.countTempVarsPerStatement(decl.body);
             let maxSlots = 0;
@@ -1305,7 +1300,20 @@ export class PCodeGenerator {
                 if (concurrent > maxSlots) maxSlots = concurrent;
             }
             const scalarCount = this.countFunctionPreEvalScalars(decl);
-            rootArea += maxSlots * this.getFuncTempSlotSize(decl.name) + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+            const tempSize = maxSlots * this.getFuncTempSlotSize(decl.name) + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+
+            if (decl.name.startsWith('on_')) {
+                let localsSize = 0;
+                for (const v of sym.localVariables) {
+                    localsSize += v.dataType?.size ?? 2;
+                }
+                rootArea += Math.max(localsSize, tempSize);
+            } else {
+                for (const v of sym.localVariables) {
+                    rootArea += v.dataType?.size ?? 2;
+                }
+                rootArea += tempSize;
+            }
 
             if (rootArea > maxRootArea) maxRootArea = rootArea;
         }
@@ -1607,6 +1615,10 @@ export class PCodeGenerator {
                 params = (sym as SyscallSymbol).parameters;
             } else if (sym?.kind === SymbolKind.Function || sym?.kind === SymbolKind.Sub) {
                 params = (sym as FunctionSymbol).parameters;
+                const fn = sym as FunctionSymbol;
+                if (fn.returnType && isString(fn.returnType)) {
+                    count++;
+                }
             }
         } else if (callExpr.callee.kind === 'MemberExpr' && callExpr.callee.object.kind === 'IdentifierExpr') {
             const objSym = this.symbols.current.lookup(callExpr.callee.object.name);
@@ -3180,6 +3192,9 @@ export class PCodeGenerator {
         const retPtrAddr = this.functionReturnPtrAddr.get(fn.name);
         if (retPtrAddr !== undefined) {
             const targetAddr = this.pendingReturnTarget ?? this.getTempStringAddr(0);
+            if (fn.returnType && isString(fn.returnType) && !this.pendingReturnTarget) {
+                this.emitTempStringInit(targetAddr);
+            }
             this.emitter.emitByte(OP.OPCODE_LEA);
             this.emitter.emitDataAddress(targetAddr);
             this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
