@@ -1,0 +1,15 @@
+include "global.tbh"
+
+sub on_sys_init()
+    dim a as char = 1
+    dim b as byte = 2
+    dim c as short = 3
+    dim d as word = 4
+    dim e as long = 5
+    dim f as dword = 6
+    dim g as float = 7.1
+    dim h as real = 8.2
+    dim i as string = "Hello, World!"
+    dim j as boolean = true
+    
+end sub
