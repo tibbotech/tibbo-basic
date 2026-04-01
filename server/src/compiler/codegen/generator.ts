@@ -57,6 +57,7 @@ export class PCodeGenerator {
     private rootTempScratchSize = 0;
     /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
     private onEventDeclaredLocalBytes = 0;
+    private functionTempSlotSizes = new Map<string, number>();
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -103,6 +104,136 @@ export class PCodeGenerator {
         return n;
     }
 
+    private getFuncTempSlotSize(name: string): number {
+        return this.functionTempSlotSizes.get(name.toLowerCase()) ?? PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+    }
+
+    private currentTempSlotSize(): number {
+        const fn = this.ctx.currentFunction;
+        return fn ? this.getFuncTempSlotSize(fn.name) : PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+    }
+
+    private computeAllFunctionTempSlotSizes(program: AST.Program): void {
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            const maxLen = this.maxTempStringLenInStatements(decl.body);
+            if (maxLen >= 0) {
+                this.functionTempSlotSizes.set(decl.name.toLowerCase(), 2 + maxLen);
+            }
+        }
+    }
+
+    private maxTempStringLenInStatements(stmts: AST.Statement[]): number {
+        let maxLen = -1;
+        for (const stmt of stmts) {
+            const len = this.maxTempStringLenInNode(stmt);
+            if (len > maxLen) maxLen = len;
+            if (stmt.kind === 'IfStmt') {
+                const t = this.maxTempStringLenInStatements(stmt.thenBody);
+                if (t > maxLen) maxLen = t;
+                for (const br of stmt.elseIfBranches) {
+                    const b = this.maxTempStringLenInStatements(br.body);
+                    if (b > maxLen) maxLen = b;
+                }
+                if (stmt.elseBody) {
+                    const e = this.maxTempStringLenInStatements(stmt.elseBody);
+                    if (e > maxLen) maxLen = e;
+                }
+            } else if (stmt.kind === 'WhileStmt') {
+                const w = this.maxTempStringLenInStatements(stmt.body);
+                if (w > maxLen) maxLen = w;
+            } else if (stmt.kind === 'ForStmt') {
+                const f = this.maxTempStringLenInStatements(stmt.body);
+                if (f > maxLen) maxLen = f;
+            } else if (stmt.kind === 'DoLoopStmt') {
+                const d = this.maxTempStringLenInStatements(stmt.body);
+                if (d > maxLen) maxLen = d;
+            } else if (stmt.kind === 'SelectCaseStmt') {
+                for (const c of stmt.cases) {
+                    const cs = this.maxTempStringLenInStatements(c.body);
+                    if (cs > maxLen) maxLen = cs;
+                }
+                if (stmt.defaultCase) {
+                    const dc = this.maxTempStringLenInStatements(stmt.defaultCase);
+                    if (dc > maxLen) maxLen = dc;
+                }
+            }
+        }
+        return maxLen;
+    }
+
+    private maxTempStringLenInNode(node: unknown): number {
+        if (!node || typeof node !== 'object') return -1;
+        const n = node as Record<string, unknown>;
+        let maxLen = -1;
+        if (n.kind === 'CallExpr') {
+            const len = this.maxTempStringLenForCall(n as unknown as AST.CallExpr);
+            if (len > maxLen) maxLen = len;
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const c of child) {
+                    const cl = this.maxTempStringLenInNode(c);
+                    if (cl > maxLen) maxLen = cl;
+                }
+            } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                const cl = this.maxTempStringLenInNode(child);
+                if (cl > maxLen) maxLen = cl;
+            }
+        }
+        return maxLen;
+    }
+
+    private maxTempStringLenForCall(callExpr: AST.CallExpr): number {
+        let maxLen = -1;
+        let params: VariableSymbol[] | undefined;
+
+        if (callExpr.callee.kind === 'IdentifierExpr') {
+            const sym = this.symbols.current.lookup(callExpr.callee.name);
+            if (sym?.kind === SymbolKind.Syscall) {
+                const sc = sym as SyscallSymbol;
+                params = sc.parameters;
+                if (sc.returnType && isString(sc.returnType)) maxLen = 255;
+            } else if (sym?.kind === SymbolKind.Function || sym?.kind === SymbolKind.Sub) {
+                const fn = sym as FunctionSymbol;
+                params = fn.parameters;
+                if (fn.returnType && isString(fn.returnType)) maxLen = 255;
+            }
+        } else if (callExpr.callee.kind === 'MemberExpr' && callExpr.callee.object.kind === 'IdentifierExpr') {
+            const objSym = this.symbols.current.lookup(callExpr.callee.object.name);
+            if (objSym?.kind === SymbolKind.Object) {
+                const fn = (objSym as ObjectSymbol).functions.get(callExpr.callee.property.toLowerCase());
+                if (fn) {
+                    params = fn.parameters;
+                    if (fn.returnType && isString(fn.returnType)) maxLen = 255;
+                }
+            }
+        }
+
+        if (!params) return maxLen;
+
+        for (let i = 0; i < callExpr.args.length && i < params.length; i++) {
+            const param = params[i];
+            const arg = callExpr.args[i];
+            const paramDt = param.dataType;
+            const isStringParam = paramDt && isString(paramDt);
+            const isByRefParam = param.isByRef;
+
+            if (isByRefParam || isStringParam) {
+                if (arg.kind === 'IdentifierExpr') continue;
+                if (arg.kind === 'StringLiteral') {
+                    if (arg.value.length > maxLen) maxLen = arg.value.length;
+                } else {
+                    maxLen = 255;
+                }
+            }
+        }
+
+        return maxLen;
+    }
+
     private onEventScratchSkip(): number {
         const fn = this.ctx.currentFunction;
         if (!fn?.name.startsWith('on_')) return 0;
@@ -110,21 +241,23 @@ export class PCodeGenerator {
     }
 
     private getTempStringAddr(slot = 0): number {
+        const slotSize = this.currentTempSlotSize();
         const fn = this.ctx.currentFunction;
         if (fn) {
             const fnBase = this.functionTempBase.get(fn.name);
             if (fnBase !== undefined) {
-                return fnBase + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                return fnBase + slot * slotSize;
             }
         }
         const skip = this.onEventScratchSkip();
-        return this.tempScratchBase + skip + slot * PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+        return this.tempScratchBase + skip + slot * slotSize;
     }
 
     private getTempScalarAddr(slot = 0): number {
+        const slotSize = this.currentTempSlotSize();
         const skip = this.onEventScratchSkip();
         return this.tempScratchBase + skip
-            + PCodeGenerator.TEMP_STRING_SLOT_COUNT * PCodeGenerator.TEMP_STRING_SLOT_SIZE
+            + PCodeGenerator.TEMP_STRING_SLOT_COUNT * slotSize
             + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
     }
 
@@ -137,6 +270,7 @@ export class PCodeGenerator {
         this.buildSyscallMap();
         this.allocateGlobalVariables(program);
         this.buildCallGraph(program);
+        this.computeAllFunctionTempSlotSizes(program);
         this.stackSize = this.computeStackSize();
         this.allocateFunctionFrames(program);
 
@@ -738,7 +872,7 @@ export class PCodeGenerator {
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
             const complexCalls: AST.CallExpr[] = [];
             this.collectComplexStrCalls(expr, complexCalls);
-            const scalarBase = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+            const scalarBase = tempAddr + this.currentTempSlotSize();
             for (let i = 0; i < complexCalls.length; i++) {
                 const call = complexCalls[i];
                 this.generateExpression(call.args[0]);
@@ -841,7 +975,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName(isFirst ? 'strcpy' : 'strcat');
             }
         } else if (expr.kind === 'MemberExpr') {
-            const sourceAddr = isFirst ? tempAddr : tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
+            const sourceAddr = isFirst ? tempAddr : tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
             if (this.tryEmitPropertyGetterDirect(expr, sourceAddr)) {
                 if (!isFirst) {
                     this.emitLeaToArg(tempAddr, 0);
@@ -866,7 +1000,7 @@ export class PCodeGenerator {
         if (expr.kind === 'CallExpr') {
             const folded = this.tryFoldStrCall(expr);
             if (folded !== null) {
-                const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
+                const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
                 this.emitTempStringInit(litAddr, folded.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
                 this.emitter.emitDataAddress(litAddr);
@@ -880,7 +1014,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName('strcat');
                 return;
             }
-            const callResultAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
+            const callResultAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
             if (this.emitStringCallResultToAddr(expr, callResultAddr)) {
                 this.emitLeaToArg(tempAddr, 0);
                 this.emitLeaToArg(callResultAddr, 1);
@@ -890,7 +1024,7 @@ export class PCodeGenerator {
         }
 
         if (expr.kind === 'StringLiteral') {
-            const litAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
+            const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
             this.emitTempStringInit(litAddr, expr.value.length);
             this.emitter.emitByte(OP.OPCODE_LEA);
             this.emitter.emitDataAddress(litAddr);
@@ -917,7 +1051,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName('strcat');
             }
         } else if (expr.kind === 'MemberExpr') {
-            const sourceAddr = tempAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE + this.preEvalMap.size * 4;
+            const sourceAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
             if (this.tryEmitPropertyGetterDirect(expr, sourceAddr)) {
                 this.emitLeaToArg(sourceAddr, 1);
                 this.emitSyscallByName('strcat');
@@ -1158,7 +1292,7 @@ export class PCodeGenerator {
                 if (concurrent > maxSlots) maxSlots = concurrent;
             }
             const scalarCount = this.countFunctionPreEvalScalars(decl);
-            rootArea += maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+            rootArea += maxSlots * this.getFuncTempSlotSize(decl.name) + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
             if (rootArea > maxRootArea) maxRootArea = rootArea;
         }
@@ -1264,7 +1398,7 @@ export class PCodeGenerator {
                     }
                     const scalarCountTail = this.countFunctionPreEvalScalars(decl);
                     const tailTempSize =
-                        maxSlotsTail * PCodeGenerator.TEMP_STRING_SLOT_SIZE +
+                        maxSlotsTail * this.getFuncTempSlotSize(fnName) +
                         scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
                     if (tailTempSize > 0) {
                         const tempBase = paramBase + liveParamOffset;
@@ -1347,7 +1481,7 @@ export class PCodeGenerator {
                 if (concurrent > maxSlots) maxSlots = concurrent;
             }
             const scalarCount = this.countFunctionPreEvalScalars(decl);
-            const tempFootprint = maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE
+            const tempFootprint = maxSlots * this.getFuncTempSlotSize(decl.name)
                 + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
             frameSizes.set(decl.name, declaredSize);
@@ -1370,25 +1504,11 @@ export class PCodeGenerator {
         }
         this.rootTempScratchSize = maxRootTempExt;
 
-        const getChainSize = (name: string, counted: Set<string>): number => {
-            if (counted.has(name)) return 0;
-            counted.add(name);
-            const ownSize = frameSizes.get(name) ?? 0;
-            const calls = this.callGraph.get(name);
-            let calleeTotal = 0;
-            if (calls) {
-                for (const c of calls) {
-                    calleeTotal += getChainSize(c, counted);
-                }
-            }
-            return ownSize + calleeTotal;
-        };
-
         for (const [name] of frameSizes) {
             if (calledFunctions.has(name)) continue;
-            const chainTotal = getChainSize(name, new Set<string>());
-            if (chainTotal > this.localAllocSize) {
-                this.localAllocSize = chainTotal;
+            const rootSize = frameSizes.get(name) ?? 0;
+            if (rootSize > this.localAllocSize) {
+                this.localAllocSize = rootSize;
             }
         }
     }
@@ -1571,7 +1691,7 @@ export class PCodeGenerator {
                     }
                 }
 
-                const slot1Offset = PCodeGenerator.TEMP_STRING_SLOT_SIZE +
+                const slot1Offset = this.getFuncTempSlotSize(fn.name) +
                     scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
                 for (let i = 0; i < slotAssignments.length; i++) {
@@ -1595,7 +1715,7 @@ export class PCodeGenerator {
             }
 
             if (scalarCount > 0) {
-                const scalarAddr = tempBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                const scalarAddr = tempBase + this.getFuncTempSlotSize(fn.name);
                 const nrVar: VariableSymbol = {
                     name: '_tmp_numeric_result',
                     kind: SymbolKind.Variable,
@@ -2834,6 +2954,10 @@ export class PCodeGenerator {
 
             if (sym.kind === SymbolKind.Function || sym.kind === SymbolKind.Sub) {
                 const fn = sym as FunctionSymbol;
+                if (expr.args.length !== fn.parameters.length) {
+                    this.diagnostics.error(expr.callee.loc, `Too ${expr.args.length > fn.parameters.length ? 'many' : 'few'} arguments for '${name}': expected ${fn.parameters.length}, got ${expr.args.length}`);
+                    return;
+                }
                 this.emitFunctionCall(fn, expr.args);
                 if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name)) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');

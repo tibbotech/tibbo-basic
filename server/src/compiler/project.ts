@@ -95,6 +95,9 @@ export class ProjectCompiler {
     constructor(projectPath: string, platformsPath?: string, options?: ProjectCompilerOptions) {
         this.projectPath = projectPath;
         this.platformsPath = platformsPath || path.join(projectPath, 'Platforms');
+        if (!fs.existsSync(this.platformsPath)) {
+            this.platformsPath = path.join(__dirname, '..', '..', '..', 'platforms', 'Platforms');
+        }
         this.diagnostics = new DiagnosticCollection();
         this.options = options || {};
 
