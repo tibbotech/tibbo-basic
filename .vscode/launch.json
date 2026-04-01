@@ -134,6 +134,23 @@
 				"program": "${workspaceFolder}/server/node_modules/jest/bin/jest"
 			}
 		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Compiler test tmake",
+			"cwd": "${workspaceFolder}/server",
+			"program": "${workspaceFolder}/server/node_modules/.bin/jest",
+			"args": [
+				"tests/compiler/tmake-js-opcode-parity.test.ts",
+				"--runInBand"
+			],
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"disableOptimisticBPs": true,
+			"windows": {
+				"program": "${workspaceFolder}/server/node_modules/jest/bin/jest"
+			}
+		},
 	],
 	"compounds": [
 		{
