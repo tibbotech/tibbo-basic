@@ -2916,7 +2916,7 @@ export class PCodeGenerator {
                     const argSym = this.symbols.current.lookup(argExpr.name);
                     if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
                         const aVarSym = argSym as VariableSymbol;
-                        this.emitter.emitByte(OP.OPCODE_LEA);
+                        this.emitter.emitByte(aVarSym.isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
                         this.emitVarDataAddress(aVarSym);
                         this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
                         if (fn.isDeclare) {
@@ -2927,7 +2927,13 @@ export class PCodeGenerator {
                         continue;
                     }
                 }
+                const tempAddr = this.getTempScalarAddr(0);
                 this.generateExpression(argExpr);
+                const byRefStoreOp = getStoreOpcode(param.dataType ?? BUILTIN_TYPES.word);
+                this.emitter.emitByte(byRefStoreOp | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitter.emitByte(OP.OPCODE_LEA);
+                this.emitter.emitDataAddress(tempAddr);
                 this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
                 if (fn.isDeclare) {
                     this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
