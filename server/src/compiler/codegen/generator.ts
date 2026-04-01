@@ -160,6 +160,8 @@ export class PCodeGenerator {
         this.generateGlobalInit(program);
         this.emitter.endInit();
 
+        this.emitUnimplementedEventStub();
+
         for (const decl of program.declarations) {
             if (!this.isFromCurrentFile(decl)) continue;
             switch (decl.kind) {
@@ -169,6 +171,15 @@ export class PCodeGenerator {
         }
 
         this.emitter.resolveLabels();
+    }
+
+    private emitUnimplementedEventStub(): void {
+        const hasUnimplementedEvent = this.symbols.globalScope.getAllSymbols().some(
+            s => s.kind === SymbolKind.Event
+        );
+        if (hasUnimplementedEvent) {
+            this.emitter.emitByte(OP.OPCODE_RET);
+        }
     }
 
     /**
@@ -1339,7 +1350,7 @@ export class PCodeGenerator {
             const tempFootprint = maxSlots * PCodeGenerator.TEMP_STRING_SLOT_SIZE
                 + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
-            frameSizes.set(decl.name, declaredSize + tempFootprint);
+            frameSizes.set(decl.name, declaredSize);
             tempFootprints.set(decl.name, tempFootprint);
         }
 

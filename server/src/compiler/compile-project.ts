@@ -44,7 +44,7 @@ function main(): void {
             projectFolder = arg;
         }
     }
-
+    platformsPath = path.join(__dirname, '..', '..', '..', 'platforms', 'Platforms');
     if (!projectFolder) {
         console.error('Error: No project folder specified');
         printUsage();
