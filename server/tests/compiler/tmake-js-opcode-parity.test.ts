@@ -172,7 +172,7 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
     it.each(TPR_PROJECT_DIRS.map(d => [projectLabel(d), d] as const))(
         'matches disassembled Code: tmake PDB vs JS TPC (TBIN Code section) — %s',
         async (label, projectDir) => {
-            console.log(`compiling ${projectDir}`);
+            // console.log(`compiling ${projectDir}`);
             const refPdb = await runTmake(projectDir);
 
             const refFromPdb = disassembleBinaryToLines(refPdb);

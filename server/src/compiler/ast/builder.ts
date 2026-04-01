@@ -791,7 +791,32 @@ export class ASTBuilder {
 
     private visitType(ctx: any): AST.BaseTypeNode | AST.ComplexTypeNode {
         const baseCtx = this.findRule(ctx, TibboBasicParser.RULE_baseType);
-        if (baseCtx) return this.visitBaseType(baseCtx);
+        if (baseCtx) {
+            const node = this.visitBaseType(baseCtx);
+            if (node.baseType === AST.BaseTypeKind.String && !node.stringSize) {
+                const lparen = this.findToken(ctx, TibboBasicLexer.LPAREN);
+                if (lparen) {
+                    const intLit = this.findToken(ctx, TibboBasicLexer.INTEGERLITERAL);
+                    if (intLit) {
+                        node.stringSize = {
+                            kind: 'IntegerLiteral',
+                            value: parseInt(intLit.text, 10),
+                            loc: this.loc(ctx),
+                        };
+                    } else {
+                        const ident = this.findToken(ctx, TibboBasicLexer.IDENTIFIER);
+                        if (ident) {
+                            node.stringSize = {
+                                kind: 'IdentifierExpr',
+                                name: ident.text,
+                                loc: this.loc(ctx),
+                            };
+                        }
+                    }
+                }
+            }
+            return node;
+        }
         const complexCtx = this.findRule(ctx, TibboBasicParser.RULE_complexType);
         if (complexCtx) return this.visitComplexType(complexCtx);
         // Fallback: try parsing children

@@ -303,7 +303,9 @@ export class PCodeGenerator {
         this.generateGlobalInit(program);
         this.emitter.endInit();
 
-        this.emitUnimplementedEventStub();
+        if (this.emitter.initSize === 0) {
+            this.emitUnimplementedEventStub();
+        }
 
         for (const decl of program.declarations) {
             if (!this.isFromCurrentFile(decl)) continue;
@@ -1816,7 +1818,8 @@ export class PCodeGenerator {
 
                 if (isString(dt)) {
                     const strType = dt as StringDataType;
-                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
+                    const loadOp = strType.maxLength <= 127 ? OP.OPCODE_LOA16I : OP.OPCODE_LOA16;
+                    this.emitter.emitByte(loadOp | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(strType.maxLength << 8);
                     this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
                     this.emitVarDataAddress(sym);
@@ -2472,7 +2475,8 @@ export class PCodeGenerator {
 
             if (dt && isString(dt)) {
                 const strType = dt as StringDataType;
-                this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_IMMEDIATE);
+                const loadOp = strType.maxLength <= 127 ? OP.OPCODE_LOA16I : OP.OPCODE_LOA16;
+                this.emitter.emitByte(loadOp | OP.OPCODE_IMMEDIATE);
                 this.emitter.emitWord(strType.maxLength << 8);
                 this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
                 this.emitter.emitDataAddress(addr);

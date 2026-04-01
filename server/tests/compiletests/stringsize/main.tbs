@@ -1,0 +1,11 @@
+include "global.tbh"
+
+dim longstr as string(20)="helloworld"
+dim defaultstring as string="defaultstring"
+
+sub on_sys_init()
+    dim astring as string(3) = "abc"
+    sys.debugprint("astring: " + astring)
+    sys.debugprint("longstr: " + longstr)
+    sys.debugprint("defaultstring: " + defaultstring)
+end sub
