@@ -152,7 +152,7 @@ export default class TOBJ {
 
     parseScopes(): void {
         //TOBJ_SECTION_SCOPES
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_SCOPES].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_SCOPES]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -184,7 +184,7 @@ export default class TOBJ {
 
     parseVariables(): void {
         //TOBJ_SECTION_VARIABLES
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_VARIABLES].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_VARIABLES]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -278,7 +278,7 @@ export default class TOBJ {
 
     parseFunctions(): void {
         //TOBJ_SECTION_FUNCTIONS
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_FUNCTIONS].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_FUNCTIONS]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -320,7 +320,7 @@ export default class TOBJ {
 
     parseLines(): void {
         //TOBJ_SECTION_LINE_INFO
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_LINE_INFO].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_LINE_INFO]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -348,7 +348,7 @@ export default class TOBJ {
 
     parseAddresses(): void {
         //TOBJ_ADDRESS_ENTRY
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_ADDRESSES].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_ADDRESSES]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -385,7 +385,7 @@ export default class TOBJ {
 
     parseObjects(): void {
         //TOBJ_OBJECT_ENTRY
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_OBJECTS].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_OBJECTS]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
@@ -414,7 +414,7 @@ export default class TOBJ {
 
     parseTypes(): void {
         //TOBJ_TYPE_ENTRY
-        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_TYPES].buffer;
+        const buf = this.descriptors[TOBJ_SECTION_DESCRIPTOR.TOBJ_SECTION_TYPES]?.buffer;
         let index = 0;
         if (buf == undefined) {
             return;
