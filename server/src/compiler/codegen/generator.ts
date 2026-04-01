@@ -58,6 +58,7 @@ export class PCodeGenerator {
     /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
     private onEventDeclaredLocalBytes = 0;
     private functionTempSlotSizes = new Map<string, number>();
+    private pendingReturnTarget: number | undefined;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -232,6 +233,14 @@ export class PCodeGenerator {
         }
 
         return maxLen;
+    }
+
+    private canDirectReturnTo(callExpr: AST.CallExpr): boolean {
+        if (callExpr.callee.kind !== 'IdentifierExpr') return false;
+        const sym = this.symbols.current.lookup(callExpr.callee.name);
+        if (!sym || sym.kind !== SymbolKind.Function) return false;
+        const fn = sym as FunctionSymbol;
+        return !!fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name);
     }
 
     private onEventScratchSkip(): number {
@@ -1207,7 +1216,7 @@ export class PCodeGenerator {
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            if (offset > this.localAllocSize) {
+            if (!decl.name.startsWith('on_') && offset > this.localAllocSize) {
                 this.localAllocSize = offset;
             }
         }
@@ -1281,8 +1290,10 @@ export class PCodeGenerator {
             for (const p of sym.parameters) {
                 rootArea += p.isByRef ? 4 : (p.dataType?.size ?? 2);
             }
-            for (const v of sym.localVariables) {
-                rootArea += v.dataType?.size ?? 2;
+            if (!decl.name.startsWith('on_')) {
+                for (const v of sym.localVariables) {
+                    rootArea += v.dataType?.size ?? 2;
+                }
             }
 
             const perStmt = this.countTempVarsPerStatement(decl.body);
@@ -1308,109 +1319,116 @@ export class PCodeGenerator {
             for (const c of calls) calledFunctions.add(c);
         }
 
-        const ordered = this.getCallChainOrder(calledFunctions);
+        const roots: string[] = [];
+        for (const name of this.callGraph.keys()) {
+            if (!calledFunctions.has(name)) roots.push(name);
+        }
 
-        let liveParamOffset = 0;
-        let deadParamTotal = 0;
+        const depthMap = new Map<string, number>();
+        const assignDepth = (caller: string, parentDepth: number) => {
+            const calls = this.callGraph.get(caller);
+            if (!calls) return;
+            for (const c of calls) {
+                if (!calledFunctions.has(c)) continue;
+                const childDepth = parentDepth + 1;
+                const existing = depthMap.get(c);
+                if (existing !== undefined && existing >= childDepth) continue;
+                depthMap.set(c, childDepth);
+                assignDepth(c, childDepth);
+            }
+        };
+        for (const root of roots) assignDepth(root, 0);
 
-        for (const fnName of ordered) {
-            const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
-            if (!sym) continue;
+        const maxDepth = depthMap.size > 0 ? Math.max(...depthMap.values()) : 0;
+        const depthGroups: string[][] = [];
+        for (let d = 1; d <= maxDepth; d++) {
+            const group: string[] = [];
+            for (const [name, depth] of depthMap) {
+                if (depth === d) group.push(name);
+            }
+            if (group.length > 0) depthGroups.push(group);
+        }
 
-            const isLive = this.liveReachable.has(fnName);
-            const isFuncWithReturn = sym.kind === SymbolKind.Function && !!sym.returnType;
+        let depthOffset = 0;
+        for (const group of depthGroups) {
+            let maxGroupFrameSize = 0;
 
-            if (isLive) {
-                for (let i = 0; i < sym.parameters.length; i++) {
-                    const v = sym.parameters[i];
-                    v.address = paramBase + liveParamOffset;
-                    if (this.resolveDataAddresses) {
-                        const labelName = `?A:${sym.name}:${i}`;
-                        this.localVarLabelMap.set(v, labelName);
-                        this.emitter.defineDataLabel(labelName, v.address);
-                    }
-                    liveParamOffset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
-                }
-                if (isFuncWithReturn) {
-                    const retPtrAddr = paramBase + liveParamOffset;
-                    this.functionReturnPtrAddr.set(fnName, retPtrAddr);
-                    liveParamOffset += 4;
+            for (const fnName of group) {
+                const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
+                if (!sym) continue;
+                const isLive = this.liveReachable.has(fnName);
+                const isFuncWithReturn = sym.kind === SymbolKind.Function && !!sym.returnType;
 
-                    const retVar = sym.localVariables.find(
-                        v => v.name.toLowerCase() === sym.name.toLowerCase()
-                    );
-                    if (retVar) {
-                        retVar.address = retPtrAddr;
-                        retVar.isByRef = true;
+                let offset = depthOffset;
+
+                if (isLive) {
+                    for (let i = 0; i < sym.parameters.length; i++) {
+                        const v = sym.parameters[i];
+                        v.address = paramBase + offset;
                         if (this.resolveDataAddresses) {
-                            const retLabelName = `?A:${sym.name}:${sym.parameters.length + 1}`;
-                            this.localVarLabelMap.set(retVar, retLabelName);
-                            this.emitter.defineDataLabel(retLabelName, retPtrAddr);
+                            const labelName = `?A:${sym.name}:${i}`;
+                            this.localVarLabelMap.set(v, labelName);
+                            this.emitter.defineDataLabel(labelName, v.address);
+                        }
+                        offset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
+                    }
+                    if (isFuncWithReturn) {
+                        const retPtrAddr = paramBase + offset;
+                        this.functionReturnPtrAddr.set(fnName, retPtrAddr);
+                        offset += 4;
+
+                        const retVar = sym.localVariables.find(
+                            v => v.name.toLowerCase() === sym.name.toLowerCase()
+                        );
+                        if (retVar) {
+                            retVar.address = retPtrAddr;
+                            retVar.isByRef = true;
+                            if (this.resolveDataAddresses) {
+                                const retLabelName = `?A:${sym.name}:${sym.parameters.length + 1}`;
+                                this.localVarLabelMap.set(retVar, retLabelName);
+                                this.emitter.defineDataLabel(retLabelName, retPtrAddr);
+                            }
+                        }
+                    }
+                    for (const v of sym.localVariables) {
+                        if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
+                        v.address = paramBase + offset;
+                        offset += v.dataType?.size ?? 2;
+                    }
+                }
+
+                if (isLive) {
+                    const decl = program.declarations.find(d =>
+                        (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
+                    );
+                    if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
+                        const perStmtTail = this.countTempVarsPerStatement(decl.body);
+                        let maxSlotsTail = 0;
+                        for (const n of perStmtTail) {
+                            const concurrent = n >= 2 ? 2 : n;
+                            if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
+                        }
+                        const scalarCountTail = this.countFunctionPreEvalScalars(decl);
+                        const tailTempSize =
+                            maxSlotsTail * this.getFuncTempSlotSize(fnName) +
+                            scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+                        if (tailTempSize > 0) {
+                            this.functionTempBase.set(fnName, paramBase + offset);
+                            offset += tailTempSize;
                         }
                     }
                 }
-            } else {
-                for (const p of sym.parameters) {
-                    deadParamTotal += p.isByRef ? 4 : (p.dataType?.size ?? 2);
-                }
-                if (isFuncWithReturn) {
-                    deadParamTotal += 4;
-                }
+
+                const fnFrameSize = offset - depthOffset;
+                if (fnFrameSize > maxGroupFrameSize) maxGroupFrameSize = fnFrameSize;
             }
 
-            const hasCallees = (this.callGraph.get(fnName)?.size ?? 0) > 0;
-
-            let localOffset = 0;
-            if (isLive) {
-                for (const v of sym.localVariables) {
-                    if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
-                        continue;
-                    }
-                    v.address = paramBase + liveParamOffset + localOffset;
-                    localOffset += v.dataType?.size ?? 2;
-                }
-            } else {
-                for (const v of sym.localVariables) {
-                    if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) {
-                        continue;
-                    }
-                    localOffset += v.dataType?.size ?? 2;
-                }
-            }
-
-            if (isLive) {
-                liveParamOffset += localOffset;
-            } else {
-                deadParamTotal += localOffset;
-            }
-
-            if (isLive) {
-                const decl = program.declarations.find(d =>
-                    (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
-                );
-                if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
-                    // Must match registerTempVariables: same perStmt / maxSlots / scalarCount as full body.
-                    const perStmtTail = this.countTempVarsPerStatement(decl.body);
-                    let maxSlotsTail = 0;
-                    for (const n of perStmtTail) {
-                        const concurrent = n >= 2 ? 2 : n;
-                        if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
-                    }
-                    const scalarCountTail = this.countFunctionPreEvalScalars(decl);
-                    const tailTempSize =
-                        maxSlotsTail * this.getFuncTempSlotSize(fnName) +
-                        scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
-                    if (tailTempSize > 0) {
-                        const tempBase = paramBase + liveParamOffset;
-                        this.functionTempBase.set(fnName, tempBase);
-                        liveParamOffset += tailTempSize;
-                    }
-                }
-            }
+            depthOffset += maxGroupFrameSize;
         }
-        const chainSize = maxRootArea + liveParamOffset + deadParamTotal;
-        if (chainSize > this.localAllocSize) {
-            this.localAllocSize = chainSize;
+
+        const totalSize = maxRootArea + depthOffset;
+        if (totalSize > this.localAllocSize) {
+            this.localAllocSize = totalSize;
         }
     }
 
@@ -1499,13 +1517,20 @@ export class PCodeGenerator {
             if (tempFp === 0) continue;
             const fn = this.symbols.lookupGlobal(name) as FunctionSymbol | undefined;
             if (!fn) continue;
-            const ext = this.eventFramePrefixBytes(fn) + tempFp;
+            let prefix = 0;
+            if (fn.name.startsWith('on_')) {
+                for (const p of fn.parameters) prefix += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+            } else {
+                prefix = this.eventFramePrefixBytes(fn);
+            }
+            const ext = prefix + tempFp;
             if (ext > maxRootTempExt) maxRootTempExt = ext;
         }
         this.rootTempScratchSize = maxRootTempExt;
 
         for (const [name] of frameSizes) {
             if (calledFunctions.has(name)) continue;
+            if (name.startsWith('on_')) continue;
             const rootSize = frameSizes.get(name) ?? 0;
             if (rootSize > this.localAllocSize) {
                 this.localAllocSize = rootSize;
@@ -1681,7 +1706,13 @@ export class PCodeGenerator {
             if (total === 0 && scalarCount === 0) continue;
 
             const fnTempBase = this.functionTempBase.get(fn.name);
-            const tempBase = fnTempBase ?? this.tempScratchBase + this.eventFramePrefixBytes(fn);
+            let rootPrefix = 0;
+            if (fn.name.startsWith('on_')) {
+                for (const p of fn.parameters) rootPrefix += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+            } else {
+                rootPrefix = this.eventFramePrefixBytes(fn);
+            }
+            const tempBase = fnTempBase ?? this.tempScratchBase + rootPrefix;
 
             if (total > 0) {
                 const slotAssignments: number[] = [];
@@ -2463,6 +2494,10 @@ export class PCodeGenerator {
                     this.generateStringAssignment(varSym, stmt.initializer);
                 } else if (this.tryEmitPropertyGetterDirect(stmt.initializer, addr)) {
                     // Property getter stores directly to local var
+                } else if (stmt.initializer.kind === 'CallExpr' && this.canDirectReturnTo(stmt.initializer as AST.CallExpr)) {
+                    this.pendingReturnTarget = addr;
+                    this.generateExpression(stmt.initializer);
+                    this.pendingReturnTarget = undefined;
                 } else {
                     this.generateExpression(stmt.initializer);
                     this.emitStore(varSym);
@@ -2959,7 +2994,7 @@ export class PCodeGenerator {
                     return;
                 }
                 this.emitFunctionCall(fn, expr.args);
-                if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name)) {
+                if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name) && !this.pendingReturnTarget) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
                     this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
                     this.emitter.emitDataAddress(this.getTempStringAddr(0));
@@ -3140,8 +3175,9 @@ export class PCodeGenerator {
 
         const retPtrAddr = this.functionReturnPtrAddr.get(fn.name);
         if (retPtrAddr !== undefined) {
+            const targetAddr = this.pendingReturnTarget ?? this.getTempStringAddr(0);
             this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddress(this.getTempStringAddr(0));
+            this.emitter.emitDataAddress(targetAddr);
             this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
             this.emitter.emitDataAddress(retPtrAddr);
         }
