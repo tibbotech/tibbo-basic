@@ -1,0 +1,11 @@
+include "global.tbh"
+
+sub asdf()
+
+end sub
+
+sub on_sys_init()
+    
+    sys.debugprint("on_sys_init")
+    asdf("asdf")
+end sub

@@ -1,0 +1,12 @@
+include "global.tbh"
+
+sub test()
+    dim a as byte=0
+    ' a = 1
+    ' sys.debugprint("a: " + str(a))
+end sub
+
+sub on_sys_init()
+    sys.debugprint("on_sys_init")
+    test()
+end sub

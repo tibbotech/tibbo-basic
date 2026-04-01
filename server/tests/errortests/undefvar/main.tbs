@@ -1,0 +1,6 @@
+include "global.tbh"
+
+sub on_sys_init()
+    asdf
+    sys.debugprint("on_sys_init")
+end sub

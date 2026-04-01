@@ -168,40 +168,40 @@ function logFirstMismatch(
     }
 }
 
-describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr projects)', () => {
-    it.each(TPR_PROJECT_DIRS.map(d => [projectLabel(d), d] as const))(
-        'matches disassembled Code: tmake PDB vs JS TPC (TBIN Code section) — %s',
-        async (label, projectDir) => {
-            console.log(`compiling ${projectDir}`);
-            const refPdb = await runTmake(projectDir);
-
-            const refFromPdb = disassembleBinaryToLines(refPdb);
-            const refCodeSection = disassembleBinarySectionToLines(refPdb, TObjSection.Code);
-            expect(refCodeSection).toEqual(refFromPdb);
-            const platformsDir = path.join(projectDir, 'Platforms');
-            let platformsPath = platformsDir;
-            if (!fs.existsSync(platformsDir)) {
-                // set to submodule platforms
-                platformsPath = path.join(__dirname, '..', '..', '..', 'platforms', 'Platforms');
-            }
-            const compiler = new ProjectCompiler(projectDir, platformsPath);
+describe('compiler errors', () => {
+    it('should compile with undefined variable error', () => {
+        const projectDir = path.resolve(__dirname, 'undefvar');
+        let platformsPath = projectDir;
+            const compiler = new ProjectCompiler(projectDir);
             // see if platforms directory exists
             
             const result = compiler.compile();
-            expect(result.errors).toHaveLength(0);
-            expect(result.tpc).not.toBeNull();
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain('Undefined identifier: asdf');
+        },
+    );
 
-            const jsTpc = result.tpc!;
-            expect(jsTpc.toString('ascii', 0, 4)).toBe('TBIN');
+    it('should compile with undefined function error', () => {
+        const projectDir = path.resolve(__dirname, 'undeffunc');
+        let platformsPath = projectDir;
+            const compiler = new ProjectCompiler(projectDir);
+            // see if platforms directory exists
+            
+            const result = compiler.compile();
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain('Undefined function or sub:');
+        },
+    );
 
-            const jsFromTpc = disassembleBinaryToLines(jsTpc);
-            const jsCodeSection = disassembleBinarySectionToLines(jsTpc, TObjSection.Code);
-            expect(jsCodeSection).toEqual(jsFromTpc);
-
-            if (refFromPdb.length !== jsFromTpc.length) {
-                logFirstMismatch(label, refFromPdb, jsFromTpc);
-            }
-            expect(jsFromTpc).toEqual(refFromPdb);
+    it('should compile with function signature mismatch error', () => {
+        const projectDir = path.resolve(__dirname, 'funcsignature');
+        let platformsPath = projectDir;
+            const compiler = new ProjectCompiler(projectDir);
+            // see if platforms directory exists
+            
+            const result = compiler.compile();
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain('Too many arguments for \'asdf\': expected 0, got 1');
         },
     );
 });
