@@ -1059,15 +1059,13 @@ export class PCodeGenerator {
                 this.allocateDeadChainInRootArea(decl.name, localBase, offset);
             }
 
-            const localsStartOffset = offset;
             for (const v of sym.localVariables) {
                 v.address = localBase + offset;
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            const localVarsSize = offset - localsStartOffset;
-            if (localVarsSize > this.localAllocSize) {
-                this.localAllocSize = localVarsSize;
+            if (offset > this.localAllocSize) {
+                this.localAllocSize = offset;
             }
         }
     }
@@ -1324,7 +1322,6 @@ export class PCodeGenerator {
 
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
-            if (!this.isFromCurrentFile(decl)) continue;
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
 

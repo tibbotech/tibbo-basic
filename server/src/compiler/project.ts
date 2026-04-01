@@ -840,6 +840,7 @@ export class ProjectCompiler {
 
         const fileSize = currentOffset;
         const baseHdr = buffers[0];
+        const maxLocalAllocSize = buffers.reduce((acc, buf) => Math.max(acc, buf.readUInt32LE(24)), 0);
 
         const w = new BinaryWriter();
         w.writeDword(TOBJ_SIGNATURE_PDB);
@@ -849,7 +850,7 @@ export class ProjectCompiler {
         w.writeDword(baseHdr.readUInt32LE(12)); // platformSize
         w.writeDword(baseHdr.readUInt32LE(16)); // globalAllocSize
         w.writeDword(baseHdr.readUInt32LE(20)); // stackSize
-        w.writeDword(baseHdr.readUInt32LE(24)); // localAllocSize
+        w.writeDword(maxLocalAllocSize); // localAllocSize: max across all OBJs
         w.writeDword(baseHdr.readUInt32LE(28)); // flags
         w.writeDword(baseHdr.readUInt32LE(32)); // projectName
         w.writeDword(baseHdr.readUInt32LE(36)); // buildId
