@@ -59,6 +59,9 @@ export class PCodeGenerator {
     private onEventDeclaredLocalBytes = 0;
     private functionTempSlotSizes = new Map<string, number>();
     private pendingReturnTarget: number | undefined;
+    private projectOverrideStackSize?: number;
+    private minLocalAllocSizeBeforeTemp?: number;
+    private _localAllocSizeBeforeCalledFuncs = 0;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -89,6 +92,18 @@ export class PCodeGenerator {
 
     getStackSize(): number {
         return this.stackSize;
+    }
+
+    getLocalAllocSizeBeforeCalledFuncs(): number {
+        return this._localAllocSizeBeforeCalledFuncs;
+    }
+
+    setProjectOverrideStackSize(size: number): void {
+        this.projectOverrideStackSize = size;
+    }
+
+    setMinLocalAllocSizeBeforeTemp(size: number): void {
+        this.minLocalAllocSizeBeforeTemp = size;
     }
 
     /** Static bytes before scratch (params + all user locals). Used for registerTempVariables / maxRootArea parity. */
@@ -280,13 +295,17 @@ export class PCodeGenerator {
         this.allocateGlobalVariables(program);
         this.buildCallGraph(program);
         this.computeAllFunctionTempSlotSizes(program);
-        this.stackSize = this.computeStackSize();
+        this.stackSize = this.projectOverrideStackSize ?? this.computeStackSize();
         this.allocateFunctionFrames(program);
 
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
         this.includeTempsInLocalAllocSize(program);
+        if (this.minLocalAllocSizeBeforeTemp !== undefined) {
+            this.localAllocSize = Math.max(this.localAllocSize, this.minLocalAllocSizeBeforeTemp);
+        }
         this.tempScratchBase = localBase + this.localAllocSize;
         this.localAllocSize += this.rootTempScratchSize;
+        this._localAllocSizeBeforeCalledFuncs = this.localAllocSize;
 
         const maxRootArea = this.computeMaxRootArea(program);
         this.allocateCalledFunctionParams(program, maxRootArea);
@@ -304,7 +323,14 @@ export class PCodeGenerator {
         this.emitter.endInit();
 
         if (this.emitter.initSize === 0) {
-            this.emitUnimplementedEventStub();
+            const hasEventImpl = program.declarations.some(
+                d => this.isFromCurrentFile(d)
+                    && (d.kind === 'SubDecl' || d.kind === 'FunctionDecl')
+                    && d.name.startsWith('on_'),
+            );
+            if (hasEventImpl) {
+                this.emitUnimplementedEventStub();
+            }
         }
 
         for (const decl of program.declarations) {

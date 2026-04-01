@@ -258,7 +258,17 @@ export class ProjectCompiler {
         let maxLocalAllocSize = 0;
         let maxStackSize = 0;
 
-        // Compile each .tbs file separately into its own OBJ
+        // First pass: compile each .tbs file separately into its own OBJ
+        interface FirstPassEntry {
+            baseName: string;
+            objName: string;
+            perFileSource: string;
+            sourceFilePath: string;
+            headerLineCount: number;
+            result: CompileResult;
+        }
+        const firstPassEntries: FirstPassEntry[] = [];
+
         for (const sf of sourceFiles) {
             const baseName = path.basename(sf.path);
             try {
@@ -303,12 +313,58 @@ export class ProjectCompiler {
                 if (result.stackSize > maxStackSize) {
                     maxStackSize = result.stackSize;
                 }
+                firstPassEntries.push({
+                    baseName, objName, perFileSource, sourceFilePath, headerLineCount, result,
+                });
             } catch (e) {
                 allErrors.push({
                     severity: DiagnosticSeverity.Error,
                     location: { file: baseName, line: 1, column: 0 },
                     message: `Failed to compile ${baseName}: ${e instanceof Error ? e.message : String(e)}`,
                 });
+            }
+        }
+
+        // Second pass: recompile files that need project-wide stackSize / localAllocSize
+        if (firstPassEntries.length > 1 && allErrors.length === 0) {
+            let maxStep4 = 0;
+            for (const entry of firstPassEntries) {
+                if (entry.result.localAllocSizeBeforeCalledFuncs > maxStep4) {
+                    maxStep4 = entry.result.localAllocSizeBeforeCalledFuncs;
+                }
+            }
+
+            for (const entry of firstPassEntries) {
+                const needsRecompile =
+                    entry.result.stackSize < maxStackSize ||
+                    entry.result.localAllocSizeBeforeCalledFuncs < maxStep4;
+                if (!needsRecompile) continue;
+
+                const result = compile(entry.perFileSource, {
+                    fileName: entry.baseName,
+                    flags,
+                    maxEventNumber,
+                    platformSize: this.platformConfig.platformId,
+                    headerLineCount: entry.headerLineCount,
+                    includedFiles,
+                    fileSequence,
+                    sourceFilePath: entry.sourceFilePath,
+                    firmwareVer: this.platformConfig.version,
+                    configStr: this.platformConfig.configStr,
+                    projectName: this.config.name,
+                    projectOverrideStackSize: maxStackSize,
+                    minLocalAllocSizeBeforeTemp: maxStep4,
+                });
+
+                objs.set(entry.objName, result.obj);
+                if (result.initObjDescriptors.length > 0) {
+                    objDescriptors.set(entry.objName, result.initObjDescriptors);
+                } else {
+                    objDescriptors.delete(entry.objName);
+                }
+                if (result.localAllocSize > maxLocalAllocSize) {
+                    maxLocalAllocSize = result.localAllocSize;
+                }
             }
         }
 

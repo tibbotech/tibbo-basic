@@ -35,6 +35,8 @@ export interface CompileOptions {
     sourceMap?: SourceMapEntry[];
     resolveDataAddresses?: boolean;
     stackSize?: number;
+    projectOverrideStackSize?: number;
+    minLocalAllocSizeBeforeTemp?: number;
     projectName?: string;
     buildId?: string;
     configStr?: string;
@@ -54,6 +56,7 @@ export interface CompileResult {
     globalAllocSize: number;
     localAllocSize: number;
     stackSize: number;
+    localAllocSizeBeforeCalledFuncs: number;
     initObjDescriptors: InitObjDescriptor[];
 }
 
@@ -110,6 +113,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         globalAllocSize: 0,
         localAllocSize: 0,
         stackSize: 0,
+        localAllocSizeBeforeCalledFuncs: 0,
         initObjDescriptors: [],
     };
 
@@ -157,6 +161,12 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
             generator.setResolveDataAddresses(true);
             generator.emitter.setAutoTrackDataRefs(true);
         }
+        if (options.projectOverrideStackSize != null) {
+            generator.setProjectOverrideStackSize(options.projectOverrideStackSize);
+        }
+        if (options.minLocalAllocSizeBeforeTemp != null) {
+            generator.setMinLocalAllocSizeBeforeTemp(options.minLocalAllocSizeBeforeTemp);
+        }
         generator.generate(ast);
     } catch (e) {
         diagnostics.error({ file: fileName, line: 1, column: 0 }, `Code generation failed: ${e instanceof Error ? e.message : String(e)}`, 'CODEGEN');
@@ -199,6 +209,7 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         globalAllocSize: generator.getGlobalAllocSize(),
         localAllocSize: generator.getLocalAllocSize(),
         stackSize: generator.getStackSize(),
+        localAllocSizeBeforeCalledFuncs: generator.getLocalAllocSizeBeforeCalledFuncs(),
         initObjDescriptors: generator.emitter.getInitObjDescriptors(),
     };
 }
