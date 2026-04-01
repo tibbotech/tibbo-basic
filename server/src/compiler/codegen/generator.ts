@@ -1046,11 +1046,9 @@ export class PCodeGenerator {
             for (let pi = 0; pi < sym.parameters.length; pi++) {
                 const v = sym.parameters[pi];
                 v.address = localBase + offset;
-                if (this.resolveDataAddresses) {
-                    const labelName = `?A:${sym.name}:${pi}`;
-                    this.localVarLabelMap.set(v, labelName);
-                    this.emitter.defineDataLabel(labelName, v.address);
-                }
+                const labelName = `?A:${sym.name}:${pi}`;
+                this.localVarLabelMap.set(v, labelName);
+                this.emitter.defineDataLabel(labelName, v.address);
                 ordinal++;
                 offset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
             }
@@ -1099,11 +1097,9 @@ export class PCodeGenerator {
             for (let i = 0; i < sym.parameters.length; i++) {
                 const v = sym.parameters[i];
                 v.address = localBase + paramEnd;
-                if (this.resolveDataAddresses) {
-                    const labelName = `?A:${sym.name}:${i}`;
-                    this.localVarLabelMap.set(v, labelName);
-                    this.emitter.defineDataLabel(labelName, v.address);
-                }
+                const labelName = `?A:${sym.name}:${i}`;
+                this.localVarLabelMap.set(v, labelName);
+                this.emitter.defineDataLabel(labelName, v.address);
                 paramEnd += v.isByRef ? 4 : (v.dataType?.size ?? 2);
             }
 
@@ -2898,6 +2894,24 @@ export class PCodeGenerator {
             const argExpr = args[i];
 
             if (param.isByRef) {
+                if (argExpr.kind === 'StringLiteral' && param.dataType && isString(param.dataType)) {
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitTempStringInit(tempAddr, argExpr.value.length);
+                    this.emitLeaArg(tempAddr);
+                    const rdataOff = this.emitter.addStringRData(argExpr.value);
+                    this.emitRDataLoad(rdataOff);
+                    this.emitSyscallArg(1);
+                    this.emitSyscallByName('strload');
+                    this.emitter.emitByte(OP.OPCODE_LEA);
+                    this.emitter.emitDataAddress(tempAddr);
+                    this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
+                    if (fn.isDeclare) {
+                        this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
+                    } else {
+                        this.emitter.emitDataAddress(param.address ?? 0);
+                    }
+                    continue;
+                }
                 if (argExpr.kind === 'IdentifierExpr') {
                     const argSym = this.symbols.current.lookup(argExpr.name);
                     if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
@@ -2905,13 +2919,21 @@ export class PCodeGenerator {
                         this.emitter.emitByte(OP.OPCODE_LEA);
                         this.emitVarDataAddress(aVarSym);
                         this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(param.address ?? 0);
+                        if (fn.isDeclare) {
+                            this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
+                        } else {
+                            this.emitter.emitDataAddress(param.address ?? 0);
+                        }
                         continue;
                     }
                 }
                 this.generateExpression(argExpr);
                 this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(param.address ?? 0);
+                if (fn.isDeclare) {
+                    this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
+                } else {
+                    this.emitter.emitDataAddress(param.address ?? 0);
+                }
                 continue;
             }
 
@@ -2968,7 +2990,11 @@ export class PCodeGenerator {
             this.generateExpression(argExpr);
             const storeOp = getStoreOpcode(paramDt ?? BUILTIN_TYPES.word);
             this.emitter.emitByte(storeOp | OP.OPCODE_DIRECT);
-            this.emitter.emitDataAddress(param.address ?? 0);
+            if (fn.isDeclare) {
+                this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
+            } else {
+                this.emitter.emitDataAddress(param.address ?? 0);
+            }
         }
 
         const retPtrAddr = this.functionReturnPtrAddr.get(fn.name);
