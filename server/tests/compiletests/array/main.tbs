@@ -1,0 +1,12 @@
+include "global.tbh"
+
+dim aa as byte=3
+dim sock_nums(32) as byte
+
+
+sub on_sys_init()
+    dim i as byte=1
+    sock_nums(i) = 2
+    dim zz as byte=sock_nums(1)
+    sys.debugprint(str(zz))
+end sub

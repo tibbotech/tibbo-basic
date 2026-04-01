@@ -6,7 +6,9 @@
 // cross module
 // declarations
 // byref
+// data types
 // byval
 // global
 // enum
 // struct
+// array
