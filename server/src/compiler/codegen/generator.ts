@@ -1936,6 +1936,16 @@ export class PCodeGenerator {
         if (n.kind === 'CallExpr') {
             count += this.countTempVarsForCall(n as unknown as AST.CallExpr);
         }
+        if (n.kind === 'DimStmt') {
+            const dimStmt = n as unknown as AST.DimStmt;
+            if (dimStmt.initializer
+                && dimStmt.initializer.kind === 'BinaryExpr'
+                && (dimStmt.initializer as AST.BinaryExpr).op === AST.BinaryOp.Add
+                && this.isStringExpression(dimStmt.initializer)
+                && this.tryFoldStringConcat(dimStmt.initializer) === null) {
+                count += 1;
+            }
+        }
         for (const key of Object.keys(n)) {
             if (key === 'loc' || key === 'kind') continue;
             const child = n[key];
@@ -2500,8 +2510,11 @@ export class PCodeGenerator {
                 this.emitSyscallArg(1);
                 this.emitSyscallByName('strload');
             } else {
-                this.generateStringAssignment(varSym, value.left);
-                this.emitStringCat(varSym, value.right);
+                const tempAddr = this.getTempStringAddr(0);
+                this.emitStringExprToTemp(value, tempAddr, true);
+                this.emitVarLeaArg(varSym);
+                this.emitLeaToArg(tempAddr, 1);
+                this.emitSyscallByName('strcpy');
             }
         } else if (value.kind === 'MemberExpr') {
             const member = value as AST.MemberExpr;

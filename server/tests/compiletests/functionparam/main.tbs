@@ -4,6 +4,8 @@ sub test4(byref s as string)
     s = "asdfasdf"
     dim baa as string = "asdf" + "zzz"
     sys.debugprint(baa)
+    dim bzz as string = "aaa" + s
+    sys.debugprint(bzz)
 end sub
 
 sub test3(byref s as string)
