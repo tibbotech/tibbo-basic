@@ -925,6 +925,19 @@ export class PCodeGenerator {
                         const storeSize = this.getSyscallParamStoreSize(sc.parameters[0]);
                         this.emitStoreToArgBuffer(0, storeSize);
                         nextOffset = storeSize;
+                    } else if (expr.args.length > 0 && sc.parameters.length > 0
+                               && expr.args[0].kind === 'BinaryExpr') {
+                        const tempAddr = this.getTempStringAddr(0);
+                        const param = sc.parameters[0];
+                        const paramDt = param.dataType ?? BUILTIN_TYPES.word;
+                        this.generateExpression(expr.args[0]);
+                        this.emitter.emitByte(getStoreOpcode(paramDt) | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(tempAddr);
+                        this.emitter.emitByte(getLoadOpcode(paramDt, 'A') | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(tempAddr);
+                        const storeSize = this.getSyscallParamStoreSize(param);
+                        this.emitStoreToArgBuffer(0, storeSize);
+                        nextOffset = storeSize;
                     } else {
                         nextOffset = this.emitSyscallArgsOnly(sc, expr.args, 0);
                     }
@@ -2617,6 +2630,10 @@ export class PCodeGenerator {
                 this.emitInitObjAtAddr(addr, varSym.isByRef, dt);
             }
 
+            if (this.ctx.currentFunction?.name.startsWith('on_') && !varSym.isTemp) {
+                this.onEventDeclaredLocalBytes += varSym.dataType?.size ?? 2;
+            }
+
             if (stmt.initializer) {
                 if (dt && isString(dt) && stmt.initializer.kind === 'StringLiteral') {
                     const strLit = stmt.initializer as AST.StringLiteral;
@@ -2641,10 +2658,6 @@ export class PCodeGenerator {
 
             if (stmt.arrayInitializer && dt && isArray(dt)) {
                 this.emitArrayInitializer(addr, dt, stmt.arrayInitializer, varSym.isByRef);
-            }
-
-            if (this.ctx.currentFunction?.name.startsWith('on_') && !varSym.isTemp) {
-                this.onEventDeclaredLocalBytes += varSym.dataType?.size ?? 2;
             }
         }
     }
