@@ -1401,7 +1401,8 @@ export class PCodeGenerator {
                 for (const v of sym.localVariables) {
                     localsSize += v.dataType?.size ?? 2;
                 }
-                rootArea += Math.max(localsSize, tempSize);
+                const activeFootprint = this.computeOnEventActiveFootprint(decl, sym, tempSize);
+                rootArea += Math.max(localsSize, tempSize, activeFootprint);
             } else {
                 for (const v of sym.localVariables) {
                     rootArea += v.dataType?.size ?? 2;
@@ -1412,6 +1413,82 @@ export class PCodeGenerator {
             if (rootArea > maxRootArea) maxRootArea = rootArea;
         }
         return maxRootArea;
+    }
+
+    private computeOnEventActiveFootprint(
+        decl: AST.SubDecl | AST.FunctionDecl,
+        sym: FunctionSymbol,
+        tempSize: number
+    ): number {
+        const varSizeMap = new Map<string, number>();
+        for (const v of sym.localVariables) {
+            varSizeMap.set(v.name.toLowerCase(), v.dataType?.size ?? 2);
+        }
+
+        let maxFootprint = 0;
+
+        const walkStmts = (stmts: AST.Statement[], declaredBytes: number): void => {
+            for (const stmt of stmts) {
+                const hasTempUsage = this.countTempVarsInNode(stmt) > 0;
+                const returnSize = this.getStmtDiscardedReturnSize(stmt);
+
+                if (hasTempUsage || returnSize > 0) {
+                    const footprint = declaredBytes + (hasTempUsage ? tempSize : 0) + returnSize;
+                    if (footprint > maxFootprint) maxFootprint = footprint;
+                }
+
+                if (stmt.kind === 'DimStmt') {
+                    for (const v of stmt.variables) {
+                        const size = varSizeMap.get(v.name.toLowerCase());
+                        if (size !== undefined) declaredBytes += size;
+                    }
+                }
+
+                if (stmt.kind === 'ForStmt') {
+                    const saved = declaredBytes;
+                    walkStmts(stmt.body, declaredBytes);
+                    declaredBytes = saved;
+                } else if (stmt.kind === 'WhileStmt') {
+                    const saved = declaredBytes;
+                    walkStmts(stmt.body, declaredBytes);
+                    declaredBytes = saved;
+                } else if (stmt.kind === 'IfStmt') {
+                    walkStmts(stmt.thenBody, declaredBytes);
+                    for (const br of stmt.elseIfBranches) {
+                        walkStmts(br.body, declaredBytes);
+                    }
+                    if (stmt.elseBody) {
+                        walkStmts(stmt.elseBody, declaredBytes);
+                    }
+                } else if (stmt.kind === 'DoLoopStmt') {
+                    const saved = declaredBytes;
+                    walkStmts(stmt.body, declaredBytes);
+                    declaredBytes = saved;
+                } else if (stmt.kind === 'SelectCaseStmt') {
+                    for (const c of stmt.cases) {
+                        walkStmts(c.body, declaredBytes);
+                    }
+                    if (stmt.defaultCase) {
+                        walkStmts(stmt.defaultCase, declaredBytes);
+                    }
+                }
+            }
+        };
+
+        walkStmts(decl.body, 0);
+        return maxFootprint;
+    }
+
+    private getStmtDiscardedReturnSize(stmt: AST.Statement): number {
+        if (stmt.kind !== 'ExpressionStmt') return 0;
+        const expr = stmt.expression;
+        if (expr.kind !== 'CallExpr') return 0;
+        if (expr.callee.kind !== 'IdentifierExpr') return 0;
+        const sym = this.symbols.current.lookup(expr.callee.name);
+        if (!sym || sym.kind !== SymbolKind.Function) return 0;
+        const fn = sym as FunctionSymbol;
+        if (!fn.returnType || isString(fn.returnType)) return 0;
+        return fn.returnType.size ?? 2;
     }
 
     private allocateCalledFunctionParams(program: AST.Program, maxRootArea: number): void {
@@ -3309,6 +3386,16 @@ export class PCodeGenerator {
                     this.emitLeaToArg(paramAddr, 0);
                     this.emitLeaToArg(tempAddr, 1);
                     this.emitSyscallByName('strcpy');
+                } else if (argExpr.kind === 'CallExpr' && this.isStringExpression(argExpr)) {
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitStringCallResultToAddr(argExpr, tempAddr);
+                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(strType.maxLength << 8);
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(paramAddr);
+                    this.emitLeaToArg(paramAddr, 0);
+                    this.emitLeaToArg(tempAddr, 1);
+                    this.emitSyscallByName('strcpy');
                 } else {
                     this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(strType.maxLength << 8);
@@ -3335,8 +3422,6 @@ export class PCodeGenerator {
                             this.emitVarLeaArgAt(src, 1);
                             this.emitSyscallByName('strcpy');
                         }
-                    } else if (argExpr.kind === 'CallExpr' && this.isStringExpression(argExpr)) {
-                        this.emitStringCallResultToAddr(argExpr, paramAddr);
                     } else {
                         this.generateStringAssignment({ address: paramAddr, dataType: paramDt, kind: SymbolKind.Variable, isByRef: false, isGlobal: false, name: '', scope: '' } as unknown as VariableSymbol, argExpr);
                     }
@@ -3363,7 +3448,15 @@ export class PCodeGenerator {
 
         const retPtrAddr = this.functionReturnPtrAddr.get(fn.name);
         if (retPtrAddr !== undefined) {
-            const targetAddr = this.pendingReturnTarget ?? this.getTempStringAddr(0);
+            let targetAddr: number;
+            if (this.pendingReturnTarget) {
+                targetAddr = this.pendingReturnTarget;
+            } else if (fn.returnType && !isString(fn.returnType)
+                       && this.ctx.currentFunction?.name.startsWith('on_')) {
+                targetAddr = this.getTempStringAddr(0) + this.currentTempSlotSize();
+            } else {
+                targetAddr = this.getTempStringAddr(0);
+            }
             if (fn.returnType && isString(fn.returnType) && !this.pendingReturnTarget) {
                 this.emitTempStringInit(targetAddr);
             }
