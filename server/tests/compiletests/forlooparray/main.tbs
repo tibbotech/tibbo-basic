@@ -11,9 +11,12 @@ sub on_sys_init()
     for i=0 to 32
         z = num_sockets(i)
         sys.debugprint(str(num_sockets(0)))
-        ' dim j as byte = i
-        ' dim ss as string = str(z)
-        ' dim ss as string = str(num_sockets(0))
+        dim j as byte = i
+        sys.debugprint(str(j))
+        dim ss as string = str(z + 1)
+        sys.debugprint(ss)
+        ' dim zz as string = str(num_sockets(i))
+        ' sys.debugprint(zz)
     next i
     i = 3
     z = num_sockets(i)
