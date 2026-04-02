@@ -1320,11 +1320,16 @@ export class PCodeGenerator {
             const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!sym) continue;
 
+            // Non-event root functions may be called from another module; use the
+            // project-wide called-function base offset so addresses match across modules.
+            const isOnEvent = decl.name.startsWith('on_');
+            const rootBase = isOnEvent ? localBase : localBase + (this.minLocalAllocSizeBeforeTemp ?? 0);
+
             let offset = 0;
             let ordinal = 1;
             for (let pi = 0; pi < sym.parameters.length; pi++) {
                 const v = sym.parameters[pi];
-                v.address = localBase + offset;
+                v.address = rootBase + offset;
                 const labelName = `?A:${sym.name}:${pi}`;
                 this.localVarLabelMap.set(v, labelName);
                 this.emitter.defineDataLabel(labelName, v.address);
@@ -1332,13 +1337,13 @@ export class PCodeGenerator {
                 offset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
             }
 
-            if (!decl.name.startsWith('on_')) {
-                this.allocateDeadChainInRootArea(decl.name, localBase, offset);
+            if (!isOnEvent) {
+                this.allocateDeadChainInRootArea(decl.name, rootBase, offset);
             }
 
-            const isFuncWithReturn = decl.kind === 'FunctionDecl' && !decl.name.startsWith('on_') && !!sym.returnType;
+            const isFuncWithReturn = decl.kind === 'FunctionDecl' && !isOnEvent && !!sym.returnType;
             if (isFuncWithReturn) {
-                const retPtrAddr = localBase + offset;
+                const retPtrAddr = rootBase + offset;
                 this.functionReturnPtrAddr.set(decl.name, retPtrAddr);
                 const retVar = sym.localVariables.find(v => v.name.toLowerCase() === sym.name.toLowerCase());
                 if (retVar) {
@@ -1350,11 +1355,11 @@ export class PCodeGenerator {
 
             for (const v of sym.localVariables) {
                 if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
-                v.address = localBase + offset;
+                v.address = rootBase + offset;
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            if (!decl.name.startsWith('on_') && offset > this.localAllocSize && this.liveReachable.has(decl.name)) {
+            if (!isOnEvent && offset > this.localAllocSize && this.liveReachable.has(decl.name)) {
                 this.localAllocSize = offset;
             }
         }
@@ -3594,11 +3599,20 @@ export class PCodeGenerator {
             let targetAddr: number;
             if (this.pendingReturnTarget) {
                 targetAddr = this.pendingReturnTarget;
-            } else if (fn.returnType && !isString(fn.returnType)
-                       && this.ctx.currentFunction?.name.startsWith('on_')) {
-                targetAddr = this.getTempStringAddr(0) + this.currentTempSlotSize();
             } else {
-                targetAddr = this.getTempStringAddr(0);
+                // Count string temp slots consumed by this call's arguments.
+                // If any args use slot 0 for string temporaries, the return target
+                // must go at slot 1 to avoid overwriting those temporaries.
+                let argStringTemps = 0;
+                for (let ai = 0; ai < args.length && ai < fn.parameters.length; ai++) {
+                    const p = fn.parameters[ai];
+                    const a = args[ai];
+                    if ((p.isByRef || (p.dataType && isString(p.dataType))) && a.kind !== 'IdentifierExpr') {
+                        argStringTemps++;
+                    }
+                }
+                const returnSlot = Math.min(argStringTemps, 1);
+                targetAddr = this.getTempStringAddr(returnSlot);
             }
             if (fn.returnType && isString(fn.returnType) && !this.pendingReturnTarget) {
                 this.emitTempStringInit(targetAddr);
