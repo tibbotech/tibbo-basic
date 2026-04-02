@@ -2,6 +2,7 @@ include "global.tbh"
 
 
 dim num_sockets(32) as byte
+
 sub on_sys_init()
     dim i as byte=1
     dim z as byte=0
