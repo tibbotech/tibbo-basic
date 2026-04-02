@@ -296,6 +296,7 @@ export class PCodeGenerator {
         this.buildCallGraph(program);
         this.computeAllFunctionTempSlotSizes(program);
         this.stackSize = this.projectOverrideStackSize ?? this.computeStackSize();
+        this.pruneUnreferencedLocals(program);
         this.allocateFunctionFrames(program);
 
         const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
@@ -847,6 +848,54 @@ export class PCodeGenerator {
             } else if (child && typeof child === 'object') {
                 this.walkExpressionsInNode(child, visitor);
             }
+        }
+    }
+
+    private collectReferencedLocals(body: AST.Statement[]): Set<string> {
+        const referenced = new Set<string>();
+        const walk = (node: unknown): void => {
+            if (!node || typeof node !== 'object') return;
+            const n = node as Record<string, unknown>;
+            if (n.kind === 'IdentifierExpr' && typeof n.name === 'string') {
+                referenced.add((n.name as string).toLowerCase());
+            }
+            if (n.kind === 'DimStmt' && (n.initializer || n.arrayInitializer)) {
+                const vars = n.variables as Array<{ name: string }>;
+                if (vars) {
+                    for (const v of vars) referenced.add(v.name.toLowerCase());
+                }
+            }
+            for (const key of Object.keys(n)) {
+                if (key === 'loc' || key === 'kind') continue;
+                const child = n[key];
+                if (Array.isArray(child)) {
+                    for (const item of child) walk(item);
+                } else if (child && typeof child === 'object') {
+                    walk(child);
+                }
+            }
+        };
+        walk(body);
+        return referenced;
+    }
+
+    private pruneUnreferencedLocals(program: AST.Program): void {
+        for (const decl of program.declarations) {
+            if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+            if (!this.isFromCurrentFile(decl)) continue;
+            const sym = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
+            if (!sym) continue;
+
+            const referenced = this.collectReferencedLocals(decl.body);
+            const isFuncReturn = decl.kind === 'FunctionDecl';
+            sym.localVariables = sym.localVariables.filter(v => {
+                if (v.isTemp) return true;
+                if (isFuncReturn && v.name.toLowerCase() === decl.name.toLowerCase()) return true;
+                if (referenced.has(v.name.toLowerCase())) return true;
+                const dt = v.dataType;
+                if (dt && (isString(dt) || isArray(dt) || isStruct(dt))) return true;
+                return false;
+            });
         }
     }
 
