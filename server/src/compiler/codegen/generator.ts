@@ -2384,7 +2384,9 @@ export class PCodeGenerator {
 
         const elseLabel = (stmt.elseIfBranches.length > 0 || stmt.elseBody) ? this.makeLabel('else') : endLabel;
         this.generateConditionJump(stmt.condition, elseLabel, false);
+        const savedLocalBytes = this.onEventDeclaredLocalBytes;
         this.generateBlock(stmt.thenBody);
+        this.onEventDeclaredLocalBytes = savedLocalBytes;
 
         if (stmt.elseIfBranches.length > 0 || stmt.elseBody) {
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
@@ -2396,14 +2398,18 @@ export class PCodeGenerator {
             const branch = stmt.elseIfBranches[i];
             const nextLabel = (i < stmt.elseIfBranches.length - 1 || stmt.elseBody) ? this.makeLabel('elseif') : endLabel;
             this.generateConditionJump(branch.condition, nextLabel, false);
+            const savedBranchBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(branch.body);
+            this.onEventDeclaredLocalBytes = savedBranchBytes;
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(endLabel);
             this.emitter.defineLabel(nextLabel);
         }
 
         if (stmt.elseBody) {
+            const savedElseBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(stmt.elseBody);
+            this.onEventDeclaredLocalBytes = savedElseBytes;
         }
 
         this.emitter.defineLabel(endLabel);
@@ -2428,14 +2434,18 @@ export class PCodeGenerator {
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(nextLabel);
             this.emitter.defineLabel(caseBodyLabel);
+            const savedCaseBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(c.body);
+            this.onEventDeclaredLocalBytes = savedCaseBytes;
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(endLabel);
             this.emitter.defineLabel(nextLabel);
         }
 
         if (stmt.defaultCase) {
+            const savedDefaultBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(stmt.defaultCase);
+            this.onEventDeclaredLocalBytes = savedDefaultBytes;
         }
 
         this.emitter.defineLabel(endLabel);
@@ -2472,7 +2482,9 @@ export class PCodeGenerator {
             }
         }
 
+        const savedLocalBytes = this.onEventDeclaredLocalBytes;
         this.generateBlock(stmt.body);
+        this.onEventDeclaredLocalBytes = savedLocalBytes;
 
         if (stmt.init.kind === 'BinaryExpr' && stmt.init.left.kind === 'IdentifierExpr') {
             const counterName = stmt.init.left.name;
@@ -2512,7 +2524,9 @@ export class PCodeGenerator {
 
         this.emitter.defineLabel(startLabel);
         this.generateConditionJump(stmt.condition, endLabel, false);
+        const savedLocalBytes = this.onEventDeclaredLocalBytes;
         this.generateBlock(stmt.body);
+        this.onEventDeclaredLocalBytes = savedLocalBytes;
         this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
         this.emitter.emitLabelReference(startLabel);
         this.emitter.defineLabel(endLabel);
@@ -2540,7 +2554,9 @@ export class PCodeGenerator {
             this.generateConditionJump(stmt.condition, endLabel, true);
         }
 
+        const savedLocalBytes = this.onEventDeclaredLocalBytes;
         this.generateBlock(stmt.body);
+        this.onEventDeclaredLocalBytes = savedLocalBytes;
 
         if (stmt.loopKind === AST.DoLoopKind.WhilePost && stmt.condition) {
             this.generateConditionJump(stmt.condition, startLabel, true);
