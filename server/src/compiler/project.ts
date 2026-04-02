@@ -335,10 +335,11 @@ export class ProjectCompiler {
             }
 
             for (const entry of firstPassEntries) {
-                const needsRecompile =
+                const needsStackFix =
                     entry.result.stackSize < maxStackSize ||
                     entry.result.localAllocSizeBeforeCalledFuncs < maxStep4;
-                if (!needsRecompile) continue;
+                const needsGlobalFix = entry.result.globalAllocSize < totalGlobalAllocSize;
+                if (!needsStackFix && !needsGlobalFix) continue;
 
                 const result = compile(entry.perFileSource, {
                     fileName: entry.baseName,
@@ -352,8 +353,11 @@ export class ProjectCompiler {
                     firmwareVer: this.platformConfig.version,
                     configStr: this.platformConfig.configStr,
                     projectName: this.config.name,
-                    projectOverrideStackSize: maxStackSize,
-                    minLocalAllocSizeBeforeTemp: maxStep4,
+                    projectGlobalAllocSize: totalGlobalAllocSize,
+                    ...(needsStackFix && {
+                        projectOverrideStackSize: maxStackSize,
+                        minLocalAllocSizeBeforeTemp: maxStep4,
+                    }),
                 });
 
                 objs.set(entry.objName, result.obj);

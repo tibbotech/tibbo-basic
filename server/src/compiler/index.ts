@@ -37,6 +37,7 @@ export interface CompileOptions {
     stackSize?: number;
     projectOverrideStackSize?: number;
     minLocalAllocSizeBeforeTemp?: number;
+    projectGlobalAllocSize?: number;
     projectName?: string;
     buildId?: string;
     configStr?: string;
@@ -166,6 +167,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         }
         if (options.minLocalAllocSizeBeforeTemp != null) {
             generator.setMinLocalAllocSizeBeforeTemp(options.minLocalAllocSizeBeforeTemp);
+        }
+        if (options.projectGlobalAllocSize != null) {
+            generator.setProjectGlobalAllocSize(options.projectGlobalAllocSize);
         }
         generator.generate(ast);
     } catch (e) {

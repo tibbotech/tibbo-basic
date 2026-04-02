@@ -63,6 +63,7 @@ export class PCodeGenerator {
     private projectOverrideStackSize?: number;
     private minLocalAllocSizeBeforeTemp?: number;
     private _localAllocSizeBeforeCalledFuncs = 0;
+    private projectGlobalAllocSize = 0;
 
     constructor(symbols: SymbolTable, resolver: SemanticResolver, checker: TypeChecker, diagnostics: DiagnosticCollection) {
         this.symbols = symbols;
@@ -105,6 +106,10 @@ export class PCodeGenerator {
 
     setMinLocalAllocSizeBeforeTemp(size: number): void {
         this.minLocalAllocSizeBeforeTemp = size;
+    }
+
+    setProjectGlobalAllocSize(size: number): void {
+        this.projectGlobalAllocSize = size;
     }
 
     /** Static bytes before scratch (params + all user locals). Used for registerTempVariables / maxRootArea parity. */
@@ -300,7 +305,7 @@ export class PCodeGenerator {
         this.pruneUnreferencedLocals(program);
         this.allocateFunctionFrames(program);
 
-        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const localBase = this.platformSize + Math.max(this.globalDataOffset, this.projectGlobalAllocSize) + this.stackSize;
         this.includeTempsInLocalAllocSize(program);
         if (this.minLocalAllocSizeBeforeTemp !== undefined) {
             this.localAllocSize = Math.max(this.localAllocSize, this.minLocalAllocSizeBeforeTemp);
@@ -1285,7 +1290,7 @@ export class PCodeGenerator {
     }
 
     private allocateFunctionFrames(program: AST.Program): void {
-        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const localBase = this.platformSize + Math.max(this.globalDataOffset, this.projectGlobalAllocSize) + this.stackSize;
 
         const calledFunctions = new Set<string>();
         for (const calls of this.callGraph.values()) {
@@ -1336,7 +1341,7 @@ export class PCodeGenerator {
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            if (!decl.name.startsWith('on_') && offset > this.localAllocSize) {
+            if (!decl.name.startsWith('on_') && offset > this.localAllocSize && this.liveReachable.has(decl.name)) {
                 this.localAllocSize = offset;
             }
         }
@@ -1523,7 +1528,7 @@ export class PCodeGenerator {
     }
 
     private allocateCalledFunctionParams(program: AST.Program, maxRootArea: number): void {
-        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const localBase = this.platformSize + Math.max(this.globalDataOffset, this.projectGlobalAllocSize) + this.stackSize;
         const paramBase = localBase + maxRootArea;
 
         const calledFunctions = new Set<string>();
@@ -1813,6 +1818,7 @@ export class PCodeGenerator {
         for (const [name] of frameSizes) {
             if (calledFunctions.has(name)) continue;
             if (name.startsWith('on_')) continue;
+            if (!this.liveReachable.has(name)) continue;
             const rootSize = frameSizes.get(name) ?? 0;
             if (rootSize > this.localAllocSize) {
                 this.localAllocSize = rootSize;
@@ -3684,7 +3690,7 @@ export class PCodeGenerator {
         }
 
         // return value pointer at offset 21 (after all 8 possible word indices)
-        const localBase = this.platformSize + this.globalDataOffset + this.stackSize;
+        const localBase = this.platformSize + Math.max(this.globalDataOffset, this.projectGlobalAllocSize) + this.stackSize;
         const fn = this.ctx.currentFunction;
         const tempAddr = fn?.name.startsWith('on_')
             ? localBase + this.onEventDeclaredLocalBytes
