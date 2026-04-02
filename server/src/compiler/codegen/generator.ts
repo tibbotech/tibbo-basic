@@ -2583,12 +2583,34 @@ export class PCodeGenerator {
             const addr = varSym.address ?? 0;
 
             if (dt && isString(dt)) {
-                const strType = dt as StringDataType;
-                const loadOp = strType.maxLength <= 127 ? OP.OPCODE_LOA16I : OP.OPCODE_LOA16;
-                this.emitter.emitByte(loadOp | OP.OPCODE_IMMEDIATE);
-                this.emitter.emitWord(strType.maxLength << 8);
-                this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(addr);
+                let skipInit = false;
+                if (stmt.initializer && stmt.initializer.kind === 'CallExpr') {
+                    const callExpr = stmt.initializer as AST.CallExpr;
+                    if (callExpr.callee.kind === 'IdentifierExpr') {
+                        const calleeSym = this.symbols.current.lookup((callExpr.callee as AST.IdentifierExpr).name);
+                        if (calleeSym?.kind === SymbolKind.Syscall) {
+                            const sc = calleeSym as SyscallSymbol;
+                            skipInit = !!(sc.returnType && isString(sc.returnType));
+                        }
+                    } else if (callExpr.callee.kind === 'MemberExpr') {
+                        const member = callExpr.callee as AST.MemberExpr;
+                        if (member.object.kind === 'IdentifierExpr') {
+                            const objSym = this.symbols.current.lookup((member.object as AST.IdentifierExpr).name);
+                            if (objSym?.kind === SymbolKind.Object) {
+                                const fn = (objSym as ObjectSymbol).functions.get(member.property.toLowerCase());
+                                skipInit = !!(fn?.returnType && isString(fn.returnType));
+                            }
+                        }
+                    }
+                }
+                if (!skipInit) {
+                    const strType = dt as StringDataType;
+                    const loadOp = strType.maxLength <= 127 ? OP.OPCODE_LOA16I : OP.OPCODE_LOA16;
+                    this.emitter.emitByte(loadOp | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(strType.maxLength << 8);
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(addr);
+                }
             }
 
             if (dt && (isStruct(dt) || isArray(dt))) {
