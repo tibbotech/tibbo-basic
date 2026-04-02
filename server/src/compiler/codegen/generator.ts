@@ -682,7 +682,12 @@ export class PCodeGenerator {
     }
 
     private emitSyscallWithArgs(_syscallName: string, sym: SyscallSymbol, args: AST.Expression[]): void {
-        this.emitSyscallArgsOnly(sym, args, 0);
+        const nextOffset = this.emitSyscallArgsOnly(sym, args, 0);
+        if (sym.returnType && isString(sym.returnType)) {
+            const tempAddr = this.getTempStringAddr(0);
+            this.emitTempStringInit(tempAddr);
+            this.emitLeaToArgOffset(tempAddr, nextOffset);
+        }
         this.emitSyscall(sym.syscallNumber);
     }
 

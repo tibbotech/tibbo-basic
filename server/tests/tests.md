@@ -12,3 +12,5 @@
 // enum
 // struct
 // array
+// control structures for loops while loops
+// arithmetic
