@@ -2408,11 +2408,12 @@ export class PCodeGenerator {
             const counterName = stmt.init.left.name;
             const counterSym = this.symbols.current.lookup(counterName);
             if (counterSym && (counterSym.kind === SymbolKind.Variable || counterSym.kind === SymbolKind.Parameter)) {
-                this.generateExpression(stmt.to);
-                this.emitter.emitByte(OP.OPCODE_XCG);
                 this.emitLoad(counterSym as VariableSymbol);
+                this.emitSecondOperand(stmt.to);
                 this.emitter.emitByte(OP.OPCODE_CMP);
-                this.emitter.emitByte(OP.OPCODE_JG | OP.OPCODE_DIRECT);
+                const stepValue = stmt.step !== undefined ? this.evalConstantIntExpr(stmt.step) : 1;
+                const exitJump = (stepValue !== undefined && stepValue < 0) ? OP.OPCODE_JB : OP.OPCODE_JA;
+                this.emitter.emitByte(exitJump | OP.OPCODE_DIRECT);
                 this.emitter.emitLabelReference(endLabel);
             }
         }
@@ -2733,6 +2734,25 @@ export class PCodeGenerator {
             }
             return;
         }
+        if (expr.kind === 'UnaryExpr' && expr.op === AST.UnaryOp.Neg) {
+            const constVal = this.evalConstantIntExpr(expr);
+            if (constVal !== undefined) {
+                if (constVal >= -128 && constVal <= 127) {
+                    this.emitter.emitByte(OP.OPCODE_LOB8I | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitByte(constVal & 0xFF);
+                } else if (constVal >= 0 && constVal <= 255) {
+                    this.emitter.emitByte(OP.OPCODE_LOB8 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitByte(constVal & 0xFF);
+                } else if (constVal >= -32768 && constVal <= 65535) {
+                    this.emitter.emitByte(OP.OPCODE_LOB16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(constVal & 0xFFFF);
+                } else {
+                    this.emitter.emitByte(OP.OPCODE_LOB32 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitDword(constVal);
+                }
+                return;
+            }
+        }
         if (expr.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.name);
             if (sym) {
@@ -2770,6 +2790,17 @@ export class PCodeGenerator {
         this.emitter.emitByte(OP.OPCODE_XCG);
         this.generateExpression(expr);
         this.emitter.emitByte(OP.OPCODE_XCG);
+    }
+
+    private evalConstantIntExpr(expr: AST.Expression): number | undefined {
+        if (expr.kind === 'IntegerLiteral' || expr.kind === 'HexLiteral' || expr.kind === 'BinLiteral') {
+            return (expr as AST.IntegerLiteral).value;
+        }
+        if (expr.kind === 'UnaryExpr' && expr.op === AST.UnaryOp.Neg) {
+            const v = this.evalConstantIntExpr(expr.operand);
+            return v !== undefined ? -v : undefined;
+        }
+        return undefined;
     }
 
     // ─── Comparison ─────────────────────────────────────────────────────────

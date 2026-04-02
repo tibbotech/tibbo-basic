@@ -1,0 +1,21 @@
+include "global.tbh"
+
+
+#define MAX_NUM_INTERFACES 32
+#define MAX_NUM_SOCKETS MAX_NUM_INTERFACES
+
+sub on_sys_init()
+    dim i as byte=1
+    for i=0 to 32
+        sys.debugprint(str(i))
+    next i
+
+    for i=32 to 0 step -1
+        sys.debugprint(str(i))
+    next i
+
+    for i=0 to MAX_NUM_SOCKETS
+        sys.debugprint(str(i))
+    next i
+    sys.debugprint("done")
+end sub
