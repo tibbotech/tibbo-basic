@@ -335,11 +335,10 @@ export class ProjectCompiler {
             }
 
             for (const entry of firstPassEntries) {
-                const needsStackFix =
-                    entry.result.stackSize < maxStackSize ||
-                    entry.result.localAllocSizeBeforeCalledFuncs < maxStep4;
+                const needsStackSizeFix = entry.result.stackSize < maxStackSize;
+                const needsLocalAllocFix = entry.result.localAllocSizeBeforeCalledFuncs < maxStep4;
                 const needsGlobalFix = entry.result.globalAllocSize < totalGlobalAllocSize;
-                if (!needsStackFix && !needsGlobalFix) continue;
+                if (!needsStackSizeFix && !needsLocalAllocFix && !needsGlobalFix) continue;
 
                 const result = compile(entry.perFileSource, {
                     fileName: entry.baseName,
@@ -354,8 +353,10 @@ export class ProjectCompiler {
                     configStr: this.platformConfig.configStr,
                     projectName: this.config.name,
                     projectGlobalAllocSize: totalGlobalAllocSize,
-                    ...(needsStackFix && {
+                    ...(needsStackSizeFix && {
                         projectOverrideStackSize: maxStackSize,
+                    }),
+                    ...(needsLocalAllocFix && {
                         minLocalAllocSizeBeforeTemp: maxStep4,
                     }),
                 });
