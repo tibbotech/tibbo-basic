@@ -59,6 +59,7 @@ export class PCodeGenerator {
     private onEventDeclaredLocalBytes = 0;
     private functionTempSlotSizes = new Map<string, number>();
     private pendingReturnTarget: number | undefined;
+    private isStatementCall = false;
     private projectOverrideStackSize?: number;
     private minLocalAllocSizeBeforeTemp?: number;
     private _localAllocSizeBeforeCalledFuncs = 0;
@@ -2074,7 +2075,9 @@ export class PCodeGenerator {
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Eq) {
             this.generateAssignment(expr.left, expr.right);
         } else if (expr.kind === 'CallExpr') {
+            this.isStatementCall = true;
             this.generateCall(expr);
+            this.isStatementCall = false;
         } else {
             this.generateExpression(expr);
         }
@@ -3172,7 +3175,7 @@ export class PCodeGenerator {
                     return;
                 }
                 this.emitFunctionCall(fn, expr.args);
-                if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name) && !this.pendingReturnTarget) {
+                if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name) && !this.pendingReturnTarget && !this.isStatementCall) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
                     this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
                     this.emitter.emitDataAddress(this.getTempStringAddr(0));
@@ -3341,9 +3344,16 @@ export class PCodeGenerator {
                 continue;
             }
 
+            const effectiveDt = paramDt ?? BUILTIN_TYPES.word;
             this.generateExpression(argExpr);
-            const storeOp = getStoreOpcode(paramDt ?? BUILTIN_TYPES.word);
-            this.emitter.emitByte(storeOp | OP.OPCODE_DIRECT);
+            if (argExpr.kind === 'BinaryExpr') {
+                const tempAddr = this.getTempStringAddr(0);
+                this.emitter.emitByte(getStoreOpcode(effectiveDt) | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitter.emitByte(getLoadOpcode(effectiveDt, 'A') | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(tempAddr);
+            }
+            this.emitter.emitByte(getStoreOpcode(effectiveDt) | OP.OPCODE_DIRECT);
             if (fn.isDeclare) {
                 this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
             } else {
