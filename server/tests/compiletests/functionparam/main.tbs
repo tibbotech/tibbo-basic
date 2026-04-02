@@ -12,5 +12,5 @@ sub on_sys_init()
     sys.debugprint("on_sys_init")
     dim aa as byte=2
     test(aa + 1)
-    test2(str(aa))
+    test2("number is " + str(aa))
 end sub
