@@ -1,8 +1,15 @@
 include "global.tbh"
 
+sub test4(byref s as string)
+    s = "asdfasdf"
+    dim baa as string = "asdf" + "zzz"
+    sys.debugprint(baa)
+end sub
+
 sub test3(byref s as string)
     ' s = "number is "
     sys.debugprint(s)
+    test4(s)
 end sub
 
 function test2(s as string) as byte

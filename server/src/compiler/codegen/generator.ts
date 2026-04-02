@@ -367,6 +367,20 @@ export class PCodeGenerator {
             if (node === null || node === undefined) return;
             if (typeof node !== 'object') return;
             const n = node as Record<string, unknown>;
+            if (n.kind === 'BinaryExpr') {
+                const expr = n as unknown as AST.BinaryExpr;
+                if (expr.op === AST.BinaryOp.Add) {
+                    const folded = this.tryFoldStringConcat(expr);
+                    if (folded !== null) {
+                        hits.push({
+                            s: folded,
+                            line: expr.loc?.line ?? 0,
+                            col: expr.loc?.column ?? 0,
+                        });
+                        return;
+                    }
+                }
+            }
             if (n.kind === 'StringLiteral') {
                 const sl = n as unknown as AST.StringLiteral;
                 hits.push({
@@ -765,6 +779,16 @@ export class PCodeGenerator {
             }
         }
         return offset;
+    }
+
+    private tryFoldStringConcat(expr: AST.Expression): string | null {
+        if (expr.kind === 'StringLiteral') return expr.value;
+        if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
+            const left = this.tryFoldStringConcat(expr.left);
+            const right = this.tryFoldStringConcat(expr.right);
+            if (left !== null && right !== null) return left + right;
+        }
+        return null;
     }
 
     private tryFoldStrCall(expr: AST.CallExpr): string | null {
@@ -2468,8 +2492,17 @@ export class PCodeGenerator {
             this.generateExpression(value);
             this.emitStore(varSym);
         } else if (value.kind === 'BinaryExpr' && value.op === AST.BinaryOp.Add) {
-            this.generateStringAssignment(varSym, value.left);
-            this.emitStringCat(varSym, value.right);
+            const folded = this.tryFoldStringConcat(value);
+            if (folded !== null) {
+                const rdataOffset = this.emitter.addStringRData(folded);
+                this.emitVarLeaArg(varSym);
+                this.emitRDataLoad(rdataOffset);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+            } else {
+                this.generateStringAssignment(varSym, value.left);
+                this.emitStringCat(varSym, value.right);
+            }
         } else if (value.kind === 'MemberExpr') {
             const member = value as AST.MemberExpr;
             if (member.object.kind === 'IdentifierExpr') {
@@ -2505,14 +2538,15 @@ export class PCodeGenerator {
             return;
         }
 
-        this.emitVarLeaArg(destSym);
         if (expr.kind === 'StringLiteral') {
             const rdataOffset = this.emitter.addStringRData(expr.value);
             this.emitRDataLoad(rdataOffset);
             this.emitSyscallArg(1);
-            this.emitSyscallByName('strload');
-            this.emitVarLeaArg(destSym);
+            this.emitSyscallByName('strcat');
+            return;
         }
+
+        this.emitVarLeaArg(destSym);
         if (expr.kind === 'IdentifierExpr') {
             const srcSym = this.symbols.current.lookup(expr.name);
             if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
@@ -2521,7 +2555,7 @@ export class PCodeGenerator {
             }
         } else if (expr.kind === 'CallExpr' && this.emitStringCallResultToAddr(expr, this.getTempStringAddr(0))) {
             this.emitLeaToArg(this.getTempStringAddr(0), 1);
-        } else if (expr.kind !== 'StringLiteral') {
+        } else {
             this.generateExpression(expr);
             this.emitSyscallArg(1);
         }
