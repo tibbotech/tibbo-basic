@@ -1537,17 +1537,89 @@ export class PCodeGenerator {
             if (group.length > 0) depthGroups.push(group);
         }
 
-        let depthOffset = 0;
-        for (const group of depthGroups) {
-            let maxGroupFrameSize = 0;
+        const callerOf = new Map<string, Set<string>>();
+        for (const [caller, callees] of this.callGraph) {
+            for (const callee of callees) {
+                if (!calledFunctions.has(callee)) continue;
+                if (!callerOf.has(callee)) callerOf.set(callee, new Set());
+                callerOf.get(callee)!.add(caller);
+            }
+        }
 
+        // Phase 1: compute frame sizes without assigning addresses
+        const frameSizes = new Map<string, number>();
+        for (const group of depthGroups) {
             for (const fnName of group) {
                 const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
                 if (!sym) continue;
                 const isLive = this.liveReachable.has(fnName);
                 const isFuncWithReturn = sym.kind === SymbolKind.Function && !!sym.returnType;
 
-                let offset = depthOffset;
+                let size = 0;
+                if (isLive) {
+                    for (const v of sym.parameters) {
+                        size += v.isByRef ? 4 : (v.dataType?.size ?? 2);
+                    }
+                    if (isFuncWithReturn) size += 4;
+                    for (const v of sym.localVariables) {
+                        if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
+                        size += v.dataType?.size ?? 2;
+                    }
+
+                    const decl = program.declarations.find(d =>
+                        (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
+                    );
+                    if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
+                        const perStmtTail = this.countTempVarsPerStatement(decl.body);
+                        let maxSlotsTail = 0;
+                        for (const n of perStmtTail) {
+                            const concurrent = n >= 2 ? 2 : n;
+                            if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
+                        }
+                        const scalarCountTail = this.countFunctionPreEvalScalars(decl);
+                        const tailTempSize =
+                            maxSlotsTail * this.getFuncTempSlotSize(fnName) +
+                            scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+                        size += tailTempSize;
+                    }
+                }
+                frameSizes.set(fnName, size);
+            }
+        }
+
+        // Phase 2: compute per-function start offsets based on caller frame ends
+        const funcStartOffset = new Map<string, number>();
+        for (const group of depthGroups) {
+            for (const fnName of group) {
+                const depth = depthMap.get(fnName) ?? 1;
+                if (depth === 1) {
+                    funcStartOffset.set(fnName, 0);
+                } else {
+                    const callers = callerOf.get(fnName);
+                    let maxCallerEnd = 0;
+                    if (callers) {
+                        for (const caller of callers) {
+                            if (!calledFunctions.has(caller)) continue;
+                            const callerStart = funcStartOffset.get(caller) ?? 0;
+                            const callerSize = frameSizes.get(caller) ?? 0;
+                            maxCallerEnd = Math.max(maxCallerEnd, callerStart + callerSize);
+                        }
+                    }
+                    funcStartOffset.set(fnName, maxCallerEnd);
+                }
+            }
+        }
+
+        // Phase 3: assign addresses using per-function offsets
+        for (const group of depthGroups) {
+            for (const fnName of group) {
+                const sym = this.symbols.lookupGlobal(fnName) as FunctionSymbol | undefined;
+                if (!sym) continue;
+                const isLive = this.liveReachable.has(fnName);
+                const isFuncWithReturn = sym.kind === SymbolKind.Function && !!sym.returnType;
+                const startOffset = funcStartOffset.get(fnName) ?? 0;
+
+                let offset = startOffset;
 
                 if (isLive) {
                     for (let i = 0; i < sym.parameters.length; i++) {
@@ -1583,9 +1655,7 @@ export class PCodeGenerator {
                         v.address = paramBase + offset;
                         offset += v.dataType?.size ?? 2;
                     }
-                }
 
-                if (isLive) {
                     const decl = program.declarations.find(d =>
                         (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
                     );
@@ -1606,15 +1676,15 @@ export class PCodeGenerator {
                         }
                     }
                 }
-
-                const fnFrameSize = offset - depthOffset;
-                if (fnFrameSize > maxGroupFrameSize) maxGroupFrameSize = fnFrameSize;
             }
-
-            depthOffset += maxGroupFrameSize;
         }
 
-        const totalSize = maxRootArea + depthOffset;
+        let maxEnd = 0;
+        for (const [fnName, startOff] of funcStartOffset) {
+            const end = startOff + (frameSizes.get(fnName) ?? 0);
+            if (end > maxEnd) maxEnd = end;
+        }
+        const totalSize = maxRootArea + maxEnd;
         if (totalSize > this.localAllocSize) {
             this.localAllocSize = totalSize;
         }
