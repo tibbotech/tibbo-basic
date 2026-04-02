@@ -1,0 +1,16 @@
+include "global.tbh"
+
+function test2(s as string) as byte
+    test2 = 3
+end function
+
+sub test(z as byte)
+    sys.debugprint("a: " + str(z))
+end sub
+
+sub on_sys_init()
+    sys.debugprint("on_sys_init")
+    dim aa as byte=2
+    test(aa + 1)
+    test2(str(aa))
+end sub
