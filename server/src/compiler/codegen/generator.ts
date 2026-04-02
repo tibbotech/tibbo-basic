@@ -312,9 +312,9 @@ export class PCodeGenerator {
         }
         this.tempScratchBase = localBase + this.localAllocSize;
         this.localAllocSize += this.rootTempScratchSize;
-        this._localAllocSizeBeforeCalledFuncs = this.localAllocSize;
 
         const maxRootArea = this.computeMaxRootArea(program);
+        this._localAllocSizeBeforeCalledFuncs = Math.max(this.localAllocSize, maxRootArea);
         this.allocateCalledFunctionParams(program, maxRootArea);
 
         this.registerTempVariables(program);
@@ -1308,7 +1308,7 @@ export class PCodeGenerator {
             }
         };
         for (const name of this.callGraph.keys()) {
-            if (name.startsWith('on_') && !calledFunctions.has(name)) {
+            if (!calledFunctions.has(name)) {
                 computeLive(name);
             }
         }
@@ -1336,7 +1336,20 @@ export class PCodeGenerator {
                 this.allocateDeadChainInRootArea(decl.name, localBase, offset);
             }
 
+            const isFuncWithReturn = decl.kind === 'FunctionDecl' && !decl.name.startsWith('on_') && !!sym.returnType;
+            if (isFuncWithReturn) {
+                const retPtrAddr = localBase + offset;
+                this.functionReturnPtrAddr.set(decl.name, retPtrAddr);
+                const retVar = sym.localVariables.find(v => v.name.toLowerCase() === sym.name.toLowerCase());
+                if (retVar) {
+                    retVar.address = retPtrAddr;
+                    retVar.isByRef = true;
+                }
+                offset += 4;
+            }
+
             for (const v of sym.localVariables) {
+                if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
                 v.address = localBase + offset;
                 offset += v.dataType?.size ?? 2;
             }

@@ -3,5 +3,5 @@
 'INCLUDES------------------------------------------------------------
 
 'DECLARATIONS--------------------------------------------------------
-
+declare function multiply(num1 as word, num2 as word) as word
 declare sub boot()

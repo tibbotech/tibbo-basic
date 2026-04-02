@@ -12,9 +12,8 @@ sub on_sys_init()
     sock_nums(i) = 3
     dim zz as byte=sock_nums(1)
     sys.debugprint("asdf")
-    'printstring("zza")
+    printstring("zza")
     dim iword as word=400
-    
-    
-    
+    boot()
+    'multiply(iword, 2)
 end sub
