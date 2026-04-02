@@ -1,7 +1,13 @@
 include "global.tbh"
 
+sub test3(byref s as string)
+    ' s = "number is "
+    sys.debugprint(s)
+end sub
+
 function test2(s as string) as byte
     test2 = 3
+    test3(s)
 end function
 
 sub test(z as byte)
