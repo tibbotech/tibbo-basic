@@ -1418,8 +1418,12 @@ export class PCodeGenerator {
     private computeOnEventActiveFootprint(
         decl: AST.SubDecl | AST.FunctionDecl,
         sym: FunctionSymbol,
-        tempSize: number
+        _tempSize: number
     ): number {
+        const slotSize = this.getFuncTempSlotSize(decl.name);
+        const scalarCount = this.countFunctionPreEvalScalars(decl);
+        const scalarSize = scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+
         const varSizeMap = new Map<string, number>();
         for (const v of sym.localVariables) {
             varSizeMap.set(v.name.toLowerCase(), v.dataType?.size ?? 2);
@@ -1429,11 +1433,14 @@ export class PCodeGenerator {
 
         const walkStmts = (stmts: AST.Statement[], declaredBytes: number): void => {
             for (const stmt of stmts) {
-                const hasTempUsage = this.countTempVarsInNode(stmt) > 0;
+                const stmtTempCount = this.countTempVarsInNode(stmt);
                 const returnSize = this.getStmtDiscardedReturnSize(stmt);
 
-                if (hasTempUsage || returnSize > 0) {
-                    const footprint = declaredBytes + (hasTempUsage ? tempSize : 0) + returnSize;
+                if (stmtTempCount > 0 || returnSize > 0) {
+                    const concurrent = stmtTempCount >= 2 ? 2 : stmtTempCount;
+                    const stmtTempSize = concurrent * slotSize + (concurrent > 0 ? scalarSize : 0);
+                    const returnFits = returnSize > 0 && (concurrent - 1) * slotSize + scalarSize >= returnSize;
+                    const footprint = declaredBytes + stmtTempSize + (returnFits ? 0 : returnSize);
                     if (footprint > maxFootprint) maxFootprint = footprint;
                 }
 
