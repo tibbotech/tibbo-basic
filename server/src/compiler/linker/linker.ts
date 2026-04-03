@@ -100,6 +100,7 @@ export class Linker {
     // Per-OBJ tracking for PDB debug sections
     private allObjSectionData: Buffer[][] = [];
     private pdbCodeBases: number[] = [];
+    private pdbInitBases: number[] = [];
     private pdbSymBases: number[] = [];
     private pdbAddrBases: number[] = [];
     private pdbFuncBases: number[] = [];
@@ -116,6 +117,7 @@ export class Linker {
         this.cumulativeGlobalAlloc = 0;
         this.allObjSectionData = [];
         this.pdbCodeBases = [];
+        this.pdbInitBases = [];
         this.pdbSymBases = [];
         this.pdbAddrBases = [];
         this.pdbFuncBases = [];
@@ -131,6 +133,7 @@ export class Linker {
             const obj = objFiles[i];
 
             this.pdbCodeBases.push(this.mergedCode.length);
+            this.pdbInitBases.push(this.mergedInit.length);
             this.pdbSymBases.push(this.mergedObjSymbols.length);
             this.pdbAddrBases.push(addrCount);
             this.pdbFuncBases.push(funcCount);
@@ -469,9 +472,11 @@ export class Linker {
             const refCount = addrData.readUInt32LE(pos); pos += 4;
 
             if (flags & TObjAddressFlags.Code) {
-                address += codeBase;
-            } else if (flags & TObjAddressFlags.Init) {
-                address += initBase;
+                if (flags & TObjAddressFlags.Init) {
+                    address += initBase;
+                } else {
+                    address += codeBase;
+                }
             } else if (globalAddrIndices.has(addrEntryIndex)) {
                 address = (address + globalBase) >>> 0;
             }
@@ -652,13 +657,13 @@ export class Linker {
         // --- PDB debug sections (9-19) ---
         const allSec = this.allObjSectionData;
 
-        const pdbAddresses = this.pdbMergeAddresses(allSec, this.pdbCodeBases, this.pdbSymBases, initSize);
+        const pdbAddresses = this.pdbMergeAddresses(allSec, this.pdbCodeBases, this.pdbInitBases, this.pdbSymBases, initSize);
         const pdbFunctions = this.pdbMergeFunctions(allSec, this.pdbSymBases, this.pdbAddrBases, this.pdbFuncBases);
         const pdbScopes = this.pdbMergeScopes(allSec, this.pdbCodeBases, this.pdbSymBases, initSize);
         const pdbVariables = this.pdbMergeVariables(allSec, this.pdbSymBases, this.pdbAddrBases, this.pdbScopeBases);
         const pdbLineInfo = this.pdbMergeLineInfo(allSec, this.pdbCodeBases, this.pdbSymBases, initSize);
 
-        const objRdataDir = this.pdbMergeRDataDir(allSec, this.pdbCodeBases, this.pdbRdataBases);
+        const objRdataDir = this.pdbMergeRDataDir(allSec, this.pdbCodeBases, this.pdbInitBases, this.pdbRdataBases);
         const descRdataDirW = new BinaryWriter();
         for (const entry of descriptorRdataEntries) {
             descRdataDirW.writeDword(entry.rdataOffset);
@@ -781,12 +786,12 @@ export class Linker {
 
     // ---- PDB debug section merge methods (ported from ProjectCompiler) ----
 
-    private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], symBases: number[], initOffset: number): Buffer {
+    private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], initBases: number[], symBases: number[], initOffset: number): Buffer {
         const w = new BinaryWriter();
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.Addresses];
             if (!data || data.length === 0) continue;
-            const cb = codeBases[i], sb = symBases[i];
+            const cb = codeBases[i], ib = initBases[i], sb = symBases[i];
             let pos = 0;
             while (pos + 17 <= data.length) {
                 const flags = data.readUInt8(pos); pos += 1;
@@ -796,7 +801,13 @@ export class Linker {
                 const refCount = data.readUInt32LE(pos); pos += 4;
 
                 tag += sb;
-                if (flags & TObjAddressFlags.Code) addr += cb + initOffset;
+                if (flags & TObjAddressFlags.Code) {
+                    if (flags & TObjAddressFlags.Init) {
+                        addr += ib;
+                    } else {
+                        addr += cb + initOffset;
+                    }
+                }
 
                 w.writeByte(flags);
                 w.writeDword(tag);
@@ -809,6 +820,7 @@ export class Linker {
                     const rt = data.readUInt8(pos); pos += 1;
                     let ro = data.readUInt32LE(pos); pos += 4;
                     if (rt === TObjRefType.Code) ro += cb;
+                    else if (rt === TObjRefType.Init) ro += ib;
                     w.writeByte(rt);
                     w.writeDword(ro);
                 }
@@ -928,12 +940,12 @@ export class Linker {
         return w.toBuffer();
     }
 
-    private pdbMergeRDataDir(allSections: Buffer[][], codeBases: number[], rdataBases: number[]): Buffer {
+    private pdbMergeRDataDir(allSections: Buffer[][], codeBases: number[], initBases: number[], rdataBases: number[]): Buffer {
         const w = new BinaryWriter();
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.RDataDir];
             if (!data || data.length === 0) continue;
-            const cb = codeBases[i], rb = rdataBases[i];
+            const cb = codeBases[i], ib = initBases[i], rb = rdataBases[i];
             let pos = 0;
             while (pos + 12 <= data.length) {
                 let rdOff = data.readUInt32LE(pos); pos += 4;
@@ -948,6 +960,7 @@ export class Linker {
                     const rt = data.readUInt8(pos); pos += 1;
                     let ro = data.readUInt32LE(pos); pos += 4;
                     if (rt === TObjRefType.Code) ro += cb;
+                    else if (rt === TObjRefType.Init) ro += ib;
                     w.writeByte(rt);
                     w.writeDword(ro);
                 }
