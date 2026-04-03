@@ -43,7 +43,6 @@ const INTERNAL_SYSCALL_MAP: Record<string, string> = {
 
 export class PCodeGenerator {
     private static readonly TEMP_STRING_SLOT_SIZE = 257;
-    private static readonly TEMP_STRING_SLOT_COUNT = 4;
     private static readonly TEMP_SCALAR_SLOT_SIZE = 4;
     readonly emitter = new ByteEmitter();
     private symbols: SymbolTable;
@@ -69,6 +68,8 @@ export class PCodeGenerator {
     private rootTempScratchSize = 0;
     /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
     private onEventDeclaredLocalBytes = 0;
+    /** For on_* only: sum of word-rounded local/param sizes (tmake stack slots); drives property-getter numeric scratch base. */
+    private onEventStackSlotBytes = 0;
     private functionTempSlotSizes = new Map<string, number>();
     private pendingReturnTarget: number | undefined;
     private isStatementCall = false;
@@ -288,6 +289,13 @@ export class PCodeGenerator {
         return this.onEventDeclaredLocalBytes;
     }
 
+    /** tmake uses word-sized stack slots for on_* locals when placing syscall getter scratch (see syscalls str(sys.byte)). */
+    private onEventScalarScratchSkip(): number {
+        const fn = this.ctx.currentFunction;
+        if (!fn?.name.startsWith('on_')) return this.onEventScratchSkip();
+        return this.onEventStackSlotBytes;
+    }
+
     private getTempStringAddr(slot = 0): number {
         const slotSize = this.currentTempSlotSize();
         const fn = this.ctx.currentFunction;
@@ -303,10 +311,17 @@ export class PCodeGenerator {
 
     private getTempScalarAddr(slot = 0): number {
         const slotSize = this.currentTempSlotSize();
-        const skip = this.onEventScratchSkip();
-        return this.tempScratchBase + skip
-            + PCodeGenerator.TEMP_STRING_SLOT_COUNT * slotSize
-            + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+        const fn = this.ctx.currentFunction;
+        if (fn) {
+            const fnBase = this.functionTempBase.get(fn.name);
+            if (fnBase !== undefined) {
+                return fnBase + this.getFuncTempSlotSize(fn.name)
+                    + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+            }
+        }
+        const skip = this.onEventScalarScratchSkip();
+        // Matches registerTempVariables: _tmp_numeric_result at tempBase + one string slot.
+        return this.tempScratchBase + skip + slotSize + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
     }
 
     private isFromCurrentFile(decl: AST.TopLevelDeclaration): boolean {
@@ -402,6 +417,17 @@ export class PCodeGenerator {
                         });
                         return;
                     }
+                }
+            }
+            if (n.kind === 'CallExpr') {
+                const call = n as unknown as AST.CallExpr;
+                const foldedChr = this.tryFoldChrCall(call);
+                if (foldedChr !== null) {
+                    hits.push({
+                        s: foldedChr,
+                        line: call.loc?.line ?? 0,
+                        col: call.loc?.column ?? 0,
+                    });
                 }
             }
             if (n.kind === 'StringLiteral') {
@@ -797,8 +823,7 @@ export class PCodeGenerator {
                 offset += storeSize;
             } else {
                 const maxOpSz = this.maxIntegralOperandSizeForStrArg(argExpr);
-                const strByteArithToWordArg =
-                    argExpr.kind === 'BinaryExpr' &&
+                const strByteExpandForStr =
                     this.emitter.isData32 &&
                     sym.name.toLowerCase() === 'str' &&
                     storeSize === 2 &&
@@ -807,20 +832,80 @@ export class PCodeGenerator {
                     paramDt.size === 2 &&
                     maxOpSz !== undefined &&
                     maxOpSz < 2 &&
-                    !this.strSyscallArgNeedsDwordScratchTemp(argExpr, paramDt);
+                    !this.strSyscallArgNeedsDwordScratchTemp(argExpr, paramDt) &&
+                    (argExpr.kind === 'BinaryExpr' || this.isObjectPropertyMemberForStrByteExpand(argExpr));
+                const emitStrByteScratch = (): void => {
+                    const strBase = strOutputStringAddr ?? this.getTempStringAddr(0);
+                    const scratch = strBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(scratch);
+                    this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(scratch);
+                };
+                // tmake: str(val(stringVar)) passes val's byref string arg via embedded slot 1 (STO32 +4), then LOA16I widen.
+                if (
+                    sym.name.toLowerCase() === 'str' &&
+                    argExpr.kind === 'CallExpr' &&
+                    argExpr.callee.kind === 'IdentifierExpr'
+                ) {
+                    const calleeSym = this.symbols.current.lookup(argExpr.callee.name);
+                    if (
+                        calleeSym?.kind === SymbolKind.Syscall &&
+                        (calleeSym as SyscallSymbol).name.toLowerCase() === 'val' &&
+                        argExpr.args.length >= 1
+                    ) {
+                        const valSc = calleeSym as SyscallSymbol;
+                        const srcArg = argExpr.args[0];
+                        if (srcArg.kind === 'IdentifierExpr') {
+                            const idArg = srcArg as AST.IdentifierExpr;
+                            const nameLower = idArg.name.toLowerCase();
+                            const curFn = this.ctx.currentFunction;
+                            // Prefer the VariableSymbol from the current function frame: symbols.current.lookup
+                            // must match the same object identity as localVarLabelMap keys from assignLocalVarLabels.
+                            let vSym: VariableSymbol | undefined = curFn?.localVariables.find(
+                                v => v.name.toLowerCase() === nameLower,
+                            ) as VariableSymbol | undefined;
+                            if (!vSym) {
+                                vSym = curFn?.parameters.find(
+                                    p => p.name.toLowerCase() === nameLower,
+                                ) as VariableSymbol | undefined;
+                            }
+                            if (!vSym) {
+                                const vs = this.symbols.current.lookup(idArg.name);
+                                if (vs && (vs.kind === SymbolKind.Variable || vs.kind === SymbolKind.Parameter)) {
+                                    vSym = vs as VariableSymbol;
+                                }
+                            }
+                            if (vSym) {
+                                // tmake: str(val(var)) uses the string temp slot *before* the str() output slot for
+                                // the first LEA (operand differs by exactly TEMP_STRING_SLOT_SIZE from addr).
+                                const strResultAddr = strOutputStringAddr ?? this.getTempStringAddr(0);
+                                const strOut = strResultAddr - PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                                this.emitter.emitByte(OP.OPCODE_LEA);
+                                this.emitter.emitDataAddress(strOut);
+                                this.emitSyscallArg(0);
+                                // tmake: val's byref string LEA is str() output temp + one string slot (not strOut+2).
+                                const valStrPtr = strResultAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                                this.emitter.emitByte(OP.OPCODE_LEA);
+                                this.emitter.emitDataAddress(valStrPtr);
+                                this.emitSyscallArg(1);
+                                this.emitSyscall(valSc.syscallNumber);
+                                this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
+                                this.emitter.emitDataAddress(valStrPtr);
+                                this.emitStoreToArgBuffer(offset, storeSize);
+                                offset += storeSize;
+                                continue;
+                            }
+                        }
+                    }
+                }
                 if (argExpr.kind === 'MemberExpr') {
                     this.generateMember(argExpr);
+                    if (strByteExpandForStr) emitStrByteScratch();
                     this.emitStoreToArgBuffer(offset, storeSize);
                 } else {
                     this.generateExpression(argExpr);
-                    if (strByteArithToWordArg) {
-                        const strBase = strOutputStringAddr ?? this.getTempStringAddr(0);
-                        const scratch = strBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
-                        this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(scratch);
-                        this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(scratch);
-                    }
+                    if (strByteExpandForStr) emitStrByteScratch();
                     this.emitStoreToArgBuffer(offset, storeSize);
                 }
                 offset += storeSize;
@@ -851,6 +936,19 @@ export class PCodeGenerator {
             return String((arg as AST.IntegerLiteral).value);
         }
         return null;
+    }
+
+    /** Matches tide `InlineChr`: constant `chr(n)` becomes a one-char string literal at codegen (strload path). */
+    private tryFoldChrCall(expr: AST.CallExpr): string | null {
+        if (expr.callee.kind !== 'IdentifierExpr') return null;
+        const sym = this.symbols.current.lookup(expr.callee.name);
+        if (!sym || sym.kind !== SymbolKind.Syscall) return null;
+        const sc = sym as SyscallSymbol;
+        if (sc.name.toLowerCase() !== 'chr') return null;
+        if (expr.args.length !== 1) return null;
+        const v = this.evalConstantIntExpr(expr.args[0]);
+        if (v === undefined) return null;
+        return String.fromCharCode(v & 0xff);
     }
 
     private collectComplexStrCalls(expr: AST.Expression, result: AST.CallExpr[]): void {
@@ -1106,10 +1204,25 @@ export class PCodeGenerator {
                 this.emitLeaToArgOffset(tempAddr, argOffset);
                 return;
             }
+        } else if (expr.kind === 'CallExpr') {
+            const foldedChr = this.tryFoldChrCall(expr);
+            if (foldedChr !== null) {
+                this.emitTempStringInit(tempAddr, foldedChr.length);
+                this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(foldedChr);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                this.emitLeaToArgOffset(tempAddr, argOffset);
+                return;
+            }
+            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
+                this.emitLeaToArgOffset(tempAddr, argOffset);
+                return;
+            }
         } else if (expr.kind === 'MemberExpr' && this.tryEmitPropertyGetterDirect(expr, tempAddr)) {
-            this.emitLeaToArgOffset(tempAddr, argOffset);
-            return;
-        } else if (expr.kind === 'CallExpr' && this.emitStringCallResultToAddr(expr, tempAddr)) {
             this.emitLeaToArgOffset(tempAddr, argOffset);
             return;
         }
@@ -1131,6 +1244,18 @@ export class PCodeGenerator {
                 this.emitter.emitDataAddress(tempAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(folded);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName(isFirst ? 'strload' : 'strcat');
+                return;
+            }
+            const foldedChr = this.tryFoldChrCall(expr);
+            if (foldedChr !== null) {
+                this.emitTempStringInit(tempAddr, foldedChr.length);
+                this.emitter.emitByte(OP.OPCODE_LEA);
+                this.emitter.emitDataAddress(tempAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(foldedChr);
                 this.emitRDataLoad(rdataOff);
                 this.emitSyscallArg(1);
                 this.emitSyscallByName(isFirst ? 'strload' : 'strcat');
@@ -1197,6 +1322,22 @@ export class PCodeGenerator {
                 this.emitter.emitDataAddress(litAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(folded);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                this.emitLeaToArg(tempAddr, 0);
+                this.emitLeaToArg(litAddr, 1);
+                this.emitSyscallByName('strcat');
+                return;
+            }
+            const foldedChr = this.tryFoldChrCall(expr);
+            if (foldedChr !== null) {
+                const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
+                this.emitTempStringInit(litAddr, foldedChr.length);
+                this.emitter.emitByte(OP.OPCODE_LEA);
+                this.emitter.emitDataAddress(litAddr);
+                this.emitSyscallArg(0);
+                const rdataOff = this.emitter.addStringRData(foldedChr);
                 this.emitRDataLoad(rdataOff);
                 this.emitSyscallArg(1);
                 this.emitSyscallByName('strload');
@@ -2255,12 +2396,14 @@ export class PCodeGenerator {
         this.ctx.functionEndLabel = endLabel;
 
         this.onEventDeclaredLocalBytes = 0;
+        this.onEventStackSlotBytes = 0;
         if (sym.name.startsWith('on_')) {
             for (const par of sym.parameters) {
-                this.onEventDeclaredLocalBytes += par.isByRef ? 4 : (par.dataType?.size ?? 2);
+                const psz = par.isByRef ? 4 : (par.dataType?.size ?? 2);
+                this.onEventDeclaredLocalBytes += psz;
+                this.onEventStackSlotBytes += (psz + 1) & ~1;
             }
         }
-
         this.symbols.pushScope(undefined as any);
         for (const p of sym.parameters) this.symbols.current.define(p);
         for (const v of sym.localVariables) this.symbols.current.define(v);
@@ -2291,12 +2434,14 @@ export class PCodeGenerator {
         this.ctx.functionEndLabel = endLabel;
 
         this.onEventDeclaredLocalBytes = 0;
+        this.onEventStackSlotBytes = 0;
         if (sym.name.startsWith('on_')) {
             for (const par of sym.parameters) {
-                this.onEventDeclaredLocalBytes += par.isByRef ? 4 : (par.dataType?.size ?? 2);
+                const psz = par.isByRef ? 4 : (par.dataType?.size ?? 2);
+                this.onEventDeclaredLocalBytes += psz;
+                this.onEventStackSlotBytes += (psz + 1) & ~1;
             }
         }
-
         this.symbols.pushScope(undefined as any);
         for (const p of sym.parameters) this.symbols.current.define(p);
         for (const v of sym.localVariables) this.symbols.current.define(v);
@@ -2467,7 +2612,8 @@ export class PCodeGenerator {
                     }
 
                     this.generateExpression(value);
-                    this.emitSyscallArg(0);
+                    const setterArgSz = propDt && propDt.size >= 1 ? propDt.size : 2;
+                    this.emitStoreToArgBuffer(0, setterArgSz);
                     if (setNum !== undefined) {
                         this.emitSyscall(setNum);
                     }
@@ -2476,7 +2622,9 @@ export class PCodeGenerator {
                 const fn = obj.functions.get(target.property.toLowerCase());
                 if (fn) {
                     this.generateExpression(value);
-                    this.emitSyscallArg(0);
+                    const p0 = fn.parameters[0];
+                    const argSz = p0 ? this.getSyscallParamStoreSize(p0) : 2;
+                    this.emitStoreToArgBuffer(0, argSz);
                     this.emitSyscall(fn.syscallNumber);
                     return;
                 }
@@ -2619,6 +2767,15 @@ export class PCodeGenerator {
             this.generateExpression(value);
             this.emitStore(varSym);
         } else if (value.kind === 'CallExpr') {
+            const foldedChr = this.tryFoldChrCall(value);
+            if (foldedChr !== null) {
+                const rdataOffset = this.emitter.addStringRData(foldedChr);
+                this.emitVarLeaArg(varSym);
+                this.emitRDataLoad(rdataOffset);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                return;
+            }
             if (this.emitStringCallResultToAddr(value, varSym.address ?? 0, varSym.isByRef)) {
                 return;
             }
@@ -2688,8 +2845,10 @@ export class PCodeGenerator {
         const elseLabel = (stmt.elseIfBranches.length > 0 || stmt.elseBody) ? this.makeLabel('else') : endLabel;
         this.generateConditionJump(stmt.condition, elseLabel, false);
         const savedLocalBytes = this.onEventDeclaredLocalBytes;
+        const savedStackSlots = this.onEventStackSlotBytes;
         this.generateBlock(stmt.thenBody);
         this.onEventDeclaredLocalBytes = savedLocalBytes;
+        this.onEventStackSlotBytes = savedStackSlots;
 
         if (stmt.elseIfBranches.length > 0 || stmt.elseBody) {
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
@@ -2702,8 +2861,10 @@ export class PCodeGenerator {
             const nextLabel = (i < stmt.elseIfBranches.length - 1 || stmt.elseBody) ? this.makeLabel('elseif') : endLabel;
             this.generateConditionJump(branch.condition, nextLabel, false);
             const savedBranchBytes = this.onEventDeclaredLocalBytes;
+            const savedBranchStack = this.onEventStackSlotBytes;
             this.generateBlock(branch.body);
             this.onEventDeclaredLocalBytes = savedBranchBytes;
+            this.onEventStackSlotBytes = savedBranchStack;
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(endLabel);
             this.emitter.defineLabel(nextLabel);
@@ -2711,8 +2872,10 @@ export class PCodeGenerator {
 
         if (stmt.elseBody) {
             const savedElseBytes = this.onEventDeclaredLocalBytes;
+            const savedElseStack = this.onEventStackSlotBytes;
             this.generateBlock(stmt.elseBody);
             this.onEventDeclaredLocalBytes = savedElseBytes;
+            this.onEventStackSlotBytes = savedElseStack;
         }
 
         this.emitter.defineLabel(endLabel);
@@ -2759,8 +2922,10 @@ export class PCodeGenerator {
             }
 
             const savedCaseBytes = this.onEventDeclaredLocalBytes;
+            const savedCaseStack = this.onEventStackSlotBytes;
             this.generateBlock(c.body);
             this.onEventDeclaredLocalBytes = savedCaseBytes;
+            this.onEventStackSlotBytes = savedCaseStack;
 
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(endLabel);
@@ -2769,8 +2934,10 @@ export class PCodeGenerator {
         this.emitter.defineLabel(nextCaseEntryLabel);
         if (stmt.defaultCase) {
             const savedDefaultBytes = this.onEventDeclaredLocalBytes;
+            const savedDefaultStack = this.onEventStackSlotBytes;
             this.generateBlock(stmt.defaultCase);
             this.onEventDeclaredLocalBytes = savedDefaultBytes;
+            this.onEventStackSlotBytes = savedDefaultStack;
         }
 
         this.emitter.defineLabel(endLabel);
@@ -2808,8 +2975,10 @@ export class PCodeGenerator {
         }
 
         const savedLocalBytes = this.onEventDeclaredLocalBytes;
+        const savedStackSlots = this.onEventStackSlotBytes;
         this.generateBlock(stmt.body);
         this.onEventDeclaredLocalBytes = savedLocalBytes;
+        this.onEventStackSlotBytes = savedStackSlots;
 
         if (stmt.init.kind === 'BinaryExpr' && stmt.init.left.kind === 'IdentifierExpr') {
             const counterName = stmt.init.left.name;
@@ -2850,8 +3019,10 @@ export class PCodeGenerator {
         this.emitter.defineLabel(startLabel);
         this.generateConditionJump(stmt.condition, endLabel, false);
         const savedLocalBytes = this.onEventDeclaredLocalBytes;
+        const savedStackSlots = this.onEventStackSlotBytes;
         this.generateBlock(stmt.body);
         this.onEventDeclaredLocalBytes = savedLocalBytes;
+        this.onEventStackSlotBytes = savedStackSlots;
         this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
         this.emitter.emitLabelReference(startLabel);
         this.emitter.defineLabel(endLabel);
@@ -2880,8 +3051,10 @@ export class PCodeGenerator {
         }
 
         const savedLocalBytes = this.onEventDeclaredLocalBytes;
+        const savedStackSlots = this.onEventStackSlotBytes;
         this.generateBlock(stmt.body);
         this.onEventDeclaredLocalBytes = savedLocalBytes;
+        this.onEventStackSlotBytes = savedStackSlots;
 
         if (stmt.loopKind === AST.DoLoopKind.WhilePost && stmt.condition) {
             this.generateConditionJump(stmt.condition, startLabel, true);
@@ -2943,7 +3116,9 @@ export class PCodeGenerator {
             }
 
             if (this.ctx.currentFunction?.name.startsWith('on_') && !varSym.isTemp) {
-                this.onEventDeclaredLocalBytes += varSym.dataType?.size ?? 2;
+                const vsz = varSym.dataType?.size ?? 2;
+                this.onEventDeclaredLocalBytes += vsz;
+                this.onEventStackSlotBytes += (vsz + 1) & ~1;
             }
 
             if (stmt.initializer) {
@@ -3457,6 +3632,15 @@ export class PCodeGenerator {
         const t = this.inferType(expr);
         if (t && isIntegral(t)) return t.size;
         return undefined;
+    }
+
+    /** tmake widens byte `sys.*` (and other object) property reads for str(); struct fields stay direct. */
+    private isObjectPropertyMemberForStrByteExpand(expr: AST.Expression): boolean {
+        if (expr.kind !== 'MemberExpr') return false;
+        const m = expr as AST.MemberExpr;
+        if (m.object.kind !== 'IdentifierExpr') return false;
+        const sym = this.symbols.current.lookup(m.object.name);
+        return sym?.kind === SymbolKind.Object;
     }
 
     /**

@@ -1,0 +1,33 @@
+include "global.tbh"
+
+sub on_sys_init()
+    dim tc as word
+    tc = sys.timercount
+    sys.debugprint(str(tc))
+    dim rm as pl_sys_mode
+    rm = sys.runmode
+    sys.debugprint(str(rm))
+    dim tc32 as dword
+    tc32 = sys.timercount32
+    sys.debugprint(lstr(tc32))
+    dim p as byte
+    p = sys.onsystimerperiod
+    sys.onsystimerperiod = 10
+    sys.debugprint(str(sys.onsystimerperiod))
+    sys.onsystimerperiod = p
+    dim wdp as word
+    wdp = sys.wdperiod
+    sys.debugprint(hex(wdp))
+    sys.wdperiod = wdp
+    dim d as dword
+    d = 12345
+    sys.debugprint(lstr(d))
+    dim s as short
+    s = -5
+    sys.debugprint(stri(s))
+    sys.debugprint(chr(65))
+    dim lit as string = "42"
+    sys.debugprint(str(val(lit)))
+    ' Void syscall; sys.sleep not on AppBlocks tmake platform
+    sys.halt()
+end sub
