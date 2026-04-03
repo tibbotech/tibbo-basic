@@ -400,6 +400,10 @@ export class PCodeGenerator {
      */
     private preallocateStringPoolFromAst(program: AST.Program): void {
         const hits: { s: string; line: number; col: number }[] = [];
+        const skipLiterals = new Set<AST.StringLiteral>();
+        for (const decl of program.declarations) {
+            this.collectFoldedStringLiterals(decl, skipLiterals);
+        }
 
         const visit = (node: unknown): void => {
             if (node === null || node === undefined) return;
@@ -432,11 +436,13 @@ export class PCodeGenerator {
             }
             if (n.kind === 'StringLiteral') {
                 const sl = n as unknown as AST.StringLiteral;
-                hits.push({
-                    s: sl.value,
-                    line: sl.loc?.line ?? 0,
-                    col: sl.loc?.column ?? 0,
-                });
+                if (!skipLiterals.has(sl)) {
+                    hits.push({
+                        s: sl.value,
+                        line: sl.loc?.line ?? 0,
+                        col: sl.loc?.column ?? 0,
+                    });
+                }
             }
             for (const key of Object.keys(n)) {
                 if (key === 'loc') continue;
@@ -456,6 +462,53 @@ export class PCodeGenerator {
         hits.sort((a, b) => a.line - b.line || a.col - b.col);
         for (const h of hits) {
             this.emitter.addStringRData(h.s);
+        }
+    }
+
+    private static readonly SMALL_INTEGRAL_TYPES = new Set([
+        AST.BaseTypeKind.Byte, AST.BaseTypeKind.Char, AST.BaseTypeKind.Boolean,
+        AST.BaseTypeKind.Word, AST.BaseTypeKind.Short, AST.BaseTypeKind.Integer,
+    ]);
+
+    /**
+     * tmake constant-folds decimal string literals assigned to integral types smaller
+     * than 32 bits, so those literals never enter RData.  Mark them so the pre-pool
+     * visitor can skip them.
+     */
+    private collectFoldedStringLiterals(node: unknown, out: Set<AST.StringLiteral>): void {
+        if (node === null || node === undefined || typeof node !== 'object') return;
+        const n = node as Record<string, unknown>;
+        if (n.kind === 'DimStmt') {
+            const dim = n as unknown as AST.DimStmt;
+            if (dim.initializer?.kind === 'StringLiteral' && dim.typeRef) {
+                const tn = dim.typeRef.typeName;
+                if (tn.kind === 'BaseType' && PCodeGenerator.SMALL_INTEGRAL_TYPES.has(tn.baseType)) {
+                    const num = parseInt((dim.initializer as AST.StringLiteral).value, 10);
+                    if (!isNaN(num)) {
+                        out.add(dim.initializer as AST.StringLiteral);
+                    }
+                }
+            }
+        } else if (n.kind === 'ExpressionStmt') {
+            const es = n as unknown as AST.ExpressionStmt;
+            if (es.expression.kind === 'BinaryExpr') {
+                const bin = es.expression as AST.BinaryExpr;
+                if (bin.op === AST.BinaryOp.Eq && bin.right.kind === 'StringLiteral') {
+                    const num = parseInt((bin.right as AST.StringLiteral).value, 10);
+                    if (!isNaN(num)) {
+                        out.add(bin.right as AST.StringLiteral);
+                    }
+                }
+            }
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc') continue;
+            const v = n[key];
+            if (Array.isArray(v)) {
+                for (const item of v) this.collectFoldedStringLiterals(item, out);
+            } else if (v && typeof v === 'object') {
+                this.collectFoldedStringLiterals(v, out);
+            }
         }
     }
 
@@ -3131,6 +3184,19 @@ export class PCodeGenerator {
                     this.emitSyscallByName('strload');
                 } else if (dt && isString(dt)) {
                     this.generateStringAssignment(varSym, stmt.initializer);
+                } else if (stmt.initializer.kind === 'StringLiteral' && dt && dt.size >= 4 && isIntegral(dt)) {
+                    // tmake: dword/long = "literal" uses strload + lval at runtime, not constant folding
+                    const strLit = stmt.initializer as AST.StringLiteral;
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitTempStringInit(tempAddr, strLit.value.length);
+                    const rdataOffset = this.emitter.addStringRData(strLit.value);
+                    this.emitLeaToArg(tempAddr, 0);
+                    this.emitRDataLoad(rdataOffset);
+                    this.emitSyscallArg(1);
+                    this.emitSyscallByName('strload');
+                    this.emitLeaToArg(tempAddr, 0);
+                    this.emitVarLeaArgAt(varSym, 1);
+                    this.emitSyscallByName('lval');
                 } else if (this.tryEmitPropertyGetterDirect(stmt.initializer, addr)) {
                     // Property getter stores directly to local var
                 } else if (stmt.initializer.kind === 'CallExpr' && this.canDirectReturnTo(stmt.initializer as AST.CallExpr)) {

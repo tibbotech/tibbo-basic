@@ -9,5 +9,8 @@ sub on_sys_init()
     sys.debugprint(str(wa))
     sys.debugprint(str(wb))
     sys.debugprint(stri(sc))
+
+    dim du as dword = "65535"
+    dim ll as long = "4294967295"
     sys.halt()
 end sub
