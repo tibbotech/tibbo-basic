@@ -1,7 +1,7 @@
 import {
     TOBJ_SIGNATURE_OBJ, TOBJ_SIGNATURE_PDB, TOBJ_SIGNATURE_BIN, TOBJ_VERSION,
     TObjSection, TObjHeaderFlags, TObjAddressFlags, TObjRefType,
-    TObjVariableFlags,
+    TObjVariableFlags, TObjFunctionFlags, TObjDataType,
     HEADER_SIZE, SECTION_DESCRIPTOR_SIZE, MAXDWORD,
 } from '../tobj/format';
 import { BinaryWriter } from '../tobj/writer';
@@ -98,6 +98,7 @@ export class Linker {
     private fnSpanByTag = new Map<string, { start: number; end: number }>();
     private importOnlyFnTags = new Set<string>();
     private eventFnTags = new Set<string>();
+    private localRelocDeltas = new Map<string, number>();
 
     // Per-OBJ tracking for PDB debug sections
     private allObjSectionData: Buffer[][] = [];
@@ -169,6 +170,7 @@ export class Linker {
             }
         }
 
+        this.relocateLocals(objFiles);
         this.compactUnreferencedFunctions();
         this.reorderFunctions();
         this.applyVariableAddressOverrides();
@@ -786,6 +788,231 @@ export class Linker {
         return result;
     }
 
+    // ---- Local variable relocation (matching C++ RelocateLocals) ----
+
+    private relocateLocals(objFiles: ObjFile[]): void {
+        // 1. Build cross-module call graph from Functions sections
+        interface FnEntry {
+            name: string;
+            isEvent: boolean;
+            calleeNames: string[];
+        }
+        const callGraph = new Map<string, FnEntry>();
+
+        for (const obj of objFiles) {
+            const funcData = obj.sections[TObjSection.Functions]?.data;
+            const symData = obj.sections[TObjSection.Symbols]?.data;
+            if (!funcData || !symData || funcData.length === 0) continue;
+
+            const readSym = (off: number): string => {
+                let s = '';
+                for (let i = off; i < symData.length && symData[i] !== 0; i++) {
+                    s += String.fromCharCode(symData[i]);
+                }
+                return s;
+            };
+
+            const perObjFns: { name: string; flags: number; calleeIndices: number[] }[] = [];
+            let pos = 0;
+            while (pos + 17 <= funcData.length) {
+                const flags = funcData.readUInt8(pos); pos += 1;
+                const nameRef = funcData.readUInt32LE(pos); pos += 4;
+                pos += 4; // addrIdx
+                pos += 4; // eventIdx
+                const calleeCount = funcData.readUInt32LE(pos); pos += 4;
+                const calleeIndices: number[] = [];
+                for (let c = 0; c < calleeCount; c++) {
+                    if (pos + 4 > funcData.length) break;
+                    calleeIndices.push(funcData.readUInt32LE(pos));
+                    pos += 4;
+                }
+                perObjFns.push({ name: readSym(nameRef), flags, calleeIndices });
+            }
+
+            for (const fn of perObjFns) {
+                const nameLc = fn.name.toLowerCase();
+                const calleeNames = fn.calleeIndices
+                    .filter(idx => idx < perObjFns.length)
+                    .map(idx => perObjFns[idx].name.toLowerCase());
+
+                const existing = callGraph.get(nameLc);
+                if (existing) {
+                    if (fn.flags & TObjFunctionFlags.Event) existing.isEvent = true;
+                    for (const c of calleeNames) {
+                        if (!existing.calleeNames.includes(c)) existing.calleeNames.push(c);
+                    }
+                } else {
+                    callGraph.set(nameLc, {
+                        name: nameLc,
+                        isEvent: !!(fn.flags & TObjFunctionFlags.Event),
+                        calleeNames,
+                    });
+                }
+            }
+        }
+
+        if (callGraph.size === 0) return;
+
+        // 2. Build per-OBJ address-index-to-size map from Variables + Types sections
+        const addrIndexToSize = new Map<number, number>();
+        const useData32 = !!(this.flags & TObjHeaderFlags.Data32);
+        const dataAddrSize = useData32 ? 4 : 2;
+        let globalAddrOffset = 0;
+
+        for (const obj of objFiles) {
+            const varData = obj.sections[TObjSection.Variables]?.data;
+            const typesData = obj.sections[TObjSection.Types]?.data;
+
+            const typeSizes = parseTypeSizes(typesData);
+
+            if (varData && varData.length > 0) {
+                let vpos = 0;
+                while (vpos + 18 <= varData.length) {
+                    const vflags = varData.readUInt8(vpos); vpos += 1;
+                    vpos += 4; // name
+                    const addrIdx = varData.readUInt32LE(vpos); vpos += 4;
+                    const ownerScope = varData.readUInt32LE(vpos); vpos += 4;
+                    const dtByte = varData.readUInt8(vpos); vpos += 1;
+                    const dtDword = varData.readUInt32LE(vpos); vpos += 4;
+
+                    if (ownerScope === MAXDWORD) continue; // global
+                    if (vflags & TObjVariableFlags.Static) continue;
+
+                    const size = getVariableSize(vflags, dtByte, dtDword, typeSizes, dataAddrSize);
+                    addrIndexToSize.set(globalAddrOffset + addrIdx, size);
+                }
+            }
+
+            const addrBuf = obj.sections[TObjSection.Addresses]?.data ?? Buffer.alloc(0);
+            globalAddrOffset += countAddressEntries(addrBuf);
+        }
+
+        // 3. Associate addresses with functions and compute frame info
+        const fnAddresses = new Map<string, LinkedAddress[]>();
+
+        for (const addr of this.addresses) {
+            if (addr.flags & TObjAddressFlags.Code) continue;
+            const fnName = extractFunctionName(addr.tag);
+            if (!fnName) continue;
+            const fnLc = fnName.toLowerCase();
+            if (!fnAddresses.has(fnLc)) fnAddresses.set(fnLc, []);
+            fnAddresses.get(fnLc)!.push(addr);
+        }
+
+        // Compute variable sizes by matching address values to the addr-index-to-size map
+        const addrToSize = new Map<LinkedAddress, number>();
+        let globalIdx = 0;
+        for (const obj of objFiles) {
+            const addrData = obj.sections[TObjSection.Addresses]?.data;
+            if (!addrData || addrData.length === 0) {
+                continue;
+            }
+            const symData = obj.sections[TObjSection.Symbols]?.data;
+            let apos = 0;
+            while (apos + 17 <= addrData.length) {
+                const aflags = addrData.readUInt8(apos); apos += 1;
+                const tagOff = addrData.readUInt32LE(apos); apos += 4;
+                apos += 4; // address
+                apos += 4; // base
+                const refCount = addrData.readUInt32LE(apos); apos += 4;
+                apos += refCount * 5;
+
+                const size = addrIndexToSize.get(globalIdx);
+                if (size !== undefined) {
+                    let tagName = '';
+                    if (symData && tagOff < symData.length) {
+                        for (let si = tagOff; si < symData.length && symData[si] !== 0; si++) {
+                            tagName += String.fromCharCode(symData[si]);
+                        }
+                    }
+                    if (tagName) {
+                        const matched = this.addresses.find(a => a.tag === tagName);
+                        if (matched) addrToSize.set(matched, size);
+                    }
+                }
+                globalIdx++;
+            }
+        }
+
+        interface FrameInfo { base: number; size: number }
+        const frameInfoMap = new Map<string, FrameInfo>();
+
+        for (const [fnLc, addrs] of fnAddresses) {
+            if (addrs.length === 0) continue;
+            let minAddr = Number.MAX_SAFE_INTEGER;
+            let maxEnd = 0;
+            for (const addr of addrs) {
+                if (addr.address < minAddr) minAddr = addr.address;
+                const varSize = addrToSize.get(addr) ?? 1;
+                const end = addr.address + varSize;
+                if (end > maxEnd) maxEnd = end;
+            }
+            if (minAddr < Number.MAX_SAFE_INTEGER) {
+                frameInfoMap.set(fnLc, { base: minAddr, size: maxEnd - minAddr });
+            }
+        }
+
+        // 4. Walk call graph from all functions, relocating callees
+        this.localRelocDeltas.clear();
+        const computedLocalBase = (this.options.platformSize ?? 0) +
+            Math.max(this.cumulativeGlobalAlloc >>> 0, this.options.globalAllocSize ?? 0) +
+            (this.options.stackSize ?? 0);
+
+        const relocateFunction = (fnLc: string, requestedBase: number): number => {
+            const frame = frameInfoMap.get(fnLc);
+            if (!frame || frame.size === 0) {
+                const entry = callGraph.get(fnLc);
+                if (!entry) return 0;
+                let result = requestedBase;
+                for (const callee of entry.calleeNames) {
+                    const r = relocateFunction(callee, requestedBase);
+                    if (r > result) result = r;
+                }
+                return result;
+            }
+
+            if (requestedBase > frame.base) {
+                const delta = requestedBase - frame.base;
+                const addrs = fnAddresses.get(fnLc);
+                if (addrs) {
+                    for (const addr of addrs) {
+                        addr.address += delta;
+                        this.localRelocDeltas.set(addr.tag, (this.localRelocDeltas.get(addr.tag) ?? 0) + delta);
+                    }
+                }
+                frame.base = requestedBase;
+            }
+
+            const frameEnd = frame.base + frame.size;
+            let result = frameEnd;
+
+            const entry = callGraph.get(fnLc);
+            if (entry) {
+                for (const callee of entry.calleeNames) {
+                    const r = relocateFunction(callee, frameEnd);
+                    if (r > result) result = r;
+                }
+            }
+
+            return result;
+        };
+
+        let maxLocalEnd = computedLocalBase;
+        for (const [fnLc, entry] of callGraph) {
+            if (entry.isEvent || !(callGraph.get(fnLc)?.isEvent === false)) {
+                // Process all non-doevents functions starting from localBase
+            }
+            const r = relocateFunction(fnLc, computedLocalBase);
+            if (r > maxLocalEnd) maxLocalEnd = r;
+        }
+
+        // 5. Update localAllocSize
+        const newLocalAllocSize = maxLocalEnd - computedLocalBase;
+        if (newLocalAllocSize > this.maxLocalAllocSize) {
+            this.maxLocalAllocSize = newLocalAllocSize;
+        }
+    }
+
     private emptyHeader(): ObjHeader {
         return {
             signature: 0, version: 0, checksum: 0, fileSize: 0,
@@ -801,6 +1028,7 @@ export class Linker {
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.Addresses];
             if (!data || data.length === 0) continue;
+            const symData = allSections[i][TObjSection.Symbols];
             const cb = codeBases[i], ib = initBases[i], sb = symBases[i];
             let pos = 0;
             while (pos + 17 <= data.length) {
@@ -810,14 +1038,21 @@ export class Linker {
                 const base = data.readUInt32LE(pos); pos += 4;
                 const refCount = data.readUInt32LE(pos); pos += 4;
 
-                tag += sb;
                 if (flags & TObjAddressFlags.Code) {
                     if (flags & TObjAddressFlags.Init) {
                         addr += ib;
                     } else {
                         addr += cb + initOffset;
                     }
+                } else if (this.localRelocDeltas.size > 0 && symData) {
+                    let tagName = '';
+                    for (let si = tag; si < symData.length && symData[si] !== 0; si++) {
+                        tagName += String.fromCharCode(symData[si]);
+                    }
+                    const delta = this.localRelocDeltas.get(tagName);
+                    if (delta) addr += delta;
                 }
+                tag += sb;
 
                 w.writeByte(flags);
                 w.writeDword(tag);
@@ -1260,6 +1495,93 @@ function countFunctionEntries(data: Buffer): number {
         count++;
     }
     return count;
+}
+
+function extractFunctionName(tag: string): string | null {
+    if (tag.startsWith('!V:')) {
+        const rest = tag.substring(3);
+        const colonIdx = rest.indexOf(':');
+        return colonIdx >= 0 ? rest.substring(0, colonIdx) : null;
+    }
+    if (tag.startsWith('?A:')) {
+        const rest = tag.substring(3);
+        const colonIdx = rest.indexOf(':');
+        return colonIdx >= 0 ? rest.substring(0, colonIdx) : null;
+    }
+    const localMatch = tag.match(/:local\(([^:)]+)/);
+    if (localMatch) return localMatch[1];
+    return null;
+}
+
+function getVariableSize(
+    flags: number, dtByte: number, dtDword: number,
+    typeSizes: Map<number, number>, dataAddrSize: number,
+): number {
+    if (flags & TObjVariableFlags.ByRef) return dataAddrSize;
+    switch (dtByte) {
+        case TObjDataType.Boolean:
+        case TObjDataType.Byte:
+        case TObjDataType.Char:
+            return 1;
+        case TObjDataType.Word:
+        case TObjDataType.Short:
+            return 2;
+        case TObjDataType.Dword:
+        case TObjDataType.Long:
+        case TObjDataType.Real:
+            return 4;
+        case TObjDataType.String:
+            return (dtDword & 0xFF) + 1;
+        case TObjDataType.Array:
+        case TObjDataType.Struct:
+        case TObjDataType.StructC:
+        case TObjDataType.Enum:
+        case TObjDataType.Union:
+            return typeSizes.get(dtDword) ?? 2;
+        default:
+            return 2;
+    }
+}
+
+function parseTypeSizes(typesData: Buffer | undefined): Map<number, number> {
+    const sizes = new Map<number, number>();
+    if (!typesData || typesData.length === 0) return sizes;
+
+    let pos = 0;
+    let idx = 0;
+    while (pos + 17 <= typesData.length) {
+        const dtType = typesData.readUInt8(pos);
+        // name at pos+1 (4 bytes), size at pos+5 (4 bytes)
+        const size = typesData.readUInt32LE(pos + 5);
+        const elemCount = typesData.readUInt32LE(pos + 9);
+        const refCount = typesData.readUInt32LE(pos + 13);
+        sizes.set(idx, size);
+        pos += 17;
+
+        switch (dtType) {
+            case TObjDataType.Array:
+            case TObjDataType.ArrayC:
+            case TObjDataType.Pointer:
+            case TObjDataType.Reference:
+                pos += 5; // element data type
+                pos += refCount * 5;
+                break;
+            case TObjDataType.Enum:
+                pos += 1; // base type
+                pos += elemCount * 8;
+                break;
+            case TObjDataType.Struct:
+            case TObjDataType.StructC:
+            case TObjDataType.Union:
+                pos += elemCount * 13;
+                pos += refCount * 5;
+                break;
+            default:
+                break;
+        }
+        idx++;
+    }
+    return sizes;
 }
 
 /**

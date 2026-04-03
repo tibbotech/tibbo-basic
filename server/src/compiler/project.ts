@@ -292,6 +292,7 @@ export class ProjectCompiler {
                     firmwareVer: this.platformConfig.version,
                     configStr: this.platformConfig.configStr,
                     projectName: this.config.name,
+                    resolveDataAddresses: true,
                 });
 
                 const objName = baseName + '.obj';
@@ -349,6 +350,7 @@ export class ProjectCompiler {
                     firmwareVer: this.platformConfig.version,
                     configStr: this.platformConfig.configStr,
                     projectName: this.config.name,
+                    resolveDataAddresses: true,
                     projectGlobalAllocSize: totalGlobalAllocSize,
                     projectCalleeNamesLower,
                     ...(needsStackSizeFix && {
