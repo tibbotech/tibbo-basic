@@ -5,7 +5,7 @@ import { SemanticResolver } from './semantics/resolver';
 import { TypeChecker } from './semantics/checker';
 import { PCodeGenerator } from './codegen/generator';
 import { TObjWriter } from './tobj/writer';
-import { Linker, LinkerOptions } from './linker/linker';
+import { Linker, LinkerOptions, pdbToTpc } from './linker/linker';
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const antlr4 = require('antlr4');
@@ -68,6 +68,7 @@ export interface LinkOptions {
 }
 
 export interface LinkResult {
+    pdb: Buffer;
     tpc: Buffer;
     errors: Diagnostic[];
     warnings: Diagnostic[];
@@ -227,8 +228,10 @@ export function link(objFiles: { name: string; data: Buffer; initObjDescriptors?
     const diagnostics = new DiagnosticCollection();
     try {
         const linker = new Linker(diagnostics, linkerOptions);
-        const tpc = linker.link(objFiles);
+        const pdb = linker.link(objFiles);
+        const tpc = pdbToTpc(pdb);
         return {
+            pdb,
             tpc,
             errors: diagnostics.getErrors(),
             warnings: diagnostics.getWarnings(),
@@ -236,6 +239,7 @@ export function link(objFiles: { name: string; data: Buffer; initObjDescriptors?
     } catch (e) {
         diagnostics.error({ file: '<linker>', line: 0, column: 0 }, `Linking failed: ${e instanceof Error ? e.message : String(e)}`, 'LINK');
         return {
+            pdb: Buffer.alloc(0),
             tpc: Buffer.alloc(0),
             errors: diagnostics.getErrors(),
             warnings: diagnostics.getWarnings(),
@@ -251,4 +255,4 @@ export { SemanticResolver } from './semantics/resolver';
 export { TypeChecker } from './semantics/checker';
 export { PCodeGenerator } from './codegen/generator';
 export { TObjWriter } from './tobj/writer';
-export { Linker, LinkerOptions } from './linker/linker';
+export { Linker, LinkerOptions, pdbToTpc } from './linker/linker';

@@ -123,6 +123,14 @@ function main(): void {
     fs.writeFileSync(tpcOutput, result.tpc);
     console.log(`${tpcOutput} (${result.tpc.length} bytes)`);
 
+    if (result.pdb) {
+        const pdbOutput = tpcOutput.replace(/\.[^.]+$/, '.pdb');
+        fs.writeFileSync(pdbOutput, result.pdb);
+        if (verbose) {
+            console.log(`${pdbOutput} (${result.pdb.length} bytes)`);
+        }
+    }
+
     if (verbose) {
         const sig = result.tpc.toString('ascii', 0, 4);
         const fileSize = result.tpc.readUInt32LE(8);

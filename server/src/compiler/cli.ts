@@ -169,6 +169,12 @@ function linkMode(args: CLIArgs): void {
         if (args.verbose) {
             console.log(`  -> ${outputFile} (${result.tpc.length} bytes)`);
         }
+
+        const pdbFile = outputFile.replace(/\.[^.]+$/, '.pdb');
+        fs.writeFileSync(pdbFile, result.pdb);
+        if (args.verbose) {
+            console.log(`  -> ${pdbFile} (${result.pdb.length} bytes)`);
+        }
     }
 
     process.exit(hasErrors ? 1 : 0);
