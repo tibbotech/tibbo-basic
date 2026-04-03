@@ -1,4 +1,5 @@
 import { compile, buildAST, parse, link } from '../../src/compiler/index';
+import { TObjSection, HEADER_SIZE } from '../../src/compiler/tobj/format';
 
 describe('Tibbo Basic Compiler', () => {
 
@@ -406,6 +407,69 @@ end sub
             ]);
             expect(linkResult.errors).toHaveLength(0);
             expect(linkResult.tpc.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('Init section', () => {
+        function readSection(buf: Buffer, section: number): Buffer {
+            const off = buf.readUInt32LE(HEADER_SIZE + section * 8);
+            const sz = buf.readUInt32LE(HEADER_SIZE + section * 8 + 4);
+            return buf.slice(off, off + sz);
+        }
+
+        it('should generate init code for global variable with initializer', () => {
+            const result = compile(`
+dim x as byte = 1
+sub on_sys_init()
+end sub
+`, { flags: 0x04 }); // Data32 flag for 4-byte data addresses
+            expect(result.errors).toHaveLength(0);
+
+            const initSection = readSection(result.obj, TObjSection.Init);
+            expect(initSection.length).toBeGreaterThan(0);
+            // LOA8I_IMM(0x8b) 0x01 STO8(0x10) + 4-byte address
+            expect(initSection.length).toBe(7);
+            expect(initSection[0]).toBe(0x8b); // OPCODE_LOA8I | OPCODE_IMMEDIATE
+            expect(initSection[1]).toBe(0x01); // value 1
+            expect(initSection[2]).toBe(0x10); // OPCODE_STO8 | OPCODE_DIRECT
+        });
+
+        it('should keep init section in linked PDB', () => {
+            const r1 = compile(`
+dim a as byte = 1
+sub on_sys_init()
+end sub
+`, { fileName: 'main.tbs', flags: 0x04 });
+
+            const r2 = compile(`
+declare sub on_sys_init()
+dim b as byte = 2
+sub helper()
+end sub
+`, { fileName: 'helper.tbs', flags: 0x04 });
+
+            expect(r1.errors).toHaveLength(0);
+            expect(r2.errors).toHaveLength(0);
+
+            const r1Init = readSection(r1.obj, TObjSection.Init);
+            const r2Init = readSection(r2.obj, TObjSection.Init);
+            expect(r1Init.length).toBe(7);
+            expect(r2Init.length).toBe(7);
+
+            const linkResult = link([
+                { name: 'main.obj', data: r1.obj },
+                { name: 'helper.obj', data: r2.obj },
+            ]);
+            expect(linkResult.errors).toHaveLength(0);
+
+            // PDB should have a non-empty Init section (merged init from both OBJs)
+            const pdbInit = readSection(linkResult.pdb, TObjSection.Init);
+            expect(pdbInit.length).toBe(14); // 7 + 7 bytes from both files
+
+            // Code section should start with init bytes + RET + function code
+            const pdbCode = readSection(linkResult.pdb, TObjSection.Code);
+            expect(pdbCode.length).toBeGreaterThan(14);
+            expect(pdbCode[14]).toBe(0x1f); // OPCODE_RET separating init from code
         });
     });
 });

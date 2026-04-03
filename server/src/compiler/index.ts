@@ -255,4 +255,4 @@ export { SemanticResolver } from './semantics/resolver';
 export { TypeChecker } from './semantics/checker';
 export { PCodeGenerator } from './codegen/generator';
 export { TObjWriter } from './tobj/writer';
-export { Linker, LinkerOptions, pdbToTpc } from './linker/linker';
+export { Linker, LinkerOptions, pdbToTpc, extractPdbLayout, PdbLayoutInfo } from './linker/linker';

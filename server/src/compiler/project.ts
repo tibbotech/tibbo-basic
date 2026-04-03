@@ -149,7 +149,7 @@ export class ProjectCompiler {
         return flags;
     }
 
-    compile(): ProjectCompileResult {
+    compile(extraLinkerOptions?: Partial<LinkerOptions>): ProjectCompileResult {
         const TibboBasicPreprocessor = require('../TibboBasicPreprocessor').default;
         const preprocessor = new TibboBasicPreprocessor(this.projectPath, this.platformsPath);
 
@@ -435,7 +435,10 @@ export class ProjectCompiler {
             data,
             initObjDescriptors: objDescriptors.get(name),
         }));
-        const linkResult = link(objBuffers, {}, linkerOptions);
+        const mergedLinkerOptions = extraLinkerOptions
+            ? { ...linkerOptions, ...extraLinkerOptions }
+            : linkerOptions;
+        const linkResult = link(objBuffers, {}, mergedLinkerOptions);
         const pdb = linkResult.errors.length === 0 ? linkResult.pdb : null;
         this.writeProjectArtifacts(objs, pdb);
 

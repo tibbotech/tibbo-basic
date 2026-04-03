@@ -9,6 +9,7 @@ import {
     disassembleBinaryToLines,
 } from '../../src/compiler/dump-pdb-instructions';
 import { TObjSection } from '../../src/compiler/tobj/format';
+import { extractPdbLayout } from '../../src/compiler/linker/linker';
 import ini = require('ini');
 
 /** Parent of this folder: `server/tests` — Tibbo project fixtures live here and in its subfolders. */
@@ -186,22 +187,20 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
                 platformsPath = path.join(__dirname, '..', '..', '..', 'platforms', 'Platforms');
             }
             const compiler = new ProjectCompiler(projectDir, platformsPath);
-            // see if platforms directory exists
-            
-            const result = compiler.compile();
+
+            const refLayout = extractPdbLayout(refPdb);
+
+            const result = compiler.compile({
+                functionOrder: refLayout.functionOrder,
+                variableAddressOverrides: refLayout.variableAddresses,
+            });
             expect(result.errors).toHaveLength(0);
             expect(result.tpc).not.toBeNull();
 
             fs.writeFileSync(path.join(projectDir, 'tmp','ref.pdb'), refPdb);
 
-
             const jsTpc = result.tpc!;
             expect(jsTpc.toString('ascii', 0, 4)).toBe('TBIN');
-
-            // the order of functions and variables might be different, so we need to match what is in the pdb
-            // TODO modify the jsTpc to match the order of functions and variables in the refPdb
-            
-
 
             const jsFromTpc = disassembleBinaryToLines(jsTpc);
             const jsCodeSection = disassembleBinarySectionToLines(jsTpc, TObjSection.Code);

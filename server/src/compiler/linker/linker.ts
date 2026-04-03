@@ -20,6 +20,8 @@ export interface LinkerOptions {
     flags?: number;
     fixedTimestamp?: Date;
     resources?: Array<{ name: string; data: Buffer }>;
+    functionOrder?: string[];
+    variableAddressOverrides?: Map<string, number>;
 }
 
 interface ObjFile {
@@ -168,6 +170,8 @@ export class Linker {
         }
 
         this.compactUnreferencedFunctions();
+        this.reorderFunctions();
+        this.applyVariableAddressOverrides();
         return this.emit();
     }
 
@@ -1042,6 +1046,129 @@ export class Linker {
         return out;
     }
 
+    private applyVariableAddressOverrides(): void {
+        const overrides = this.options.variableAddressOverrides;
+        if (!overrides || overrides.size === 0) return;
+
+        for (const addr of this.addresses) {
+            if (addr.flags & TObjAddressFlags.Code) continue;
+            if (!(addr.flags & TObjAddressFlags.Defined)) continue;
+            const overrideAddr = overrides.get(addr.tag);
+            if (overrideAddr !== undefined) {
+                addr.address = overrideAddr;
+            }
+        }
+    }
+
+    private reorderFunctions(): void {
+        const targetOrder = this.options.functionOrder;
+        if (!targetOrder || targetOrder.length === 0) return;
+        if (this.fnSpanByTag.size === 0) return;
+
+        const spans = [...this.fnSpanByTag.entries()]
+            .map(([tag, span]) => ({ tag, ...span }))
+            .sort((a, b) => a.start - b.start);
+
+        const orderIndex = new Map<string, number>();
+        for (let i = 0; i < targetOrder.length; i++) {
+            orderIndex.set(targetOrder[i], i);
+        }
+
+        const reordered = [...spans].sort((a, b) => {
+            const ai = orderIndex.get(a.tag) ?? Number.MAX_SAFE_INTEGER;
+            const bi = orderIndex.get(b.tag) ?? Number.MAX_SAFE_INTEGER;
+            if (ai !== bi) return ai - bi;
+            return a.start - b.start;
+        });
+
+        let changed = false;
+        for (let i = 0; i < spans.length; i++) {
+            if (spans[i].tag !== reordered[i].tag) { changed = true; break; }
+        }
+        if (!changed) return;
+
+        const extractedBlocks: { tag: string; data: number[]; oldStart: number; oldEnd: number }[] = [];
+        for (const sp of reordered) {
+            extractedBlocks.push({
+                tag: sp.tag,
+                data: this.mergedCode.slice(sp.start, sp.end),
+                oldStart: sp.start,
+                oldEnd: sp.end,
+            });
+        }
+
+        const codeStart = spans[0].start;
+        const codeEnd = spans[spans.length - 1].end;
+
+        const oldToNew = new Map<number, number>();
+        let cursor = codeStart;
+        for (const block of extractedBlocks) {
+            oldToNew.set(block.oldStart, cursor);
+            cursor += block.data.length;
+        }
+
+        const remapCodeOffset = (offset: number): number => {
+            for (const block of extractedBlocks) {
+                const newStart = oldToNew.get(block.oldStart)!;
+                if (offset >= block.oldStart && offset < block.oldEnd) {
+                    return newStart + (offset - block.oldStart);
+                }
+            }
+            return offset;
+        };
+
+        const newCode = new Array(this.mergedCode.length);
+        for (let i = 0; i < codeStart; i++) newCode[i] = this.mergedCode[i];
+        cursor = codeStart;
+        for (const block of extractedBlocks) {
+            for (let j = 0; j < block.data.length; j++) {
+                newCode[cursor + j] = block.data[j];
+            }
+            cursor += block.data.length;
+        }
+        for (let i = codeEnd; i < this.mergedCode.length; i++) newCode[i] = this.mergedCode[i];
+        this.mergedCode = newCode;
+
+        for (const addr of this.addresses) {
+            if (addr.flags & TObjAddressFlags.Code) {
+                addr.address = remapCodeOffset(addr.address);
+            }
+            for (const ref of addr.references) {
+                if (ref.type === TObjRefType.Code) {
+                    ref.offset = remapCodeOffset(ref.offset);
+                }
+            }
+        }
+
+        for (let i = 0; i < this.eventEntries.length; i++) {
+            const en = this.eventEntries[i];
+            if (en) {
+                en.codeAddress = remapCodeOffset(en.codeAddress);
+            }
+        }
+
+        for (const reloc of this.rdataRelocs) {
+            if (reloc.refType === TObjRefType.Code) {
+                reloc.codeOffset = remapCodeOffset(reloc.codeOffset);
+            }
+        }
+
+        for (const desc of this.pendingDescriptors) {
+            if (desc.refType === TObjRefType.Code) {
+                desc.adjustedOffset = remapCodeOffset(desc.adjustedOffset);
+            }
+        }
+
+        this.fnSpanByTag.clear();
+        for (const block of extractedBlocks) {
+            const newStart = oldToNew.get(block.oldStart)!;
+            this.fnSpanByTag.set(block.tag, {
+                start: newStart,
+                end: newStart + block.data.length,
+            });
+        }
+    }
+
     private compactUnreferencedFunctions(): void {
         const deadTagKeys = new Set<string>();
         for (const addr of this.addresses) {
@@ -1307,6 +1434,75 @@ export function pdbToTpc(pdb: Buffer): Buffer {
     result[7] = (checksum >> 8) & 0xFF;
 
     return result;
+}
+
+export interface PdbLayoutInfo {
+    functionOrder: string[];
+    variableAddresses: Map<string, number>;
+}
+
+/**
+ * Parse a PDB buffer and extract the function ordering (by code address)
+ * and variable data-address assignments from its Addresses section.
+ * Tags are returned as-is (case preserved).
+ */
+export function extractPdbLayout(pdb: Buffer): PdbLayoutInfo {
+    if (pdb.length < HEADER_SIZE) {
+        return { functionOrder: [], variableAddresses: new Map() };
+    }
+
+    const pdbSectionCount = TObjSection.CountObj;
+
+    const readSectionBuf = (idx: number): Buffer => {
+        const descOff = HEADER_SIZE + idx * SECTION_DESCRIPTOR_SIZE;
+        if (descOff + 8 > pdb.length) return Buffer.alloc(0);
+        const offset = pdb.readUInt32LE(descOff);
+        const size = pdb.readUInt32LE(descOff + 4);
+        return (offset + size <= pdb.length) ? pdb.slice(offset, offset + size) : Buffer.alloc(0);
+    };
+
+    const symData = readSectionBuf(TObjSection.Symbols);
+    const addrData = readSectionBuf(TObjSection.Addresses);
+
+    const readSym = (off: number): string => {
+        if (off >= symData.length) return '';
+        let s = '';
+        for (let i = off; i < symData.length && symData[i] !== 0; i++) {
+            s += String.fromCharCode(symData[i]);
+        }
+        return s;
+    };
+
+    const codeFunctions: { tag: string; address: number }[] = [];
+    const variableAddresses = new Map<string, number>();
+
+    let pos = 0;
+    while (pos + 17 <= addrData.length) {
+        const flags = addrData.readUInt8(pos); pos += 1;
+        const tagOff = addrData.readUInt32LE(pos); pos += 4;
+        const address = addrData.readUInt32LE(pos); pos += 4;
+        pos += 4; // baseAddress
+        const refCount = addrData.readUInt32LE(pos); pos += 4;
+        pos += refCount * 5;
+
+        const tag = readSym(tagOff);
+        const tagLc = tag.toLowerCase();
+
+        if (flags & TObjAddressFlags.Code) {
+            if ((tagLc.startsWith('?f:') || tagLc.startsWith('!f:')) && (flags & TObjAddressFlags.Defined)) {
+                codeFunctions.push({ tag: tagLc, address });
+            }
+        } else {
+            if (tag && (flags & TObjAddressFlags.Defined)) {
+                variableAddresses.set(tag, address);
+            }
+        }
+    }
+
+    codeFunctions.sort((a, b) => a.address - b.address);
+    const functionOrder = codeFunctions.map(f => f.tag);
+
+    return { functionOrder, variableAddresses };
 }
 
 class BinSymbolStringTable {
