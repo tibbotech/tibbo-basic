@@ -62,6 +62,8 @@ export class PCodeGenerator {
     private isStatementCall = false;
     private projectOverrideStackSize?: number;
     private minLocalAllocSizeBeforeTemp?: number;
+    /** If set, `minLocalAllocSizeBeforeTemp` applies only to these roots (plus single-file default: all). */
+    private projectCalleeNamesLower?: Set<string>;
     private _localAllocSizeBeforeCalledFuncs = 0;
     private projectGlobalAllocSize = 0;
 
@@ -106,6 +108,10 @@ export class PCodeGenerator {
 
     setMinLocalAllocSizeBeforeTemp(size: number): void {
         this.minLocalAllocSizeBeforeTemp = size;
+    }
+
+    setProjectCalleeNamesLower(names: Set<string>): void {
+        this.projectCalleeNamesLower = names;
     }
 
     setProjectGlobalAllocSize(size: number): void {
@@ -1323,7 +1329,12 @@ export class PCodeGenerator {
             // Non-event root functions may be called from another module; use the
             // project-wide called-function base offset so addresses match across modules.
             const isOnEvent = decl.name.startsWith('on_');
-            const rootBase = isOnEvent ? localBase : localBase + (this.minLocalAllocSizeBeforeTemp ?? 0);
+            const scratch = this.minLocalAllocSizeBeforeTemp ?? 0;
+            const invokedFromProject =
+                this.projectCalleeNamesLower === undefined
+                    ? true
+                    : this.projectCalleeNamesLower.has(decl.name.toLowerCase());
+            const rootBase = isOnEvent ? localBase : localBase + (scratch > 0 && invokedFromProject ? scratch : 0);
 
             let offset = 0;
             let ordinal = 1;
@@ -3058,7 +3069,13 @@ export class PCodeGenerator {
             } else if (value >= 0 && value <= 255) {
                 this.emitter.emitByte(OP.OPCODE_LOB8 | OP.OPCODE_IMMEDIATE);
                 this.emitter.emitByte(value & 0xFF);
-            } else if (value >= -32768 && value <= 65535) {
+            } else if (value >= -32768 && value <= 32767) {
+                // SHORT type: use signed load in data32 mode (mirrors C++ GetIntConstantType + Registers.cpp)
+                const op16 = this.emitter.isData32 ? OP.OPCODE_LOB16I : OP.OPCODE_LOB16;
+                this.emitter.emitByte(op16 | OP.OPCODE_IMMEDIATE);
+                this.emitter.emitWord(value & 0xFFFF);
+            } else if (value >= 0 && value <= 65535) {
+                // WORD type: always unsigned load
                 this.emitter.emitByte(OP.OPCODE_LOB16 | OP.OPCODE_IMMEDIATE);
                 this.emitter.emitWord(value & 0xFFFF);
             } else {
@@ -3076,7 +3093,11 @@ export class PCodeGenerator {
                 } else if (constVal >= 0 && constVal <= 255) {
                     this.emitter.emitByte(OP.OPCODE_LOB8 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitByte(constVal & 0xFF);
-                } else if (constVal >= -32768 && constVal <= 65535) {
+                } else if (constVal >= -32768 && constVal <= 32767) {
+                    const op16 = this.emitter.isData32 ? OP.OPCODE_LOB16I : OP.OPCODE_LOB16;
+                    this.emitter.emitByte(op16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(constVal & 0xFFFF);
+                } else if (constVal >= 0 && constVal <= 65535) {
                     this.emitter.emitByte(OP.OPCODE_LOB16 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(constVal & 0xFFFF);
                 } else {
@@ -3110,6 +3131,10 @@ export class PCodeGenerator {
                         } else if (value >= 0 && value <= 255) {
                             this.emitter.emitByte(OP.OPCODE_LOB8 | OP.OPCODE_IMMEDIATE);
                             this.emitter.emitByte(value & 0xFF);
+                        } else if (value >= -32768 && value <= 32767) {
+                            const op16 = this.emitter.isData32 ? OP.OPCODE_LOB16I : OP.OPCODE_LOB16;
+                            this.emitter.emitByte(op16 | OP.OPCODE_IMMEDIATE);
+                            this.emitter.emitWord(value & 0xFFFF);
                         } else {
                             this.emitter.emitByte(OP.OPCODE_LOB16 | OP.OPCODE_IMMEDIATE);
                             this.emitter.emitWord(value & 0xFFFF);

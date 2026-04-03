@@ -92,6 +92,12 @@ export class Linker {
     private totalGlobalSize = 0;
     private maxLocalAllocSize = 0;
     private pendingDescriptors: { adjustedOffset: number; data: number[]; refType: number }[] = [];
+    /** Lowercase `?F:name` / `!F:name` → [start,end) in merged Code section (before init prepend). */
+    private fnSpanByTag = new Map<string, { start: number; end: number }>();
+    /** Function tags that appeared as Code but not Defined in some object (import / external). */
+    private importOnlyFnTags = new Set<string>();
+    /** Lowercase `?F:name` for event handlers (never stripped). */
+    private eventFnTags = new Set<string>();
 
     constructor(diagnostics: DiagnosticCollection, options: LinkerOptions = {}) {
         this.diagnostics = diagnostics;
@@ -118,6 +124,7 @@ export class Linker {
             }
         }
 
+        this.compactUnreferencedFunctions();
         return this.emit();
     }
 
@@ -252,21 +259,38 @@ export class Linker {
         if (obj.header.localAllocSize > this.maxLocalAllocSize) {
             this.maxLocalAllocSize = obj.header.localAllocSize;
         }
+
+        const codeAdded = this.mergedCode.length - codeBase;
+        if (codeAdded > 0) {
+            this.recordFunctionSpansFromObj(obj, codeBase, codeAdded);
+        }
     }
 
     private linkFunctions(obj: ObjFile, codeBase: number): void {
         const funcData = obj.sections[TObjSection.Functions]?.data;
         if (!funcData || funcData.length === 0) return;
 
+        const symbolData = obj.sections[TObjSection.Symbols]?.data;
+
         let pos = 0;
         while (pos + 17 <= funcData.length) {
             const flags = funcData.readUInt8(pos); pos += 1;
-            const _nameRef = funcData.readUInt32LE(pos); pos += 4;
+            const nameRef = funcData.readUInt32LE(pos); pos += 4;
             const addrIdx = funcData.readUInt32LE(pos); pos += 4;
             const eventIdx = funcData.readUInt32LE(pos); pos += 4;
             const calleeCount = funcData.readUInt32LE(pos); pos += 4;
 
             pos += calleeCount * 4;
+
+            if (flags & 1) {
+                let fnName = '';
+                if (symbolData && nameRef < symbolData.length) {
+                    for (let i = nameRef; i < symbolData.length && symbolData[i] !== 0; i++) {
+                        fnName += String.fromCharCode(symbolData[i]);
+                    }
+                }
+                this.eventFnTags.add(('?F:' + fnName).toLowerCase());
+            }
 
             if (!(flags & 1)) continue; // TOBJ_FUN_EVENT
 
@@ -407,6 +431,11 @@ export class Linker {
                     tagName += String.fromCharCode(symbolSection[i]);
                     i++;
                 }
+            }
+
+            const tagLc = tagName.toLowerCase();
+            if ((tagLc.startsWith('?f:') || tagLc.startsWith('!f:')) && (flags & TObjAddressFlags.Code) && !(flags & TObjAddressFlags.Defined)) {
+                this.importOnlyFnTags.add(tagLc);
             }
 
             // Merge or add address
@@ -689,6 +718,146 @@ export class Linker {
             platformSize: 0, globalAllocSize: 0, stackSize: 0, localAllocSize: 0,
             flags: 0, projectName: 0, buildId: 0, firmwareVer: 0,
         };
+    }
+
+    /** Parse Addresses: defined `?F:` / `!F:` code symbols → span until next such symbol or end of Code. */
+    private recordFunctionSpansFromObj(obj: ObjFile, codeBase: number, codeLen: number): void {
+        const addrData = obj.sections[TObjSection.Addresses]?.data;
+        const symbolSection = obj.sections[TObjSection.Symbols]?.data;
+        if (!addrData || !symbolSection) return;
+
+        const ents: { tagKey: string; off: number }[] = [];
+        let pos = 0;
+        while (pos < addrData.length) {
+            if (pos + 17 > addrData.length) break;
+            const flags = addrData.readUInt8(pos); pos += 1;
+            const tagOff = addrData.readUInt32LE(pos); pos += 4;
+            const address = addrData.readUInt32LE(pos); pos += 4;
+            pos += 4; // baseAddress
+            const refCount = addrData.readUInt32LE(pos); pos += 4;
+
+            for (let i = 0; i < refCount; i++) {
+                if (pos + 5 > addrData.length) break;
+                pos += 5;
+            }
+
+            if (!(flags & TObjAddressFlags.Code) || !(flags & TObjAddressFlags.Defined)) continue;
+
+            let tname = '';
+            if (tagOff < symbolSection.length) {
+                for (let i = tagOff; i < symbolSection.length && symbolSection[i] !== 0; i++) {
+                    tname += String.fromCharCode(symbolSection[i]);
+                }
+            }
+            const tagKey = tname.toLowerCase();
+            if (!tagKey.startsWith('?f:') && !tagKey.startsWith('!f:')) continue;
+            if (address >= codeLen) continue;
+
+            ents.push({ tagKey, off: address });
+        }
+
+        ents.sort((a, b) => a.off - b.off);
+        for (let i = 0; i < ents.length; i++) {
+            const endOff = i + 1 < ents.length ? ents[i + 1].off : codeLen;
+            this.fnSpanByTag.set(ents[i].tagKey, {
+                start: codeBase + ents[i].off,
+                end: codeBase + endOff,
+            });
+        }
+    }
+
+    private mergeHalfOpenIntervals(intervals: [number, number][]): [number, number][] {
+        if (intervals.length === 0) return [];
+        const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
+        const out: [number, number][] = [];
+        let cs = sorted[0][0];
+        let ce = sorted[0][1];
+        for (let i = 1; i < sorted.length; i++) {
+            const [s, e] = sorted[i];
+            if (s <= ce) {
+                ce = Math.max(ce, e);
+            } else {
+                out.push([cs, ce]);
+                cs = s;
+                ce = e;
+            }
+        }
+        out.push([cs, ce]);
+        return out;
+    }
+
+    /**
+     * Remove unreferenced `!F:` (private linkage) functions from merged Code and fix offsets.
+     * Public `?F:` symbols are kept even with zero refs (matches tmake linked image).
+     */
+    private compactUnreferencedFunctions(): void {
+        const deadTagKeys = new Set<string>();
+        for (const addr of this.addresses) {
+            const t = addr.tag.toLowerCase();
+            if (!t.startsWith('!f:')) continue;
+            if (!(addr.flags & TObjAddressFlags.Code)) continue;
+            if (!(addr.flags & TObjAddressFlags.Defined)) continue;
+            if (addr.references.length > 0) continue;
+            if (this.eventFnTags.has(t)) continue;
+            if (this.importOnlyFnTags.has(t)) continue;
+            deadTagKeys.add(t);
+        }
+        if (deadTagKeys.size === 0) return;
+
+        const intervals: [number, number][] = [];
+        for (const key of deadTagKeys) {
+            const sp = this.fnSpanByTag.get(key);
+            if (!sp || sp.end <= sp.start) continue;
+            intervals.push([sp.start, sp.end]);
+        }
+        if (intervals.length === 0) return;
+
+        const merged = this.mergeHalfOpenIntervals(intervals);
+        const bytesRemovedBefore = (p: number): number => {
+            let sum = 0;
+            for (const [s, e] of merged) {
+                if (e <= p) sum += e - s;
+            }
+            return sum;
+        };
+        const adjustCode = (p: number): number => p - bytesRemovedBefore(p);
+
+        for (let i = merged.length - 1; i >= 0; i--) {
+            const [s, e] = merged[i];
+            this.mergedCode.splice(s, e - s);
+        }
+
+        for (const addr of this.addresses) {
+            if (addr.flags & TObjAddressFlags.Code) {
+                addr.address = adjustCode(addr.address);
+            }
+            for (const ref of addr.references) {
+                if (ref.type === TObjRefType.Code) {
+                    ref.offset = adjustCode(ref.offset);
+                }
+            }
+        }
+
+        this.addresses = this.addresses.filter(a => !deadTagKeys.has(a.tag.toLowerCase()));
+
+        for (let i = 0; i < this.eventEntries.length; i++) {
+            const en = this.eventEntries[i];
+            if (en) {
+                en.codeAddress = adjustCode(en.codeAddress);
+            }
+        }
+
+        for (const reloc of this.rdataRelocs) {
+            if (reloc.refType === TObjRefType.Code) {
+                reloc.codeOffset = adjustCode(reloc.codeOffset);
+            }
+        }
+
+        for (const desc of this.pendingDescriptors) {
+            if (desc.refType === TObjRefType.Code) {
+                desc.adjustedOffset = adjustCode(desc.adjustedOffset);
+            }
+        }
     }
 }
 

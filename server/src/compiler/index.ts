@@ -37,6 +37,8 @@ export interface CompileOptions {
     stackSize?: number;
     projectOverrideStackSize?: number;
     minLocalAllocSizeBeforeTemp?: number;
+    /** When set (multi-file projects), only these sub/function names get the pre-temp scratch under non-event roots. */
+    projectCalleeNamesLower?: Set<string>;
     projectGlobalAllocSize?: number;
     projectName?: string;
     buildId?: string;
@@ -167,6 +169,9 @@ export function compile(source: string, options: CompileOptions = {}): CompileRe
         }
         if (options.minLocalAllocSizeBeforeTemp != null) {
             generator.setMinLocalAllocSizeBeforeTemp(options.minLocalAllocSizeBeforeTemp);
+        }
+        if (options.projectCalleeNamesLower != null) {
+            generator.setProjectCalleeNamesLower(options.projectCalleeNamesLower);
         }
         if (options.projectGlobalAllocSize != null) {
             generator.setProjectGlobalAllocSize(options.projectGlobalAllocSize);

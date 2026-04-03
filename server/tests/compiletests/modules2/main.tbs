@@ -15,5 +15,6 @@ sub on_sys_init()
     printstring("zza")
     dim iword as word=400
     boot()
-    'multiply(iword, 2)
+    dim rword as word = multiply(iword, 2)
+    rword = rword * 999
 end sub

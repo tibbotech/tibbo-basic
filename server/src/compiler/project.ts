@@ -334,6 +334,8 @@ export class ProjectCompiler {
                 }
             }
 
+            const projectCalleeNamesLower = this.collectProjectCalleeNamesLower(firstPassEntries);
+
             for (const entry of firstPassEntries) {
                 const needsStackSizeFix = entry.result.stackSize < maxStackSize;
                 const needsLocalAllocFix = entry.result.localAllocSizeBeforeCalledFuncs < maxStep4;
@@ -353,6 +355,7 @@ export class ProjectCompiler {
                     configStr: this.platformConfig.configStr,
                     projectName: this.config.name,
                     projectGlobalAllocSize: totalGlobalAllocSize,
+                    projectCalleeNamesLower,
                     ...(needsStackSizeFix && {
                         projectOverrideStackSize: maxStackSize,
                     }),
@@ -448,6 +451,36 @@ export class ProjectCompiler {
             errors: [...allErrors, ...linkResult.errors],
             warnings: [...allWarnings, ...linkResult.warnings],
         };
+    }
+
+    /** Union of `ident(` call targets across all first-pass compilation units (lowercase). */
+    private collectProjectCalleeNamesLower(entries: { result: CompileResult }[]): Set<string> {
+        const out = new Set<string>();
+        const walk = (node: unknown): void => {
+            if (!node || typeof node !== 'object') return;
+            const n = node as Record<string, unknown>;
+            if (n.kind === 'CallExpr') {
+                const callee = n.callee as Record<string, unknown> | undefined;
+                if (callee?.kind === 'IdentifierExpr' && typeof callee.name === 'string') {
+                    out.add(callee.name.toLowerCase());
+                }
+            }
+            for (const key of Object.keys(n)) {
+                if (key === 'loc' || key === 'kind') continue;
+                const child = n[key];
+                if (Array.isArray(child)) {
+                    for (const c of child) walk(c);
+                } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                    walk(child);
+                }
+            }
+        };
+        for (const e of entries) {
+            for (const decl of e.result.ast.declarations) {
+                walk(decl);
+            }
+        }
+        return out;
     }
 
     private buildHeaderSource(preprocessor: any): string {
