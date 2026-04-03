@@ -523,6 +523,12 @@ export class Linker {
     }
 
     private emit(): Buffer {
+        // Snapshot merged init before appending the RET terminator;
+        // the PDB keeps the raw init payload in TOBJ_SECTION_INIT.
+        const initSectionData = this.mergedInit.length > 0
+            ? Buffer.from(this.mergedInit)
+            : Buffer.alloc(0);
+
         if (this.mergedInit.length > 0) {
             this.mergedInit.push(0x1F); // OPCODE_RET
         }
@@ -686,7 +692,7 @@ export class Linker {
         const sectionCount = TObjSection.CountObj;
         const sectionData: Buffer[] = new Array(sectionCount).fill(Buffer.alloc(0));
         sectionData[TObjSection.Code] = codeBuffer;
-        sectionData[TObjSection.Init] = Buffer.alloc(0);
+        sectionData[TObjSection.Init] = initSectionData;
         sectionData[TObjSection.RData] = rdataBuffer;
         sectionData[TObjSection.FileData] = fileDataBuffer;
         sectionData[TObjSection.Symbols] = pdbSymbols;
