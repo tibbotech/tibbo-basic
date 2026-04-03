@@ -174,7 +174,8 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
         async (label, projectDir) => {
             // console.log(`compiling ${projectDir}`);
             const refPdb = await runTmake(projectDir);
-
+            // save pdb to file
+            fs.writeFileSync(path.join(projectDir, 'tmp','ref.pdb'), refPdb);
             const refFromPdb = disassembleBinaryToLines(refPdb);
             const refCodeSection = disassembleBinarySectionToLines(refPdb, TObjSection.Code);
             expect(refCodeSection).toEqual(refFromPdb);
@@ -191,8 +192,16 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
             expect(result.errors).toHaveLength(0);
             expect(result.tpc).not.toBeNull();
 
+            fs.writeFileSync(path.join(projectDir, 'tmp','ref.pdb'), refPdb);
+
+
             const jsTpc = result.tpc!;
             expect(jsTpc.toString('ascii', 0, 4)).toBe('TBIN');
+
+            // the order of functions and variables might be different, so we need to match what is in the pdb
+            // TODO modify the jsTpc to match the order of functions and variables in the refPdb
+            
+
 
             const jsFromTpc = disassembleBinaryToLines(jsTpc);
             const jsCodeSection = disassembleBinarySectionToLines(jsTpc, TObjSection.Code);

@@ -1,18 +1,11 @@
 include "global.tbh"
 
-function test2() as byte
-    test2 = 3
-end function
+dim asdf as byte=1
 
-sub test()
-    dim a as byte=0
-    a = 1
-    sys.debugprint("a: " + str(a))
-end sub
+
 
 sub on_sys_init()
-    sys.debugprint("on_sys_init")
-    test()
-    dim b as byte=test2()
+    asdf = 2
+    dim aa as byte = asdf
     boot()
 end sub

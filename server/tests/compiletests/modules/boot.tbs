@@ -1,5 +1,17 @@
 include "global.tbh"
 
+dim fdsa as byte=1
+
 sub boot()
-    sys.debugprint("boot")
+    fdsa = 3
+    ' dim a as byte=1
+    ' dim b as byte=1+a
+    ' sys.debugprint("boot")
+    ' dim i as byte
+    ' sys.debugprint(str(i))
+    ' for i=0 to 32
+    '     ' sys.debugprint("a")
+    ' next i
+    ' sys.debugprint("boot")
+    ' somefunct()
 end sub
