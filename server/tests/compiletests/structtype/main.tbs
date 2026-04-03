@@ -1,0 +1,18 @@
+include "global.tbh"
+
+type point_rec
+    x as word
+    y as word
+    tag as byte
+end type
+
+sub on_sys_init()
+    dim p as point_rec
+    p.x = 10
+    p.y = 20
+    p.tag = 3
+    sys.debugprint(str(p.x + p.y))
+    sys.debugprint(str(p.tag))
+    p.x = p.x + 1
+    sys.debugprint(str(p.x))
+end sub

@@ -6,10 +6,22 @@ import { SymbolTable, SymbolKind, VariableSymbol, FunctionSymbol, SyscallSymbol,
 import { SemanticResolver } from '../semantics/resolver';
 import { TypeChecker } from '../semantics/checker';
 import {
-    DataType, isString, isFloat, isNumeric, isEnum, isStruct, isArray,
+    DataType, isString, isFloat, isNumeric, isEnum, isStruct, isArray, isIntegral, isPrimitive,
     StringDataType, EnumDataType, StructDataType, ArrayDataType, getPromotedType, BUILTIN_TYPES,
 } from '../semantics/types';
-import { BINARY_OPS, CMP_OPS, CMP_OPS_SIGNED, CMP_OPS_UNSIGNED, UNARY_OPS, getLoadOpcode, getStoreOpcode, getCmpOpInfo, needsSyscall, getSyscallName } from './operators';
+import {
+    BINARY_OPS,
+    CMP_OPS,
+    CMP_OPS_SIGNED,
+    CMP_OPS_UNSIGNED,
+    UNARY_OPS,
+    getLoadOpcode,
+    getStoreOpcode,
+    getCmpOpInfo,
+    needsSyscall,
+    getSyscallName,
+    relationalComparisonSigned,
+} from './operators';
 import { TObjRttiType } from '../tobj/format';
 
 interface GeneratorContext {
@@ -718,7 +730,12 @@ export class PCodeGenerator {
         this.emitSyscall(sym.syscallNumber);
     }
 
-    private emitSyscallArgsOnly(sym: SyscallSymbol, args: AST.Expression[], startOffset: number): number {
+    private emitSyscallArgsOnly(
+        sym: SyscallSymbol,
+        args: AST.Expression[],
+        startOffset: number,
+        strOutputStringAddr?: number,
+    ): number {
         const params = sym.parameters;
         let offset = startOffset;
         for (let i = 0; i < args.length && i < params.length; i++) {
@@ -779,11 +796,31 @@ export class PCodeGenerator {
                 this.emitStoreToArgBuffer(offset, 4);
                 offset += storeSize;
             } else {
+                const maxOpSz = this.maxIntegralOperandSizeForStrArg(argExpr);
+                const strByteArithToWordArg =
+                    argExpr.kind === 'BinaryExpr' &&
+                    this.emitter.isData32 &&
+                    sym.name.toLowerCase() === 'str' &&
+                    storeSize === 2 &&
+                    paramDt &&
+                    isIntegral(paramDt) &&
+                    paramDt.size === 2 &&
+                    maxOpSz !== undefined &&
+                    maxOpSz < 2 &&
+                    !this.strSyscallArgNeedsDwordScratchTemp(argExpr, paramDt);
                 if (argExpr.kind === 'MemberExpr') {
                     this.generateMember(argExpr);
                     this.emitStoreToArgBuffer(offset, storeSize);
                 } else {
                     this.generateExpression(argExpr);
+                    if (strByteArithToWordArg) {
+                        const strBase = strOutputStringAddr ?? this.getTempStringAddr(0);
+                        const scratch = strBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                        this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(scratch);
+                        this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(scratch);
+                    }
                     this.emitStoreToArgBuffer(offset, storeSize);
                 }
                 offset += storeSize;
@@ -952,30 +989,44 @@ export class PCodeGenerator {
             if (sym && sym.kind === SymbolKind.Syscall) {
                 const sc = sym as SyscallSymbol;
                 if (sc.returnType && isString(sc.returnType)) {
-                    this.emitTempStringInit(addr);
                     let nextOffset: number;
                     const preEvalAddr = this.preEvalMap.get(expr);
-                    if (preEvalAddr !== undefined) {
-                        this.emitter.emitByte(OP.OPCODE_LOA32);
-                        this.emitter.emitDataAddress(preEvalAddr);
-                        const storeSize = this.getSyscallParamStoreSize(sc.parameters[0]);
-                        this.emitStoreToArgBuffer(0, storeSize);
-                        nextOffset = storeSize;
-                    } else if (expr.args.length > 0 && sc.parameters.length > 0
-                               && expr.args[0].kind === 'BinaryExpr') {
-                        const tempAddr = this.getTempStringAddr(0);
-                        const param = sc.parameters[0];
-                        const paramDt = param.dataType ?? BUILTIN_TYPES.word;
+                    const widePath =
+                        preEvalAddr === undefined &&
+                        this.emitter.isData32 &&
+                        expr.args.length > 0 &&
+                        sc.parameters.length > 0 &&
+                        !sc.parameters[0].isByRef;
+                    const p0 = widePath ? sc.parameters[0] : undefined;
+                    const pdt = p0?.dataType;
+                    const useWideDwordTemp =
+                        !!widePath &&
+                        !!pdt &&
+                        this.strSyscallArgNeedsDwordScratchTemp(expr.args[0], pdt);
+
+                    if (useWideDwordTemp) {
+                        const argStoreSz = this.getSyscallParamStoreSize(p0!);
                         this.generateExpression(expr.args[0]);
-                        this.emitter.emitByte(getStoreOpcode(paramDt) | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(tempAddr);
-                        this.emitter.emitByte(getLoadOpcode(paramDt, 'A') | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(tempAddr);
-                        const storeSize = this.getSyscallParamStoreSize(param);
-                        this.emitStoreToArgBuffer(0, storeSize);
-                        nextOffset = storeSize;
+                        // tmake places this dword scratch immediately after the str() output string slot.
+                        const tmp = addr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
+                        this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(tmp);
+                        this.emitTempStringInit(addr);
+                        this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_DIRECT);
+                        this.emitter.emitDataAddress(tmp);
+                        this.emitStoreToArgBuffer(0, argStoreSz);
+                        nextOffset = argStoreSz;
                     } else {
-                        nextOffset = this.emitSyscallArgsOnly(sc, expr.args, 0);
+                        this.emitTempStringInit(addr);
+                        if (preEvalAddr !== undefined) {
+                            const storeSize = this.getSyscallParamStoreSize(sc.parameters[0]);
+                            this.emitter.emitByte(OP.OPCODE_LOA32);
+                            this.emitter.emitDataAddress(preEvalAddr);
+                            this.emitStoreToArgBuffer(0, storeSize);
+                            nextOffset = storeSize;
+                        } else {
+                            nextOffset = this.emitSyscallArgsOnly(sc, expr.args, 0, addr);
+                        }
                     }
                     const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                     this.emitter.emitByte(OP.OPCODE_LEA | indirection);
@@ -994,7 +1045,7 @@ export class PCodeGenerator {
                 const fn = obj.functions.get(expr.callee.property.toLowerCase());
                 if (fn && fn.returnType && isString(fn.returnType)) {
                     this.emitTempStringInit(addr);
-                    const nextOffset = this.emitSyscallArgsOnly(fn, expr.args, 0);
+                    const nextOffset = this.emitSyscallArgsOnly(fn, expr.args, 0, addr);
                     this.emitter.emitByte(OP.OPCODE_LEA);
                     this.emitter.emitDataAddress(addr);
                     this.emitStoreToArgBuffer(nextOffset, 4);
@@ -2669,31 +2720,53 @@ export class PCodeGenerator {
 
     // ─── Select Case ────────────────────────────────────────────────────────
 
+    /** Matches tide `SelectCaseStatement`: BooleanFalseJmp to next case (JNE on equality). */
     private generateSelectCase(stmt: AST.SelectCaseStmt): void {
         const endLabel = this.makeLabel('select_end');
+        let nextCaseEntryLabel = this.makeLabel('select_case_entry');
 
         for (let i = 0; i < stmt.cases.length; i++) {
             const c = stmt.cases[i];
-            const caseBodyLabel = this.makeLabel('case_body');
-            const nextLabel = this.makeLabel('case_next');
+            this.emitter.defineLabel(nextCaseEntryLabel);
+            nextCaseEntryLabel = this.makeLabel(`select_case_${i + 1}`);
 
-            for (const cond of c.conditions) {
+            const hasMultiple = c.conditions.length > 1;
+            const sharedBodyLabel = hasMultiple ? this.makeLabel('select_multi') : null;
+
+            for (let j = 0; j < c.conditions.length; j++) {
+                const cond = c.conditions[j];
+                const isLast = j === c.conditions.length - 1;
                 this.emitTypedComparison(stmt.testExpr, cond);
-                this.emitter.emitByte(OP.OPCODE_JE | OP.OPCODE_DIRECT);
-                this.emitter.emitLabelReference(caseBodyLabel);
+                const signed = relationalComparisonSigned(
+                    this.inferType(stmt.testExpr),
+                    this.inferType(cond),
+                );
+                const cmpInfo = getCmpOpInfo('=', signed);
+                if (!cmpInfo) {
+                    continue;
+                }
+                if (!isLast) {
+                    this.emitter.emitByte(cmpInfo.trueJmp | OP.OPCODE_DIRECT);
+                    this.emitter.emitLabelReference(sharedBodyLabel!);
+                } else {
+                    this.emitter.emitByte(cmpInfo.falseJmp | OP.OPCODE_DIRECT);
+                    this.emitter.emitLabelReference(nextCaseEntryLabel);
+                }
             }
 
-            this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
-            this.emitter.emitLabelReference(nextLabel);
-            this.emitter.defineLabel(caseBodyLabel);
+            if (sharedBodyLabel) {
+                this.emitter.defineLabel(sharedBodyLabel);
+            }
+
             const savedCaseBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(c.body);
             this.onEventDeclaredLocalBytes = savedCaseBytes;
+
             this.emitter.emitByte(OP.OPCODE_JMP | OP.OPCODE_DIRECT);
             this.emitter.emitLabelReference(endLabel);
-            this.emitter.defineLabel(nextLabel);
         }
 
+        this.emitter.defineLabel(nextCaseEntryLabel);
         if (stmt.defaultCase) {
             const savedDefaultBytes = this.onEventDeclaredLocalBytes;
             this.generateBlock(stmt.defaultCase);
@@ -3144,6 +3217,24 @@ export class PCodeGenerator {
                 }
             }
         }
+        if (expr.kind === 'MemberExpr' && expr.object.kind === 'IdentifierExpr') {
+            const sym = this.symbols.current.lookup(expr.object.name);
+            if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                const varSym = sym as VariableSymbol;
+                const dt = varSym.dataType;
+                if (dt && isStruct(dt)) {
+                    const member = dt.memberMap.get(expr.property.toLowerCase());
+                    if (member) {
+                        const memberAddr = (varSym.address ?? 0) + member.offset;
+                        const loadOp = getLoadOpcode(member.dataType, 'B');
+                        const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
+                        this.emitter.emitByte(loadOp | indirection);
+                        this.emitter.emitDataAddress(memberAddr);
+                        return;
+                    }
+                }
+            }
+        }
 
         this.emitter.emitByte(OP.OPCODE_XCG);
         this.generateExpression(expr);
@@ -3209,16 +3300,20 @@ export class PCodeGenerator {
             this.generateExpression(right);
             this.emitSyscallArg(1);
             this.emitSyscallByName('lcmp');
-            return (leftType?.signed || rightType?.signed) ?? false;
+            return relationalComparisonSigned(leftType, rightType);
         }
 
         this.generateExpression(left);
         this.emitSecondOperand(right);
         this.emitter.emitByte(OP.OPCODE_CMP);
-        return (leftType?.signed || rightType?.signed) ?? false;
+        return relationalComparisonSigned(leftType, rightType);
     }
 
     private generateConditionJump(condition: AST.Expression, label: string, jumpIfTrue: boolean): void {
+        if (condition.kind === 'ParenExpr') {
+            this.generateConditionJump(condition.expression, label, jumpIfTrue);
+            return;
+        }
         if (condition.kind === 'BinaryExpr') {
             const op = condition.op;
 
@@ -3303,6 +3398,84 @@ export class PCodeGenerator {
         this.emitSyscallArg(argIndex);
     }
 
+    /**
+     * tide NumericBinaryOperator when m_nDataAddrSize == 4 (see tide/src/tbc/Operators.cpp).
+     */
+    private tideData32BinaryNumericResultType(lt: DataType, rt: DataType): DataType {
+        const cat = (dt: DataType): 'dw' | 'lg' | 'wd' | 'sh' | 'by' => {
+            if (!isPrimitive(dt)) return 'by';
+            if (dt.size >= 4) return dt.signed ? 'lg' : 'dw';
+            if (dt.size >= 2) return dt.signed ? 'sh' : 'wd';
+            return 'by';
+        };
+        const a = cat(lt);
+        const b = cat(rt);
+        const has = (c: 'dw' | 'lg' | 'wd' | 'sh' | 'by') => a === c || b === c;
+        if (has('dw')) return BUILTIN_TYPES.dword;
+        if (has('lg')) return BUILTIN_TYPES.long;
+        if (has('wd')) return BUILTIN_TYPES.dword;
+        if (has('sh')) return BUILTIN_TYPES.long;
+        if (has('by')) return BUILTIN_TYPES.dword;
+        return BUILTIN_TYPES.long;
+    }
+
+    private unwrapParenExpr(e: AST.Expression): AST.Expression {
+        let x = e;
+        while (x.kind === 'ParenExpr') {
+            x = (x as AST.ParenExpr).expression;
+        }
+        return x;
+    }
+
+    /**
+     * Arithmetic binary result type in 32-bit data mode (word+word → dword, etc.).
+     */
+    private inferData32ArithmeticExprWideResult(e: AST.Expression): DataType | undefined {
+        if (!this.emitter.isData32) return undefined;
+        const x = this.unwrapParenExpr(e);
+        if (x.kind !== 'BinaryExpr') return undefined;
+        const be = x as AST.BinaryExpr;
+        if (be.op === AST.BinaryOp.Add && this.isStringExpression(be)) return undefined;
+        if (isComparisonOp(be.op) || be.op === AST.BinaryOp.And || be.op === AST.BinaryOp.Or) return undefined;
+        if (!BINARY_OPS[be.op]) return undefined;
+        const lt = this.inferType(be.left);
+        const rt = this.inferType(be.right);
+        if (!lt || !rt || !isIntegral(lt) || !isIntegral(rt)) return undefined;
+        return this.tideData32BinaryNumericResultType(lt, rt);
+    }
+
+    /** Largest integral leaf size for a simple binary op, or the inferred type size otherwise. */
+    private maxIntegralOperandSizeForStrArg(expr: AST.Expression): number | undefined {
+        const x = this.unwrapParenExpr(expr);
+        if (x.kind === 'BinaryExpr' && BINARY_OPS[x.op] && !isComparisonOp(x.op)
+            && !(x.op === AST.BinaryOp.Add && this.isStringExpression(x))) {
+            const lt = this.inferType(x.left);
+            const rt = this.inferType(x.right);
+            if (!lt || !rt || !isIntegral(lt) || !isIntegral(rt)) return undefined;
+            return Math.max(lt.size, rt.size);
+        }
+        const t = this.inferType(expr);
+        if (t && isIntegral(t)) return t.size;
+        return undefined;
+    }
+
+    /**
+     * tmake uses a dword scratch + reload for some str() arithmetic args (e.g. word+word), but not
+     * for byte-only arithmetic (e.g. byte + byte) — see forlooparray str(z + 1).
+     */
+    private strSyscallArgNeedsDwordScratchTemp(argExpr: AST.Expression, paramDt: DataType): boolean {
+        const wide = this.inferData32ArithmeticExprWideResult(argExpr);
+        if (!wide || wide.size !== 4 || !isIntegral(paramDt) || paramDt.size >= 4) return false;
+        const x = this.unwrapParenExpr(argExpr);
+        if (x.kind !== 'BinaryExpr') return false;
+        const be = x as AST.BinaryExpr;
+        const lt = this.inferType(be.left);
+        const rt = this.inferType(be.right);
+        if (!lt || !rt) return false;
+        if (lt.size < 2 && rt.size < 2) return false;
+        return true;
+    }
+
     // ─── Type inference helper ──────────────────────────────────────────────
 
     private inferType(expr: AST.Expression): DataType | undefined {
@@ -3362,7 +3535,19 @@ export class PCodeGenerator {
             }
         }
         if (expr.kind === 'MemberExpr') {
-            return this.inferMemberType(expr);
+            const objProp = this.inferMemberType(expr);
+            if (objProp) return objProp;
+            if (expr.object.kind === 'IdentifierExpr') {
+                const sym = this.symbols.current.lookup(expr.object.name);
+                if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
+                    const dt = (sym as VariableSymbol).dataType;
+                    if (dt && isStruct(dt)) {
+                        const member = dt.memberMap.get(expr.property.toLowerCase());
+                        if (member) return member.dataType;
+                    }
+                }
+            }
+            return undefined;
         }
         if (expr.kind === 'IndexExpr') {
             if (expr.object.kind === 'IdentifierExpr') {

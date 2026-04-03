@@ -1,0 +1,48 @@
+include "global.tbh"
+
+sub on_sys_init()
+    dim ten as byte
+    dim three as byte
+    dim hundred as byte
+    dim seven as byte
+    dim a as byte
+    dim b as byte
+    dim w as word
+    ten = 10
+    three = 3
+    hundred = 100
+    seven = 7
+    a = ten mod three
+    a = ten mod 3
+    sys.debugprint(str(a))
+    w = hundred mod seven
+    sys.debugprint(str(w))
+
+    dim m as byte
+    dim n as byte
+    m = 15
+    n = 7
+    b = m and n
+    sys.debugprint(str(b))
+    m = 8
+    n = 4
+    b = m or n
+    sys.debugprint(str(b))
+    m = 15
+    n = 8
+    b = m xor n
+    sys.debugprint(str(b))
+    dim z as byte
+    z = 0
+    b = not z
+    sys.debugprint(str(b))
+
+    dim s1 as byte
+    s1 = 1
+    w = s1 shl 5
+    sys.debugprint(str(w))
+    dim s256 as word
+    s256 = 256
+    w = s256 shr 4
+    sys.debugprint(str(w))
+end sub

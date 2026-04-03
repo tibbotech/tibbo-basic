@@ -91,7 +91,8 @@ export class SemanticResolver {
 
     private collectType(decl: AST.TypeDecl): void {
         const structMembers: StructMember[] = [];
-        let offset = 0;
+        // Match tide StructStatement: 2-byte struct header before first member.
+        let offset = 2;
         for (let i = 0; i < decl.members.length; i++) {
             const m = decl.members[i];
             const dt = this.resolveTypeRef(m.typeRef);

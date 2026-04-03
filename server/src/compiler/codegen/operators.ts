@@ -1,5 +1,46 @@
 import * as OP from './opcodes';
-import { DataType, isFloat, isIntegral, isPrimitive, PrimitiveType } from '../semantics/types';
+import {
+    DataType,
+    EnumDataType,
+    isEnum,
+    isFloat,
+    isIntegral,
+    isPrimitive,
+    PrimitiveDataType,
+    PrimitiveType,
+} from '../semantics/types';
+
+function unwrapNumericPrimitive(dt: DataType | undefined): PrimitiveDataType | undefined {
+    if (!dt) return undefined;
+    if (isEnum(dt)) {
+        const a = (dt as EnumDataType).actualType;
+        return isPrimitive(a) ? a : undefined;
+    }
+    if (isPrimitive(dt)) return dt;
+    return undefined;
+}
+
+/**
+ * Signed flag for integer CMP + relational jumps — matches tide
+ * `CTibboBasicCompiler::RelationalOperator` (Operators.cpp): dword/word/byte
+ * unsigned; long/short signed; char etc. default signed; if either operand
+ * hits an earlier branch, that rule wins (e.g. long+byte → signed).
+ */
+export function relationalComparisonSigned(
+    leftType: DataType | undefined,
+    rightType: DataType | undefined,
+): boolean {
+    const l = unwrapNumericPrimitive(leftType);
+    const r = unwrapNumericPrimitive(rightType);
+    if (!l || !r) return (leftType?.signed || rightType?.signed) ?? false;
+    const has = (p: PrimitiveType) => l.primitiveType === p || r.primitiveType === p;
+    if (has(PrimitiveType.Dword)) return false;
+    if (has(PrimitiveType.Long)) return true;
+    if (has(PrimitiveType.Word)) return false;
+    if (has(PrimitiveType.Short) || has(PrimitiveType.Integer)) return true;
+    if (has(PrimitiveType.Byte)) return false;
+    return true;
+}
 
 export interface BinaryOpInfo {
     opcodeWord: number;

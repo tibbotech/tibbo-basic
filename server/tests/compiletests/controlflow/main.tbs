@@ -1,0 +1,44 @@
+include "global.tbh"
+
+sub on_sys_init()
+    dim x as byte
+    x = 2
+    if x = 1 then
+        sys.debugprint("if1")
+    else if x = 2 then
+        sys.debugprint("if2")
+    else
+        sys.debugprint("ifelse")
+    end if
+
+    dim n as byte
+    n = 0
+    while n < 3
+        sys.debugprint(str(n))
+        n = n + 1
+    wend
+
+    dim d as byte
+    d = 0
+    do while d < 2
+        d = d + 1
+        sys.debugprint(str(d))
+    loop
+
+    d = 0
+    do
+        d = d + 1
+    loop until d >= 2
+    sys.debugprint(str(d))
+
+    dim s as byte
+    s = 2
+    select case s
+        case 1:
+            sys.debugprint("s1")
+        case 2, 3:
+            sys.debugprint("s23")
+        case else
+            sys.debugprint("selse")
+    end select
+end sub

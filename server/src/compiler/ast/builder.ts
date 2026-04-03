@@ -382,6 +382,47 @@ export class ASTBuilder {
         return stmts;
     }
 
+    /**
+     * ANTLR expression precedence lists EQ before AND/OR/SHL/SHR, so `b = m and n` parses as
+     * `(b = m) and n`. Rotate to `b = (m and n)` to match tmake assignment (tide VariableStatement).
+     * Post-order: repair children first so nested `((b = m) and n) and p` becomes one assignment.
+     */
+    private repairAssignmentPrecedence(expr: AST.Expression): AST.Expression {
+        const LOW_PREC = new Set<AST.BinaryOp>([
+            AST.BinaryOp.And,
+            AST.BinaryOp.Or,
+            AST.BinaryOp.Xor,
+            AST.BinaryOp.Shl,
+            AST.BinaryOp.Shr,
+        ]);
+        if (expr.kind === 'ParenExpr') {
+            return { ...expr, expression: this.repairAssignmentPrecedence(expr.expression) };
+        }
+        if (expr.kind !== 'BinaryExpr') {
+            return expr;
+        }
+        const left = this.repairAssignmentPrecedence(expr.left);
+        const right = this.repairAssignmentPrecedence(expr.right);
+        let e: AST.Expression = { ...expr, left, right };
+        if (LOW_PREC.has(e.op)) {
+            const L = e.left;
+            if (L.kind === 'BinaryExpr' && L.op === AST.BinaryOp.Eq && this.isAssignableLValue(L.left)) {
+                e = {
+                    kind: 'BinaryExpr',
+                    op: AST.BinaryOp.Eq,
+                    left: L.left,
+                    right: { kind: 'BinaryExpr', op: e.op, left: L.right, right: e.right, loc: e.loc },
+                    loc: L.loc,
+                };
+            }
+        }
+        return e;
+    }
+
+    private isAssignableLValue(e: AST.Expression): boolean {
+        return e.kind === 'IdentifierExpr' || e.kind === 'MemberExpr' || e.kind === 'IndexExpr';
+    }
+
     private visitStatement(ctx: any): AST.Statement | null {
         if (!ctx?.children) return null;
         const child = ctx.children[0];
@@ -406,8 +447,14 @@ export class ASTBuilder {
                 return this.visitVariableStmt(child);
             case TibboBasicParser.RULE_whileWendStmt:
                 return this.visitWhileWendStmt(child);
-            case TibboBasicParser.RULE_expression:
-                return { kind: 'ExpressionStmt', expression: this.visitExpression(child), loc: this.loc(child) };
+            case TibboBasicParser.RULE_expression: {
+                const raw = this.visitExpression(child);
+                return {
+                    kind: 'ExpressionStmt',
+                    expression: this.repairAssignmentPrecedence(raw),
+                    loc: this.loc(child),
+                };
+            }
             default:
                 return null;
         }

@@ -1,0 +1,24 @@
+include "global.tbh"
+
+const LIMIT = 4
+
+enum tier
+    T0,
+    T1,
+    T2 = 7
+end enum
+
+sub on_sys_init()
+    dim i as byte
+    for i = 0 to LIMIT
+        sys.debugprint(str(i))
+    next i
+
+    dim t as byte
+    t = T1
+    sys.debugprint(str(t))
+
+    dim u as byte
+    u = T2
+    sys.debugprint(str(u))
+end sub
