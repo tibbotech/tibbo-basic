@@ -1,6 +1,7 @@
 import {
     TOBJ_SIGNATURE_OBJ, TOBJ_SIGNATURE_BIN, TOBJ_VERSION,
     TObjSection, TObjHeaderFlags, TObjAddressFlags, TObjRefType,
+    TObjVariableFlags,
     HEADER_SIZE, SECTION_DESCRIPTOR_SIZE, MAXDWORD,
 } from '../tobj/format';
 import { BinaryWriter } from '../tobj/writer';
@@ -89,7 +90,8 @@ export class Linker {
     private rdataRelocs: RDataReloc[] = [];
     private resources: LinkedResourceEntry[] = [];
     private flags = 0;
-    private totalGlobalSize = 0;
+    /** Byte size of merged global/static storage (sum of each object file's global region, reference: TObjFileLink.cpp). */
+    private cumulativeGlobalAlloc = 0;
     private maxLocalAllocSize = 0;
     private pendingDescriptors: { adjustedOffset: number; data: number[]; refType: number }[] = [];
     /** Lowercase `?F:name` / `!F:name` → [start,end) in merged Code section (before init prepend). */
@@ -105,6 +107,7 @@ export class Linker {
     }
 
     link(objBuffers: { name: string; data: Buffer; initObjDescriptors?: { initOffset: number; data: number[]; isInit?: boolean }[] }[]): Buffer {
+        this.cumulativeGlobalAlloc = 0;
         const objFiles = objBuffers.map(b => this.loadObj(b.name, b.data));
 
         for (let i = 0; i < objFiles.length; i++) {
@@ -225,8 +228,14 @@ export class Linker {
 
         this.linkResFileDir(obj, fileDataBase);
 
-        // Merge ADDRESSES
-        this.linkAddresses(obj, codeBase, initBase);
+        const varData = obj.sections[TObjSection.Variables]?.data;
+        const globalAddrIndices =
+            varData && varData.length > 0
+                ? this.collectGlobalAddressIndices(varData)
+                : new Set<number>();
+
+        // Merge ADDRESSES (relocate global/static data offsets by prior objects' global regions)
+        this.linkAddresses(obj, codeBase, initBase, globalAddrIndices);
 
         // Merge EVENT_DIR (entries are indexed by event number)
         const eventData = obj.sections[TObjSection.EventDir]?.data;
@@ -253,9 +262,7 @@ export class Linker {
         // Process RDataDir for RData relocations
         this.linkRDataDir(obj, codeBase, initBase, rdataBase);
 
-        if (obj.header.globalAllocSize > this.totalGlobalSize) {
-            this.totalGlobalSize = obj.header.globalAllocSize;
-        }
+        this.cumulativeGlobalAlloc += obj.header.globalAllocSize >>> 0;
         if (obj.header.localAllocSize > this.maxLocalAllocSize) {
             this.maxLocalAllocSize = obj.header.localAllocSize;
         }
@@ -390,11 +397,47 @@ export class Linker {
         }
     }
 
-    private linkAddresses(obj: ObjFile, codeBase: number, initBase: number): void {
+    /**
+     * Address indices used by globals (owner scope MAXDWORD) or statics — same rule as
+     * CTObjFile::LinkVariable (tide/src/tobj/TObjFileLink.cpp).
+     */
+    private collectGlobalAddressIndices(varBuf: Buffer): Set<number> {
+        const set = new Set<number>();
+        let pos = 0;
+        while (pos < varBuf.length) {
+            if (pos + 14 > varBuf.length) break;
+            const flags = varBuf.readUInt8(pos);
+            pos += 1;
+            pos += 4; // name sym offset
+            const addrIdx = varBuf.readUInt32LE(pos);
+            pos += 4;
+            const ownerScope = varBuf.readUInt32LE(pos);
+            pos += 4;
+            // TOBJ_DATA_TYPE blob in variable entry is always 5 bytes (see TObjWriter.writeDataType)
+            if (pos + 5 > varBuf.length) break;
+            pos += 5;
+
+            const isGlobal = ownerScope === MAXDWORD;
+            const isStatic = (flags & TObjVariableFlags.Static) !== 0;
+            if (isGlobal || isStatic) {
+                set.add(addrIdx);
+            }
+        }
+        return set;
+    }
+
+    private linkAddresses(
+        obj: ObjFile,
+        codeBase: number,
+        initBase: number,
+        globalAddrIndices: Set<number>,
+    ): void {
         const addrData = obj.sections[TObjSection.Addresses]?.data;
         if (!addrData || addrData.length === 0) return;
 
+        const globalBase = (this.cumulativeGlobalAlloc >>> 0);
         let pos = 0;
+        let addrEntryIndex = 0;
         while (pos < addrData.length) {
             if (pos + 17 > addrData.length) break;
 
@@ -409,7 +452,10 @@ export class Linker {
                 address += codeBase;
             } else if (flags & TObjAddressFlags.Init) {
                 address += initBase;
+            } else if (globalAddrIndices.has(addrEntryIndex)) {
+                address = (address + globalBase) >>> 0;
             }
+            addrEntryIndex += 1;
 
             const refs: LinkedReference[] = [];
             for (let i = 0; i < refCount; i++) {
@@ -573,7 +619,11 @@ export class Linker {
         const eventW = new BinaryWriter();
         const platformSize = this.options.platformSize ?? 0;
         const stackSize = this.options.stackSize ?? 0;
-        const globalAllocSize = this.options.globalAllocSize ?? this.totalGlobalSize;
+        const computedGlobal = this.cumulativeGlobalAlloc >>> 0;
+        const globalAllocSize =
+            this.options.globalAllocSize !== undefined
+                ? Math.max(this.options.globalAllocSize >>> 0, computedGlobal)
+                : computedGlobal;
         const totalDataSize = globalAllocSize + platformSize + stackSize;
 
         const maxEventNumber = this.options.maxEventNumber ?? 0;
