@@ -176,7 +176,6 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
             // console.log(`compiling ${projectDir}`);
             const refPdb = await runTmake(projectDir);
             // save pdb to file
-            fs.writeFileSync(path.join(projectDir, 'tmp','ref.pdb'), refPdb);
             const refFromPdb = disassembleBinaryToLines(refPdb);
             const refCodeSection = disassembleBinarySectionToLines(refPdb, TObjSection.Code);
             expect(refCodeSection).toEqual(refFromPdb);
