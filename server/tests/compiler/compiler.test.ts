@@ -229,6 +229,19 @@ end sub
             expect(result.obj.length).toBeGreaterThan(0);
         });
 
+        it('should compile implicit decimal string literal to word/short', () => {
+            const result = compile(`
+sub on_sys_init()
+    dim wa as word = "42"
+    dim wb as word = "0"
+    wb = "100"
+    dim sc as short = "-15"
+end sub
+`);
+            expect(result.errors).toHaveLength(0);
+            expect(result.obj.length).toBeGreaterThan(0);
+        });
+
         it('should compile control flow', () => {
             const result = compile(`
 sub test()

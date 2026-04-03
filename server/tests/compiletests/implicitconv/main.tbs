@@ -1,0 +1,13 @@
+include "global.tbh"
+
+' Implicit conversion: decimal string literal -> integral (Tibbo val-like fold in JS compiler).
+sub on_sys_init()
+    dim wa as word = "42"
+    dim wb as word = "0"
+    wb = "100"
+    dim sc as short = "-15"
+    sys.debugprint(str(wa))
+    sys.debugprint(str(wb))
+    sys.debugprint(stri(sc))
+    sys.halt()
+end sub
