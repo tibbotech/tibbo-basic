@@ -26,6 +26,13 @@ sub on_sys_init()
     s = -5
     sys.debugprint(stri(s))
     sys.debugprint(chr(65))
+    ' Extra syscall coverage (parity with tmake): bin/lhex/lbin/lstri
+    sys.debugprint(bin(wdp))
+    sys.debugprint(lhex(d))
+    sys.debugprint(lbin(d))
+    dim lg as long
+    lg = -12345
+    sys.debugprint(lstri(lg))
     dim lit as string = "42"
     sys.debugprint(str(val(lit)))
     ' Void syscall; sys.sleep not on AppBlocks tmake platform
