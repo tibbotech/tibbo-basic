@@ -100,6 +100,8 @@ export class Linker {
     private eventFnTags = new Set<string>();
     private localRelocDeltas = new Map<string, number>();
     private linkAddressAdjustments = new Map<string, number>();
+    /** Set in relocateLocals from merged call graph (TObjFileReloc PreRelocateFunction); overrides options.stackSize when non-null. */
+    private linkedStackSizeBytes: number | null = null;
 
     // Per-OBJ tracking for PDB debug sections
     private allObjSectionData: Buffer[][] = [];
@@ -128,6 +130,7 @@ export class Linker {
         this.pdbScopeBases = [];
         this.pdbRdataBases = [];
         this.firstObjData = null;
+        this.linkedStackSizeBytes = null;
 
         const objFiles = objBuffers.map(b => this.loadObj(b.name, b.data));
 
@@ -754,7 +757,9 @@ export class Linker {
 
         // EventDir
         const platformSize = this.options.platformSize ?? 0;
-        const stackSize = this.options.stackSize ?? 0;
+        const stackSize = this.linkedStackSizeBytes !== null
+            ? this.linkedStackSizeBytes
+            : (this.options.stackSize ?? 0);
         const computedGlobal = this.cumulativeGlobalAlloc >>> 0;
         const globalAllocSize =
             this.options.globalAllocSize !== undefined
@@ -910,7 +915,7 @@ export class Linker {
         // 1. Build cross-module call graph from Functions sections
         interface FnEntry {
             name: string;
-            isEvent: boolean;
+            flags: number;
             calleeNames: string[];
         }
         const callGraph = new Map<string, FnEntry>();
@@ -953,14 +958,14 @@ export class Linker {
 
                 const existing = callGraph.get(nameLc);
                 if (existing) {
-                    if (fn.flags & TObjFunctionFlags.Event) existing.isEvent = true;
+                    existing.flags |= fn.flags;
                     for (const c of calleeNames) {
                         if (!existing.calleeNames.includes(c)) existing.calleeNames.push(c);
                     }
                 } else {
                     callGraph.set(nameLc, {
                         name: nameLc,
-                        isEvent: !!(fn.flags & TObjFunctionFlags.Event),
+                        flags: fn.flags,
                         calleeNames,
                     });
                 }
@@ -968,6 +973,60 @@ export class Linker {
         }
 
         if (callGraph.size === 0) return;
+
+        // 1b. Stack size from merged graph (matches CTObjFileReloc::PreRelocateFunction + stack accounting)
+        const codeAddrSizeForStack = (this.flags & TObjHeaderFlags.Code24) ? 3 : 2;
+        let nMaxStackEntryCount = 0;
+        let nMaxDoEventsStackEntryCount = 0;
+
+        type PreOk = { ok: true; stackCount: number; doEventsStackCount: number };
+        type PreBad = { ok: false; msg: string };
+        const preRelocateForStack = (fnLc: string, chain: string[]): PreOk | PreBad => {
+            if (chain.includes(fnLc)) {
+                return { ok: false, msg: `Recursion detected for function '${fnLc}'` };
+            }
+            const entry = callGraph.get(fnLc);
+            const callees = entry?.calleeNames ?? [];
+            let nStackEntryCount = 0;
+            let nDoEventsStackEntryCount = (entry?.flags ?? 0) & TObjFunctionFlags.DoEvents ? 1 : 0;
+
+            const chainNext = [...chain, fnLc];
+            for (const calleeLc of callees) {
+                const r = preRelocateForStack(calleeLc, chainNext);
+                if (!r.ok) return r;
+                let nCalleeStack = r.stackCount;
+                let nCalleeDoEvents = r.doEventsStackCount;
+                nCalleeStack++;
+                nStackEntryCount = Math.max(nStackEntryCount, nCalleeStack);
+                const calleeEntry = callGraph.get(calleeLc);
+                if (calleeEntry && (calleeEntry.flags & TObjFunctionFlags.DoEvents)) {
+                    nCalleeDoEvents++;
+                    nDoEventsStackEntryCount = Math.max(nDoEventsStackEntryCount, nCalleeDoEvents);
+                    if (entry) entry.flags |= TObjFunctionFlags.DoEvents;
+                }
+            }
+            return { ok: true, stackCount: nStackEntryCount, doEventsStackCount: nDoEventsStackEntryCount };
+        };
+
+        for (const [fnLc, fnEntry] of callGraph) {
+            const r = preRelocateForStack(fnLc, []);
+            if (!r.ok) {
+                this.diagnostics.error({ file: '<linker>', line: 0, column: 0 }, r.msg, 'LINK');
+                throw new Error(r.msg);
+            }
+            const isEventOrHtml = !!(fnEntry.flags & (TObjFunctionFlags.Event | TObjFunctionFlags.Html));
+            if (!isEventOrHtml) continue;
+            nMaxStackEntryCount = Math.max(nMaxStackEntryCount, r.stackCount);
+            nMaxDoEventsStackEntryCount += r.doEventsStackCount;
+        }
+
+        const nTotalStackEntryCount = nMaxStackEntryCount + nMaxDoEventsStackEntryCount;
+        if (nTotalStackEntryCount > 255) {
+            const msg = 'This program requires too much stack (255 stack locations max)';
+            this.diagnostics.error({ file: '<linker>', line: 0, column: 0 }, msg, 'LINK');
+            throw new Error(msg);
+        }
+        this.linkedStackSizeBytes = nTotalStackEntryCount * codeAddrSizeForStack;
 
         // 2. Build per-OBJ address-index-to-size map from Variables + Types sections
         const addrIndexToSize = new Map<number, number>();
@@ -1116,9 +1175,12 @@ export class Linker {
 
         // 4. Walk call graph from all functions, relocating callees
         this.localRelocDeltas.clear();
+        const stackBytesForLocals = this.linkedStackSizeBytes !== null
+            ? this.linkedStackSizeBytes
+            : (this.options.stackSize ?? 0);
         const computedLocalBase = (this.options.platformSize ?? 0) +
             Math.max(this.cumulativeGlobalAlloc >>> 0, this.options.globalAllocSize ?? 0) +
-            (this.options.stackSize ?? 0);
+            stackBytesForLocals;
 
         const relocateFunction = (fnLc: string, requestedBase: number): number => {
             const frame = frameInfoMap.get(fnLc);
@@ -1160,10 +1222,7 @@ export class Linker {
         };
 
         let maxLocalEnd = computedLocalBase;
-        for (const [fnLc, entry] of callGraph) {
-            if (entry.isEvent || !(callGraph.get(fnLc)?.isEvent === false)) {
-                // Process all non-doevents functions starting from localBase
-            }
+        for (const [fnLc] of callGraph) {
             const r = relocateFunction(fnLc, computedLocalBase);
             if (r > maxLocalEnd) maxLocalEnd = r;
         }
