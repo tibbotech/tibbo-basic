@@ -1615,8 +1615,9 @@ export class PCodeGenerator {
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            if (!isOnEvent && offset > this.localAllocSize && this.liveReachable.has(decl.name)) {
-                this.localAllocSize = offset;
+            const localEnd = rootBase - localBase + offset;
+            if (!isOnEvent && localEnd > this.localAllocSize && this.liveReachable.has(decl.name)) {
+                this.localAllocSize = localEnd;
             }
         }
     }

@@ -99,6 +99,7 @@ export class Linker {
     private importOnlyFnTags = new Set<string>();
     private eventFnTags = new Set<string>();
     private localRelocDeltas = new Map<string, number>();
+    private linkAddressAdjustments = new Map<string, number>();
 
     // Per-OBJ tracking for PDB debug sections
     private allObjSectionData: Buffer[][] = [];
@@ -171,9 +172,15 @@ export class Linker {
         }
 
         this.relocateLocals(objFiles);
+        for (const [tag, adjustment] of this.linkAddressAdjustments) {
+            this.localRelocDeltas.set(
+                tag,
+                (this.localRelocDeltas.get(tag) ?? 0) + adjustment,
+            );
+        }
         this.compactUnreferencedFunctions();
         this.reorderFunctions();
-        this.applyVariableAddressOverrides();
+        // this.applyVariableAddressOverrides();
         return this.emit();
     }
 
@@ -275,7 +282,8 @@ export class Linker {
                 ? this.collectGlobalAddressIndices(varData)
                 : new Set<number>();
 
-        this.linkAddresses(obj, codeBase, initBase, globalAddrIndices);
+        const localTagSizes = this.collectLocalAddressSizes(obj);
+        this.linkAddresses(obj, codeBase, initBase, globalAddrIndices, localTagSizes);
 
         const eventData = obj.sections[TObjSection.EventDir]?.data;
         if (eventData && eventData.length >= 8) {
@@ -456,15 +464,72 @@ export class Linker {
         return set;
     }
 
+    private collectLocalAddressSizes(obj: ObjFile): Map<string, number> {
+        const result = new Map<string, number>();
+        const varData = obj.sections[TObjSection.Variables]?.data;
+        const typesData = obj.sections[TObjSection.Types]?.data;
+        const addrData = obj.sections[TObjSection.Addresses]?.data;
+        const symbolData = obj.sections[TObjSection.Symbols]?.data;
+        if (!varData || !addrData || !symbolData) return result;
+
+        const useData32 = !!(this.flags & TObjHeaderFlags.Data32);
+        const dataAddrSize = useData32 ? 4 : 2;
+        const typeSizes = parseTypeSizes(typesData);
+
+        const addrIdxToSize = new Map<number, number>();
+        let vpos = 0;
+        while (vpos + 18 <= varData.length) {
+            const vflags = varData.readUInt8(vpos); vpos += 1;
+            vpos += 4;
+            const addrIdx = varData.readUInt32LE(vpos); vpos += 4;
+            const ownerScope = varData.readUInt32LE(vpos); vpos += 4;
+            const dtByte = varData.readUInt8(vpos); vpos += 1;
+            const dtDword = varData.readUInt32LE(vpos); vpos += 4;
+
+            if (ownerScope === MAXDWORD) continue;
+            if (vflags & TObjVariableFlags.Static) continue;
+
+            const size = getVariableSize(vflags, dtByte, dtDword, typeSizes, dataAddrSize);
+            addrIdxToSize.set(addrIdx, size);
+        }
+
+        let apos = 0;
+        let addrIdx = 0;
+        while (apos + 17 <= addrData.length) {
+            const flags = addrData.readUInt8(apos); apos += 1;
+            const tagOff = addrData.readUInt32LE(apos); apos += 4;
+            apos += 4;
+            apos += 4;
+            const refCount = addrData.readUInt32LE(apos); apos += 4;
+            apos += refCount * 5;
+
+            if (!(flags & TObjAddressFlags.Code)) {
+                const size = addrIdxToSize.get(addrIdx);
+                if (size !== undefined) {
+                    let tagName = '';
+                    for (let i = tagOff; i < symbolData.length && symbolData[i] !== 0; i++) {
+                        tagName += String.fromCharCode(symbolData[i]);
+                    }
+                    if (tagName) result.set(tagName, size);
+                }
+            }
+            addrIdx++;
+        }
+
+        return result;
+    }
+
     private linkAddresses(
         obj: ObjFile,
         codeBase: number,
         initBase: number,
         globalAddrIndices: Set<number>,
+        localTagSizes?: Map<string, number>,
     ): void {
         const addrData = obj.sections[TObjSection.Addresses]?.data;
         if (!addrData || addrData.length === 0) return;
 
+        const startIdx = this.addresses.length;
         const globalBase = (this.cumulativeGlobalAlloc >>> 0);
         let pos = 0;
         let addrEntryIndex = 0;
@@ -524,6 +589,37 @@ export class Linker {
                 existing.references.push(...refs);
             } else {
                 this.addresses.push({ flags, tag: tagName, address, baseAddress, references: refs });
+            }
+        }
+
+        if (localTagSizes && localTagSizes.size > 0) {
+            const scopeGroups = new Map<string, LinkedAddress[]>();
+            for (let i = startIdx; i < this.addresses.length; i++) {
+                const addr = this.addresses[i];
+                if (addr.flags & TObjAddressFlags.Code) continue;
+                const fnName = extractFunctionName(addr.tag);
+                if (!fnName) continue;
+                const fnLc = fnName.toLowerCase();
+                if (!scopeGroups.has(fnLc)) scopeGroups.set(fnLc, []);
+                scopeGroups.get(fnLc)!.push(addr);
+            }
+
+            for (const [, addrs] of scopeGroups) {
+                if (addrs.length < 2) continue;
+                addrs.sort((a, b) => a.address - b.address);
+                for (let i = 1; i < addrs.length; i++) {
+                    const prev = addrs[i - 1];
+                    const prevSize = localTagSizes.get(prev.tag) ?? 1;
+                    const minAddr = prev.address + prevSize;
+                    if (addrs[i].address < minAddr) {
+                        const adjustment = minAddr - addrs[i].address;
+                        addrs[i].address = minAddr;
+                        this.linkAddressAdjustments.set(
+                            addrs[i].tag,
+                            (this.linkAddressAdjustments.get(addrs[i].tag) ?? 0) + adjustment,
+                        );
+                    }
+                }
             }
         }
     }
@@ -858,12 +954,49 @@ export class Linker {
         const useData32 = !!(this.flags & TObjHeaderFlags.Data32);
         const dataAddrSize = useData32 ? 4 : 2;
         let globalAddrOffset = 0;
+        const variableNameToSize: any[] = [];
 
         for (const obj of objFiles) {
             const varData = obj.sections[TObjSection.Variables]?.data;
             const typesData = obj.sections[TObjSection.Types]?.data;
 
             const typeSizes = parseTypeSizes(typesData);
+
+            const pdb = obj.data;
+            const readSectionBuf = (idx: number): Buffer => {
+                const descOff = HEADER_SIZE + idx * SECTION_DESCRIPTOR_SIZE;
+                if (descOff + 8 > pdb.length) return Buffer.alloc(0);
+                const offset = pdb.readUInt32LE(descOff);
+                const size = pdb.readUInt32LE(descOff + 4);
+                return (offset + size <= pdb.length) ? pdb.slice(offset, offset + size) : Buffer.alloc(0);
+            };
+
+            const symData = readSectionBuf(TObjSection.Symbols);
+            const addrData = readSectionBuf(TObjSection.Addresses);
+
+            const readSym = (off: number): string => {
+                if (off >= symData.length) return '';
+                let s = '';
+                for (let i = off; i < symData.length && symData[i] !== 0; i++) {
+                    s += String.fromCharCode(symData[i]);
+                }
+                return s;
+            };
+
+            const getAddrEntry = (index: number): { tag: string; address: number } | undefined => {
+                let apos = 0;
+                for (let i = 0; i < index; i++) {
+                    if (apos + 17 > addrData.length) return undefined;
+                    apos += 13;
+                    const refCount = addrData.readUInt32LE(apos); apos += 4;
+                    apos += refCount * 5;
+                }
+                if (apos + 17 > addrData.length) return undefined;
+                apos += 1; // flags
+                const tagOff = addrData.readUInt32LE(apos); apos += 4;
+                const address = addrData.readUInt32LE(apos);
+                return { tag: readSym(tagOff), address };
+            };
 
             if (varData && varData.length > 0) {
                 let vpos = 0;
@@ -880,6 +1013,15 @@ export class Linker {
 
                     const size = getVariableSize(vflags, dtByte, dtDword, typeSizes, dataAddrSize);
                     addrIndexToSize.set(globalAddrOffset + addrIdx, size);
+
+                    const entry = getAddrEntry(addrIdx);
+                    if (entry) {
+                        variableNameToSize.push({
+                            size,
+                            tag: entry.tag,
+                            address: entry.address,
+                        });
+                    }
                 }
             }
 
@@ -1025,6 +1167,10 @@ export class Linker {
 
     private pdbMergeAddresses(allSections: Buffer[][], codeBases: number[], initBases: number[], symBases: number[], initOffset: number): Buffer {
         const w = new BinaryWriter();
+        const linkedByTag = new Map<string, LinkedAddress>();
+        for (const a of this.addresses) {
+            if (a.tag) linkedByTag.set(a.tag, a);
+        }
         for (let i = 0; i < allSections.length; i++) {
             const data = allSections[i][TObjSection.Addresses];
             if (!data || data.length === 0) continue;
@@ -1038,17 +1184,22 @@ export class Linker {
                 const base = data.readUInt32LE(pos); pos += 4;
                 const refCount = data.readUInt32LE(pos); pos += 4;
 
-                if (flags & TObjAddressFlags.Code) {
+                let tagName = '';
+                if (symData) {
+                    for (let si = tag; si < symData.length && symData[si] !== 0; si++) {
+                        tagName += String.fromCharCode(symData[si]);
+                    }
+                }
+                const linked = tagName ? linkedByTag.get(tagName) : undefined;
+                if (linked) {
+                    addr = linked.address;
+                } else if (flags & TObjAddressFlags.Code) {
                     if (flags & TObjAddressFlags.Init) {
                         addr += ib;
                     } else {
                         addr += cb + initOffset;
                     }
                 } else if (this.localRelocDeltas.size > 0 && symData) {
-                    let tagName = '';
-                    for (let si = tag; si < symData.length && symData[si] !== 0; si++) {
-                        tagName += String.fromCharCode(symData[si]);
-                    }
                     const delta = this.localRelocDeltas.get(tagName);
                     if (delta) addr += delta;
                 }
@@ -1064,7 +1215,7 @@ export class Linker {
                     if (pos + 5 > data.length) break;
                     const rt = data.readUInt8(pos); pos += 1;
                     let ro = data.readUInt32LE(pos); pos += 4;
-                    if (rt === TObjRefType.Code) ro += cb;
+                    if (rt === TObjRefType.Code) ro += cb + initOffset;
                     else if (rt === TObjRefType.Init) ro += ib;
                     w.writeByte(rt);
                     w.writeDword(ro);

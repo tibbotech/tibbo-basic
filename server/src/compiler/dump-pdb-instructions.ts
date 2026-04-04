@@ -37,7 +37,7 @@ interface LineInfoFile {
     lines: LineInfoEntry[];
 }
 
-interface DecodedInstruction {
+export interface DecodedInstruction {
     address: number;
     size: number;
     mnemonic: string;
@@ -175,17 +175,25 @@ function main(): void {
     printGroupedByLine(instructions, files);
 }
 
-export function disassembleBinary(buf: Buffer): DecodedInstruction[] {
-    const header = parseHeader(buf);
-    const code = getSectionBuffer(buf, header, TObjSection.Code);
+/**
+ * Disassemble the Code section bytes using the same address-width rules as the TOBJ header {@code flags}
+ * ({@link TObjHeaderFlags.Code24}, {@link TObjHeaderFlags.Data32}).
+ */
+export function disassembleCodeBuffer(code: Buffer, fileFlags: number): DecodedInstruction[] {
     if (code.length === 0) {
         return [];
     }
-    const useCode24 = (header.flags & TObjHeaderFlags.Code24) !== 0;
-    const useData32 = (header.flags & TObjHeaderFlags.Data32) !== 0;
+    const useCode24 = (fileFlags & TObjHeaderFlags.Code24) !== 0;
+    const useData32 = (fileFlags & TObjHeaderFlags.Data32) !== 0;
     const codeAddrSize = useCode24 ? 3 : 2;
     const dataAddrSize = useData32 ? 4 : 2;
     return disassemble(code, codeAddrSize, dataAddrSize);
+}
+
+export function disassembleBinary(buf: Buffer): DecodedInstruction[] {
+    const header = parseHeader(buf);
+    const code = getSectionBuffer(buf, header, TObjSection.Code);
+    return disassembleCodeBuffer(code, header.flags);
 }
 
 /**

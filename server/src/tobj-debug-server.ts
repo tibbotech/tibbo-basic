@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import TOBJ from './TOBJ';
+import { decodeCodeInstructionsForTobj } from './tobj-debug/decodeCodeInstructions';
 import { serializeTobjForDebug } from './tobj-debug/serializeTobjForDebug';
 
 const PORT = Number(process.env.TOBJ_DEBUG_PORT || 8765);
@@ -31,8 +32,10 @@ const server = http.createServer((req, res) => {
             try {
                 const buf = Buffer.concat(chunks);
                 const tobj = new TOBJ(buf);
-                const json = serializeTobjForDebug(tobj);
+                const json = serializeTobjForDebug(tobj) as Record<string, unknown>;
+                json.codeInstructions = decodeCodeInstructionsForTobj(tobj);
                 const body = JSON.stringify(json, null, 2);
+
                 res.writeHead(200, {
                     'Content-Type': 'application/json; charset=utf-8',
                     'Content-Length': Buffer.byteLength(body, 'utf8'),
