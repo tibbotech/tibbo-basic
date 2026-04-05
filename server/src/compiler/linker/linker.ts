@@ -860,7 +860,7 @@ export class Linker {
         }
 
         const fileSize = currentOffset;
-        const localAllocSize = this.options.localAllocSize ?? this.maxLocalAllocSize;
+        const localAllocSize = this.maxLocalAllocSize;
         const mergedFlags = this.flags | (this.options.flags ?? 0);
 
         const now = this.options.fixedTimestamp ?? new Date();
@@ -1081,7 +1081,7 @@ export class Linker {
                 let vpos = 0;
                 while (vpos + 18 <= varData.length) {
                     const vflags = varData.readUInt8(vpos); vpos += 1;
-                    vpos += 4; // name
+                    const name = readSym(varData.readUInt32LE(vpos)); vpos += 4;
                     const addrIdx = varData.readUInt32LE(vpos); vpos += 4;
                     const ownerScope = varData.readUInt32LE(vpos); vpos += 4;
                     const dtByte = varData.readUInt8(vpos); vpos += 1;
@@ -1221,14 +1221,19 @@ export class Linker {
             return result;
         };
 
-        let maxLocalEnd = computedLocalBase;
         for (const [fnLc] of callGraph) {
-            const r = relocateFunction(fnLc, computedLocalBase);
-            if (r > maxLocalEnd) maxLocalEnd = r;
+            relocateFunction(fnLc, computedLocalBase);
         }
 
-        // 5. Update localAllocSize
-        const newLocalAllocSize = maxLocalEnd - computedLocalBase;
+        // 5. Update localAllocSize (matches C++ CTObjFileReloc after RelocateLocals: max over
+        // every function of m_nStackFrameBase + m_nStackFrameSize, minus nLocalBase — not the
+        // return value of a single relocate walk, which can under-report with shared callees.)
+        let nLocalEnd = computedLocalBase;
+        for (const [, frame] of frameInfoMap) {
+            const stackFrameEnd = frame.base + frame.size;
+            if (stackFrameEnd > nLocalEnd) nLocalEnd = stackFrameEnd;
+        }
+        const newLocalAllocSize = nLocalEnd - computedLocalBase;
         if (newLocalAllocSize > this.maxLocalAllocSize) {
             this.maxLocalAllocSize = newLocalAllocSize;
         }
@@ -1761,7 +1766,8 @@ function getVariableSize(
         case TObjDataType.Real:
             return 4;
         case TObjDataType.String:
-            return (dtDword & 0xFF) + 1;
+            if (dtDword === 0) return 255 + 2;
+            return (dtDword & 0xFF) + 2;
         case TObjDataType.Array:
         case TObjDataType.Struct:
         case TObjDataType.StructC:

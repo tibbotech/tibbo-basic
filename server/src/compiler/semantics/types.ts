@@ -77,6 +77,7 @@ export const BUILTIN_TYPES: Record<string, PrimitiveDataType> = {
     dword:   { kind: 'primitive', name: 'dword',   primitiveType: PrimitiveType.Dword,   size: 4, signed: false },
     real:    { kind: 'primitive', name: 'real',    primitiveType: PrimitiveType.Real,     size: 4, signed: true },
     float:   { kind: 'primitive', name: 'float',   primitiveType: PrimitiveType.Float,   size: 4, signed: true },
+    string:  { kind: 'primitive', name: 'string',  primitiveType: PrimitiveType.String,  size: 255, signed: false },
 };
 
 export function makeStringType(maxLength: number): StringDataType {

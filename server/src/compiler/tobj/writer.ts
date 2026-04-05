@@ -719,14 +719,14 @@ export class TObjWriter {
             return;
         }
 
-        if (isPrimitive(dt)) {
-            w.writeByte(this.primitiveToTObjType(dt.name));
-            w.writeDword(0);
-        } else if (isString(dt)) {
+        if (isString(dt)) {
             w.writeByte(TObjDataType.String);
             w.writeByte((dt as any).maxLength & 0xFF);
             w.writeByte(0);
             w.writeWord(0);
+        } else if (isPrimitive(dt)) {
+            w.writeByte(this.primitiveToTObjType(dt.name));
+            w.writeDword(0);
         } else if (isArray(dt)) {
             w.writeByte(TObjDataType.Array);
             w.writeDword(this.typeIndexMap.get(dt.name.toLowerCase()) ?? 0);
