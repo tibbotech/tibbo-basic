@@ -2,8 +2,23 @@ include "global.tbh"
 
 dim fdsa as byte=1
 
+sub somefunct()
+    dim zz as byte=3
+    boot()
+end sub
+
 sub boot()
     fdsa = 3
+    dim aa as byte=1+fdsa
+    dim bb as word=1+fdsa
+    ' dim ss as string = "a" + "a"
+    ' dim s2 as string = "b"
+    ' dim s3 as string = "a"
+    ' sys.debugprint(ss)
+    ' sys.debugprint("aaa")
+    sys.debugprint(str(aa))
+    ' dim aab as byte = fdsa + 3
+    ' sys.debugprint(str(aab))
     ' dim a as byte=1
     ' dim b as byte=1+a
     ' sys.debugprint("boot")

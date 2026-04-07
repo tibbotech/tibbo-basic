@@ -34,7 +34,6 @@ condition=
 locked=no
 location=
 
-
 [file3]
 path=boot.tbs
 type=basic

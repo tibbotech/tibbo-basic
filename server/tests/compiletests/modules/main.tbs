@@ -7,5 +7,8 @@ dim asdf as byte=1
 sub on_sys_init()
     asdf = 2
     dim aa as byte = asdf
+    sys.debugprint(str(aa))
+    ' dim zz as byte = 3 + aa
     boot()
+    ' somefunct()
 end sub
