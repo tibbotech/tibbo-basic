@@ -431,6 +431,7 @@ export class ProjectCompiler {
             flags,
             fixedTimestamp: this.options.fixedTimestamp,
             resources: linkedResources,
+            relocationCalleeEdges: this.collectRelocationCallGraph(firstPassEntries),
         };
         const objBuffers = [...objs.entries()].map(([name, data]) => ({
             name,
@@ -481,6 +482,43 @@ export class ProjectCompiler {
             }
         }
         return out;
+    }
+
+    /**
+     * Caller(lowercase) → callees(lowercase) from direct `name(` calls in each sub/function body.
+     * OBJ Functions sections only encode intra-file callee indices; this restores cross-.tbs edges for RelocateLocals.
+     */
+    private collectRelocationCallGraph(entries: { result: CompileResult }[]): Map<string, string[]> {
+        const walkBody = (node: unknown, callees: Set<string>): void => {
+            if (!node || typeof node !== 'object') return;
+            const n = node as Record<string, unknown>;
+            if (n.kind === 'CallExpr') {
+                const callee = n.callee as Record<string, unknown> | undefined;
+                if (callee?.kind === 'IdentifierExpr' && typeof callee.name === 'string') {
+                    callees.add(callee.name.toLowerCase());
+                }
+            }
+            for (const key of Object.keys(n)) {
+                if (key === 'loc' || key === 'kind') continue;
+                const child = n[key];
+                if (Array.isArray(child)) {
+                    for (const c of child) walkBody(c, callees);
+                } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                    walkBody(child, callees);
+                }
+            }
+        };
+        const map = new Map<string, string[]>();
+        for (const e of entries) {
+            for (const decl of e.result.ast.declarations) {
+                if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
+                const callees = new Set<string>();
+                const body = (decl as { body?: unknown }).body;
+                if (body !== undefined) walkBody(body, callees);
+                map.set(decl.name.toLowerCase(), [...callees]);
+            }
+        }
+        return map;
     }
 
     private buildHeaderSource(preprocessor: any): string {

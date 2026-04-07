@@ -20,8 +20,11 @@ export interface LinkerOptions {
     flags?: number;
     fixedTimestamp?: Date;
     resources?: Array<{ name: string; data: Buffer }>;
-    functionOrder?: string[];
-    variableAddressOverrides?: Map<string, number>;
+    /**
+     * Per-OBJ Functions sections only list intra-file callee indices; cross-.tbs calls are omitted.
+     * Merge this caller(lowercase) → callees(lowercase) map (from the whole project) before RelocateLocals.
+     */
+    relocationCalleeEdges?: Map<string, string[]>;
 }
 
 interface ObjFile {
@@ -172,8 +175,6 @@ export class Linker {
 
         this.relocateLocals(objFiles);
         this.compactUnreferencedFunctions();
-        // this.reorderFunctions();
-        // this.applyVariableAddressOverrides();
         return this.emit();
     }
 
@@ -853,6 +854,19 @@ export class Linker {
 
         if (callGraph.size === 0) return;
 
+        const extraEdges = this.options.relocationCalleeEdges;
+        if (extraEdges && extraEdges.size > 0) {
+            for (const [caller, callees] of extraEdges) {
+                const callerLc = caller.toLowerCase();
+                let entry = callGraph.get(callerLc);
+                if (!entry) continue;
+                for (const c of callees) {
+                    const t = c.toLowerCase();
+                    if (!entry.calleeNames.includes(t)) entry.calleeNames.push(t);
+                }
+            }
+        }
+
         // 2. Build per-OBJ address-index-to-size map from Variables + Types sections
         const addrIndexToSize = new Map<number, number>();
         const useData32 = !!(this.flags & TObjHeaderFlags.Data32);
@@ -952,7 +966,7 @@ export class Linker {
             }
         }
 
-        // 4. Walk call graph from all functions, relocating callees
+        // 4. Walk call graph from roots (uncalled + event fallback), relocating callees at frameEnd
         this.localRelocDeltas.clear();
         const computedLocalBase = (this.options.platformSize ?? 0) +
             Math.max(this.cumulativeGlobalAlloc >>> 0, this.options.globalAllocSize ?? 0) +
@@ -997,12 +1011,21 @@ export class Linker {
             return result;
         };
 
+        const calledAsCallee = new Set<string>();
+        for (const e of callGraph.values()) {
+            for (const c of e.calleeNames) calledAsCallee.add(c);
+        }
+        let roots = [...callGraph.keys()].filter(fnLc => !calledAsCallee.has(fnLc));
+        if (roots.length === 0) {
+            roots = [...callGraph.keys()].filter(fnLc => callGraph.get(fnLc)!.isEvent);
+        }
+        if (roots.length === 0) {
+            roots = [...callGraph.keys()];
+        }
+
         let maxLocalEnd = computedLocalBase;
-        for (const [fnLc, entry] of callGraph) {
-            if (entry.isEvent || !(callGraph.get(fnLc)?.isEvent === false)) {
-                // Process all non-doevents functions starting from localBase
-            }
-            const r = relocateFunction(fnLc, computedLocalBase);
+        for (const root of roots) {
+            const r = relocateFunction(root, computedLocalBase);
             if (r > maxLocalEnd) maxLocalEnd = r;
         }
 
@@ -1281,129 +1304,6 @@ export class Linker {
         return out;
     }
 
-    private applyVariableAddressOverrides(): void {
-        const overrides = this.options.variableAddressOverrides;
-        if (!overrides || overrides.size === 0) return;
-
-        for (const addr of this.addresses) {
-            if (addr.flags & TObjAddressFlags.Code) continue;
-            if (!(addr.flags & TObjAddressFlags.Defined)) continue;
-            const overrideAddr = overrides.get(addr.tag);
-            if (overrideAddr !== undefined) {
-                addr.address = overrideAddr;
-            }
-        }
-    }
-
-    private reorderFunctions(): void {
-        const targetOrder = this.options.functionOrder;
-        if (!targetOrder || targetOrder.length === 0) return;
-        if (this.fnSpanByTag.size === 0) return;
-
-        const spans = [...this.fnSpanByTag.entries()]
-            .map(([tag, span]) => ({ tag, ...span }))
-            .sort((a, b) => a.start - b.start);
-
-        const orderIndex = new Map<string, number>();
-        for (let i = 0; i < targetOrder.length; i++) {
-            orderIndex.set(targetOrder[i], i);
-        }
-
-        const reordered = [...spans].sort((a, b) => {
-            const ai = orderIndex.get(a.tag) ?? Number.MAX_SAFE_INTEGER;
-            const bi = orderIndex.get(b.tag) ?? Number.MAX_SAFE_INTEGER;
-            if (ai !== bi) return ai - bi;
-            return a.start - b.start;
-        });
-
-        let changed = false;
-        for (let i = 0; i < spans.length; i++) {
-            if (spans[i].tag !== reordered[i].tag) { changed = true; break; }
-        }
-        if (!changed) return;
-
-        const extractedBlocks: { tag: string; data: number[]; oldStart: number; oldEnd: number }[] = [];
-        for (const sp of reordered) {
-            extractedBlocks.push({
-                tag: sp.tag,
-                data: this.mergedCode.slice(sp.start, sp.end),
-                oldStart: sp.start,
-                oldEnd: sp.end,
-            });
-        }
-
-        const codeStart = spans[0].start;
-        const codeEnd = spans[spans.length - 1].end;
-
-        const oldToNew = new Map<number, number>();
-        let cursor = codeStart;
-        for (const block of extractedBlocks) {
-            oldToNew.set(block.oldStart, cursor);
-            cursor += block.data.length;
-        }
-
-        const remapCodeOffset = (offset: number): number => {
-            for (const block of extractedBlocks) {
-                const newStart = oldToNew.get(block.oldStart)!;
-                if (offset >= block.oldStart && offset < block.oldEnd) {
-                    return newStart + (offset - block.oldStart);
-                }
-            }
-            return offset;
-        };
-
-        const newCode = new Array(this.mergedCode.length);
-        for (let i = 0; i < codeStart; i++) newCode[i] = this.mergedCode[i];
-        cursor = codeStart;
-        for (const block of extractedBlocks) {
-            for (let j = 0; j < block.data.length; j++) {
-                newCode[cursor + j] = block.data[j];
-            }
-            cursor += block.data.length;
-        }
-        for (let i = codeEnd; i < this.mergedCode.length; i++) newCode[i] = this.mergedCode[i];
-        this.mergedCode = newCode;
-
-        for (const addr of this.addresses) {
-            if (addr.flags & TObjAddressFlags.Code) {
-                addr.address = remapCodeOffset(addr.address);
-            }
-            for (const ref of addr.references) {
-                if (ref.type === TObjRefType.Code) {
-                    ref.offset = remapCodeOffset(ref.offset);
-                }
-            }
-        }
-
-        for (let i = 0; i < this.eventEntries.length; i++) {
-            const en = this.eventEntries[i];
-            if (en) {
-                en.codeAddress = remapCodeOffset(en.codeAddress);
-            }
-        }
-
-        for (const reloc of this.rdataRelocs) {
-            if (reloc.refType === TObjRefType.Code) {
-                reloc.codeOffset = remapCodeOffset(reloc.codeOffset);
-            }
-        }
-
-        for (const desc of this.pendingDescriptors) {
-            if (desc.refType === TObjRefType.Code) {
-                desc.adjustedOffset = remapCodeOffset(desc.adjustedOffset);
-            }
-        }
-
-        this.fnSpanByTag.clear();
-        for (const block of extractedBlocks) {
-            const newStart = oldToNew.get(block.oldStart)!;
-            this.fnSpanByTag.set(block.tag, {
-                start: newStart,
-                end: newStart + block.data.length,
-            });
-        }
-    }
-
     private compactUnreferencedFunctions(): void {
         const deadTagKeys = new Set<string>();
         for (const addr of this.addresses) {
@@ -1513,18 +1413,11 @@ function extractFunctionName(tag: string): string | null {
     return null;
 }
 
-/** Must match PCodeGenerator.TEMP_STRING_SLOT_SIZE; TOBJ maxLen+1 underestimates scratch. */
-const LINKER_TEMP_STRING_SCRATCH_BYTES = 257;
-
 function getVariableSize(
     flags: number, dtByte: number, dtDword: number,
     typeSizes: Map<number, number>, dataAddrSize: number,
 ): number {
     if (flags & TObjVariableFlags.ByRef) return dataAddrSize;
-    // Compiler allocates string scratch (_tmp_*) in fixed 257-byte slots for syscalls/str().
-    if ((flags & TObjVariableFlags.Temp) !== 0 && dtByte === TObjDataType.String) {
-        return LINKER_TEMP_STRING_SCRATCH_BYTES;
-    }
     switch (dtByte) {
         case TObjDataType.Boolean:
         case TObjDataType.Byte:
