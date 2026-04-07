@@ -401,15 +401,20 @@ export class TObjWriter {
                     }
                 }
             } else if (!isDerivedOffset && isLocal) {
-                const match = name.match(/^\?V:(.+?):local\(/);
+                const match = name.match(/^\?V:(.+?):local\(([^:]+):/);
                 if (match) {
                     const simpleName = match[1];
-                    for (const fn of symbols.getFunctions()) {
-                        if (fn.isDeclare) continue;
+                    const ownerFnName = match[2];
+                    const fn = symbols.getFunctions().find(
+                        f => !f.isDeclare && f.name.toLowerCase() === ownerFnName.toLowerCase(),
+                    );
+                    if (fn) {
                         for (const v of [...fn.parameters, ...fn.localVariables]) {
-                            if (v.name === simpleName && !this.localVarAddrIndex.has(v)) {
+                            if (v.name.toLowerCase() !== simpleName.toLowerCase()) continue;
+                            if (!this.localVarAddrIndex.has(v)) {
                                 this.localVarAddrIndex.set(v, idx);
                             }
+                            break;
                         }
                     }
                 }

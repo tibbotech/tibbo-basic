@@ -643,8 +643,9 @@ export class PCodeGenerator {
     }
 
     /**
-     * Emit a data operand that may refer to the current function's frame (incl. scratch temps).
-     * With resolveDataAddresses + autoTrackDataRefs, use the ?V:?A label so the linker records Code refs.
+     * Emit a data operand for addresses that match registered scratch temps (_tmp_*, _tmp_numeric_result).
+     * Only isTemp: str()/LEA helpers may use raw addresses equal to a real local (e.g. strOut =
+     * str slot − SLOT_SIZE); attaching a Code ref to the wrong ?V: symbol breaks local relocation.
      */
     private emitPossiblyLocalDataAddress(addr: number): void {
         if (!this.resolveDataAddresses) {
@@ -653,8 +654,8 @@ export class PCodeGenerator {
         }
         const fn = this.ctx.currentFunction;
         if (fn) {
-            for (const v of [...fn.parameters, ...fn.localVariables]) {
-                if (v.address !== addr || v.isGlobal) continue;
+            for (const v of fn.localVariables) {
+                if (!v.isTemp || v.address !== addr || v.isGlobal) continue;
                 const labelName = this.localVarLabelMap.get(v);
                 if (labelName) {
                     this.emitter.emitDataAddressRef(labelName);
@@ -2288,7 +2289,7 @@ export class PCodeGenerator {
     }
 
     private registerTempVariables(program: AST.Program): void {
-        let globalTmpCounter = 0;
+        const tmpCounter = { v: 0 };
 
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
@@ -2297,8 +2298,6 @@ export class PCodeGenerator {
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
 
-            const isFuncWithReturn = fn.kind === SymbolKind.Function && !!fn.returnType;
-
             const perStmt = this.countTempVarsPerStatement(decl.body);
             const total = perStmt.reduce((a, b) => a + b, 0);
             const scalarCount = this.countFunctionPreEvalScalars(decl);
@@ -2306,6 +2305,12 @@ export class PCodeGenerator {
             if (total === 0 && scalarCount === 0) continue;
 
             const fnTempBase = this.functionTempBase.get(fn.name);
+            /** Scratch lives at tempScratchBase + skip (dims, etc.); single static base is wrong. */
+            if (fn.name.startsWith('on_') && fnTempBase === undefined) {
+                this.registerOnEventScratchTempsForDecl(fn, decl, scalarCount, tmpCounter);
+                continue;
+            }
+
             let rootPrefix = 0;
             if (fn.name.startsWith('on_')) {
                 for (const p of fn.parameters) rootPrefix += p.isByRef ? 4 : (p.dataType?.size ?? 2);
@@ -2326,11 +2331,11 @@ export class PCodeGenerator {
                     scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
 
                 for (let i = 0; i < slotAssignments.length; i++) {
-                    globalTmpCounter++;
+                    tmpCounter.v++;
                     const slot = slotAssignments[i];
                     const addr = tempBase + (slot === 0 ? 0 : slot1Offset);
                     const tmpVar: VariableSymbol = {
-                        name: `_tmp_${globalTmpCounter}`,
+                        name: `_tmp_${tmpCounter.v}`,
                         kind: SymbolKind.Variable,
                         dataType: BUILTIN_TYPES.string,
                         location: { file: '', line: 0, column: 0 },
@@ -2364,10 +2369,317 @@ export class PCodeGenerator {
         }
     }
 
+    /** Max complex str() arguments inside string concat (+) for one expression tree. */
+    private countPreEvalScalarsInExpr(expr: AST.Expression): number {
+        let count = 0;
+        this.walkExpressionsInNode(expr, (e: AST.Expression) => {
+            if (e.kind === 'BinaryExpr' && e.op === AST.BinaryOp.Add) {
+                const scalars = this.countComplexStrCallsInExpr(e);
+                if (scalars > count) count = scalars;
+            }
+        });
+        return count;
+    }
+
+    private countTempVarsInDimInitializerPhase(dim: AST.DimStmt): number {
+        if (!dim.initializer) return 0;
+        let count = 0;
+        if (
+            dim.initializer.kind === 'BinaryExpr'
+            && dim.initializer.op === AST.BinaryOp.Add
+            && this.isStringExpression(dim.initializer)
+            && this.tryFoldStringConcat(dim.initializer) === null
+        ) {
+            count += 1;
+        }
+        count += this.countTempVarsInNode(dim.initializer);
+        return count;
+    }
+
+    private pushOnEventStringScratchVars(
+        fn: FunctionSymbol,
+        declaredSkip: number,
+        scalarCount: number,
+        slotSize: number,
+        n: number,
+        counter: { v: number },
+    ): void {
+        if (n <= 0) return;
+        const tempBase = this.tempScratchBase + declaredSkip;
+        const slot1Offset = slotSize + scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+        for (let s = 0; s < n; s++) {
+            counter.v++;
+            const slot = Math.min(s, 1);
+            const addr = tempBase + (slot === 0 ? 0 : slot1Offset);
+            const tmpVar: VariableSymbol = {
+                name: `_tmp_${counter.v}`,
+                kind: SymbolKind.Variable,
+                dataType: BUILTIN_TYPES.string,
+                location: { file: '', line: 0, column: 0 },
+                isPublic: false,
+                isDeclare: false,
+                isByRef: false,
+                isGlobal: false,
+                isTemp: true,
+                address: addr,
+            };
+            fn.localVariables.push(tmpVar);
+        }
+    }
+
+    private pushOnEventNumericScratchVar(fn: FunctionSymbol, stackSkip: number, slotSize: number): void {
+        const scalarAddr = this.tempScratchBase + stackSkip + slotSize;
+        const nrVar: VariableSymbol = {
+            name: '_tmp_numeric_result',
+            kind: SymbolKind.Variable,
+            dataType: BUILTIN_TYPES.dword,
+            location: { file: '', line: 0, column: 0 },
+            isPublic: false,
+            isDeclare: false,
+            isByRef: false,
+            isGlobal: false,
+            isTemp: true,
+            address: scalarAddr,
+        };
+        fn.localVariables.push(nrVar);
+    }
+
+    private registerOnEventDimScratchTemps(
+        fn: FunctionSymbol,
+        stmt: AST.DimStmt,
+        scalarCount: number,
+        slotSize: number,
+        counter: { v: number },
+        skipState: { declared: number; stack: number },
+        numericState: { done: boolean },
+    ): void {
+        for (const v of stmt.variables) {
+            const varSym = fn.localVariables.find(
+                x => x.name.toLowerCase() === v.name.toLowerCase(),
+            );
+            if (!varSym || (varSym.kind !== SymbolKind.Variable && varSym.kind !== SymbolKind.Parameter)) continue;
+
+            const vsym = varSym as VariableSymbol;
+            if (vsym.isTemp) continue;
+            const vsz = vsym.dataType?.size ?? 2;
+
+            if (fn.name.startsWith('on_')) {
+                skipState.declared += vsz;
+                skipState.stack += (vsz + 1) & ~1;
+            }
+
+            if (stmt.initializer) {
+                if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(stmt.initializer) > 0) {
+                    this.pushOnEventNumericScratchVar(fn, skipState.stack, slotSize);
+                    numericState.done = true;
+                }
+                const n = this.countTempVarsInDimInitializerPhase(stmt);
+                if (n > 0) {
+                    this.pushOnEventStringScratchVars(
+                        fn,
+                        skipState.declared,
+                        scalarCount,
+                        slotSize,
+                        n,
+                        counter,
+                    );
+                }
+            }
+        }
+    }
+
+    private registerOnEventScratchTempsWalk(
+        fn: FunctionSymbol,
+        body: AST.Statement[],
+        scalarCount: number,
+        slotSize: number,
+        counter: { v: number },
+        skipState: { declared: number; stack: number },
+        numericState: { done: boolean },
+    ): void {
+        for (const stmt of body) {
+            switch (stmt.kind) {
+                case 'DimStmt':
+                    this.registerOnEventDimScratchTemps(
+                        fn,
+                        stmt,
+                        scalarCount,
+                        slotSize,
+                        counter,
+                        skipState,
+                        numericState,
+                    );
+                    break;
+                case 'IfStmt': {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    const nCond = this.countTempVarsInNode(stmt.condition);
+                    if (nCond > 0) {
+                        this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nCond, counter);
+                    }
+                    if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(stmt.condition) > 0) {
+                        this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                        numericState.done = true;
+                    }
+                    this.registerOnEventScratchTempsWalk(fn, stmt.thenBody, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    for (const br of stmt.elseIfBranches) {
+                        this.registerOnEventScratchTempsWalk(fn, br.body, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    }
+                    if (stmt.elseBody) {
+                        this.registerOnEventScratchTempsWalk(fn, stmt.elseBody, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    }
+                    break;
+                }
+                case 'WhileStmt': {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    const nCond = this.countTempVarsInNode(stmt.condition);
+                    if (nCond > 0) {
+                        this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nCond, counter);
+                    }
+                    if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(stmt.condition) > 0) {
+                        this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                        numericState.done = true;
+                    }
+                    this.registerOnEventScratchTempsWalk(fn, stmt.body, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    break;
+                }
+                case 'ForStmt': {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    const fs = stmt as AST.ForStmt;
+                    if (scalarCount > 0 && !numericState.done) {
+                        if (
+                            this.countPreEvalScalarsInExpr(fs.init) > 0
+                            || this.countPreEvalScalarsInExpr(fs.to) > 0
+                            || (fs.step !== undefined && this.countPreEvalScalarsInExpr(fs.step) > 0)
+                        ) {
+                            this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                            numericState.done = true;
+                        }
+                    }
+                    const nInit = this.countTempVarsInNode(fs.init);
+                    if (nInit > 0) {
+                        this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nInit, counter);
+                    }
+                    const nTo = this.countTempVarsInNode(fs.to);
+                    if (nTo > 0) {
+                        this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nTo, counter);
+                    }
+                    if (fs.step) {
+                        const nStep = this.countTempVarsInNode(fs.step);
+                        if (nStep > 0) {
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nStep, counter);
+                        }
+                    }
+                    this.registerOnEventScratchTempsWalk(fn, fs.body, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    break;
+                }
+                case 'DoLoopStmt': {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    const pre = stmt.loopKind === AST.DoLoopKind.WhilePre || stmt.loopKind === AST.DoLoopKind.UntilPre;
+                    if (pre && stmt.condition) {
+                        const nCond = this.countTempVarsInNode(stmt.condition);
+                        if (nCond > 0) {
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nCond, counter);
+                        }
+                        if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(stmt.condition) > 0) {
+                            this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                            numericState.done = true;
+                        }
+                    }
+                    this.registerOnEventScratchTempsWalk(fn, stmt.body, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    if (!pre && stmt.condition) {
+                        const nCond = this.countTempVarsInNode(stmt.condition);
+                        if (nCond > 0) {
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, nCond, counter);
+                        }
+                        if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(stmt.condition) > 0) {
+                            this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                            numericState.done = true;
+                        }
+                    }
+                    break;
+                }
+                case 'SelectCaseStmt': {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    for (const c of stmt.cases) {
+                        this.registerOnEventScratchTempsWalk(fn, c.body, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    }
+                    if (stmt.defaultCase) {
+                        this.registerOnEventScratchTempsWalk(fn, stmt.defaultCase, scalarCount, slotSize, counter, { declared: d, stack: s }, numericState);
+                    }
+                    break;
+                }
+                default: {
+                    const d = skipState.declared;
+                    const s = skipState.stack;
+                    if (stmt.kind === 'ExpressionStmt') {
+                        const est = stmt as AST.ExpressionStmt;
+                        if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInExpr(est.expression) > 0) {
+                            this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                            numericState.done = true;
+                        }
+                        const n = this.countTempVarsInNode(est.expression);
+                        if (n > 0) {
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter);
+                        }
+                    } else {
+                        if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInStmt(stmt) > 0) {
+                            this.pushOnEventNumericScratchVar(fn, s, slotSize);
+                            numericState.done = true;
+                        }
+                        const n = this.countTempVarsInNode(stmt);
+                        if (n > 0) {
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    private registerOnEventScratchTempsForDecl(
+        fn: FunctionSymbol,
+        decl: AST.SubDecl | AST.FunctionDecl,
+        scalarCount: number,
+        counter: { v: number },
+    ): void {
+        const slotSize = this.getFuncTempSlotSize(fn.name);
+        const skipState = { declared: 0, stack: 0 };
+        if (fn.name.startsWith('on_')) {
+            for (const p of fn.parameters) {
+                const psz = p.isByRef ? 4 : (p.dataType?.size ?? 2);
+                skipState.declared += psz;
+                skipState.stack += (psz + 1) & ~1;
+            }
+        }
+        const numericState = { done: false };
+        this.registerOnEventScratchTempsWalk(
+            fn,
+            decl.body,
+            scalarCount,
+            slotSize,
+            counter,
+            skipState,
+            numericState,
+        );
+        if (scalarCount > 0 && !numericState.done) {
+            this.pushOnEventNumericScratchVar(fn, skipState.stack, slotSize);
+        }
+    }
+
     private assignLocalVarLabels(program: AST.Program): void {
         if (!this.resolveDataAddresses) return;
 
-        let globalOrdinal = 1;
+        /** tmake PDB: roots (never targeted as callees) use ?V local ordinals from 1; callees from 2. */
+        const callees = new Set<string>();
+        for (const calls of this.callGraph.values()) {
+            for (const c of calls) callees.add(c);
+        }
 
         for (const decl of program.declarations) {
             if (decl.kind !== 'SubDecl' && decl.kind !== 'FunctionDecl') continue;
@@ -2375,6 +2687,8 @@ export class PCodeGenerator {
 
             const fn = this.symbols.lookupGlobal(decl.name) as FunctionSymbol | undefined;
             if (!fn || fn.isDeclare) continue;
+
+            let globalOrdinal = callees.has(fn.name) ? 2 : 1;
 
             const isFuncWithReturn = fn.kind === SymbolKind.Function && !!fn.returnType;
 

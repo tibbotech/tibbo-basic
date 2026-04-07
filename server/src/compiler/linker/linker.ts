@@ -1513,11 +1513,18 @@ function extractFunctionName(tag: string): string | null {
     return null;
 }
 
+/** Must match PCodeGenerator.TEMP_STRING_SLOT_SIZE; TOBJ maxLen+1 underestimates scratch. */
+const LINKER_TEMP_STRING_SCRATCH_BYTES = 257;
+
 function getVariableSize(
     flags: number, dtByte: number, dtDword: number,
     typeSizes: Map<number, number>, dataAddrSize: number,
 ): number {
     if (flags & TObjVariableFlags.ByRef) return dataAddrSize;
+    // Compiler allocates string scratch (_tmp_*) in fixed 257-byte slots for syscalls/str().
+    if ((flags & TObjVariableFlags.Temp) !== 0 && dtByte === TObjDataType.String) {
+        return LINKER_TEMP_STRING_SCRATCH_BYTES;
+    }
     switch (dtByte) {
         case TObjDataType.Boolean:
         case TObjDataType.Byte:
