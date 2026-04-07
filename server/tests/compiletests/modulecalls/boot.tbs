@@ -1,0 +1,13 @@
+include "global.tbh"
+
+sub boot()
+    sys.debugprint("boot")
+end sub
+
+function multiply(num1 as word, num2 as word) as word
+    multiply = num1 * num2
+end function 
+
+function divide(num1 as word, num2 as word) as word
+    divide = num1 / num2
+end function 

@@ -547,7 +547,7 @@ export class TObjWriter {
                 w.writeDword(this.symStrings.add(nameStr));
                 w.writeDword(addrIdx);
                 w.writeDword(ownerScopeIdx);
-                this.writeDataType(w, v.dataType);
+                this.writeDataType(w, v.dataType, flags);
             }
         };
 
@@ -717,7 +717,7 @@ export class TObjWriter {
         return w.toBuffer();
     }
 
-    private writeDataType(w: BinaryWriter, dt?: DataType): void {
+    private writeDataType(w: BinaryWriter, dt?: DataType, variableFlags = 0): void {
         if (!dt) {
             w.writeByte(TObjDataType.Byte);
             w.writeDword(0);
@@ -725,8 +725,18 @@ export class TObjWriter {
         }
 
         if (isString(dt)) {
+            const s = dt as StringDataType;
             w.writeByte(TObjDataType.String);
-            w.writeByte((dt as any).maxLength & 0xFF);
+            w.writeByte((s.maxLength ?? 255) & 0xFF);
+            w.writeByte(0);
+            w.writeWord(0);
+        } else if (isPrimitive(dt) && dt.primitiveType === PrimitiveType.String
+            && (variableFlags & TObjVariableFlags.Temp) !== 0) {
+            // Scratch temps use primitive BUILTIN string; default isPrimitive encoding is String+dword(0),
+            // which reads as max length 0 in the Variables section. Emit explicit max len like StringDataType.
+            const maxLen = (dt.size > 0 ? dt.size : 255) & 0xFF;
+            w.writeByte(TObjDataType.String);
+            w.writeByte(maxLen);
             w.writeByte(0);
             w.writeWord(0);
         } else if (isPrimitive(dt)) {

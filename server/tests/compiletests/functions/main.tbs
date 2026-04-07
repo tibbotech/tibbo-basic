@@ -7,7 +7,7 @@ end function
 sub test()
     dim a as byte=0
     a = 1
-    sys.debugprint("a: " + str(a))
+    sys.debugprint(str(a))
 end sub
 
 sub on_sys_init()

@@ -9,7 +9,6 @@ import {
     disassembleBinaryToLines,
 } from '../../src/compiler/dump-pdb-instructions';
 import { TObjSection } from '../../src/compiler/tobj/format';
-import { extractPdbLayout } from '../../src/compiler/linker/linker';
 import ini = require('ini');
 
 /** Parent of this folder: `server/tests` — Tibbo project fixtures live here and in its subfolders. */
@@ -187,12 +186,7 @@ describe('tmake reference vs JS compiler opcodes (all server/tests *.tpr project
             }
             const compiler = new ProjectCompiler(projectDir, platformsPath);
 
-            const refLayout = extractPdbLayout(refPdb);
-
-            const result = compiler.compile({
-                functionOrder: refLayout.functionOrder,
-                variableAddressOverrides: refLayout.variableAddresses,
-            });
+            const result = compiler.compile();
             expect(result.errors).toHaveLength(0);
             expect(result.tpc).not.toBeNull();
 

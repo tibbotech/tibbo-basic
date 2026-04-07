@@ -1,0 +1,20 @@
+include "global.tbh"
+
+dim aa as byte=3
+dim sock_nums(32) as byte
+
+sub printstring(byref a as string)
+    sys.debugprint(a)
+end sub
+
+sub on_sys_init()
+    dim i as byte=1
+    sock_nums(i) = 3
+    dim zz as byte=sock_nums(1)
+    sys.debugprint("asdf")
+    printstring("zza")
+    dim iword as word=400
+    boot()
+    dim rword as word = multiply(iword, 2)
+    rword = rword * 999
+end sub
