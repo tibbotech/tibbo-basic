@@ -592,7 +592,7 @@ export class PCodeGenerator {
 
     private emitLeaToArg(addr: number, argIndex: number, isByRef = false): void {
         this.emitter.emitByte(isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(addr);
+        this.emitPossiblyLocalDataAddress(addr);
         this.emitSyscallArg(argIndex);
     }
 
@@ -642,6 +642,29 @@ export class PCodeGenerator {
         }
     }
 
+    /**
+     * Emit a data operand that may refer to the current function's frame (incl. scratch temps).
+     * With resolveDataAddresses + autoTrackDataRefs, use the ?V:?A label so the linker records Code refs.
+     */
+    private emitPossiblyLocalDataAddress(addr: number): void {
+        if (!this.resolveDataAddresses) {
+            this.emitter.emitDataAddress(addr);
+            return;
+        }
+        const fn = this.ctx.currentFunction;
+        if (fn) {
+            for (const v of [...fn.parameters, ...fn.localVariables]) {
+                if (v.address !== addr || v.isGlobal) continue;
+                const labelName = this.localVarLabelMap.get(v);
+                if (labelName) {
+                    this.emitter.emitDataAddressRef(labelName);
+                    return;
+                }
+            }
+        }
+        this.emitter.emitDataAddress(addr);
+    }
+
     private emitVarLeaArg(sym: VariableSymbol): void {
         this.emitVarLeaArgAt(sym, 0);
     }
@@ -673,7 +696,7 @@ export class PCodeGenerator {
 
     private emitLeaToArgOffset(addr: number, offset: number, isByRef = false): void {
         this.emitter.emitByte(isByRef ? OP.OPCODE_LOA32 : OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(addr);
+        this.emitPossiblyLocalDataAddress(addr);
         this.emitStoreToArgBuffer(offset, 4);
     }
 
@@ -691,7 +714,7 @@ export class PCodeGenerator {
     private emitTempStringInit(addr: number, maxLen = 255): void {
         this.generateIntLiteral(maxLen << 8);
         this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-        this.emitter.emitDataAddress(addr);
+        this.emitPossiblyLocalDataAddress(addr);
     }
 
     private elementRttiType(et: DataType): number {
@@ -843,7 +866,7 @@ export class PCodeGenerator {
                     const tempAddr = this.getTempStringAddr(0);
                     this.emitTempStringInit(tempAddr, argExpr.value.length);
                     this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(tempAddr);
+                    this.emitPossiblyLocalDataAddress(tempAddr);
                     this.emitSyscallArg(0);
                     const rdataOff = this.emitter.addStringRData(argExpr.value);
                     this.emitRDataLoad(rdataOff);
@@ -865,7 +888,7 @@ export class PCodeGenerator {
                         continue;
                     }
                     this.emitter.emitByte(OP.OPCODE_LEA);
-                    this.emitter.emitDataAddress(this.getTempScalarAddr(0));
+                    this.emitPossiblyLocalDataAddress(this.getTempScalarAddr(0));
                     this.emitStoreToArgBuffer(offset, 4);
                     this.generateMember(argExpr);
                     offset += storeSize;
@@ -891,9 +914,9 @@ export class PCodeGenerator {
                     const strBase = strOutputStringAddr ?? this.getTempStringAddr(0);
                     const scratch = strBase + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
                     this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(scratch);
+                    this.emitPossiblyLocalDataAddress(scratch);
                     this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(scratch);
+                    this.emitPossiblyLocalDataAddress(scratch);
                 };
                 // tmake: str(val(stringVar)) passes val's byref string arg via embedded slot 1 (STO32 +4), then LOA16I widen.
                 if (
@@ -935,16 +958,16 @@ export class PCodeGenerator {
                                 const strResultAddr = strOutputStringAddr ?? this.getTempStringAddr(0);
                                 const strOut = strResultAddr - PCodeGenerator.TEMP_STRING_SLOT_SIZE;
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress(strOut);
+                                this.emitPossiblyLocalDataAddress(strOut);
                                 this.emitSyscallArg(0);
                                 // tmake: val's byref string LEA is str() output temp + one string slot (not strOut+2).
                                 const valStrPtr = strResultAddr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
                                 this.emitter.emitByte(OP.OPCODE_LEA);
-                                this.emitter.emitDataAddress(valStrPtr);
+                                this.emitPossiblyLocalDataAddress(valStrPtr);
                                 this.emitSyscallArg(1);
                                 this.emitSyscall(valSc.syscallNumber);
                                 this.emitter.emitByte(OP.OPCODE_LOA16I | OP.OPCODE_DIRECT);
-                                this.emitter.emitDataAddress(valStrPtr);
+                                this.emitPossiblyLocalDataAddress(valStrPtr);
                                 this.emitStoreToArgBuffer(offset, storeSize);
                                 offset += storeSize;
                                 continue;
@@ -1161,10 +1184,10 @@ export class PCodeGenerator {
                         // tmake places this dword scratch immediately after the str() output string slot.
                         const tmp = addr + PCodeGenerator.TEMP_STRING_SLOT_SIZE;
                         this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(tmp);
+                        this.emitPossiblyLocalDataAddress(tmp);
                         this.emitTempStringInit(addr);
                         this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(tmp);
+                        this.emitPossiblyLocalDataAddress(tmp);
                         this.emitStoreToArgBuffer(0, argStoreSz);
                         nextOffset = argStoreSz;
                     } else {
@@ -1172,7 +1195,7 @@ export class PCodeGenerator {
                         if (preEvalAddr !== undefined) {
                             const storeSize = this.getSyscallParamStoreSize(sc.parameters[0]);
                             this.emitter.emitByte(OP.OPCODE_LOA32);
-                            this.emitter.emitDataAddress(preEvalAddr);
+                            this.emitPossiblyLocalDataAddress(preEvalAddr);
                             this.emitStoreToArgBuffer(0, storeSize);
                             nextOffset = storeSize;
                         } else {
@@ -1181,7 +1204,7 @@ export class PCodeGenerator {
                     }
                     const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                     this.emitter.emitByte(OP.OPCODE_LEA | indirection);
-                    this.emitter.emitDataAddress(addr);
+                    this.emitPossiblyLocalDataAddress(addr);
                     this.emitStoreToArgBuffer(nextOffset, 4);
                     this.emitSyscall(sc.syscallNumber);
                     return true;
@@ -1198,7 +1221,7 @@ export class PCodeGenerator {
                     this.emitTempStringInit(addr);
                     const nextOffset = this.emitSyscallArgsOnly(fn, expr.args, 0, addr);
                     this.emitter.emitByte(OP.OPCODE_LEA);
-                    this.emitter.emitDataAddress(addr);
+                    this.emitPossiblyLocalDataAddress(addr);
                     this.emitStoreToArgBuffer(nextOffset, 4);
                     this.emitSyscall(fn.syscallNumber);
                     return true;
@@ -1220,7 +1243,7 @@ export class PCodeGenerator {
                 this.generateExpression(call.args[0]);
                 const scalarAddr = scalarBase + i * 4;
                 this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(scalarAddr);
+                this.emitPossiblyLocalDataAddress(scalarAddr);
                 this.preEvalMap.set(call, scalarAddr);
             }
             this.emitStringExprToTemp(expr.left, tempAddr, true);
@@ -1229,7 +1252,7 @@ export class PCodeGenerator {
         } else if (expr.kind === 'StringLiteral') {
             this.emitTempStringInit(tempAddr, expr.value.length);
             this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
-            this.emitter.emitDataAddress(tempAddr);
+            this.emitPossiblyLocalDataAddress(tempAddr);
             this.emitSyscallArg(0);
             const rdataOff = this.emitter.addStringRData(expr.value);
             this.emitRDataLoad(rdataOff);
@@ -1248,7 +1271,7 @@ export class PCodeGenerator {
                 const constStr = (sym as ConstantSymbol).value as string;
                 this.emitTempStringInit(tempAddr, constStr.length);
                 this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(constStr);
                 this.emitRDataLoad(rdataOff);
@@ -1262,7 +1285,7 @@ export class PCodeGenerator {
             if (foldedChr !== null) {
                 this.emitTempStringInit(tempAddr, foldedChr.length);
                 this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(foldedChr);
                 this.emitRDataLoad(rdataOff);
@@ -1294,7 +1317,7 @@ export class PCodeGenerator {
             if (folded !== null) {
                 this.emitTempStringInit(tempAddr, folded.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(folded);
                 this.emitRDataLoad(rdataOff);
@@ -1306,7 +1329,7 @@ export class PCodeGenerator {
             if (foldedChr !== null) {
                 this.emitTempStringInit(tempAddr, foldedChr.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(foldedChr);
                 this.emitRDataLoad(rdataOff);
@@ -1328,7 +1351,7 @@ export class PCodeGenerator {
         }
 
         this.emitter.emitByte(OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(tempAddr);
+        this.emitPossiblyLocalDataAddress(tempAddr);
         this.emitSyscallArg(0);
 
         if (expr.kind === 'StringLiteral') {
@@ -1372,7 +1395,7 @@ export class PCodeGenerator {
                 const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
                 this.emitTempStringInit(litAddr, folded.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(litAddr);
+                this.emitPossiblyLocalDataAddress(litAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(folded);
                 this.emitRDataLoad(rdataOff);
@@ -1388,7 +1411,7 @@ export class PCodeGenerator {
                 const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
                 this.emitTempStringInit(litAddr, foldedChr.length);
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(litAddr);
+                this.emitPossiblyLocalDataAddress(litAddr);
                 this.emitSyscallArg(0);
                 const rdataOff = this.emitter.addStringRData(foldedChr);
                 this.emitRDataLoad(rdataOff);
@@ -1412,7 +1435,7 @@ export class PCodeGenerator {
             const litAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
             this.emitTempStringInit(litAddr, expr.value.length);
             this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddress(litAddr);
+            this.emitPossiblyLocalDataAddress(litAddr);
             this.emitSyscallArg(0);
             const rdataOff = this.emitter.addStringRData(expr.value);
             this.emitRDataLoad(rdataOff);
@@ -1425,7 +1448,7 @@ export class PCodeGenerator {
         }
 
         this.emitter.emitByte(OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(tempAddr);
+        this.emitPossiblyLocalDataAddress(tempAddr);
         this.emitSyscallArg(0);
 
         if (expr.kind === 'IdentifierExpr') {
@@ -3864,7 +3887,7 @@ export class PCodeGenerator {
                 if (fn.returnType && !isString(fn.returnType) && this.functionReturnPtrAddr.has(fn.name) && !this.pendingReturnTarget && !this.isStatementCall) {
                     const loadOp = getLoadOpcode(fn.returnType, 'A');
                     this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
-                    this.emitter.emitDataAddress(this.getTempStringAddr(0));
+                    this.emitPossiblyLocalDataAddress(this.getTempStringAddr(0));
                 }
                 return;
             }
@@ -3940,7 +3963,7 @@ export class PCodeGenerator {
                     this.emitSyscallArg(1);
                     this.emitSyscallByName('strload');
                     this.emitter.emitByte(OP.OPCODE_LEA);
-                    this.emitter.emitDataAddress(tempAddr);
+                    this.emitPossiblyLocalDataAddress(tempAddr);
                     this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
                     if (fn.isDeclare) {
                         this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
@@ -3968,9 +3991,9 @@ export class PCodeGenerator {
                 this.generateExpression(argExpr);
                 const byRefStoreOp = getStoreOpcode(param.dataType ?? BUILTIN_TYPES.word);
                 this.emitter.emitByte(byRefStoreOp | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitter.emitByte(OP.OPCODE_LEA);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
                 if (fn.isDeclare) {
                     this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
@@ -4043,9 +4066,9 @@ export class PCodeGenerator {
             if (argExpr.kind === 'BinaryExpr') {
                 const tempAddr = this.getTempStringAddr(0);
                 this.emitter.emitByte(getStoreOpcode(effectiveDt) | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
                 this.emitter.emitByte(getLoadOpcode(effectiveDt, 'A') | OP.OPCODE_DIRECT);
-                this.emitter.emitDataAddress(tempAddr);
+                this.emitPossiblyLocalDataAddress(tempAddr);
             }
             this.emitter.emitByte(getStoreOpcode(effectiveDt) | OP.OPCODE_DIRECT);
             if (fn.isDeclare) {
@@ -4079,7 +4102,7 @@ export class PCodeGenerator {
                 this.emitTempStringInit(targetAddr);
             }
             this.emitter.emitByte(OP.OPCODE_LEA);
-            this.emitter.emitDataAddress(targetAddr);
+            this.emitPossiblyLocalDataAddress(targetAddr);
             this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
             this.emitter.emitDataAddress(retPtrAddr);
         }
@@ -4100,7 +4123,7 @@ export class PCodeGenerator {
         if (!prop || prop.getterSyscall === undefined) return false;
 
         this.emitter.emitByte(OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(destAddr);
+        this.emitPossiblyLocalDataAddress(destAddr);
         this.emitSyscallArg(0);
         this.emitSyscall(prop.getterSyscall);
         return true;
@@ -4117,13 +4140,13 @@ export class PCodeGenerator {
                     if (getNum !== undefined) {
                         const tempAddr = this.getTempScalarAddr(0);
                         this.emitter.emitByte(OP.OPCODE_LEA);
-                        this.emitter.emitDataAddress(tempAddr);
+                        this.emitPossiblyLocalDataAddress(tempAddr);
                         this.emitSyscallArg(0);
                         this.emitSyscall(getNum);
                         const dt = prop.dataType;
                         const loadOp = getLoadOpcode(dt ?? BUILTIN_TYPES.word, 'A');
                         this.emitter.emitByte(loadOp | OP.OPCODE_DIRECT);
-                        this.emitter.emitDataAddress(tempAddr);
+                        this.emitPossiblyLocalDataAddress(tempAddr);
                     }
                     return;
                 }
@@ -4184,7 +4207,7 @@ export class PCodeGenerator {
             ? localBase + this.onEventDeclaredLocalBytes
             : localBase + (fn?.localAllocSize ?? 0);
         this.emitter.emitByte(OP.OPCODE_LEA);
-        this.emitter.emitDataAddress(tempAddr);
+        this.emitPossiblyLocalDataAddress(tempAddr);
         this.emitStoreToArgBuffer(21, 4);
 
         this.emitSyscallByName('gotoidx');
@@ -4198,7 +4221,7 @@ export class PCodeGenerator {
         const tempAddr = this.emitGotoidxArgs(varSym, indices);
         this.generateExpression(value);
         this.emitter.emitByte(getStoreOpcode(elementType) | OP.OPCODE_INDIRECT);
-        this.emitter.emitDataAddress(tempAddr);
+        this.emitPossiblyLocalDataAddress(tempAddr);
     }
 
     private emitGotoidxLoad(
@@ -4207,7 +4230,7 @@ export class PCodeGenerator {
     ): void {
         const tempAddr = this.emitGotoidxArgs(varSym, indices);
         this.emitter.emitByte(getLoadOpcode(elementType, 'A') | OP.OPCODE_INDIRECT);
-        this.emitter.emitDataAddress(tempAddr);
+        this.emitPossiblyLocalDataAddress(tempAddr);
     }
 
     // ─── Index expression ───────────────────────────────────────────────────
