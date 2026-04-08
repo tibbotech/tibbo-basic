@@ -4290,13 +4290,17 @@ export class PCodeGenerator {
 
     /**
      * tmake uses a dword scratch + reload for str() arithmetic args in data32 mode.
-     * In data32 mode, even byte+byte promotes to dword (see Operators.cpp NumericBinaryOperator).
+     * In data32 mode, all numeric binary results promote to dword (see Operators.cpp NumericBinaryOperator).
      */
     private strSyscallArgNeedsDwordScratchTemp(argExpr: AST.Expression, paramDt: DataType): boolean {
-        const wide = this.inferData32ArithmeticExprWideResult(argExpr);
-        if (!wide || wide.size !== 4 || !isIntegral(paramDt) || paramDt.size >= 4) return false;
+        if (!this.emitter.isData32) return false;
+        if (!isIntegral(paramDt) || paramDt.size >= 4) return false;
         const x = this.unwrapParenExpr(argExpr);
         if (x.kind !== 'BinaryExpr') return false;
+        const be = x as AST.BinaryExpr;
+        if (be.op === AST.BinaryOp.Add && this.isStringExpression(be)) return false;
+        if (isComparisonOp(be.op) || be.op === AST.BinaryOp.And || be.op === AST.BinaryOp.Or) return false;
+        if (!BINARY_OPS[be.op]) return false;
         return true;
     }
 
