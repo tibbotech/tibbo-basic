@@ -155,6 +155,12 @@ export class PCodeGenerator {
         return this.functionTempSlotSizes.get(name.toLowerCase()) ?? PCodeGenerator.TEMP_STRING_SLOT_SIZE;
     }
 
+    private makeTempStringDataType(fnName: string): DataType {
+        const slotSize = this.getFuncTempSlotSize(fnName);
+        const maxLen = slotSize >= 2 ? slotSize - 2 : 255;
+        return { ...BUILTIN_TYPES.string, size: maxLen };
+    }
+
     private currentTempSlotSize(): number {
         const fn = this.ctx.currentFunction;
         return fn ? this.getFuncTempSlotSize(fn.name) : PCodeGenerator.TEMP_STRING_SLOT_SIZE;
@@ -1691,12 +1697,16 @@ export class PCodeGenerator {
      * Walks a function body in source order, computing per-statement temp base
      * addresses that interleave with dim allocations (matching C++ DATA_STACK).
      * Returns the high-water mark (max frame offset including interleaved temps).
+     * When populateMap is false, only computes the high-water mark without
+     * storing entries in stmtTempBase (useful for frame sizing before addresses
+     * are finalized).
      */
     private computeStmtTempBases(
         decl: AST.SubDecl | AST.FunctionDecl,
         sym: FunctionSymbol,
         rootBase: number,
         preLocalOffset: number,
+        populateMap = true,
     ): number {
         const slotSize = this.getFuncTempSlotSize(decl.name);
         const scalarCount = this.countFunctionPreEvalScalars(decl);
@@ -1719,7 +1729,7 @@ export class PCodeGenerator {
                         const size = varSizeMap.get(v.name.toLowerCase());
                         if (size !== undefined) dimSoFar += size;
                     }
-                    this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
+                    if (populateMap) this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
                     const tempCount = this.countTempVarsInNode(stmt);
                     if (tempCount > 0) {
                         const concurrent = tempCount >= 2 ? 2 : tempCount;
@@ -1728,7 +1738,7 @@ export class PCodeGenerator {
                         if (frameEnd > highWater) highWater = frameEnd;
                     }
                 } else {
-                    this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
+                    if (populateMap) this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
                     const tempCount = this.countTempVarsInNode(stmt);
                     if (tempCount > 0) {
                         const concurrent = tempCount >= 2 ? 2 : tempCount;
@@ -2007,30 +2017,28 @@ export class PCodeGenerator {
 
                 let size = 0;
                 if (isLive) {
+                    let preLocalOffset = 0;
                     for (const v of sym.parameters) {
-                        size += v.isByRef ? 4 : (v.dataType?.size ?? 2);
+                        preLocalOffset += v.isByRef ? 4 : (v.dataType?.size ?? 2);
                     }
-                    if (isFuncWithReturn) size += 4;
+                    if (isFuncWithReturn) preLocalOffset += 4;
+
+                    let localsEnd = preLocalOffset;
                     for (const v of sym.localVariables) {
                         if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
-                        size += v.dataType?.size ?? 2;
+                        localsEnd += v.dataType?.size ?? 2;
                     }
 
                     const decl = program.declarations.find(d =>
                         (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
                     );
                     if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
-                        const perStmtTail = this.countTempVarsPerStatement(decl.body);
-                        let maxSlotsTail = 0;
-                        for (const n of perStmtTail) {
-                            const concurrent = n >= 2 ? 2 : n;
-                            if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
-                        }
-                        const scalarCountTail = this.countFunctionPreEvalScalars(decl);
-                        const tailTempSize =
-                            maxSlotsTail * this.getFuncTempSlotSize(fnName) +
-                            scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
-                        size += tailTempSize;
+                        const highWater = this.computeStmtTempBases(
+                            decl, sym, 0, preLocalOffset, false,
+                        );
+                        size = Math.max(localsEnd, highWater);
+                    } else {
+                        size = localsEnd;
                     }
                 }
                 frameSizes.set(fnName, size);
@@ -2100,6 +2108,8 @@ export class PCodeGenerator {
                             }
                         }
                     }
+                    const preLocalOffset = offset - startOffset;
+
                     for (const v of sym.localVariables) {
                         if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
                         v.address = paramBase + offset;
@@ -2110,20 +2120,9 @@ export class PCodeGenerator {
                         (d.kind === 'SubDecl' || d.kind === 'FunctionDecl') && d.name.toLowerCase() === fnName.toLowerCase()
                     );
                     if (decl && (decl.kind === 'SubDecl' || decl.kind === 'FunctionDecl')) {
-                        const perStmtTail = this.countTempVarsPerStatement(decl.body);
-                        let maxSlotsTail = 0;
-                        for (const n of perStmtTail) {
-                            const concurrent = n >= 2 ? 2 : n;
-                            if (concurrent > maxSlotsTail) maxSlotsTail = concurrent;
-                        }
-                        const scalarCountTail = this.countFunctionPreEvalScalars(decl);
-                        const tailTempSize =
-                            maxSlotsTail * this.getFuncTempSlotSize(fnName) +
-                            scalarCountTail * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
-                        if (tailTempSize > 0) {
-                            this.functionTempBase.set(fnName, paramBase + offset);
-                            offset += tailTempSize;
-                        }
+                        this.computeStmtTempBases(
+                            decl, sym, paramBase + startOffset, preLocalOffset, true,
+                        );
                     }
                 }
             }
@@ -2475,7 +2474,7 @@ export class PCodeGenerator {
                         const tmpVar: VariableSymbol = {
                             name: `_tmp_${tmpCounter.v}`,
                             kind: SymbolKind.Variable,
-                            dataType: BUILTIN_TYPES.string,
+                            dataType: this.makeTempStringDataType(fn.name),
                             location: { file: '', line: 0, column: 0 },
                             isPublic: false,
                             isDeclare: false,
@@ -2536,7 +2535,7 @@ export class PCodeGenerator {
                     const tmpVar: VariableSymbol = {
                         name: `_tmp_${tmpCounter.v}`,
                         kind: SymbolKind.Variable,
-                        dataType: BUILTIN_TYPES.string,
+                        dataType: this.makeTempStringDataType(fn.name),
                         location: { file: '', line: 0, column: 0 },
                         isPublic: false,
                         isDeclare: false,
@@ -2613,7 +2612,7 @@ export class PCodeGenerator {
             const tmpVar: VariableSymbol = {
                 name: `_tmp_${counter.v}`,
                 kind: SymbolKind.Variable,
-                dataType: BUILTIN_TYPES.string,
+                dataType: this.makeTempStringDataType(fn.name),
                 location: { file: '', line: 0, column: 0 },
                 isPublic: false,
                 isDeclare: false,
