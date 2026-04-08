@@ -695,6 +695,26 @@ export class Linker {
         const libNameDirSection = firstSections[TObjSection.LibNameDir] ?? Buffer.alloc(0);
         const incNameDirSection = firstSections[TObjSection.IncNameDir] ?? Buffer.alloc(0);
 
+        // PDB header fields at +32/+36/+40 are symbol-section offsets. OBJ files always write
+        // MAXDWORD for firmwareVer in the header (see TOBJ writer), and project buildId is often
+        // only known at link time — so copy-from-first-OBJ leaves them unset. Append linker
+        // metadata strings to the merged symbol pool when options supply them.
+        const firstHdrBuf = this.firstObjData;
+        let pdbHdrProjectNameOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(32) : MAXDWORD;
+        let pdbHdrBuildIdOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(36) : MAXDWORD;
+        let pdbHdrFirmwareVerOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(40) : MAXDWORD;
+        const appendPdbSymString = (s: string): number => {
+            const off = pdbSymbols.length;
+            const nb = Buffer.alloc(s.length + 1);
+            for (let i = 0; i < s.length; i++) nb[i] = s.charCodeAt(i) & 0xff;
+            nb[s.length] = 0;
+            pdbSymbols = Buffer.concat([pdbSymbols, nb]);
+            return off;
+        };
+        if (this.options.projectName) pdbHdrProjectNameOff = appendPdbSymString(this.options.projectName);
+        if (this.options.buildId) pdbHdrBuildIdOff = appendPdbSymString(this.options.buildId);
+        if (this.options.firmwareVer) pdbHdrFirmwareVerOff = appendPdbSymString(this.options.firmwareVer);
+
         // Assemble all 20 sections
         const sectionCount = TObjSection.CountObj;
         const sectionData: Buffer[] = new Array(sectionCount).fill(Buffer.alloc(0));
@@ -743,27 +763,6 @@ export class Linker {
         const fileSize = currentOffset;
         const localAllocSize = this.options.localAllocSize ?? this.maxLocalAllocSize;
         const mergedFlags = this.flags | (this.options.flags ?? 0);
-
-                // PDB header fields at +32/+36/+40 are symbol-section offsets. OBJ files always write
-        // MAXDWORD for firmwareVer in the header (see TOBJ writer), and project buildId is often
-        // only known at link time — so copy-from-first-OBJ leaves them unset. Append linker
-        // metadata strings to the merged symbol pool when options supply them.
-        const firstHdrBuf = this.firstObjData;
-        let pdbHdrProjectNameOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(32) : MAXDWORD;
-        let pdbHdrBuildIdOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(36) : MAXDWORD;
-        let pdbHdrFirmwareVerOff = firstHdrBuf ? firstHdrBuf.readUInt32LE(40) : MAXDWORD;
-        const appendPdbSymString = (s: string): number => {
-            const off = pdbSymbols.length;
-            const nb = Buffer.alloc(s.length + 1);
-            for (let i = 0; i < s.length; i++) nb[i] = s.charCodeAt(i) & 0xff;
-            nb[s.length] = 0;
-            pdbSymbols = Buffer.concat([pdbSymbols, nb]);
-            return off;
-        };
-        if (this.options.projectName) pdbHdrProjectNameOff = appendPdbSymString(this.options.projectName);
-        if (this.options.buildId) pdbHdrBuildIdOff = appendPdbSymString(this.options.buildId);
-        if (this.options.firmwareVer) pdbHdrFirmwareVerOff = appendPdbSymString(this.options.firmwareVer);
-
 
         const now = this.options.fixedTimestamp ?? new Date();
         const daysSince2000 = Math.floor((now.getTime() - new Date(2000, 0, 1).getTime()) / 86400000);
