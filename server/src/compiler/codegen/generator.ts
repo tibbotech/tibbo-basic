@@ -442,6 +442,7 @@ export class PCodeGenerator {
             if (node === null || node === undefined) return;
             if (typeof node !== 'object') return;
             const n = node as Record<string, unknown>;
+            if (n.kind === 'ConstDecl') return;
             if (n.kind === 'BinaryExpr') {
                 const expr = n as unknown as AST.BinaryExpr;
                 if (expr.op === AST.BinaryOp.Add) {
@@ -4581,6 +4582,28 @@ export class PCodeGenerator {
                     this.emitLeaToArg(paramAddr, 0);
                     this.emitLeaToArg(tempAddr, 1);
                     this.emitSyscallByName('strcpy');
+                } else if (argExpr.kind === 'IdentifierExpr' && (() => {
+                    const s = this.symbols.current.lookup(argExpr.name);
+                    return s && s.kind === SymbolKind.Constant && typeof (s as ConstantSymbol).value === 'string';
+                })()) {
+                    const srcSym = this.symbols.current.lookup(argExpr.name)!;
+                    const constStr = (srcSym as ConstantSymbol).value as string;
+                    const tempAddr = this.getTempStringAddr(0);
+                    this.emitTempStringInit(tempAddr, constStr.length);
+                    this.emitter.emitByte(OP.OPCODE_LEA | OP.OPCODE_DIRECT);
+                    this.emitPossiblyLocalDataAddress(tempAddr);
+                    this.emitSyscallArg(0);
+                    const rdataOff = this.emitter.addStringRData(constStr);
+                    this.emitRDataLoad(rdataOff);
+                    this.emitSyscallArg(1);
+                    this.emitSyscallByName('strload');
+                    this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
+                    this.emitter.emitWord(strType.maxLength << 8);
+                    this.emitter.emitByte(OP.OPCODE_STO16 | OP.OPCODE_DIRECT);
+                    this.emitter.emitDataAddress(paramAddr);
+                    this.emitLeaToArg(paramAddr, 0);
+                    this.emitLeaToArg(tempAddr, 1);
+                    this.emitSyscallByName('strcpy');
                 } else {
                     this.emitter.emitByte(OP.OPCODE_LOA16 | OP.OPCODE_IMMEDIATE);
                     this.emitter.emitWord(strType.maxLength << 8);
@@ -4595,13 +4618,7 @@ export class PCodeGenerator {
                         this.emitSyscallByName('strload');
                     } else if (argExpr.kind === 'IdentifierExpr') {
                         const srcSym = this.symbols.current.lookup(argExpr.name);
-                        if (srcSym && srcSym.kind === SymbolKind.Constant && typeof (srcSym as ConstantSymbol).value === 'string') {
-                            const rdataOff = this.emitter.addStringRData((srcSym as ConstantSymbol).value as string);
-                            this.emitLeaArg(paramAddr);
-                            this.emitRDataLoad(rdataOff);
-                            this.emitSyscallArg(1);
-                            this.emitSyscallByName('strload');
-                        } else if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
+                        if (srcSym && (srcSym.kind === SymbolKind.Variable || srcSym.kind === SymbolKind.Parameter)) {
                             const src = srcSym as VariableSymbol;
                             this.emitLeaArg(paramAddr);
                             this.emitVarLeaArgAt(src, 1);

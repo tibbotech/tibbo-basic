@@ -1,5 +1,11 @@
 include "global.tbh"
 
+const TEST_STRING = "teststring"
+
+sub test3(ds as string)
+    sys.debugprint(ds)
+end sub
+
 function test2() as byte
     test2 = 45
 end function
@@ -11,9 +17,10 @@ sub test()
 end sub
 
 sub on_sys_init()
-    dim z as byte = 3 + 2
+    dim z as byte = 3 + 4
     sys.debugprint("on_sys_init")
     test()
     dim b as byte=test2()
     b=b+z
+    test3(TEST_STRING)
 end sub

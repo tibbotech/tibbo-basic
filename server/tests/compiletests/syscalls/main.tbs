@@ -35,6 +35,9 @@ sub on_sys_init()
     sys.debugprint(lstri(lg))
     dim lit as string = "42"
     sys.debugprint(str(val(lit)))
+
+    dim dhcp_sock as byte = sock.numofsock
+    sys.debugprint(str(dhcp_sock))
     ' Void syscall; sys.sleep not on AppBlocks tmake platform
     sys.halt()
 end sub
