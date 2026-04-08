@@ -639,11 +639,6 @@ export class PCodeGenerator {
         this.emitter.emitDword(rdataOffset);
     }
 
-    private checkNotDeclareOnly(sym: VariableSymbol, loc: { file: string; line: number; column: number }): void {
-        if (sym.isDeclare) {
-            this.diagnostics.error(loc, `'${sym.name}' is declared but not defined`);
-        }
-    }
 
     private emitVarDataAddress(sym: VariableSymbol): void {
         if (sym.isGlobal) {
@@ -3106,7 +3101,6 @@ export class PCodeGenerator {
             }
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
-                this.checkNotDeclareOnly(varSym, target.loc);
                 const dt = varSym.dataType;
                 if (dt && isString(dt)) {
                     this.generateStringAssignment(varSym, value);
@@ -3160,7 +3154,6 @@ export class PCodeGenerator {
                 }
                 if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                     const varSym = sym as VariableSymbol;
-                    this.checkNotDeclareOnly(varSym, call.callee.loc);
                     const dt = varSym.dataType;
                     if (dt && isArray(dt)) {
                         const elementType = (dt as ArrayDataType).elementType;
@@ -3819,7 +3812,6 @@ export class PCodeGenerator {
             case SymbolKind.Variable:
             case SymbolKind.Parameter: {
                 const varSym = sym as VariableSymbol;
-                this.checkNotDeclareOnly(varSym, expr.loc);
                 this.emitLoad(varSym);
                 break;
             }
@@ -4456,7 +4448,6 @@ export class PCodeGenerator {
 
             if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
                 const varSym = sym as VariableSymbol;
-                this.checkNotDeclareOnly(varSym, expr.callee.loc);
                 const dt = varSym.dataType;
                 if (dt && isArray(dt)) {
                     const elementType = (dt as ArrayDataType).elementType;
