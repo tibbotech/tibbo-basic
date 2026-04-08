@@ -64,8 +64,14 @@ export class PCodeGenerator {
     private liveReachable = new Set<string>();
     private preEvalMap = new Map<AST.CallExpr, number>();
     private functionReturnPtrAddr = new Map<string, number>();
-    /** Bytes the root-function temp scratch area extends past tempScratchBase. */
+    /** Bytes the on_*-only root temp scratch area extends past tempScratchBase. */
     private rootTempScratchSize = 0;
+    /** Per non-on_* root function: end of locals relative to localBase (scratch + sym.localAllocSize). */
+    private rootFuncLocalEnd = new Map<string, number>();
+    /** Per-statement absolute temp base address (interleaved with dims in source order). */
+    private stmtTempBase = new Map<AST.Statement, number>();
+    /** Current statement being generated (for per-statement temp base lookup). */
+    private currentCodegenStmt: AST.Statement | null = null;
     /** For on_* only: localBase + this = string/scalar scratch (params + dim locals processed so far in codegen order). */
     private onEventDeclaredLocalBytes = 0;
     /** For on_* only: sum of word-rounded local/param sizes (tmake stack slots); drives property-getter numeric scratch base. */
@@ -298,6 +304,12 @@ export class PCodeGenerator {
 
     private getTempStringAddr(slot = 0): number {
         const slotSize = this.currentTempSlotSize();
+        if (this.currentCodegenStmt) {
+            const base = this.stmtTempBase.get(this.currentCodegenStmt);
+            if (base !== undefined) {
+                return base + slot * slotSize;
+            }
+        }
         const fn = this.ctx.currentFunction;
         if (fn) {
             const fnBase = this.functionTempBase.get(fn.name);
@@ -311,6 +323,14 @@ export class PCodeGenerator {
 
     private getTempScalarAddr(slot = 0): number {
         const slotSize = this.currentTempSlotSize();
+        if (this.currentCodegenStmt) {
+            const base = this.stmtTempBase.get(this.currentCodegenStmt);
+            if (base !== undefined) {
+                const fn = this.ctx.currentFunction;
+                const fnSlotSize = fn ? this.getFuncTempSlotSize(fn.name) : slotSize;
+                return base + fnSlotSize + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+            }
+        }
         const fn = this.ctx.currentFunction;
         if (fn) {
             const fnBase = this.functionTempBase.get(fn.name);
@@ -320,7 +340,6 @@ export class PCodeGenerator {
             }
         }
         const skip = this.onEventScalarScratchSkip();
-        // Matches registerTempVariables: _tmp_numeric_result at tempBase + one string slot.
         return this.tempScratchBase + skip + slotSize + slot * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
     }
 
@@ -343,6 +362,14 @@ export class PCodeGenerator {
         if (this.minLocalAllocSizeBeforeTemp !== undefined) {
             this.localAllocSize = Math.max(this.localAllocSize, this.minLocalAllocSizeBeforeTemp);
         }
+
+        for (const [name, localEnd] of this.rootFuncLocalEnd) {
+            if (name.startsWith('on_')) continue;
+            if (this.functionTempBase.has(name)) continue;
+            // Non-on_* roots use per-statement temp bases (stmtTempBase)
+            // instead of a single function-level base.
+        }
+
         this.tempScratchBase = localBase + this.localAllocSize;
         this.localAllocSize += this.rootTempScratchSize;
 
@@ -1633,17 +1660,102 @@ export class PCodeGenerator {
                 offset += 4;
             }
 
+            const preLocalOffset = offset;
+
             for (const v of sym.localVariables) {
                 if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
                 v.address = rootBase + offset;
                 offset += v.dataType?.size ?? 2;
             }
             sym.localAllocSize = offset;
-            const localEnd = rootBase - localBase + offset;
-            if (!isOnEvent && localEnd > this.localAllocSize && this.liveReachable.has(decl.name)) {
-                this.localAllocSize = localEnd;
+
+            let localEnd = rootBase - localBase + offset;
+            if (!isOnEvent) {
+                const highWater = this.computeStmtTempBases(
+                    decl, sym, rootBase, preLocalOffset,
+                );
+                if (highWater > offset) {
+                    localEnd = rootBase - localBase + highWater;
+                }
+            }
+            if (!isOnEvent && this.liveReachable.has(decl.name)) {
+                this.rootFuncLocalEnd.set(decl.name, localEnd);
+                if (localEnd > this.localAllocSize) {
+                    this.localAllocSize = localEnd;
+                }
             }
         }
+    }
+
+    /**
+     * Walks a function body in source order, computing per-statement temp base
+     * addresses that interleave with dim allocations (matching C++ DATA_STACK).
+     * Returns the high-water mark (max frame offset including interleaved temps).
+     */
+    private computeStmtTempBases(
+        decl: AST.SubDecl | AST.FunctionDecl,
+        sym: FunctionSymbol,
+        rootBase: number,
+        preLocalOffset: number,
+    ): number {
+        const slotSize = this.getFuncTempSlotSize(decl.name);
+        const scalarCount = this.countFunctionPreEvalScalars(decl);
+        const scalarSize = scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+        const isFuncWithReturn = decl.kind === 'FunctionDecl' && !!sym.returnType;
+
+        const varSizeMap = new Map<string, number>();
+        for (const v of sym.localVariables) {
+            if (isFuncWithReturn && v.name.toLowerCase() === sym.name.toLowerCase()) continue;
+            varSizeMap.set(v.name.toLowerCase(), v.dataType?.size ?? 2);
+        }
+
+        let highWater = preLocalOffset;
+        let dimSoFar = 0;
+
+        const walkStmts = (stmts: AST.Statement[]): void => {
+            for (const stmt of stmts) {
+                if (stmt.kind === 'DimStmt') {
+                    for (const v of stmt.variables) {
+                        const size = varSizeMap.get(v.name.toLowerCase());
+                        if (size !== undefined) dimSoFar += size;
+                    }
+                    this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
+                    const tempCount = this.countTempVarsInNode(stmt);
+                    if (tempCount > 0) {
+                        const concurrent = tempCount >= 2 ? 2 : tempCount;
+                        const stmtTempSize = concurrent * slotSize + (concurrent > 0 ? scalarSize : 0);
+                        const frameEnd = preLocalOffset + dimSoFar + stmtTempSize;
+                        if (frameEnd > highWater) highWater = frameEnd;
+                    }
+                } else {
+                    this.stmtTempBase.set(stmt, rootBase + preLocalOffset + dimSoFar);
+                    const tempCount = this.countTempVarsInNode(stmt);
+                    if (tempCount > 0) {
+                        const concurrent = tempCount >= 2 ? 2 : tempCount;
+                        const stmtTempSize = concurrent * slotSize + (concurrent > 0 ? scalarSize : 0);
+                        const frameEnd = preLocalOffset + dimSoFar + stmtTempSize;
+                        if (frameEnd > highWater) highWater = frameEnd;
+                    }
+                    if (stmt.kind === 'IfStmt') {
+                        walkStmts(stmt.thenBody);
+                        for (const br of stmt.elseIfBranches) walkStmts(br.body);
+                        if (stmt.elseBody) walkStmts(stmt.elseBody);
+                    } else if (stmt.kind === 'WhileStmt') {
+                        walkStmts(stmt.body);
+                    } else if (stmt.kind === 'ForStmt') {
+                        walkStmts(stmt.body);
+                    } else if (stmt.kind === 'DoLoopStmt') {
+                        walkStmts(stmt.body);
+                    } else if (stmt.kind === 'SelectCaseStmt') {
+                        for (const c of stmt.cases) walkStmts(c.body);
+                        if (stmt.defaultCase) walkStmts(stmt.defaultCase);
+                    }
+                }
+            }
+        };
+
+        walkStmts(decl.body);
+        return highWater;
     }
 
     private allocateDeadChainInRootArea(
@@ -1732,10 +1844,20 @@ export class PCodeGenerator {
                 const activeFootprint = this.computeOnEventActiveFootprint(decl, sym, tempSize);
                 rootArea += Math.max(localsSize, tempSize, activeFootprint);
             } else {
-                for (const v of sym.localVariables) {
-                    rootArea += v.dataType?.size ?? 2;
+                const interleavedEnd = this.rootFuncLocalEnd.get(decl.name);
+                if (interleavedEnd !== undefined) {
+                    const scratch = this.minLocalAllocSizeBeforeTemp ?? 0;
+                    const invokedFromProject = this.projectCalleeNamesLower === undefined
+                        ? true
+                        : this.projectCalleeNamesLower.has(decl.name.toLowerCase());
+                    const rootOffset = scratch > 0 && invokedFromProject ? scratch : 0;
+                    rootArea = interleavedEnd - rootOffset;
+                } else {
+                    for (const v of sym.localVariables) {
+                        rootArea += v.dataType?.size ?? 2;
+                    }
+                    rootArea += tempSize;
                 }
-                rootArea += tempSize;
             }
 
             if (rootArea > maxRootArea) maxRootArea = rootArea;
@@ -2103,14 +2225,15 @@ export class PCodeGenerator {
             if (tempFp === 0) continue;
             const fn = this.symbols.lookupGlobal(name) as FunctionSymbol | undefined;
             if (!fn) continue;
-            let prefix = 0;
+
             if (fn.name.startsWith('on_')) {
+                let prefix = 0;
                 for (const p of fn.parameters) prefix += p.isByRef ? 4 : (p.dataType?.size ?? 2);
+                const ext = prefix + tempFp;
+                if (ext > maxRootTempExt) maxRootTempExt = ext;
             } else {
-                prefix = this.eventFramePrefixBytes(fn);
+                // rootFuncLocalEnd already includes interleaved temp high-water mark
             }
-            const ext = prefix + tempFp;
-            if (ext > maxRootTempExt) maxRootTempExt = ext;
         }
         this.rootTempScratchSize = maxRootTempExt;
 
@@ -2288,6 +2411,30 @@ export class PCodeGenerator {
         return result;
     }
 
+    /** Like countTempVarsPerStatement but also returns the statement reference for each entry. */
+    private tempInfoPerStatement(stmts: AST.Statement[]): { stmt: AST.Statement, count: number }[] {
+        const result: { stmt: AST.Statement, count: number }[] = [];
+        for (const stmt of stmts) {
+            const n = this.countTempVarsInNode(stmt);
+            if (n > 0) result.push({ stmt, count: n });
+            if (stmt.kind === 'IfStmt') {
+                result.push(...this.tempInfoPerStatement(stmt.thenBody));
+                for (const br of stmt.elseIfBranches) result.push(...this.tempInfoPerStatement(br.body));
+                if (stmt.elseBody) result.push(...this.tempInfoPerStatement(stmt.elseBody));
+            } else if (stmt.kind === 'WhileStmt') {
+                result.push(...this.tempInfoPerStatement(stmt.body));
+            } else if (stmt.kind === 'ForStmt') {
+                result.push(...this.tempInfoPerStatement(stmt.body));
+            } else if (stmt.kind === 'DoLoopStmt') {
+                result.push(...this.tempInfoPerStatement(stmt.body));
+            } else if (stmt.kind === 'SelectCaseStmt') {
+                for (const c of stmt.cases) result.push(...this.tempInfoPerStatement(c.body));
+                if (stmt.defaultCase) result.push(...this.tempInfoPerStatement(stmt.defaultCase));
+            }
+        }
+        return result;
+    }
+
     private registerTempVariables(program: AST.Program): void {
         const tmpCounter = { v: 0 };
 
@@ -2308,6 +2455,58 @@ export class PCodeGenerator {
             /** Scratch lives at tempScratchBase + skip (dims, etc.); single static base is wrong. */
             if (fn.name.startsWith('on_') && fnTempBase === undefined) {
                 this.registerOnEventScratchTempsForDecl(fn, decl, scalarCount, tmpCounter);
+                continue;
+            }
+
+            const firstBodyStmt = decl.body[0];
+            const useStmtBases = firstBodyStmt && this.stmtTempBase.has(firstBodyStmt) && !fn.name.startsWith('on_');
+
+            if (useStmtBases) {
+                const stmtInfos = this.tempInfoPerStatement(decl.body);
+                const slot1Offset = this.getFuncTempSlotSize(fn.name) +
+                    scalarCount * PCodeGenerator.TEMP_SCALAR_SLOT_SIZE;
+
+                for (const { stmt, count: stmtCount } of stmtInfos) {
+                    const base = this.stmtTempBase.get(stmt) ?? 0;
+                    for (let s = 0; s < stmtCount; s++) {
+                        tmpCounter.v++;
+                        const slot = Math.min(s, 1);
+                        const addr = base + (slot === 0 ? 0 : slot1Offset);
+                        const tmpVar: VariableSymbol = {
+                            name: `_tmp_${tmpCounter.v}`,
+                            kind: SymbolKind.Variable,
+                            dataType: BUILTIN_TYPES.string,
+                            location: { file: '', line: 0, column: 0 },
+                            isPublic: false,
+                            isDeclare: false,
+                            isByRef: false,
+                            isGlobal: false,
+                            isTemp: true,
+                            address: addr,
+                        };
+                        fn.localVariables.push(tmpVar);
+                    }
+                }
+
+                if (scalarCount > 0) {
+                    const firstBase = stmtInfos.length > 0
+                        ? (this.stmtTempBase.get(stmtInfos[0].stmt) ?? 0)
+                        : 0;
+                    const scalarAddr = firstBase + this.getFuncTempSlotSize(fn.name);
+                    const nrVar: VariableSymbol = {
+                        name: '_tmp_numeric_result',
+                        kind: SymbolKind.Variable,
+                        dataType: BUILTIN_TYPES.dword,
+                        location: { file: '', line: 0, column: 0 },
+                        isPublic: false,
+                        isDeclare: false,
+                        isByRef: false,
+                        isGlobal: false,
+                        isTemp: true,
+                        address: scalarAddr,
+                    };
+                    fn.localVariables.push(nrVar);
+                }
                 continue;
             }
 
@@ -2857,7 +3056,12 @@ export class PCodeGenerator {
     // ─── Block / Statement ──────────────────────────────────────────────────
 
     private generateBlock(stmts: AST.Statement[]): void {
-        for (const stmt of stmts) this.generateStatement(stmt);
+        for (const stmt of stmts) {
+            const prev = this.currentCodegenStmt;
+            this.currentCodegenStmt = stmt;
+            this.generateStatement(stmt);
+            this.currentCodegenStmt = prev;
+        }
     }
 
     private generateStatement(stmt: AST.Statement): void {
@@ -4123,19 +4327,7 @@ export class PCodeGenerator {
             }
         }
         if (expr.kind === 'MemberExpr') {
-            const objProp = this.inferMemberType(expr);
-            if (objProp) return objProp;
-            if (expr.object.kind === 'IdentifierExpr') {
-                const sym = this.symbols.current.lookup(expr.object.name);
-                if (sym && (sym.kind === SymbolKind.Variable || sym.kind === SymbolKind.Parameter)) {
-                    const dt = (sym as VariableSymbol).dataType;
-                    if (dt && isStruct(dt)) {
-                        const member = dt.memberMap.get(expr.property.toLowerCase());
-                        if (member) return member.dataType;
-                    }
-                }
-            }
-            return undefined;
+            return this.inferMemberType(expr);
         }
         if (expr.kind === 'IndexExpr') {
             if (expr.object.kind === 'IdentifierExpr') {
@@ -4544,7 +4736,7 @@ export class PCodeGenerator {
     ): void {
         const tempAddr = this.emitGotoidxArgs(varSym, indices);
         this.emitter.emitByte(getLoadOpcode(elementType, 'A') | OP.OPCODE_INDIRECT);
-        this.emitPossiblyLocalDataAddress(tempAddr);
+        this.emitter.emitDataAddress(tempAddr);
     }
 
     // ─── Index expression ───────────────────────────────────────────────────
