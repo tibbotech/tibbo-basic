@@ -11,7 +11,7 @@ sub on_sys_init()
     p.x = 10
     p.y = 20
     p.tag = 3
-    sys.debugprint(str(p.x + p.y))
+    ' sys.debugprint(str(p.x + p.y))
     sys.debugprint(str(p.tag))
     p.x = p.x + 1
     sys.debugprint(str(p.x))

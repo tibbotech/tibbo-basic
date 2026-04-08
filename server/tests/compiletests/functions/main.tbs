@@ -1,7 +1,7 @@
 include "global.tbh"
 
 function test2() as byte
-    test2 = 3
+    test2 = 45
 end function
 
 sub test()
@@ -11,7 +11,9 @@ sub test()
 end sub
 
 sub on_sys_init()
+    dim z as byte = 3 + 2
     sys.debugprint("on_sys_init")
     test()
     dim b as byte=test2()
+    b=b+z
 end sub

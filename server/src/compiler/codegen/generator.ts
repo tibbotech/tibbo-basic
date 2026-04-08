@@ -3876,6 +3876,12 @@ export class PCodeGenerator {
     private generateBinary(expr: AST.BinaryExpr): void {
         const op = expr.op;
 
+        const folded = this.evalConstantIntExpr(expr);
+        if (folded !== undefined) {
+            this.generateIntLiteral(folded);
+            return;
+        }
+
         if (op === AST.BinaryOp.Eq || op === AST.BinaryOp.Neq ||
             op === AST.BinaryOp.Lt || op === AST.BinaryOp.Gt ||
             op === AST.BinaryOp.Leq || op === AST.BinaryOp.Geq) {
@@ -4027,9 +4033,41 @@ export class PCodeGenerator {
         if (expr.kind === 'IntegerLiteral' || expr.kind === 'HexLiteral' || expr.kind === 'BinLiteral') {
             return (expr as AST.IntegerLiteral).value;
         }
+        if (expr.kind === 'BooleanLiteral') {
+            return expr.value ? 1 : 0;
+        }
         if (expr.kind === 'UnaryExpr' && expr.op === AST.UnaryOp.Neg) {
             const v = this.evalConstantIntExpr(expr.operand);
             return v !== undefined ? -v : undefined;
+        }
+        if (expr.kind === 'ParenExpr') {
+            return this.evalConstantIntExpr(expr.expression);
+        }
+        if (expr.kind === 'BinaryExpr') {
+            const left = this.evalConstantIntExpr(expr.left);
+            const right = this.evalConstantIntExpr(expr.right);
+            if (left !== undefined && right !== undefined) {
+                switch (expr.op) {
+                    case AST.BinaryOp.Add: return (left + right) | 0;
+                    case AST.BinaryOp.Sub: return (left - right) | 0;
+                    case AST.BinaryOp.Mul: return (left * right) | 0;
+                    case AST.BinaryOp.Div: return right !== 0 ? Math.trunc(left / right) : undefined;
+                    case AST.BinaryOp.Mod: return right !== 0 ? (left % right) | 0 : undefined;
+                    case AST.BinaryOp.And: return left & right;
+                    case AST.BinaryOp.Or: return left | right;
+                    case AST.BinaryOp.Xor: return left ^ right;
+                    case AST.BinaryOp.Shl: return left << right;
+                    case AST.BinaryOp.Shr: return left >> right;
+                }
+            }
+        }
+        if (expr.kind === 'IdentifierExpr') {
+            const sym = this.symbols.current.lookup(expr.name);
+            if (sym?.kind === SymbolKind.Constant) {
+                const c = sym as ConstantSymbol;
+                if (typeof c.value === 'number') return c.value;
+                if (typeof c.value === 'boolean') return c.value ? 1 : 0;
+            }
         }
         return undefined;
     }
