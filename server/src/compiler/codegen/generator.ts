@@ -1180,7 +1180,7 @@ export class PCodeGenerator {
         }
     }
 
-    private emitStringCallResultToAddr(expr: AST.CallExpr, addr: number, isByRef = false): boolean {
+    private emitStringCallResultToAddr(expr: AST.CallExpr, addr: number, isByRef = false, asSyscallArg = false): boolean {
         if (expr.callee.kind === 'IdentifierExpr') {
             const sym = this.symbols.current.lookup(expr.callee.name);
             if (sym && sym.kind === SymbolKind.Function) {
@@ -1208,9 +1208,10 @@ export class PCodeGenerator {
                     const p0 = widePath ? sc.parameters[0] : undefined;
                     const pdt = p0?.dataType;
                     const useWideDwordTemp =
+                        asSyscallArg &&
                         !!widePath &&
                         !!pdt &&
-                        this.strSyscallArgNeedsDwordScratchTemp(expr.args[0], pdt);
+                        this.isData32ArithmeticBinaryForStr(expr.args[0], pdt);
 
                     if (useWideDwordTemp) {
                         const argStoreSz = this.getSyscallParamStoreSize(p0!);
@@ -1328,7 +1329,7 @@ export class PCodeGenerator {
                 this.emitLeaToArgOffset(tempAddr, argOffset);
                 return;
             }
-            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
+            if (this.emitStringCallResultToAddr(expr, tempAddr, false, true)) {
                 this.emitLeaToArgOffset(tempAddr, argOffset);
                 return;
             }
@@ -1371,7 +1372,7 @@ export class PCodeGenerator {
                 this.emitSyscallByName(isFirst ? 'strload' : 'strcat');
                 return;
             }
-            if (this.emitStringCallResultToAddr(expr, tempAddr)) {
+            if (this.emitStringCallResultToAddr(expr, tempAddr, false, true)) {
                 if (!isFirst) {
                     this.emitLeaToArg(tempAddr, 1);
                     this.emitSyscallByName('strcat');
@@ -1457,7 +1458,7 @@ export class PCodeGenerator {
                 return;
             }
             const callResultAddr = tempAddr + this.currentTempSlotSize() + this.preEvalMap.size * 4;
-            if (this.emitStringCallResultToAddr(expr, callResultAddr)) {
+            if (this.emitStringCallResultToAddr(expr, callResultAddr, false, true)) {
                 this.emitLeaToArg(tempAddr, 0);
                 this.emitLeaToArg(callResultAddr, 1);
                 this.emitSyscallByName('strcat');
@@ -4289,10 +4290,29 @@ export class PCodeGenerator {
     }
 
     /**
-     * tmake uses a dword scratch + reload for str() arithmetic args in data32 mode.
-     * In data32 mode, all numeric binary results promote to dword (see Operators.cpp NumericBinaryOperator).
+     * tmake uses a dword scratch + reload for some str() arithmetic args (e.g. word+word), but not
+     * for byte-only arithmetic (e.g. byte + byte) — see forlooparray str(z + 1).
+     * Used by strByteExpandForStr guard in emitSyscallArgsOnly.
      */
     private strSyscallArgNeedsDwordScratchTemp(argExpr: AST.Expression, paramDt: DataType): boolean {
+        const wide = this.inferData32ArithmeticExprWideResult(argExpr);
+        if (!wide || wide.size !== 4 || !isIntegral(paramDt) || paramDt.size >= 4) return false;
+        const x = this.unwrapParenExpr(argExpr);
+        if (x.kind !== 'BinaryExpr') return false;
+        const be = x as AST.BinaryExpr;
+        const lt = this.inferType(be.left);
+        const rt = this.inferType(be.right);
+        if (!lt || !rt) return false;
+        if (lt.size < 2 && rt.size < 2) return false;
+        return true;
+    }
+
+    /**
+     * In data32 mode, all numeric binary results promote to dword (see Operators.cpp).
+     * When str() is nested as an argument to another syscall, tmake always uses the
+     * dword scratch path regardless of operand sizes.
+     */
+    private isData32ArithmeticBinaryForStr(argExpr: AST.Expression, paramDt: DataType): boolean {
         if (!this.emitter.isData32) return false;
         if (!isIntegral(paramDt) || paramDt.size >= 4) return false;
         const x = this.unwrapParenExpr(argExpr);
