@@ -989,6 +989,42 @@ export class Linker {
 
         // 4. Walk call graph from roots (uncalled + event fallback), relocating callees at frameEnd
         this.localRelocDeltas.clear();
+
+        // Compute stack size from the cross-module call graph (mirrors C++ PreRelocateFunction logic).
+        // The per-file estimate in options.stackSize only sees one file's calls; here we have the full graph.
+        {
+            const useCode24 = !!(this.flags & TObjHeaderFlags.Code24);
+            const codeAddrSize = useCode24 ? 3 : 2;
+            const visitedStack = new Set<string>();
+            const getCallDepth = (name: string): number => {
+                if (visitedStack.has(name)) return 0; // recursion guard
+                const entry = callGraph.get(name);
+                if (!entry) return 0;
+                visitedStack.add(name);
+                let max = 0;
+                for (const callee of entry.calleeNames) {
+                    // Only follow callees that are themselves user functions (in callGraph).
+                    // relocationCalleeEdges may inject syscall names (e.g. "str") which are
+                    // not real stack-consuming CALL instructions and must not inflate the depth.
+                    if (!callGraph.has(callee)) continue;
+                    const d = 1 + getCallDepth(callee);
+                    if (d > max) max = d;
+                }
+                visitedStack.delete(name);
+                return max;
+            };
+            let maxDepth = 0;
+            for (const [name, entry] of callGraph) {
+                if (!entry.isEvent) continue;
+                const d = getCallDepth(name);
+                if (d > maxDepth) maxDepth = d;
+            }
+            const computedStackSize = maxDepth * codeAddrSize;
+            if (computedStackSize > (this.options.stackSize ?? 0)) {
+                this.options = { ...this.options, stackSize: computedStackSize };
+            }
+        }
+
         const computedLocalBase = (this.options.platformSize ?? 0) +
             Math.max(this.cumulativeGlobalAlloc >>> 0, this.options.globalAllocSize ?? 0) +
             (this.options.stackSize ?? 0);

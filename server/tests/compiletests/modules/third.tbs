@@ -1,0 +1,6 @@
+include "global.tbh"
+
+
+sub thirdfunc()
+    sys.debugprint("thirdfunc")
+end sub

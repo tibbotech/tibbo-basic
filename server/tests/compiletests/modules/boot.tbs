@@ -29,4 +29,5 @@ sub boot()
     ' next i
     ' sys.debugprint("boot")
     ' somefunct()
+    thirdfunc()
 end sub

@@ -2,8 +2,16 @@ include "global.tbh"
 
 const TEST_STRING = "teststring"
 
+sub dhcp_start(interface as pl_sock_interfaces, byref requested_ip as string)
+    sys.debugprint(requested_ip)
+
+    dim target_interface as pl_sock_interfaces = interface
+end sub
+
+
 sub test3(ds as string)
     sys.debugprint(ds)
+    dhcp_start(PL_SOCK_INTERFACE_NET, "192.168.1.101")
 end sub
 
 function test2() as byte

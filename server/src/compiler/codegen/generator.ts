@@ -4503,11 +4503,50 @@ export class PCodeGenerator {
         if (this.ctx.currentFunction) {
             this.ctx.currentFunction.callees.add(fn.name);
         }
+        // Pre-pass: mirrors C++ PreInvokeFunction — emit strload thunks for byref string args
+        // before emitting any non-byref numeric args (to match tmake output order).
+        const byrefStringThunks = new Map<number, number>(); // argIndex → tempAddr
+        for (let i = 0; i < args.length && i < fn.parameters.length; i++) {
+            const param = fn.parameters[i];
+            const argExpr = args[i];
+            if (!param.isByRef || !param.dataType || !isString(param.dataType)) continue;
+            // Only need a thunk when the arg is not already a variable reference
+            if (argExpr.kind === 'IdentifierExpr') {
+                const argSym = this.symbols.current.lookup(argExpr.name);
+                if (argSym && (argSym.kind === SymbolKind.Variable || argSym.kind === SymbolKind.Parameter)) {
+                    continue; // direct variable ref — no strload needed
+                }
+            }
+            // Emit strload thunk for string literal
+            if (argExpr.kind === 'StringLiteral') {
+                const tempAddr = this.getTempStringAddr(0);
+                this.emitTempStringInit(tempAddr, argExpr.value.length);
+                this.emitLeaArg(tempAddr);
+                const rdataOff = this.emitter.addStringRData(argExpr.value);
+                this.emitRDataLoad(rdataOff);
+                this.emitSyscallArg(1);
+                this.emitSyscallByName('strload');
+                byrefStringThunks.set(i, tempAddr);
+            }
+        }
         for (let i = 0; i < args.length && i < fn.parameters.length; i++) {
             const param = fn.parameters[i];
             const argExpr = args[i];
 
             if (param.isByRef) {
+                // If a thunk was pre-emitted in the pre-pass, just emit the LEA/STO32 pointer.
+                if (byrefStringThunks.has(i)) {
+                    const tempAddr = byrefStringThunks.get(i)!;
+                    this.emitter.emitByte(OP.OPCODE_LEA);
+                    this.emitPossiblyLocalDataAddress(tempAddr);
+                    this.emitter.emitByte(OP.OPCODE_STO32 | OP.OPCODE_DIRECT);
+                    if (fn.isDeclare) {
+                        this.emitter.emitDataAddressRef(`?A:${fn.name}:${i}`);
+                    } else {
+                        this.emitter.emitDataAddress(param.address ?? 0);
+                    }
+                    continue;
+                }
                 if (argExpr.kind === 'StringLiteral' && param.dataType && isString(param.dataType)) {
                     const tempAddr = this.getTempStringAddr(0);
                     this.emitTempStringInit(tempAddr, argExpr.value.length);

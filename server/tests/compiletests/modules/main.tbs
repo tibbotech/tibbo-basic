@@ -10,5 +10,5 @@ sub on_sys_init()
     sys.debugprint(str(aa))
     ' dim zz as byte = 3 + aa
     boot()
-    ' somefunct()
+    somefunct()
 end sub
