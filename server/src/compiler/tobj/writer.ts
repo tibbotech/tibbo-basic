@@ -734,7 +734,8 @@ export class TObjWriter {
             && (variableFlags & TObjVariableFlags.Temp) !== 0) {
             // Scratch temps use primitive BUILTIN string; default isPrimitive encoding is String+dword(0),
             // which reads as max length 0 in the Variables section. Emit explicit max len like StringDataType.
-            const maxLen = (dt.size > 0 ? dt.size : 255) & 0xFF;
+            // Use dt.size directly — 0 is valid for byref thunks of empty-string literals.
+            const maxLen = dt.size & 0xFF;
             w.writeByte(TObjDataType.String);
             w.writeByte(maxLen);
             w.writeByte(0);

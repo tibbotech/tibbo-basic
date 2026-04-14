@@ -1488,11 +1488,11 @@ function getVariableSize(
         case TObjDataType.Real:
             return 4;
         case TObjDataType.String:
-            // Temps use maxLen in TOBJ (see TObjWriter); footprint is maxLen+2 (e.g. 255→257). If max len
-            // is still 0 in old objects, use 257 to match codegen scratch slots.
+            // Temps use maxLen in TOBJ (see TObjWriter); footprint is maxLen+2 (e.g. 255→257).
+            // maxLen=0 is valid for byref thunks of empty-string literals (size=2).
             if (flags & TObjVariableFlags.Temp) {
                 const m = dtDword & 0xFF;
-                return m > 0 ? m + 2 : 257;
+                return m + 2;
             }
             return (dtDword & 0xFF) + 1;
         case TObjDataType.Array:

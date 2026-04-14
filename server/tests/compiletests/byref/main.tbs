@@ -1,5 +1,11 @@
 include "global.tbh"
 
+sub dhcp_start(interface as pl_sock_interfaces, byref requested_ip as string, byref host_name as string)
+    sys.debugprint(str(interface))
+    sys.debugprint(requested_ip)
+    sys.debugprint(host_name)
+end sub
+
 function calledfunction(byref s as string) as string
     sys.debugprint(s)
     calledfunction=s
@@ -13,4 +19,5 @@ end sub
 sub on_sys_init()
     dim astring as string="astring"
     calledsub(astring)
+    dhcp_start(PL_SOCK_INTERFACE_NET, "192.168.1.137", "")
 end sub

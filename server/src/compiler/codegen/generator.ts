@@ -1895,7 +1895,12 @@ export class PCodeGenerator {
 
                 if (stmtTempCount > 0 || returnSize > 0) {
                     const concurrent = stmtTempCount >= 2 ? 2 : stmtTempCount;
-                    const stmtTempSize = concurrent * slotSize + (concurrent > 0 ? scalarSize : 0);
+                    const byrefInfo = this.computeByrefThunkFootprintForStmt(stmt, slotSize);
+                    const nonByrefCount = stmtTempCount - byrefInfo.count;
+                    const nonByrefConcurrent = nonByrefCount >= 2 ? 2 : nonByrefCount;
+                    const stmtTempSize = byrefInfo.footprint
+                        + nonByrefConcurrent * slotSize
+                        + (stmtTempCount > 0 ? scalarSize : 0);
                     const returnFits = returnSize > 0 && (concurrent - 1) * slotSize + scalarSize >= returnSize;
                     const footprint = declaredBytes + stmtTempSize + (returnFits ? 0 : returnSize);
                     if (footprint > maxFootprint) maxFootprint = footprint;
@@ -2344,6 +2349,48 @@ export class PCodeGenerator {
         return count;
     }
 
+    private computeByrefThunkFootprintForStmt(stmt: AST.Statement, slotSize: number): { count: number, footprint: number } {
+        const thunkLens: number[] = [];
+        this.collectByrefStringThunkLens(stmt as unknown, thunkLens);
+        if (thunkLens.length === 0) return { count: 0, footprint: 0 };
+        // Each thunk uses slotSize as stride except the last which uses its actual size (len+2),
+        // matching C++ CreateThunk which allocates with the source's actual type.
+        const footprint = (thunkLens.length - 1) * slotSize + thunkLens[thunkLens.length - 1] + 2;
+        return { count: thunkLens.length, footprint };
+    }
+
+    private collectByrefStringThunkLens(node: unknown, out: number[]): void {
+        if (!node || typeof node !== 'object') return;
+        const n = node as Record<string, unknown>;
+        if (n.kind === 'CallExpr') {
+            const callExpr = n as unknown as AST.CallExpr;
+            if (callExpr.callee.kind === 'IdentifierExpr') {
+                const sym = this.symbols.current.lookup(callExpr.callee.name);
+                if (sym?.kind === SymbolKind.Function || sym?.kind === SymbolKind.Sub) {
+                    const params = (sym as FunctionSymbol).parameters;
+                    for (let i = 0; i < callExpr.args.length && i < params.length; i++) {
+                        const param = params[i];
+                        const arg = callExpr.args[i];
+                        if (param.isByRef && param.dataType && isString(param.dataType) && arg.kind === 'StringLiteral') {
+                            out.push(arg.value.length);
+                        }
+                    }
+                }
+            }
+        }
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const c of child) {
+                    this.collectByrefStringThunkLens(c, out);
+                }
+            } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                this.collectByrefStringThunkLens(child, out);
+            }
+        }
+    }
+
     private countStringCallsInConcat(expr: AST.Expression, isFirst = false): number {
         if (expr.kind === 'BinaryExpr' && expr.op === AST.BinaryOp.Add) {
             return this.countStringCallsInConcat(expr.left, isFirst) + this.countStringCallsInConcat(expr.right);
@@ -2351,6 +2398,86 @@ export class PCodeGenerator {
         if (expr.kind === 'CallExpr' && this.isStringExpression(expr)) return 1;
         if (expr.kind === 'StringLiteral' && !isFirst) return 1;
         return 0;
+    }
+
+    /**
+     * Returns per-slot actual sizes in the same order as countTempVarsInNode increments count.
+     * `undefined` means use default (slotSize-2); a number means this slot is a byref string
+     * literal thunk of that literal's length.
+     */
+    private collectTempVarActualSizes(node: unknown): (number | undefined)[] {
+        if (!node || typeof node !== 'object') return [];
+        const n = node as Record<string, unknown>;
+        const result: (number | undefined)[] = [];
+
+        if (n.kind === 'CallExpr') {
+            result.push(...this.collectCallLevelActualSizes(n as unknown as AST.CallExpr));
+        }
+
+        for (const key of Object.keys(n)) {
+            if (key === 'loc' || key === 'kind') continue;
+            const child = n[key];
+            if (Array.isArray(child)) {
+                for (const c of child) {
+                    result.push(...this.collectTempVarActualSizes(c));
+                }
+            } else if (child && typeof child === 'object' && (child as Record<string, unknown>).kind) {
+                result.push(...this.collectTempVarActualSizes(child));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Parallel to countTempVarsForCall: returns one entry per counted temp, in the same order.
+     * `undefined` = default size; number = actual string literal length for byref thunks.
+     */
+    private collectCallLevelActualSizes(callExpr: AST.CallExpr): (number | undefined)[] {
+        const sizes: (number | undefined)[] = [];
+        let params: VariableSymbol[] | undefined;
+
+        if (callExpr.callee.kind === 'IdentifierExpr') {
+            const sym = this.symbols.current.lookup(callExpr.callee.name);
+            if (sym?.kind === SymbolKind.Syscall) {
+                params = (sym as SyscallSymbol).parameters;
+            } else if (sym?.kind === SymbolKind.Function || sym?.kind === SymbolKind.Sub) {
+                params = (sym as FunctionSymbol).parameters;
+                const fn = sym as FunctionSymbol;
+                if (fn.returnType && isString(fn.returnType)) {
+                    sizes.push(undefined);  // String return: use default size
+                }
+            }
+        } else if (callExpr.callee.kind === 'MemberExpr' && callExpr.callee.object.kind === 'IdentifierExpr') {
+            const objSym = this.symbols.current.lookup(callExpr.callee.object.name);
+            if (objSym?.kind === SymbolKind.Object) {
+                const fn = (objSym as ObjectSymbol).functions.get(callExpr.callee.property.toLowerCase());
+                if (fn) params = fn.parameters;
+            }
+        }
+
+        if (!params) return [];
+
+        for (let i = 0; i < callExpr.args.length && i < params.length; i++) {
+            const param = params[i];
+            const arg = callExpr.args[i];
+            const paramDt = param.dataType;
+            const isStringParam = paramDt && isString(paramDt);
+            const isByRefParam = param.isByRef;
+
+            if (isByRefParam || isStringParam) {
+                if (arg.kind === 'IdentifierExpr') continue;
+                if (isByRefParam && isStringParam && arg.kind === 'StringLiteral') {
+                    sizes.push(arg.value.length);  // Actual literal length for byref thunk
+                } else {
+                    sizes.push(undefined);  // Use default size
+                }
+                if (this.isStringExpression(arg) && arg.kind === 'BinaryExpr' && arg.op === AST.BinaryOp.Add) {
+                    const subCount = this.countStringCallsInConcat(arg);
+                    for (let j = 0; j < subCount; j++) sizes.push(undefined);
+                }
+            }
+        }
+        return sizes;
     }
 
     private countTempVarsInNode(node: unknown): number {
@@ -2598,6 +2725,7 @@ export class PCodeGenerator {
         slotSize: number,
         n: number,
         counter: { v: number },
+        actualLens?: (number | undefined)[],
     ): void {
         if (n <= 0) return;
         const tempBase = this.tempScratchBase + declaredSkip;
@@ -2606,10 +2734,14 @@ export class PCodeGenerator {
             counter.v++;
             const slot = Math.min(s, 1);
             const addr = tempBase + (slot === 0 ? 0 : slot1Offset);
+            const actualLen = actualLens && s < actualLens.length ? actualLens[s] : undefined;
+            const dataType = actualLen !== undefined
+                ? { ...BUILTIN_TYPES.string, size: actualLen }
+                : this.makeTempStringDataType(fn.name);
             const tmpVar: VariableSymbol = {
                 name: `_tmp_${counter.v}`,
                 kind: SymbolKind.Variable,
-                dataType: this.makeTempStringDataType(fn.name),
+                dataType,
                 location: { file: '', line: 0, column: 0 },
                 isPublic: false,
                 isDeclare: false,
@@ -2819,7 +2951,8 @@ export class PCodeGenerator {
                         }
                         const n = this.countTempVarsInNode(est.expression);
                         if (n > 0) {
-                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter);
+                            const actualLens = this.collectTempVarActualSizes(est.expression);
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter, actualLens);
                         }
                     } else {
                         if (scalarCount > 0 && !numericState.done && this.countPreEvalScalarsInStmt(stmt) > 0) {
@@ -2828,7 +2961,8 @@ export class PCodeGenerator {
                         }
                         const n = this.countTempVarsInNode(stmt);
                         if (n > 0) {
-                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter);
+                            const actualLens = this.collectTempVarActualSizes(stmt);
+                            this.pushOnEventStringScratchVars(fn, d, scalarCount, slotSize, n, counter, actualLens);
                         }
                     }
                     break;
@@ -4506,6 +4640,7 @@ export class PCodeGenerator {
         // Pre-pass: mirrors C++ PreInvokeFunction — emit strload thunks for byref string args
         // before emitting any non-byref numeric args (to match tmake output order).
         const byrefStringThunks = new Map<number, number>(); // argIndex → tempAddr
+        let byrefSlot = 0;
         for (let i = 0; i < args.length && i < fn.parameters.length; i++) {
             const param = fn.parameters[i];
             const argExpr = args[i];
@@ -4519,7 +4654,7 @@ export class PCodeGenerator {
             }
             // Emit strload thunk for string literal
             if (argExpr.kind === 'StringLiteral') {
-                const tempAddr = this.getTempStringAddr(0);
+                const tempAddr = this.getTempStringAddr(byrefSlot++);
                 this.emitTempStringInit(tempAddr, argExpr.value.length);
                 this.emitLeaArg(tempAddr);
                 const rdataOff = this.emitter.addStringRData(argExpr.value);
