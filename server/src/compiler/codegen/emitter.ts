@@ -39,7 +39,7 @@ export class ByteEmitter {
     private autoTrackDataRefs = false;
     private addrToDataLabel = new Map<number, DataLabel>();
     private suppressAutoTrack = false;
-    private initDescriptors: { initOffset: number; data: number[]; isInit: boolean }[] = [];
+    private initDescriptors: { initOffset: number; data: number[]; isInit: boolean; typeName?: string; typeOrder?: number }[] = [];
 
     get codeSize(): number { return this.code.length; }
     get initSize(): number { return this.initCode.length; }
@@ -220,15 +220,17 @@ export class ByteEmitter {
         return offset;
     }
 
-    addInitObjDescriptor(data: number[]): void {
+    addInitObjDescriptor(data: number[], meta?: { typeName?: string; typeOrder?: number }): void {
         this.initDescriptors.push({
             initOffset: this.currentOffset,
             data,
             isInit: this.emittingInit,
+            typeName: meta?.typeName,
+            typeOrder: meta?.typeOrder,
         });
     }
 
-    getInitObjDescriptors(): { initOffset: number; data: number[]; isInit: boolean }[] {
+    getInitObjDescriptors(): { initOffset: number; data: number[]; isInit: boolean; typeName?: string; typeOrder?: number }[] {
         return this.initDescriptors;
     }
 

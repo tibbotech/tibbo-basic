@@ -49,6 +49,8 @@ export interface InitObjDescriptor {
     initOffset: number;
     data: number[];
     isInit: boolean;
+    typeName?: string;
+    typeOrder?: number;
 }
 
 export interface CompileResult {

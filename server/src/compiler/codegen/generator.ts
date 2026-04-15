@@ -799,6 +799,22 @@ export class PCodeGenerator {
         return null;
     }
 
+    private descriptorMeta(dt?: DataType): { typeName?: string; typeOrder?: number } | undefined {
+        if (dt && isStruct(dt)) {
+            const s = dt as StructDataType;
+            const name = s.name.toLowerCase();
+            const registry = this.resolver.getTypeRegistry();
+            let i = 0;
+            let order: number | undefined;
+            for (const key of registry.keys()) {
+                if (key === name) { order = i; break; }
+                i++;
+            }
+            return { typeName: name, typeOrder: order };
+        }
+        return undefined;
+    }
+
     private emitInitObjAtAddr(addr: number, isByRef = false, dt?: DataType): void {
         const indirection = isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
         this.emitter.emitByte(OP.OPCODE_LEA | indirection);
@@ -807,7 +823,7 @@ export class PCodeGenerator {
         this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
         const desc = this.buildTypeDescriptor(dt);
         if (desc) {
-            this.emitter.addInitObjDescriptor(desc);
+            this.emitter.addInitObjDescriptor(desc, this.descriptorMeta(dt));
         }
         this.emitter.emitDword(0);
         this.emitSyscallArg(1);
@@ -824,7 +840,7 @@ export class PCodeGenerator {
         this.emitter.emitByte(OP.OPCODE_LOA32 | OP.OPCODE_IMMEDIATE);
         const desc = this.buildTypeDescriptor(sym.dataType);
         if (desc) {
-            this.emitter.addInitObjDescriptor(desc);
+            this.emitter.addInitObjDescriptor(desc, this.descriptorMeta(sym.dataType));
         }
         this.emitter.emitDword(0);
         this.emitSyscallArg(1);
@@ -3383,12 +3399,10 @@ export class PCodeGenerator {
                             this.generateStringAssignmentToAddr(memberAddr, varSym.isByRef, value);
                         } else {
                             this.generateExpression(value);
-                            const baseAddr = varSym.address ?? 0;
-                            const memberAddr = baseAddr + member.offset;
                             const storeOp = getStoreOpcode(member.dataType);
                             const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                             this.emitter.emitByte(storeOp | indirection);
-                            this.emitter.emitDataAddress(memberAddr);
+                            this.emitVarDataAddressWithOffset(varSym, member.offset);
                         }
                         return;
                     }
@@ -4159,11 +4173,10 @@ export class PCodeGenerator {
                 if (dt && isStruct(dt)) {
                     const member = dt.memberMap.get(expr.property.toLowerCase());
                     if (member) {
-                        const memberAddr = (varSym.address ?? 0) + member.offset;
                         const loadOp = getLoadOpcode(member.dataType, 'B');
                         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                         this.emitter.emitByte(loadOp | indirection);
-                        this.emitter.emitDataAddress(memberAddr);
+                        this.emitVarDataAddressWithOffset(varSym, member.offset);
                         return;
                     }
                 }
@@ -4919,12 +4932,10 @@ export class PCodeGenerator {
                 if (dt && isStruct(dt)) {
                     const member = dt.memberMap.get(expr.property.toLowerCase());
                     if (member) {
-                        const baseAddr = varSym.address ?? 0;
-                        const memberAddr = baseAddr + member.offset;
                         const loadOp = getLoadOpcode(member.dataType, 'A');
                         const indirection = varSym.isByRef ? OP.OPCODE_INDIRECT : OP.OPCODE_DIRECT;
                         this.emitter.emitByte(loadOp | indirection);
-                        this.emitter.emitDataAddress(memberAddr);
+                        this.emitVarDataAddressWithOffset(varSym, member.offset);
                         return;
                     }
                 }

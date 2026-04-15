@@ -11,4 +11,6 @@ sub on_sys_init()
     ' dim zz as byte = 3 + aa
     boot()
     somefunct()
+    dim a as astro_struct
+    a.dd = 1
 end sub

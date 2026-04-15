@@ -3,3 +3,13 @@
 'INCLUDES------------------------------------------------------------
 
 'DECLARATIONS--------------------------------------------------------
+
+type crontab
+	minute as string(10)
+	hour as string(10)
+	day as string(10) 'day of month
+	month as string(10)
+	day_of_week as string(12)
+	next_timestamp as dword
+	astro as string(3)
+end type

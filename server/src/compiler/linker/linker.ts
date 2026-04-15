@@ -97,7 +97,7 @@ export class Linker {
     private flags = 0;
     private cumulativeGlobalAlloc = 0;
     private maxLocalAllocSize = 0;
-    private pendingDescriptors: { adjustedOffset: number; data: number[]; refType: number }[] = [];
+    private pendingDescriptors: { adjustedOffset: number; data: number[]; refType: number; typeName?: string; typeOrder?: number }[] = [];
     private fnSpanByTag = new Map<string, { start: number; end: number }>();
     private importOnlyFnTags = new Set<string>();
     private eventFnTags = new Set<string>();
@@ -119,7 +119,7 @@ export class Linker {
         this.options = options;
     }
 
-    link(objBuffers: { name: string; data: Buffer; initObjDescriptors?: { initOffset: number; data: number[]; isInit?: boolean }[] }[]): Buffer {
+    link(objBuffers: { name: string; data: Buffer; initObjDescriptors?: { initOffset: number; data: number[]; isInit?: boolean; typeName?: string; typeOrder?: number }[] }[]): Buffer {
         this.cumulativeGlobalAlloc = 0;
         this.allObjSectionData = [];
         this.pdbCodeBases = [];
@@ -168,6 +168,8 @@ export class Linker {
                         adjustedOffset: d.initOffset + (isInit ? initBase : codeBase),
                         data: d.data,
                         refType: isInit ? TObjRefType.Init : TObjRefType.Code,
+                        typeName: d.typeName,
+                        typeOrder: d.typeOrder,
                     });
                 }
             }
@@ -579,9 +581,48 @@ export class Linker {
             }
         }
 
-        // Append type descriptors to RData and track their RDataDir entries
+        // Append type descriptors to RData and track their RDataDir entries.
+        // Match tmake: unique descriptors are placed in type-declaration order
+        // (typeOrder), not first-use order. Multiple references to the same
+        // struct type share a single RDATA entry.
         const descriptorRdataEntries: { rdataOffset: number; size: number; refType: number; codeOffset: number }[] = [];
-        for (const desc of this.pendingDescriptors) {
+        type PendingDesc = { adjustedOffset: number; data: number[]; refType: number; typeName?: string; typeOrder?: number };
+        const descByType = new Map<string, PendingDesc[]>();
+        const unkeyed: PendingDesc[] = [];
+        for (const d of this.pendingDescriptors) {
+            if (d.typeName) {
+                const list = descByType.get(d.typeName) ?? [];
+                list.push(d);
+                descByType.set(d.typeName, list);
+            } else {
+                unkeyed.push(d);
+            }
+        }
+        const orderedKeys = [...descByType.keys()].sort((a, b) => {
+            const ao = descByType.get(a)![0].typeOrder ?? Number.MAX_SAFE_INTEGER;
+            const bo = descByType.get(b)![0].typeOrder ?? Number.MAX_SAFE_INTEGER;
+            return ao - bo;
+        });
+        for (const key of orderedKeys) {
+            const group = descByType.get(key)!;
+            const data = group[0].data;
+            const rdataTarget = this.mergedRData.length;
+            for (const b of data) this.mergedRData.push(b);
+            for (const desc of group) {
+                this.rdataRelocs.push({
+                    codeOffset: desc.adjustedOffset,
+                    refType: desc.refType,
+                    rdataTarget,
+                });
+                descriptorRdataEntries.push({
+                    rdataOffset: rdataTarget,
+                    size: data.length,
+                    refType: desc.refType,
+                    codeOffset: desc.adjustedOffset,
+                });
+            }
+        }
+        for (const desc of unkeyed) {
             const rdataTarget = this.mergedRData.length;
             for (const b of desc.data) this.mergedRData.push(b);
             this.rdataRelocs.push({

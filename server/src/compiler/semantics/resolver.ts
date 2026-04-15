@@ -16,6 +16,8 @@ export class SemanticResolver {
     private typeRegistry = new Map<string, DataType>();
     private eventMap = new Map<string, number>();
 
+    getTypeRegistry(): Map<string, DataType> { return this.typeRegistry; }
+
     constructor(diagnostics: DiagnosticCollection) {
         this.symbols = new SymbolTable();
         this.diagnostics = diagnostics;

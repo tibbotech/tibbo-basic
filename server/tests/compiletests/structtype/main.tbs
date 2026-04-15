@@ -51,4 +51,10 @@ sub on_sys_init()
     p.x = p.x + 1
     sys.debugprint(str(p.x))
     dim a as astro_struct
+    a.dd = 1
+    a.mm = 2
+    a.yy = 1
+
+    dim cc as crontab
+    cc.minute = "1,15,30,45"
 end sub
