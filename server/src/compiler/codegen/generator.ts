@@ -778,6 +778,24 @@ export class PCodeGenerator {
                 (et.size >> 8) & 0xFF,       // [9] element size hi
             ];
         }
+        if (isStruct(dt)) {
+            const s = dt as StructDataType;
+            const bytes: number[] = [
+                TObjRttiType.Struct,
+                s.members.length & 0xFF,
+                (s.members.length >> 8) & 0xFF,
+                s.size & 0xFF,
+                (s.size >> 8) & 0xFF,
+            ];
+            for (const m of s.members) {
+                const mt = m.dataType;
+                const etTag = this.elementRttiType(mt);
+                // info lo: maxLength for strings, 0 for others
+                const infoLo = isString(mt) ? (mt as StringDataType).maxLength : 0;
+                bytes.push(etTag, infoLo, 0x00, mt.size & 0xFF, (mt.size >> 8) & 0xFF);
+            }
+            return bytes;
+        }
         return null;
     }
 

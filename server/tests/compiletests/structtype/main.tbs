@@ -6,6 +6,41 @@ type point_rec
     tag as byte
 end type
 
+type astro_struct  
+	yy as byte 
+	mm as byte
+	dd as byte 
+	lat as real 
+	lng as real
+	tz as integer 
+	
+	'Julian Days/Century 
+	jd as real 'Julian Day
+	jc as real 'Julian Century
+	
+	'Sun
+	gmls as real   'Geom Mean Long Sun (deg)
+	gmas as real   'Geom Mean Anom Sun (deg)	
+	ecceo as real  'Eccent Earth Orbit
+	seqcrt as real 'Sun Eq of Ctr
+	stl as real    'Sun True Long (deg)
+	sta as real    'Sun True Anom (deg)
+	sal as real    'Sun App Long (deg)
+	moe as real	   'Mean Obliq Ecliptic (deg)	
+	oc as real	   'Obliq Corr (deg)	
+	rtasc as real  'Sun Rt Ascen (deg)	
+	sdec as real   'Sun Declin (deg)	
+	y as real	   'var y	
+	eqtm as real   'Eq of Time (minutes)	
+	hasr as real   'HA Sunrise (deg)	
+	
+	'Useful things? 
+	solnoon  as real  'Solar Noon (LST)	
+	sunrise as real   'sunrise time in seconds 
+	sunset as real    'sunset time in seconds
+
+end type
+
 sub on_sys_init()
     dim p as point_rec
     p.x = 10
@@ -15,4 +50,5 @@ sub on_sys_init()
     sys.debugprint(str(p.tag))
     p.x = p.x + 1
     sys.debugprint(str(p.x))
+    dim a as astro_struct
 end sub
