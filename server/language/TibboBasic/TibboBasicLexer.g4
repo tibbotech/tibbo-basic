@@ -92,6 +92,9 @@ STRINGLITERAL : ["`] (~["\r\n] | '""')* ["`];
 TemplateStringLiteral:          '`' ('\\`' | ~'`')* '`';
 HEXLITERAL : '&' H [0-9A-Fa-f]+;
 BINLITERAL : '&' B [0-9A-F]+;
+FLOATLITERAL : (DIGIT+ '.' DIGIT* | '.' DIGIT+) ([eE] [+-]? DIGIT+)?
+             | DIGIT+ [eE] [+-]? DIGIT+
+             ;
 INTEGERLITERAL : DIGIT+;
 
 
@@ -251,6 +254,7 @@ XOR2: X O R -> type(XOR);
 STRINGLITERAL2 : ["`] (~["\r\n] | '""')* ["`] -> type(STRINGLITERAL);
 HEXLITERAL2 : '&' H [0-9A-Fa-f]+ -> type(HEXLITERAL);
 BINLITERAL2 : '&' B [0-9A-F]+ -> type(BINLITERAL);
+FLOATLITERAL2 : ((DIGIT+ '.' DIGIT* | '.' DIGIT+) ([eE] [+-]? DIGIT+)? | DIGIT+ [eE] [+-]? DIGIT+) -> type(FLOATLITERAL);
 INTEGERLITERAL2 : DIGIT+ -> type(INTEGERLITERAL);
 
 

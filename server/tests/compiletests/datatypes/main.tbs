@@ -11,6 +11,7 @@ sub on_sys_init()
     dim h as real = 8.2
     dim i as string = "Hello, World!"
     dim j as boolean = true
+    dim k as float = 3.4028235e38
 
     dim hn as byte = &hff
     dim hn2 as word = &hffff
