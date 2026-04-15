@@ -771,15 +771,18 @@ export class ASTBuilder {
             if (type === TibboBasicLexer.IDENTIFIER) {
                 return { kind: 'IdentifierExpr', name: text, loc: this.loc(ctx) };
             }
+            if (type === TibboBasicLexer.FLOATLITERAL) {
+                return { kind: 'FloatLiteral', value: parseFloat(text), loc: this.loc(ctx) };
+            }
             if (type === TibboBasicLexer.PLUS || type === TibboBasicLexer.MINUS) {
                 // signed numeric literal
                 const sign = type === TibboBasicLexer.MINUS ? -1 : 1;
                 const numParts = children.slice(1).map((c: any) => c.symbol?.text ?? '').join('');
-                const numValue = numParts.includes('.') ? parseFloat(numParts) * sign : parseInt(numParts, 10) * sign;
-                if (numParts.includes('.')) {
-                    return { kind: 'FloatLiteral', value: numValue, loc: this.loc(ctx) };
+                const secondType = children[1]?.symbol?.type;
+                if (secondType === TibboBasicLexer.FLOATLITERAL || numParts.includes('.') || /[eE]/.test(numParts)) {
+                    return { kind: 'FloatLiteral', value: parseFloat(numParts) * sign, loc: this.loc(ctx) };
                 }
-                return { kind: 'IntegerLiteral', value: numValue, loc: this.loc(ctx) };
+                return { kind: 'IntegerLiteral', value: parseInt(numParts, 10) * sign, loc: this.loc(ctx) };
             }
             if (type === TibboBasicLexer.INTEGERLITERAL) {
                 const allText = children.map((c: any) => c.symbol?.text ?? '').join('');
